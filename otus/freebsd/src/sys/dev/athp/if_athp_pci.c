@@ -71,6 +71,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_var.h"
 #include "if_athp_pci.h"
 
+#include "if_athp_main.h"
+
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
 static device_detach_t athp_pci_detach;
@@ -175,6 +177,7 @@ athp_pci_attach(device_t dev)
 	struct athp_pci_softc *psc = device_get_softc(dev);
 	struct athp_softc *sc = &psc->sc_sc;
 	int rid;
+	int err = 0;
 
 	sc->sc_dev = dev;
 	sc->sc_invalid = 1;
@@ -195,6 +198,7 @@ athp_pci_attach(device_t dev)
 	    RF_ACTIVE);
 	if (psc->sc_sr == NULL) {
 		device_printf(dev, "cannot map register space\n");
+		err = ENXIO;
 		goto bad;
 	}
 
@@ -223,11 +227,13 @@ athp_pci_attach(device_t dev)
 	    RF_SHAREABLE|RF_ACTIVE);
 	if (psc->sc_irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
+		err = ENXIO;
 		goto bad1;
 	}
 	if (bus_setup_intr(dev, psc->sc_irq, INTR_TYPE_NET | INTR_MPSAFE,
 	    NULL, athp_pci_intr, sc, &psc->sc_ih)) {
 		device_printf(dev, "could not establish interrupt\n");
+		err = ENXIO;
 		goto bad2;
 	}
 
@@ -255,11 +261,16 @@ athp_pci_attach(device_t dev)
 	    NULL,		    /* lockarg */
 	    &sc->sc_dmat)) {
 		device_printf(dev, "cannot allocate DMA tag\n");
+		err = ENXIO;
 		goto bad3;
 	}
 
 	/* Call main attach method with given info */
-	return (0);
+	err = athp_attach(sc);
+	if (err == 0)
+		return (0);
+
+	/* Fallthrough for setup failure */
 
 #ifdef	ATHP_EEPROM_FIRMWARE
 bad4:
@@ -275,7 +286,7 @@ bad1:
 bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&sc->sc_mtx);
-	return (ENXIO);
+	return (err);
 }
 
 static int
@@ -297,6 +308,7 @@ athp_pci_detach(device_t dev)
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
 	/* XXX TODO: detach main driver */
+	(void) athp_detach(sc);
 
 	/* Free bus resources */
 	bus_generic_detach(dev);

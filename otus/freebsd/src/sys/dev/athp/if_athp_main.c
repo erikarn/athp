@@ -77,3 +77,20 @@ __FBSDID("$FreeBSD$");
 #include "hal/hw.h"
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
+
+
+int
+athp_attach(struct athp_softc *sc)
+{
+
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	return (0);
+}
+
+int
+athp_detach(struct athp_softc *sc)
+{
+
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	return (0);
+}
