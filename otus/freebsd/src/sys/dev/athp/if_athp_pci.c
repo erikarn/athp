@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
 static device_detach_t athp_pci_detach;
+/* XXX TODO: shutdown, suspend, resume */
 
 static device_method_t athp_methods[] = {
 	DEVMETHOD(device_probe,		athp_pci_probe),
