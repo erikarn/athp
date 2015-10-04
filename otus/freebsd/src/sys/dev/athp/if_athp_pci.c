@@ -192,6 +192,9 @@ athp_pci_attach(device_t dev)
 
 	/*
 	 * Arrange interrupt line.
+	 *
+	 * XXX TODO: implement MSI; we should be getting one MSI for
+	 * (almost) each CE ring.
 	 */
 	rid = 0;
 	psc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
@@ -224,8 +227,6 @@ athp_pci_attach(device_t dev)
 		device_printf(dev, "cannot allocate DMA tag\n");
 		goto bad3;
 	}
-
-
 
 	/* Call main attach method with given info */
 	return (0);
