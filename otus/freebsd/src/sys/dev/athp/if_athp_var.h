@@ -64,6 +64,7 @@ struct athp_softc {
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
+	int				sc_invalid;
 
 	int				sc_running:1,
 					sc_calibrating:1,
