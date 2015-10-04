@@ -119,11 +119,12 @@ athp_pci_probe(device_t dev)
 
 	vendor_id = pci_get_vendor(dev);
 	device_id = pci_get_device(dev);
-	if (vendor_id == 0x168c && device_id == 0x003c)
-		return (ENXIO);
+	if (vendor_id == 0x168c && device_id == 0x003c) {
+		device_set_desc(dev, "QCA988x");
+		return (BUS_PROBE_DEFAULT);
+	}
 
-	device_set_desc(dev, "QCA988x");
-	return (BUS_PROBE_DEFAULT);
+	return (ENXIO);
 }
 
 static void
