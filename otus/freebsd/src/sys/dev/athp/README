@@ -1,5 +1,7 @@
 Porting bits from ath10k:
 
+Based on linux-next commit id 76d164f582150fd0259ec0fcbc485470bcd8033e .
+
 * pci/pcie - includes a lot of SoC futzing to do things like cold/warm reset, etc
 * legacy interrupts require magic, check pci.c
 * copy engine pipe config
