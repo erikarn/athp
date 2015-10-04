@@ -1,0 +1,24 @@
+Porting bits from ath10k:
+
+* pci/pcie - includes a lot of SoC futzing to do things like cold/warm reset, etc
+* legacy interrupts require magic, check pci.c
+* copy engine pipe config
+* copy engine basics
+* bmi
+* .. at this point we should be able to load in firmware
+
+Then:
+
+* finish off copy engine bits
+* htt
+* wmi
+* whatever missing pieces for tx/rx dma at this point (should've been done above, but..)
+* send/recieve commands to firmware
+* data!
+
+Notes:
+
+* ath10k has more than Peregrine 2.0 (QCA988x) support
+* it supports newer firmware, but chances are peregrine support is only 10.1 / 10.2
+* .. so don't cheat by hard-coding 10.1 or 10.2 APIs; we have to do this somewhat
+  clean early on.
