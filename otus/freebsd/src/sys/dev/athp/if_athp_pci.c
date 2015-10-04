@@ -119,13 +119,6 @@ athp_pci_probe(device_t dev)
 }
 
 static void
-athp_pci_setup(device_t dev)
-{
-
-	/* XXX TODO: whatever initial CE, etc initialisation is required */
-}
-
-static void
 athp_pci_intr(void *arg)
 {
 	struct athp_pci_softc *psc = arg;
@@ -157,11 +150,6 @@ athp_pci_attach(device_t dev)
 	 * Enable bus mastering.
 	 */
 	pci_enable_busmaster(dev);
-
-	/*
-	 * Setup other PCI bus configuration parameters.
-	 */
-	athp_pci_setup(dev);
 
 	/*
 	 * Setup memory-mapping of PCI registers.
@@ -236,6 +224,7 @@ bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 bad:
+	/* XXX disable busmaster? */
 	mtx_destroy(&sc->sc_mtx);
 	return (ENXIO);
 }
@@ -267,6 +256,8 @@ athp_pci_detach(device_t dev)
 
 	bus_dma_tag_destroy(psc->sc_dmat);
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
+
+	/* XXX disable busmastering? */
 
 	return (0);
 }
