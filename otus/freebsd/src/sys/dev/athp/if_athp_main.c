@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include "if_athp_debug.h"
+#include "if_athp_regio.h"
 #include "if_athp_var.h"
 
 #include "if_athp_main.h"

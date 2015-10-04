@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include "if_athp_debug.h"
+#include "if_athp_regio.h"
 #include "if_athp_var.h"
 #include "if_athp_pci.h"
 
@@ -133,6 +134,41 @@ athp_pci_intr(void *arg)
 #define MSI_NUM_REQUEST_LOG2	3
 #define MSI_NUM_REQUEST		(1<<MSI_NUM_REQUEST_LOG2)
 
+/*
+ * Register space methods.  This is pretty simple; it's just
+ * straight bus_space calls.
+ */
+static uint32_t
+athp_pci_regio_read_reg(void *arg, uint32_t reg)
+{
+	struct athp_pci_softc *psc = arg;
+	uint32_t val;
+
+	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
+
+	/* XXX TODO: power save stuff */
+	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
+	return (val);
+}
+
+static void
+athp_pci_regio_write_reg(void *arg, uint32_t reg, uint32_t val)
+{
+	struct athp_pci_softc *psc = arg;
+
+	/* XXX TODO: power save stuff */
+	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
+	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
+}
+
+static void
+athp_pci_regio_flush_reg(void *arg)
+{
+	struct athp_pci_softc *psc = arg;
+
+	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
+}
+
 static int
 athp_pci_attach(device_t dev)
 {
@@ -162,6 +198,11 @@ athp_pci_attach(device_t dev)
 		goto bad;
 	}
 
+	/* Driver copy; hopefully we can delete this */
+	sc->sc_st = rman_get_bustag(psc->sc_sr);
+	sc->sc_sh = rman_get_bushandle(psc->sc_sr);
+
+	/* Local copy for bus operations */
 	psc->sc_st = rman_get_bustag(psc->sc_sr);
 	psc->sc_sh = rman_get_bushandle(psc->sc_sr);
 
@@ -191,6 +232,14 @@ athp_pci_attach(device_t dev)
 	}
 
 	/*
+	 * Attach register ops - needed for the caller to do register IO.
+	 */
+	sc->sc_regio.reg_read = athp_pci_regio_read_reg;
+	sc->sc_regio.reg_write = athp_pci_regio_write_reg;
+	sc->sc_regio.reg_flush = athp_pci_regio_flush_reg;
+	sc->sc_regio.reg_arg = psc;
+
+	/*
 	 * Setup DMA descriptor area.
 	 */
 	if (bus_dma_tag_create(bus_get_dma_tag(dev),    /* parent */
@@ -204,7 +253,7 @@ athp_pci_attach(device_t dev)
 	    BUS_DMA_ALLOCNOW,	/* flags */
 	    NULL,		    /* lockfunc */
 	    NULL,		    /* lockarg */
-	    &psc->sc_dmat)) {
+	    &sc->sc_dmat)) {
 		device_printf(dev, "cannot allocate DMA tag\n");
 		goto bad3;
 	}
@@ -215,7 +264,7 @@ athp_pci_attach(device_t dev)
 #ifdef	ATHP_EEPROM_FIRMWARE
 bad4:
 #endif
-	bus_dma_tag_destroy(psc->sc_dmat);
+	bus_dma_tag_destroy(sc->sc_dmat);
 bad3:
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 bad2:
@@ -253,8 +302,7 @@ athp_pci_detach(device_t dev)
 	bus_generic_detach(dev);
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
-
-	bus_dma_tag_destroy(psc->sc_dmat);
+	bus_dma_tag_destroy(sc->sc_dmat);
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmastering? */

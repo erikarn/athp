@@ -9,7 +9,8 @@ struct athp_pci_softc {
 	struct resource		*sc_sr;         /* memory resource */
 	struct resource		*sc_irq;        /* irq resource */
 	void			*sc_ih;         /* interrupt handler */
-	bus_dma_tag_t		sc_dmat;        /* bus DMA tag */
+
+	/* Copy for doing register access */
 	bus_space_tag_t		sc_st;          /* bus space tag */
 	bus_space_handle_t	sc_sh;          /* bus handle tag */
 };

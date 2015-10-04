@@ -59,6 +59,12 @@ struct athp_vap {
 #define	ATHP_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_mtx, MA_OWNED)
 #define	ATHP_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_mtx, MA_NOTOWNED)
 
+/*
+ * This is the top-level driver state.
+ *
+ * Since we may see SDIO or USB derived parts at some point, there
+ * is a little mini-HAL for talking to the MMIO register space.
+ */
 struct athp_softc {
 	struct ieee80211com		sc_ic;
 	struct mbufq			sc_snd;
@@ -74,6 +80,14 @@ struct athp_softc {
 	struct task			wme_update_task;
 	struct timeout_task		scan_to;
 	struct timeout_task		calib_to;
+
+	/* Bus facing state; we should abstract this out a bit */
+	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */
+	bus_space_tag_t		sc_st;		/* bus space tag */
+	bus_space_handle_t	sc_sh;		/* bus handle tag */
+
+	/* Methods used to speak to the register space */
+	struct athp_regio_methods	sc_regio;
 
 	/* How many pending, active transmit frames */
 	int				sc_tx_n_pending;
