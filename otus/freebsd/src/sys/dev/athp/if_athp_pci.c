@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_debug.h"
 #include "if_athp_var.h"
+#include "if_athp_pci.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -79,16 +80,6 @@ static device_method_t athp_methods[] = {
 	DEVMETHOD(device_detach,	athp_pci_detach),
 
 	DEVMETHOD_END
-};
-
-struct athp_pci_softc {
-	struct athp_softc	sc_sc;
-	struct resource		*sc_sr;		/* memory resource */
-	struct resource		*sc_irq;	/* irq resource */
-	void			*sc_ih;		/* interrupt handler */
-	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */
-	bus_space_tag_t		sc_st;		/* bus space tag */
-	bus_space_handle_t	sc_sh;		/* bus handle tag */
 };
 
 static driver_t athp_driver = {

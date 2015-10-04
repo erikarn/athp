@@ -37,4 +37,9 @@
 			device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
+#define	ATHP_WARN(sc, ...) \
+	do { \
+		device_printf(sc->sc_dev, __VA_ARGS__); \
+	while (0)
+
 #endif	/* __ATHP_DEBUG_H__ */
