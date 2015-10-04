@@ -137,6 +137,8 @@ athp_pci_intr(void *arg)
 
 /* XXX */
 #define	ATHP_MAX_SCATTER	8
+#define MSI_NUM_REQUEST_LOG2	3
+#define MSI_NUM_REQUEST		(1<<MSI_NUM_REQUEST_LOG2)
 
 static int
 athp_pci_attach(device_t dev)
@@ -184,7 +186,7 @@ athp_pci_attach(device_t dev)
 	/*
 	 * Arrange interrupt line.
 	 *
-	 * XXX TODO: implement MSI; we should be getting one MSI for
+	 * XXX TODO: implement MSIX; we should be getting one MSI for
 	 * (almost) each CE ring.
 	 */
 	rid = 0;
