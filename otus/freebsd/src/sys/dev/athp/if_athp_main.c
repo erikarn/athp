@@ -71,4 +71,8 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_main.h"
 
+#include "hal/linux_compat.h"
+#include "hal/targaddrs.h"
+#include "hal/hw.h"
+
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
