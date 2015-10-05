@@ -449,12 +449,12 @@ enum ath10k_hw_rate_cck {
 #define PCIE_SOC_WAKE_RESET			0x00000000
 #define SOC_GLOBAL_RESET_ADDRESS		0x0008
 
-#define RTC_SOC_BASE_ADDRESS			ar->regs->rtc_soc_base_address
-#define RTC_WMAC_BASE_ADDRESS			ar->regs->rtc_wmac_base_address
+#define RTC_SOC_BASE_ADDRESS(a)			(a)->rtc_soc_base_address
+#define RTC_WMAC_BASE_ADDRESS(a)		(a)->rtc_wmac_base_address
 #define MAC_COEX_BASE_ADDRESS			0x00006000
 #define BT_COEX_BASE_ADDRESS			0x00007000
 #define SOC_PCIE_BASE_ADDRESS			0x00008000
-#define SOC_CORE_BASE_ADDRESS			ar->regs->soc_core_base_address
+#define SOC_CORE_BASE_ADDRESS(a)		(a)->soc_core_base_address
 #define WLAN_UART_BASE_ADDRESS			0x0000c000
 #define WLAN_SI_BASE_ADDRESS			0x00010000
 #define WLAN_GPIO_BASE_ADDRESS			0x00014000
@@ -474,7 +474,7 @@ enum ath10k_hw_rate_cck {
 #define CE7_BASE_ADDRESS			ar->regs->ce7_base_address
 #define DBI_BASE_ADDRESS			0x00060000
 #define WLAN_ANALOG_INTF_PCIE_BASE_ADDRESS	0x0006c000
-#define PCIE_LOCAL_BASE_ADDRESS		ar->regs->pcie_local_base_address
+#define PCIE_LOCAL_BASE_ADDRESS(a)		(a)->pcie_local_base_address
 
 #define SOC_RESET_CONTROL_ADDRESS		0x00000000
 #define SOC_RESET_CONTROL_OFFSET		0x00000000
