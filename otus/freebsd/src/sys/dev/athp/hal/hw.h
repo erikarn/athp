@@ -212,9 +212,9 @@ void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
 				u32 cc, u32 rcc, u32 cc_prev, u32 rcc_prev);
 #endif
 
-#define QCA_REV_988X(ar) ((ar)->hw_rev == ATH10K_HW_QCA988X)
-#define QCA_REV_6174(ar) ((ar)->hw_rev == ATH10K_HW_QCA6174)
-#define QCA_REV_99X0(ar) ((ar)->hw_rev == ATH10K_HW_QCA99X0)
+#define QCA_REV_988X(sc) ((sc)->sc_hwrev == ATH10K_HW_QCA988X)
+#define QCA_REV_6174(sc) ((sc)->sc_hwrev == ATH10K_HW_QCA6174)
+#define QCA_REV_99X0(sc) ((sc)->sc_hwrev == ATH10K_HW_QCA99X0)
 
 /* Known pecularities:
  *  - raw appears in nwifi decap, raw and nwifi appear in ethernet decap
