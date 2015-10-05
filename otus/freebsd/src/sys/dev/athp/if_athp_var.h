@@ -88,6 +88,9 @@ struct athp_softc {
 	enum ath10k_hw_rev		sc_hwrev;
 	int				sc_chipid;
 
+	/* Register mapping */
+	const struct ath10k_hw_regs	*sc_regofs;
+
 	/* Bus facing state; we should abstract this out a bit */
 	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */
 	bus_space_tag_t		sc_st;		/* bus space tag */

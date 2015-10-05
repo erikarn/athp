@@ -9,6 +9,8 @@ struct athp_pci_softc {
 	struct resource		*sc_sr;         /* memory resource */
 	struct resource		*sc_irq;        /* irq resource */
 	void			*sc_ih;         /* interrupt handler */
+
+	/* Local copy of device/vendor id */
 	int			sc_deviceid;
 	int			sc_vendorid;
 

@@ -191,13 +191,16 @@ athp_pci_hw_lookup(struct athp_pci_softc *psc)
 	switch (psc->sc_deviceid) {
 	case QCA988X_2_0_DEVICE_ID:
 		sc->sc_hwrev = ATH10K_HW_QCA988X;
+		sc->sc_regofs = &qca988x_regs;
 		break;
 	case QCA6164_2_1_DEVICE_ID:
 	case QCA6174_2_1_DEVICE_ID:
 		sc->sc_hwrev = ATH10K_HW_QCA6174;
+		sc->sc_regofs = &qca6174_regs;
 		break;
 	case QCA99X0_2_0_DEVICE_ID:
 		sc->sc_hwrev = ATH10K_HW_QCA99X0;
+		sc->sc_regofs = &qca99x0_regs;
 		break;
 	default:
 		return (-1);
