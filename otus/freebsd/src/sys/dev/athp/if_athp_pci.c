@@ -66,6 +66,10 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_superg.h>
 #endif
 
+#include "hal/linux_compat.h"
+#include "hal/hw.h"
+#include "hal/chip_id.h"
+
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_var.h"
@@ -172,6 +176,35 @@ athp_pci_regio_flush_reg(void *arg)
 	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
 }
 
+/*
+ * Look at the PCI device and attach the top-level hardware
+ * ID.
+ *
+ * Returns 0 if found, -1 if the deviceid isn't something
+ * we support.
+ */
+static int
+athp_pci_hw_lookup(struct athp_pci_softc *psc)
+{
+	struct athp_softc *sc = &psc->sc_sc;
+
+	switch (psc->sc_deviceid) {
+	case QCA988X_2_0_DEVICE_ID:
+		sc->sc_hwrev = ATH10K_HW_QCA988X;
+		break;
+	case QCA6164_2_1_DEVICE_ID:
+	case QCA6174_2_1_DEVICE_ID:
+		sc->sc_hwrev = ATH10K_HW_QCA6174;
+		break;
+	case QCA99X0_2_0_DEVICE_ID:
+		sc->sc_hwrev = ATH10K_HW_QCA99X0;
+		break;
+	default:
+		return (-1);
+	}
+	return (0);
+}
+
 static int
 athp_pci_attach(device_t dev)
 {
@@ -185,6 +218,19 @@ athp_pci_attach(device_t dev)
 
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
+
+	/*
+	 * Look at the device/vendor ID and choose which register offset
+	 * mapping to use.  This is used by a lot of the register access
+	 * pieces to get the correct device-specific windows.
+	 */
+	psc->sc_vendorid = pci_get_vendor(dev);
+	psc->sc_deviceid = pci_get_device(dev);
+	if (athp_pci_hw_lookup(psc) != 0) {
+		device_printf(dev, "%s: hw lookup failed\n", __func__);
+		err = ENXIO;
+		goto bad;
+	}
 
 	/*
 	 * Enable bus mastering.

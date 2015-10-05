@@ -81,6 +81,13 @@ struct athp_softc {
 	struct timeout_task		scan_to;
 	struct timeout_task		calib_to;
 
+
+	/* XXX TODO: split out hardware and driver state! */
+
+	/* Hardware revision, chip-id, etc */
+	enum ath10k_hw_rev		sc_hwrev;
+	int				sc_chipid;
+
 	/* Bus facing state; we should abstract this out a bit */
 	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */
 	bus_space_tag_t		sc_st;		/* bus space tag */

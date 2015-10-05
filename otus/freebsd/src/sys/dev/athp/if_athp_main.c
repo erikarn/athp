@@ -66,15 +66,15 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_superg.h>
 #endif
 
+#include "hal/linux_compat.h"
+#include "hal/targaddrs.h"
+#include "hal/hw.h"
+
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_var.h"
 
 #include "if_athp_main.h"
-
-#include "hal/linux_compat.h"
-#include "hal/targaddrs.h"
-#include "hal/hw.h"
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
 
