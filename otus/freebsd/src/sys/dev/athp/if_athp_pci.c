@@ -422,6 +422,13 @@ athp_pci_attach(device_t dev)
 	/* read SoC/chip version */
 	sc->sc_chipid = athp_pci_soc_read32(sc, SOC_CHIP_ID_ADDRESS(sc->sc_regofs));
 	device_printf(sc->sc_dev, "%s: chipid: 0x%08x\n", __func__, sc->sc_chipid);
+	if (! ath10k_pci_chip_is_supported(psc->sc_deviceid, sc->sc_chipid)) {
+		device_printf(sc->sc_dev,
+		    "%s: unsupported chip; chipid: 0x%08x\n", __func__,
+		    sc->sc_chipid);
+		err = ENXIO;
+		goto bad3;
+	}
 
 	/* Verify chip version is something we can use */
 	/* call core_register */

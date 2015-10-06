@@ -116,7 +116,6 @@ static unsigned int ath10k_pci_reset_mode = ATH10K_PCI_RESET_AUTO;
 #define QCA6174_2_1_DEVICE_ID	(0x003e)
 #define QCA99X0_2_0_DEVICE_ID	(0x0040)
 
-#if 0
 static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 	/*
 	 * QCA988X pre 2.0 chips are not supported because they need some nasty
@@ -139,7 +138,6 @@ static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 
 	{ QCA99X0_2_0_DEVICE_ID, QCA99X0_HW_2_0_CHIP_ID_REV },
 };
-#endif
 
 static void ath10k_pci_buffer_cleanup(struct athp_pci_softc *ar);
 static int ath10k_pci_cold_reset(struct athp_pci_softc *ar);
@@ -1037,6 +1035,24 @@ ath10k_pci_cold_reset(struct athp_pci_softc *psc)
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot cold reset complete\n");
 
 	return 0;
+}
+
+bool
+ath10k_pci_chip_is_supported(uint32_t dev_id, uint32_t chip_id)
+{
+	const struct athp_pci_supp_chip *supp_chip;
+	int i;
+	u32 rev_id = MS(chip_id, SOC_CHIP_ID_REV);
+
+	for (i = 0; i < nitems(athp_pci_supp_chips); i++) {
+		supp_chip = &athp_pci_supp_chips[i];
+
+		if (supp_chip->dev_id == dev_id &&
+		    supp_chip->rev_id == rev_id)
+			return true;
+	}
+
+	return false;
 }
 
 /*
