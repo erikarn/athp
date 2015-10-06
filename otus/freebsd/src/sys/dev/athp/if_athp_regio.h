@@ -16,6 +16,11 @@ struct athp_regio_methods {
 	/* Top-level MMIO access */
 	reg_read_fn *reg_read;
 	reg_write_fn *reg_write;
+
+	/* MMIO access, but with force-wake, potential-sleep */
+	reg_read_fn *reg_s_read;
+	reg_write_fn *reg_s_write;
+
 	reg_flush_fn *reg_flush;
 };
 

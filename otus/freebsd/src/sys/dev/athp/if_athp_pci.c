@@ -153,10 +153,10 @@ athp_pci_regio_read_reg(void *arg, uint32_t reg)
 	struct athp_pci_softc *psc = arg;
 	uint32_t val;
 
-	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
-
-	/* XXX TODO: power save stuff */
 	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
+	device_printf(psc->sc_sc.sc_dev, "%s: %08x -> %08x\n",
+	    __func__, reg, val);
+
 	return (val);
 }
 
@@ -165,9 +165,56 @@ athp_pci_regio_write_reg(void *arg, uint32_t reg, uint32_t val)
 {
 	struct athp_pci_softc *psc = arg;
 
-	/* XXX TODO: power save stuff */
-	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
+	device_printf(psc->sc_sc.sc_dev, "%s: %08x <- %08x\n",
+	    __func__, reg, val);
 	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
+}
+
+/* These variants do a wakeup/sleep */
+static uint32_t
+athp_pci_regio_s_read_reg(void *arg, uint32_t reg)
+{
+	struct athp_pci_softc *psc = arg;
+	struct athp_softc *sc = &psc->sc_sc;
+	uint32_t val, tmp;
+
+	tmp = ath10k_pci_wake(psc);
+	if (tmp) {
+		device_printf(sc->sc_dev,
+		    "%s: (reg=0x%08x) couldn't wake; err=%d\n",
+		    __func__,
+		    reg,
+		    tmp);
+		return (0);
+	}
+	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
+	device_printf(psc->sc_sc.sc_dev, "%s: %08x -> %08x\n",
+	    __func__, reg, val);
+	ath10k_pci_sleep(psc);
+
+	return (val);
+}
+
+static void
+athp_pci_regio_s_write_reg(void *arg, uint32_t reg, uint32_t val)
+{
+	struct athp_pci_softc *psc = arg;
+	struct athp_softc *sc = &psc->sc_sc;
+	int tmp;
+
+	tmp = ath10k_pci_wake(psc);
+	if (tmp) {
+		device_printf(sc->sc_dev,
+		    "%s: (reg=0x%08x) couldn't wake; err=%d\n",
+		    __func__,
+		    reg,
+		    tmp);
+		return;
+	}
+	device_printf(psc->sc_sc.sc_dev, "%s: %08x <- %08x\n",
+	    __func__, reg, val);
+	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
+	ath10k_pci_sleep(psc);
 }
 
 static void
@@ -224,6 +271,7 @@ athp_pci_attach(device_t dev)
 
 	sc->sc_dev = dev;
 	sc->sc_invalid = 1;
+	sc->sc_debug = -1;
 
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
@@ -300,6 +348,8 @@ athp_pci_attach(device_t dev)
 	 */
 	sc->sc_regio.reg_read = athp_pci_regio_read_reg;
 	sc->sc_regio.reg_write = athp_pci_regio_write_reg;
+	sc->sc_regio.reg_s_read = athp_pci_regio_s_read_reg;
+	sc->sc_regio.reg_s_write = athp_pci_regio_s_write_reg;
 	sc->sc_regio.reg_flush = athp_pci_regio_flush_reg;
 	sc->sc_regio.reg_arg = psc;
 
@@ -357,6 +407,7 @@ athp_pci_attach(device_t dev)
 
 	/* (here's where ath10k requests IRQs */
 
+#if 1
 	/* pci_chip_reset */
 	ret = ath10k_pci_chip_reset(psc);
 	if (ret) {
@@ -366,8 +417,12 @@ athp_pci_attach(device_t dev)
 		err = ENXIO;
 		goto bad3;
 	}
+#endif
 
 	/* read SoC/chip version */
+	sc->sc_chipid = athp_pci_soc_read32(sc, SOC_CHIP_ID_ADDRESS(sc->sc_regofs));
+	device_printf(sc->sc_dev, "%s: chipid: 0x%08x\n", __func__, sc->sc_chipid);
+
 	/* Verify chip version is something we can use */
 	/* call core_register */
 

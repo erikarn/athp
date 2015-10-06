@@ -99,16 +99,16 @@ uint32_t
 athp_pci_read32(struct athp_softc *sc, uint32_t addr)
 {
 
-	/* XXX sleep/wake */
-	return (sc->sc_regio.reg_read(sc->sc_regio.reg_arg, addr));
+	/* sleep/wake */
+	return (sc->sc_regio.reg_s_read(sc->sc_regio.reg_arg, addr));
 }
 
 void
 athp_pci_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
 {
 
-	/* XXX sleep/wake */
-	sc->sc_regio.reg_write(sc->sc_regio.reg_arg, addr, val);
+	/* sleep/wake */
+	sc->sc_regio.reg_s_write(sc->sc_regio.reg_arg, addr, val);
 }
 
 uint32_t

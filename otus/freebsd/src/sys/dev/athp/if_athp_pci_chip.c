@@ -104,8 +104,8 @@ enum ath10k_pci_reset_mode {
 
 #if 0
 static unsigned int ath10k_pci_irq_mode = ATH10K_PCI_IRQ_AUTO;
-#endif
 static unsigned int ath10k_pci_reset_mode = ATH10K_PCI_RESET_AUTO;
+#endif
 
 /* how long wait to wait for target to initialise, in ms */
 #define ATH10K_PCI_TARGET_WAIT 3000
@@ -225,7 +225,7 @@ ath10k_pci_wake_wait(struct athp_pci_softc *psc)
 	return (-ETIMEDOUT);
 }
 
-static int
+int
 ath10k_pci_wake(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
@@ -261,7 +261,10 @@ ath10k_pci_wake(struct athp_pci_softc *psc)
 	return (ret);
 }
 
-static void
+/*
+ * XXX TODO: actually potentially put the thing to sleep; do timer work; etc.
+ */
+void
 ath10k_pci_sleep(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
@@ -715,11 +718,13 @@ static int
 ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
-	int i, ret;
+//	int i;
+	int ret;
 //	u32 val;
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot 988x chip reset\n");
 
+#if 0
 	/* Some hardware revisions (e.g. CUS223v2) has issues with cold reset.
 	 * It is thus preferred to use warm reset which is safer but may not be
 	 * able to recover the device from all possible fail scenarios.
@@ -736,7 +741,6 @@ ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 			continue;
 		}
 
-#if 0
 		/* FIXME: Sometimes copy engine doesn't recover after warm
 		 * reset. In most cases this needs cold reset. In some of these
 		 * cases the device is in such a state that a cold reset may
@@ -760,9 +764,6 @@ ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 				    ret);
 			continue;
 		}
-#else
-		device_printf(sc->sc_dev, "%s: implement calls to pci_init_pipes/diag32 via CE\n", __func__);
-#endif
 		ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot chip reset complete (warm)\n");
 		return 0;
 	}
@@ -771,6 +772,9 @@ ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 		ATHP_WARN(sc, "refusing cold reset as requested\n");
 		return -EPERM;
 	}
+#else
+	device_printf(sc->sc_dev, "%s: TODO: implement try-warm-reset\n", __func__);
+#endif
 
 	ret = ath10k_pci_cold_reset(psc);
 	if (ret) {
@@ -941,8 +945,10 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 	int i;
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot waiting target to initialise\n");
+	device_printf(sc->sc_dev, "%s: TODO: make DELAY 10ms again\n", __func__);
 
-	for (i = 0; i < ATH10K_PCI_TARGET_WAIT / 10; i++) {
+	//for (i = 0; i < ATH10K_PCI_TARGET_WAIT / 10; i++) {
+	for (i = 0; i < 5; i++) {
 		val = athp_pci_read32(sc, FW_INDICATOR_ADDRESS(sc->sc_regofs));
 
 		ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot target indicator %x\n",
@@ -963,7 +969,14 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 			/* Fix potential race by repeating CORE_BASE writes */
 			ath10k_pci_enable_legacy_irq(psc);
 
-		DELAY(10 * 1000);
+		/*
+		 * XXX TODO: just sleep for a second; otherwise we get spammed
+		 * with register update printing.
+		 *
+		 * Fix this to be more responsive once this is debugged.
+		 */
+//		DELAY(10 * 1000);
+		DELAY(1000 * 1000);
 	}
 
 	ath10k_pci_disable_and_clear_legacy_irq(psc);
