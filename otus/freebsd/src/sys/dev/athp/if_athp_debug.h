@@ -29,6 +29,8 @@
 #define	ATHP_DEBUG_REGIO	0x00000200
 #define	ATHP_DEBUG_IRQ		0x00000400
 #define	ATHP_DEBUG_TXCOMP	0x00000800
+#define	ATHP_DEBUG_PCI_PS	0x00001000
+#define	ATHP_DEBUG_BOOT		0x00002000
 #define	ATHP_DEBUG_ANY		0xffffffff
 
 #define	ATHP_DPRINTF(sc, dm, ...) \
@@ -40,6 +42,11 @@
 #define	ATHP_WARN(sc, ...) \
 	do { \
 		device_printf(sc->sc_dev, __VA_ARGS__); \
-	while (0)
+	} while (0)
+
+#define	ATHP_ERR(sc, ...) \
+	do { \
+		device_printf(sc->sc_dev, __VA_ARGS__); \
+	} while (0)
 
 #endif	/* __ATHP_DEBUG_H__ */
