@@ -438,9 +438,9 @@ enum ath10k_hw_rate_cck {
 #define MSI_ASSIGN_CE_MAX	ar->hw_values->msi_assign_ce_max
 
 /* as of IP3.7.1 */
-#define RTC_STATE_V_ON				ar->hw_values->rtc_state_val_on
+#define RTC_STATE_V_ON(a)			(a)->rtc_state_val_on
 
-#define RTC_STATE_COLD_RESET_MASK		ar->regs->rtc_state_cold_reset_mask
+#define RTC_STATE_COLD_RESET_MASK(a)		(a)->rtc_state_cold_reset_mask
 #define RTC_STATE_V_LSB				0
 #define RTC_STATE_V_MASK			0x00000007
 #define RTC_STATE_ADDRESS			0x0000
@@ -463,23 +463,23 @@ enum ath10k_hw_rate_cck {
 #define EFUSE_BASE_ADDRESS			0x00030000
 #define FPGA_REG_BASE_ADDRESS			0x00039000
 #define WLAN_UART2_BASE_ADDRESS			0x00054c00
-#define CE_WRAPPER_BASE_ADDRESS			ar->regs->ce_wrapper_base_address
-#define CE0_BASE_ADDRESS			ar->regs->ce0_base_address
-#define CE1_BASE_ADDRESS			ar->regs->ce1_base_address
-#define CE2_BASE_ADDRESS			ar->regs->ce2_base_address
-#define CE3_BASE_ADDRESS			ar->regs->ce3_base_address
-#define CE4_BASE_ADDRESS			ar->regs->ce4_base_address
-#define CE5_BASE_ADDRESS			ar->regs->ce5_base_address
-#define CE6_BASE_ADDRESS			ar->regs->ce6_base_address
-#define CE7_BASE_ADDRESS			ar->regs->ce7_base_address
+#define CE_WRAPPER_BASE_ADDRESS(a)		(a)->ce_wrapper_base_address
+#define CE0_BASE_ADDRESS(a)			(a)->ce0_base_address
+#define CE1_BASE_ADDRESS(a)			(a)->ce1_base_address
+#define CE2_BASE_ADDRESS(a)			(a)->ce2_base_address
+#define CE3_BASE_ADDRESS(a)			(a)->ce3_base_address
+#define CE4_BASE_ADDRESS(a)			(a)->ce4_base_address
+#define CE5_BASE_ADDRESS(a)			(a)->ce5_base_address
+#define CE6_BASE_ADDRESS(a)			(a)->ce6_base_address
+#define CE7_BASE_ADDRESS(a)			(a)->ce7_base_address
 #define DBI_BASE_ADDRESS			0x00060000
 #define WLAN_ANALOG_INTF_PCIE_BASE_ADDRESS	0x0006c000
 #define PCIE_LOCAL_BASE_ADDRESS(a)		(a)->pcie_local_base_address
 
 #define SOC_RESET_CONTROL_ADDRESS		0x00000000
 #define SOC_RESET_CONTROL_OFFSET		0x00000000
-#define SOC_RESET_CONTROL_SI0_RST_MASK		ar->regs->soc_reset_control_si0_rst_mask
-#define SOC_RESET_CONTROL_CE_RST_MASK		ar->regs->soc_reset_control_ce_rst_mask
+#define SOC_RESET_CONTROL_SI0_RST_MASK(a)	(a)->soc_reset_control_si0_rst_mask
+#define SOC_RESET_CONTROL_CE_RST_MASK(a)	(a)->soc_reset_control_ce_rst_mask
 #define SOC_RESET_CONTROL_CPU_WARM_RST_MASK	0x00000040
 #define SOC_CPU_CLOCK_OFFSET			0x00000020
 #define SOC_CPU_CLOCK_STANDARD_LSB		0
@@ -493,7 +493,7 @@ enum ath10k_hw_rate_cck {
 #define SOC_LF_TIMER_CONTROL0_ADDRESS		0x00000050
 #define SOC_LF_TIMER_CONTROL0_ENABLE_MASK	0x00000004
 
-#define SOC_CHIP_ID_ADDRESS			ar->regs->soc_chip_id_address
+#define SOC_CHIP_ID_ADDRESS(a)			(a)->soc_chip_id_address
 #define SOC_CHIP_ID_REV_LSB			8
 #define SOC_CHIP_ID_REV_MASK			0x00000f00
 
@@ -548,20 +548,20 @@ enum ath10k_hw_rate_cck {
 #define CORE_CTRL_ADDRESS			0x0000
 #define PCIE_INTR_ENABLE_ADDRESS		0x0008
 #define PCIE_INTR_CAUSE_ADDRESS			0x000c
-#define PCIE_INTR_CLR_ADDRESS			ar->regs->pcie_intr_clr_address
-#define SCRATCH_3_ADDRESS			ar->regs->scratch_3_address
+#define PCIE_INTR_CLR_ADDRESS(a)		(a)->pcie_intr_clr_address
+#define SCRATCH_3_ADDRESS(a)			(a)->scratch_3_address
 #define CPU_INTR_ADDRESS			0x0010
 
-#define CCNT_TO_MSEC(ar, x) ((x) / ar->hw_params.channel_counters_freq_hz)
+#define CCNT_TO_MSEC(a, x) ((x) / (a)->channel_counters_freq_hz)
 
 /* Firmware indications to the Host via SCRATCH_3 register. */
-#define FW_INDICATOR_ADDRESS			ar->regs->fw_indicator_address
+#define FW_INDICATOR_ADDRESS(a)			(a)->fw_indicator_address
 #define FW_IND_EVENT_PENDING			1
 #define FW_IND_INITIALIZED			2
 
 /* HOST_REG interrupt from firmware */
-#define PCIE_INTR_FIRMWARE_MASK			ar->regs->pcie_intr_fw_mask
-#define PCIE_INTR_CE_MASK_ALL			ar->regs->pcie_intr_ce_mask_all
+#define PCIE_INTR_FIRMWARE_MASK(a)		(a)->pcie_intr_fw_mask
+#define PCIE_INTR_CE_MASK_ALL(a)		(a)->pcie_intr_ce_mask_all
 
 #define DRAM_BASE_ADDRESS			0x00400000
 
