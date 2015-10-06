@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015 Adrian Chadd <adrian@FreeBSD.org>
+ * Copyright (c) 2005-2011 Atheros Communications Inc.
+ * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -378,6 +380,9 @@ ath10k_pci_enable_legacy_irq(struct athp_pci_softc *psc)
 
 	/* IMPORTANT: this extra read transaction is required to
 	 * flush the posted write buffer. */
+	/*
+	 * XXX TODO: should do an explicit register flush bus op call here.
+	 */
 	(void)athp_pci_read32(sc, SOC_CORE_BASE_ADDRESS(sc->sc_regofs) +
 				PCIE_INTR_ENABLE_ADDRESS);
 }
