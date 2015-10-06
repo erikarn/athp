@@ -71,6 +71,7 @@ struct athp_softc {
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
 	int				sc_invalid;
+	uint64_t			sc_debug;
 
 	int				sc_running:1,
 					sc_calibrating:1,
@@ -90,6 +91,7 @@ struct athp_softc {
 
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;
+	const struct ath10k_hw_values	*sc_regvals;
 
 	/* Bus facing state; we should abstract this out a bit */
 	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */

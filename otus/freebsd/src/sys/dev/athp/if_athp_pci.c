@@ -77,6 +77,8 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_main.h"
 
+#include "if_athp_pci_chip.h"
+
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
 static device_detach_t athp_pci_detach;
@@ -192,15 +194,18 @@ athp_pci_hw_lookup(struct athp_pci_softc *psc)
 	case QCA988X_2_0_DEVICE_ID:
 		sc->sc_hwrev = ATH10K_HW_QCA988X;
 		sc->sc_regofs = &qca988x_regs;
+		sc->sc_regvals = &qca988x_values;
 		break;
 	case QCA6164_2_1_DEVICE_ID:
 	case QCA6174_2_1_DEVICE_ID:
 		sc->sc_hwrev = ATH10K_HW_QCA6174;
 		sc->sc_regofs = &qca6174_regs;
+		sc->sc_regvals = &qca6174_values;
 		break;
 	case QCA99X0_2_0_DEVICE_ID:
 		sc->sc_hwrev = ATH10K_HW_QCA99X0;
 		sc->sc_regofs = &qca99x0_regs;
+		sc->sc_regvals = &qca99x0_values;
 		break;
 	default:
 		return (-1);
@@ -215,11 +220,14 @@ athp_pci_attach(device_t dev)
 	struct athp_softc *sc = &psc->sc_sc;
 	int rid;
 	int err = 0;
+	int ret;
 
 	sc->sc_dev = dev;
 	sc->sc_invalid = 1;
 
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	    MTX_DEF);
+	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 
 	/*
@@ -315,6 +323,54 @@ athp_pci_attach(device_t dev)
 		goto bad3;
 	}
 
+	/*
+	 * TODO: abstract this out to be a bus/hif specific
+	 * attach path.
+	 *
+	 * I'm not sure what USB/SDIO will look like here, but
+	 * I'm pretty sure it won't involve PCI/CE setup.
+	 * It'll still have WME/HIF/BMI, but it'll be done over
+	 * USB endpoints.
+	 */
+
+	/* Alloc pipes */
+	/* deinit ce */
+	/* disable irq */
+	ret = ath10k_pci_irq_disable(psc);
+	if (ret) {
+		device_printf(sc->sc_dev, "%s: irq_disable failed: %d\n",
+		    __func__,
+		    ret);
+		err = ENXIO;
+		goto bad3;
+	}
+
+	/* init IRQ */
+	ret = ath10k_pci_init_irq(psc);
+	if (ret) {
+		device_printf(sc->sc_dev, "%s: init_irq failed: %d\n",
+		    __func__,
+		    ret);
+		err = ENXIO;
+		goto bad3;
+	}
+
+	/* (here's where ath10k requests IRQs */
+
+	/* pci_chip_reset */
+	ret = ath10k_pci_chip_reset(psc);
+	if (ret) {
+		device_printf(sc->sc_dev, "%s: chip_reset failed: %d\n",
+		    __func__,
+		    ret);
+		err = ENXIO;
+		goto bad3;
+	}
+
+	/* read SoC/chip version */
+	/* Verify chip version is something we can use */
+	/* call core_register */
+
 	/* Call main attach method with given info */
 	err = athp_attach(sc);
 	if (err == 0)
@@ -335,6 +391,7 @@ bad1:
 
 bad:
 	/* XXX disable busmaster? */
+	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&sc->sc_mtx);
 	return (err);
 }
@@ -357,8 +414,12 @@ athp_pci_detach(device_t dev)
 	 */
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
-	/* XXX TODO: detach main driver */
+	/* detach main driver */
 	(void) athp_detach(sc);
+
+	/*
+	 * Detach PCI specific bits
+	 */
 
 	/* Free bus resources */
 	bus_generic_detach(dev);
@@ -368,6 +429,9 @@ athp_pci_detach(device_t dev)
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmastering? */
+
+	mtx_destroy(&psc->ps_mtx);
+	mtx_destroy(&sc->sc_mtx);
 
 	return (0);
 }

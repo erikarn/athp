@@ -79,11 +79,27 @@ __FBSDID("$FreeBSD$");
  * Functions to access the various register spaces.
  * These indirect through the top-level MMIO functions available.
  */
+uint32_t
+athp_reg_read32(struct athp_softc *sc, uint32_t addr)
+{
+
+	/* The users of these don't do explicit sleep/wake */
+	return (sc->sc_regio.reg_read(sc->sc_regio.reg_arg, addr));
+}
+
+void
+athp_reg_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
+{
+
+	/* The users of these don't do explicit sleep/wake */
+	sc->sc_regio.reg_write(sc->sc_regio.reg_arg, addr, val);
+}
 
 uint32_t
 athp_pci_read32(struct athp_softc *sc, uint32_t addr)
 {
 
+	/* XXX sleep/wake */
 	return (sc->sc_regio.reg_read(sc->sc_regio.reg_arg, addr));
 }
 
@@ -91,6 +107,7 @@ void
 athp_pci_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
 {
 
+	/* XXX sleep/wake */
 	sc->sc_regio.reg_write(sc->sc_regio.reg_arg, addr, val);
 }
 

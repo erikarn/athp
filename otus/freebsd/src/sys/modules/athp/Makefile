@@ -10,10 +10,11 @@ SRCS    = if_athp_pci.c if_athp_main.c			\
 	  bus_if.h device_if.h				\
 	  opt_wlan.h
 
-# These are the ath10k derived driver bits that are supposed
-# to be mostly OS agnostic.  I'd call it a HAL, but that may
-# be a dirty word.
-#.PATH: ${.CURDIR}/../../dev/athp/drv
-#SRCS    += if_athp_pci_trans.c
+# This is the chip specific register offsets used for MMIO access.
+SRCS    += if_athp_regs.c if_athp_regio.c
+
+# This is the PCI chip interface - handling reset, enable/disable
+# interrupts, etc.
+SRCS    += if_athp_pci_chip.c
 
 .include <bsd.kmod.mk>
