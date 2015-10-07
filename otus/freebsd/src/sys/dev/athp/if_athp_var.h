@@ -65,6 +65,7 @@ struct athp_vap {
  * Since we may see SDIO or USB derived parts at some point, there
  * is a little mini-HAL for talking to the MMIO register space.
  */
+struct athp_pci_softc;
 struct athp_softc {
 	struct ieee80211com		sc_ic;
 	struct mbufq			sc_snd;
@@ -82,6 +83,8 @@ struct athp_softc {
 	struct timeout_task		scan_to;
 	struct timeout_task		calib_to;
 
+	/* XXX TODO: Cheating, until all the layering is fixed */
+	struct athp_pci_softc		*sc_psc;
 
 	/* XXX TODO: split out hardware and driver state! */
 

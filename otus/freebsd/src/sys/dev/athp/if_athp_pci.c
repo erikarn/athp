@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_var.h"
+#include "if_athp_pci_ce.h"
 #include "if_athp_pci.h"
 
 #include "if_athp_main.h"
@@ -272,10 +273,14 @@ athp_pci_attach(device_t dev)
 	sc->sc_dev = dev;
 	sc->sc_invalid = 1;
 	sc->sc_debug = -1;
+	sc->sc_psc = psc;
 
+	/* XXX TODO: unique names */
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	    MTX_DEF);
+	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 
 	/*
@@ -454,6 +459,7 @@ bad1:
 bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
+	mtx_destroy(&psc->ce_mtx);
 	mtx_destroy(&sc->sc_mtx);
 	return (err);
 }
@@ -493,6 +499,7 @@ athp_pci_detach(device_t dev)
 	/* XXX disable busmastering? */
 
 	mtx_destroy(&psc->ps_mtx);
+	mtx_destroy(&psc->ce_mtx);
 	mtx_destroy(&sc->sc_mtx);
 
 	return (0);
