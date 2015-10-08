@@ -77,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_var.h"
+#include "if_athp_desc.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
 #include "if_athp_pci.h"
@@ -105,11 +106,16 @@ __FBSDID("$FreeBSD$");
  * systems.
  */
 
+/*
+ * XXX TODO: make the functions take athp_pci_softc * as the top-level
+ * state, instead of athp_softc * ?
+ */
+
 static int
 __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 {
-	struct ath10k *ar = pipe->hif_ce_state;
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_softc *sc = pipe->sc;
+	struct ath10k_pci *psc = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	struct sk_buff *skb;
 	dma_addr_t paddr;
@@ -149,7 +155,7 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 static void
 __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
-	struct ath10k *ar = pipe->hif_ce_state;
+	struct athp_softc *sc = pipe->hif_ce_state;
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	int ret, num;
@@ -177,7 +183,7 @@ __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 static void
 ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
-	struct ath10k *ar = pipe->hif_ce_state;
+	struct athp_softc *sc = pipe->hif_ce_state;
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 
 	spin_lock_bh(&ar_pci->ce_lock);
@@ -186,7 +192,7 @@ ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 }
 
 static void
-ath10k_pci_rx_post(struct ath10k *ar)
+ath10k_pci_rx_post(struct athp_softc *sc)
 {
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	int i;
@@ -197,10 +203,14 @@ ath10k_pci_rx_post(struct ath10k *ar)
 	spin_unlock_bh(&ar_pci->ce_lock);
 }
 
+/*
+ * XXX TODO: is this the deferred rx post timer thing used above?
+ * (ie, rx_post_retry)
+ */
 static void
 ath10k_pci_rx_replenish_retry(unsigned long ptr)
 {
-	struct ath10k *ar = (void *)ptr;
+	struct athp_softc *sc = (void *)ptr;
 
 	ath10k_pci_rx_post(ar);
 }
@@ -208,7 +218,7 @@ ath10k_pci_rx_replenish_retry(unsigned long ptr)
 /* Called by lower (CE) layer when a send to Target completes. */
 static void ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 {
-	struct ath10k *ar = ce_state->ar;
+	struct athp_softc *sc = ce_state->ar;
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	struct ath10k_hif_cb *cb = &ar_pci->msg_callbacks_current;
 	struct sk_buff_head list;
@@ -234,7 +244,7 @@ static void ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 /* Called by lower (CE) layer when data is received from the Target. */
 static void ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 {
-	struct ath10k *ar = ce_state->ar;
+	struct athp_softc *sc = ce_state->ar;
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	struct ath10k_pci_pipe *pipe_info =  &ar_pci->pipe_info[ce_state->id];
 	struct ath10k_hif_cb *cb = &ar_pci->msg_callbacks_current;
@@ -284,7 +294,7 @@ static void ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
  * That way the interrupts task can be killed in the bus code,
  * and we here kill the pipe/rx deferred tasks.
  */
-static void ath10k_pci_kill_tasklet(struct ath10k *ar)
+static void ath10k_pci_kill_tasklet(struct athp_softc *sc)
 {
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	int i;
@@ -300,7 +310,7 @@ static void ath10k_pci_kill_tasklet(struct ath10k *ar)
 
 static void ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 {
-	struct ath10k *ar;
+	struct athp_softc *sc;
 	struct ath10k_ce_pipe *ce_pipe;
 	struct ath10k_ce_ring *ce_ring;
 	struct sk_buff *skb;
@@ -332,7 +342,7 @@ static void ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 
 static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 {
-	struct ath10k *ar;
+	struct athp_softc *sc;
 	struct ath10k_pci *ar_pci;
 	struct ath10k_ce_pipe *ce_pipe;
 	struct ath10k_ce_ring *ce_ring;
@@ -374,7 +384,7 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
  * not yet processed are on a completion queue. They
  * are handled when the completion thread shuts down.
  */
-static void ath10k_pci_buffer_cleanup(struct ath10k *ar)
+static void ath10k_pci_buffer_cleanup(struct athp_softc *sc)
 {
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	int pipe_num;
@@ -388,7 +398,7 @@ static void ath10k_pci_buffer_cleanup(struct ath10k *ar)
 	}
 }
 
-static void ath10k_pci_ce_deinit(struct ath10k *ar)
+static void ath10k_pci_ce_deinit(struct athp_softc *sc)
 {
 	int i;
 
@@ -396,13 +406,13 @@ static void ath10k_pci_ce_deinit(struct ath10k *ar)
 		ath10k_ce_deinit_pipe(ar, i);
 }
 
-static void ath10k_pci_flush(struct ath10k *ar)
+static void ath10k_pci_flush(struct athp_softc *sc)
 {
 	ath10k_pci_kill_tasklet(ar);
 	ath10k_pci_buffer_cleanup(ar);
 }
 
-static int ath10k_pci_alloc_pipes(struct ath10k *ar)
+static int ath10k_pci_alloc_pipes(struct athp_softc *sc)
 {
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	struct ath10k_pci_pipe *pipe;
@@ -435,7 +445,7 @@ static int ath10k_pci_alloc_pipes(struct ath10k *ar)
 	return 0;
 }
 
-static void ath10k_pci_free_pipes(struct ath10k *ar)
+static void ath10k_pci_free_pipes(struct athp_softc *sc)
 {
 	int i;
 
@@ -443,7 +453,7 @@ static void ath10k_pci_free_pipes(struct ath10k *ar)
 		ath10k_ce_free_pipe(ar, i);
 }
 
-static int ath10k_pci_init_pipes(struct ath10k *ar)
+static int ath10k_pci_init_pipes(struct athp_softc *sc)
 {
 	int i, ret;
 
