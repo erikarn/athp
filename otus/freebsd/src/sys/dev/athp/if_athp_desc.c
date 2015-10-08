@@ -94,7 +94,7 @@ athp_load_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
  */
 int
 athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
-	const char *name, int ds_size)
+	const char *name, int alignment, int ds_size)
 {
 	int error;
 

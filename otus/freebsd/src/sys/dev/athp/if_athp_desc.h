@@ -21,7 +21,8 @@ struct athp_descdma {
 };
 
 extern	int athp_descdma_alloc(struct athp_softc *sc,
-	    struct athp_descdma *dd, const char *name, int ds_size);
+	    struct athp_descdma *dd, const char *name,
+	    int alignment, int ds_size);
 extern	void athp_descdma_free(struct athp_softc *sc,
 	    struct athp_descdma *dd);
 /*
