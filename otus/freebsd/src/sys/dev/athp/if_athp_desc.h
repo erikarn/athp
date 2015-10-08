@@ -12,7 +12,7 @@ struct athp_softc;
  */
 struct athp_descdma {
 	const char		*dd_name;
-	int			dd_descsize;
+	void			*dd_desc;
 	bus_addr_t		dd_desc_paddr;
 	bus_size_t		dd_desc_len;
 	bus_dma_segment_t	dd_dseg;
