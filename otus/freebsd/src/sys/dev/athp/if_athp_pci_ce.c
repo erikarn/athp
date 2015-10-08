@@ -76,11 +76,14 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
+#include "if_athp_desc.h"
 #include "if_athp_var.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci.h"
 #include "if_athp_regio.h"
 #include "if_athp_pci_chip.h"
+
+MALLOC_DECLARE(M_ATHPDEV);
 
 /*
  * This is the copy-engine DMA support.
@@ -996,12 +999,12 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 
 	nentries = roundup_pow_of_two(nentries);
 
-	src_ring = kzalloc(sizeof(*src_ring) +
+	src_ring = malloc(sizeof(*src_ring) +
 			   (nentries *
 			    sizeof(*src_ring->per_transfer_context)),
-			   GFP_KERNEL);
+			   M_ATHPDEV,
+			   M_NOWAIT | M_ZERO);
 	if (src_ring == NULL) {
-//		return ERR_PTR(-ENOMEM);
 		return (NULL);
 	}
 
@@ -1018,10 +1021,15 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 				    CE_DESC_RING_ALIGN),
 				   &base_addr, GFP_KERNEL);
 	if (!src_ring->base_addr_owner_space_unaligned) {
-		kfree(src_ring);
-//		return ERR_PTR(-ENOMEM);
+		free(src_ring, M_ATHPDEV);
 		return (NULL);
 	}
+
+	/*
+	 * base_addr_owner_space_unaligned is the KVA address.
+	 * base_addr (and thus base_addr_ce_space_unaligned)
+	 *   is the physical address (ie, for device IO, etc.)
+	 */
 
 	src_ring->base_addr_ce_space_unaligned = base_addr;
 
@@ -1036,25 +1044,32 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 	 * Also allocate a shadow src ring in regular
 	 * mem to use for faster access.
 	 */
-	src_ring->shadow_base_unaligned =
-		kmalloc((nentries * sizeof(struct ce_desc) +
-			 CE_DESC_RING_ALIGN), GFP_KERNEL);
-	if (!src_ring->shadow_base_unaligned) {
-		dma_free_coherent(ar->dev,
-				  (nentries * sizeof(struct ce_desc) +
-				   CE_DESC_RING_ALIGN),
-				  src_ring->base_addr_owner_space,
-				  src_ring->base_addr_ce_space);
-		kfree(src_ring);
-//		return ERR_PTR(-ENOMEM);
-		return (NULL);
+	src_ring->shadow_base_unaligned = contigmalloc(
+	    (nentries * sizeof(struct ce_desc)),	/* size */
+	    M_ATHPDEV,
+	    M_NOWAIT | M_ZERO,
+	    0x1000000,		/* paddr low */
+	    0xffffffff,		/* paddr high */
+	    PAGE_SIZE,		/* alignment */
+	    0ul);		/* boundary */
+	if (src_ring->shadow_base_unaligned == NULL) {
+		device_printf(sc->sc_dev,
+		    "%s: couldn't alloc shadow base\n",
+		    __func__);
+		goto error;
 	}
-
-	src_ring->shadow_base = PTR_ALIGN(
-			src_ring->shadow_base_unaligned,
-			CE_DESC_RING_ALIGN);
+	src_ring->shadow_base = src_ring->shadow_base_unaligned;
 
 	return src_ring;
+error:
+	/* XXX TODO: free things */
+	device_printf(sc->sc_dev, "%s: TODO: handle error!\n", __func__);
+	if (src_ring->shadow_base_unaligned)
+		contigfree(src_ring->shadow_base_unaligned,
+		    (nentries * sizeof(struct ce_desc)),
+		    M_ATHPDEV);
+	free(src_ring, M_ATHPDEV);
+	return (NULL);
 }
 
 static struct ath10k_ce_ring *
@@ -1067,12 +1082,12 @@ ath10k_ce_alloc_dest_ring(struct athp_softc *sc, unsigned int ce_id,
 
 	nentries = roundup_pow_of_two(attr->dest_nentries);
 
-	dest_ring = kzalloc(sizeof(*dest_ring) +
+	dest_ring = malloc(sizeof(*dest_ring) +
 			    (nentries *
 			     sizeof(*dest_ring->per_transfer_context)),
-			    GFP_KERNEL);
+			    M_ATHPDEV,
+			    M_NOWAIT | M_ZERO);
 	if (dest_ring == NULL) {
-//		return ERR_PTR(-ENOMEM);
 		return (NULL);
 	}
 
@@ -1089,8 +1104,7 @@ ath10k_ce_alloc_dest_ring(struct athp_softc *sc, unsigned int ce_id,
 				    CE_DESC_RING_ALIGN),
 				   &base_addr, GFP_KERNEL);
 	if (!dest_ring->base_addr_owner_space_unaligned) {
-		kfree(dest_ring);
-//		return ERR_PTR(-ENOMEM);
+		free(dest_ring, M_ATHPDEV);
 		return (NULL);
 	}
 
@@ -1128,7 +1142,7 @@ int ath10k_ce_init_pipe(struct athp_softc *sc, unsigned int ce_id,
 	if (attr->src_nentries) {
 		ret = ath10k_ce_init_src_ring(sc, ce_id, attr);
 		if (ret) {
-			ath10k_err(sc, "Failed to initialize CE src ring for ID: %d (%d)\n",
+			ATHP_ERR(sc, "Failed to initialize CE src ring for ID: %d (%d)\n",
 				   ce_id, ret);
 			return ret;
 		}
@@ -1137,7 +1151,7 @@ int ath10k_ce_init_pipe(struct athp_softc *sc, unsigned int ce_id,
 	if (attr->dest_nentries) {
 		ret = ath10k_ce_init_dest_ring(sc, ce_id, attr);
 		if (ret) {
-			ath10k_err(sc, "Failed to initialize CE dest ring for ID: %d (%d)\n",
+			ATHP_ERR(sc, "Failed to initialize CE dest ring for ID: %d (%d)\n",
 				   ce_id, ret);
 			return ret;
 		}
@@ -1215,7 +1229,7 @@ ath10k_ce_alloc_pipe(struct athp_softc *sc, int ce_id,
 		ce_state->src_ring = ath10k_ce_alloc_src_ring(sc, ce_id, attr);
 		if (IS_ERR(ce_state->src_ring)) {
 			ret = PTR_ERR(ce_state->src_ring);
-			ath10k_err(sc, "failed to allocate copy engine source ring %d: %d\n",
+			ATHP_ERR(sc, "failed to allocate copy engine source ring %d: %d\n",
 				   ce_id, ret);
 			ce_state->src_ring = NULL;
 			return ret;
@@ -1227,7 +1241,7 @@ ath10k_ce_alloc_pipe(struct athp_softc *sc, int ce_id,
 								attr);
 		if (IS_ERR(ce_state->dest_ring)) {
 			ret = PTR_ERR(ce_state->dest_ring);
-			ath10k_err(sc, "failed to allocate copy engine destination ring %d: %d\n",
+			ATHP_ERR(sc, "failed to allocate copy engine destination ring %d: %d\n",
 				   ce_id, ret);
 			ce_state->dest_ring = NULL;
 			return ret;
@@ -1243,6 +1257,7 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 	struct athp_pci_softc *psc = sc->sc_psc;
 	struct ath10k_ce_pipe *ce_state = &psc->ce_states[ce_id];
 
+#if 0
 	if (ce_state->src_ring) {
 		kfree(ce_state->src_ring->shadow_base_unaligned);
 		dma_free_coherent(ar->dev,
@@ -1253,7 +1268,17 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 				  ce_state->src_ring->base_addr_ce_space);
 		kfree(ce_state->src_ring);
 	}
+#else
+	if (ce_state->src_ring) {
+		device_printf(sc->sc_dev, "%s: TODO\n", __func__);
+		contigfree(ce_state->shadow_base_unaligned,
+		    (ce_state->src_ring->nentries * sizeof(struct ce_desc)),	/* size */
+		    M_ATHPDEV);
+		free(ce_state->src_ring, M_ATHPDEV);
+	}
+#endif
 
+#if 0
 	if (ce_state->dest_ring) {
 		dma_free_coherent(ar->dev,
 				  (ce_state->dest_ring->nentries *
@@ -1263,6 +1288,15 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 				  ce_state->dest_ring->base_addr_ce_space);
 		kfree(ce_state->dest_ring);
 	}
+#else
+	if (ce_state->dest_ring) {
+		device_printf(sc->sc_dev, "%s: TODO\n", __func__);
+		contigfree(ce_state->shadow_base_unaligned,
+		    (ce_state->dest_ring->nentries * sizeof(struct ce_desc)),	/* size */
+		    M_ATHPDEV);
+		free(ce_state->dest_ring, M_ATHPDEV);
+	}
+#endif
 
 	ce_state->src_ring = NULL;
 	ce_state->dest_ring = NULL;

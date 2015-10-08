@@ -24,6 +24,6 @@ SRCS    += if_athp_pci_chip.c
 SRCS    += if_athp_desc.c
 
 # This is the Copy Engine interface - the DMA ring hardware access.
-#SRCS    += if_athp_pci_ce.c
+SRCS    += if_athp_pci_ce.c
 
 .include <bsd.kmod.mk>
