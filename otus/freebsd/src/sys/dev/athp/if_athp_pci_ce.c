@@ -995,7 +995,6 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 {
 	struct ath10k_ce_ring *src_ring;
 	uint32_t nentries = attr->src_nentries;
-	dma_addr_t base_addr;
 
 	nentries = roundup_pow_of_two(nentries);
 
@@ -1015,14 +1014,16 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 	 * Legacy platforms that do not support cache
 	 * coherent DMA are unsupported
 	 */
-	src_ring->base_addr_owner_space_unaligned =
-		dma_alloc_coherent(ar->dev,
-				   (nentries * sizeof(struct ce_desc) +
-				    CE_DESC_RING_ALIGN),
-				   &base_addr, GFP_KERNEL);
-	if (!src_ring->base_addr_owner_space_unaligned) {
-		free(src_ring, M_ATHPDEV);
-		return (NULL);
+	/*
+	 * For FreeBSD, the returned space is definitely already aligned
+	 * for us.
+	 */
+	if (athp_descdma_alloc(sc, &src_ring->hw_desc, "athp src_ring",
+	    CE_DESC_RING_ALIGN,
+	    (nentries * sizeof(struct ce_desc))) != 0) {
+		device_printf(sc->sc_dev, "%s: hw_desc alloc failed\n",
+		    __func__);
+		goto error;
 	}
 
 	/*
@@ -1030,21 +1031,14 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 	 * base_addr (and thus base_addr_ce_space_unaligned)
 	 *   is the physical address (ie, for device IO, etc.)
 	 */
-
-	src_ring->base_addr_ce_space_unaligned = base_addr;
-
-	src_ring->base_addr_owner_space = PTR_ALIGN(
-			src_ring->base_addr_owner_space_unaligned,
-			CE_DESC_RING_ALIGN);
-	src_ring->base_addr_ce_space = ALIGN(
-			src_ring->base_addr_ce_space_unaligned,
-			CE_DESC_RING_ALIGN);
+	src_ring->base_addr_owner_space = src_ring->hw_desc.dd_desc;
+	src_ring->base_addr_ce_space = src_ring->hw_desc.dd_desc_paddr;
 
 	/*
 	 * Also allocate a shadow src ring in regular
 	 * mem to use for faster access.
 	 */
-	src_ring->shadow_base_unaligned = contigmalloc(
+	src_ring->shadow_base = contigmalloc(
 	    (nentries * sizeof(struct ce_desc)),	/* size */
 	    M_ATHPDEV,
 	    M_NOWAIT | M_ZERO,
@@ -1052,22 +1046,27 @@ ath10k_ce_alloc_src_ring(struct athp_softc *sc, unsigned int ce_id,
 	    0xffffffff,		/* paddr high */
 	    PAGE_SIZE,		/* alignment */
 	    0ul);		/* boundary */
-	if (src_ring->shadow_base_unaligned == NULL) {
+	if (src_ring->shadow_base == NULL) {
 		device_printf(sc->sc_dev,
 		    "%s: couldn't alloc shadow base\n",
 		    __func__);
 		goto error;
 	}
-	src_ring->shadow_base = src_ring->shadow_base_unaligned;
+
+	/*
+	 * Correctly initialize memory to 0 to prevent garbage
+	 * data crashing system when download firmware
+	 */
+	memset(src_ring->base_addr_owner_space, 0,
+	       nentries * sizeof(struct ce_desc));
 
 	return src_ring;
 error:
-	/* XXX TODO: free things */
-	device_printf(sc->sc_dev, "%s: TODO: handle error!\n", __func__);
-	if (src_ring->shadow_base_unaligned)
-		contigfree(src_ring->shadow_base_unaligned,
+	if (src_ring->shadow_base)
+		contigfree(src_ring->shadow_base,
 		    (nentries * sizeof(struct ce_desc)),
 		    M_ATHPDEV);
+	athp_descdma_free(sc, &src_ring->hw_desc);
 	free(src_ring, M_ATHPDEV);
 	return (NULL);
 }
@@ -1078,7 +1077,6 @@ ath10k_ce_alloc_dest_ring(struct athp_softc *sc, unsigned int ce_id,
 {
 	struct ath10k_ce_ring *dest_ring;
 	uint32_t nentries;
-	dma_addr_t base_addr;
 
 	nentries = roundup_pow_of_two(attr->dest_nentries);
 
@@ -1095,36 +1093,41 @@ ath10k_ce_alloc_dest_ring(struct athp_softc *sc, unsigned int ce_id,
 	dest_ring->nentries_mask = nentries - 1;
 
 	/*
-	 * Legacy platforms that do not support cache
-	 * coherent DMA are unsupported
+	 * For FreeBSD, the returned space is definitely already aligned
+	 * for us.
 	 */
-	dest_ring->base_addr_owner_space_unaligned =
-		dma_alloc_coherent(ar->dev,
-				   (nentries * sizeof(struct ce_desc) +
-				    CE_DESC_RING_ALIGN),
-				   &base_addr, GFP_KERNEL);
-	if (!dest_ring->base_addr_owner_space_unaligned) {
-		free(dest_ring, M_ATHPDEV);
-		return (NULL);
+	if (athp_descdma_alloc(sc, &dest_ring->hw_desc, "athp dest_ring",
+	    CE_DESC_RING_ALIGN,
+	    (nentries * sizeof(struct ce_desc))) != 0) {
+		device_printf(sc->sc_dev, "%s: hw_desc alloc failed\n",
+		    __func__);
+		goto error;
 	}
 
-	dest_ring->base_addr_ce_space_unaligned = base_addr;
+	/*
+	 * base_addr_owner_space_unaligned is the KVA address.
+	 * base_addr (and thus base_addr_ce_space_unaligned)
+	 *   is the physical address (ie, for device IO, etc.)
+	 */
+	dest_ring->base_addr_owner_space = dest_ring->hw_desc.dd_desc;
+	dest_ring->base_addr_ce_space = dest_ring->hw_desc.dd_desc_paddr;
 
 	/*
 	 * Correctly initialize memory to 0 to prevent garbage
 	 * data crashing system when download firmware
 	 */
-	memset(dest_ring->base_addr_owner_space_unaligned, 0,
-	       nentries * sizeof(struct ce_desc) + CE_DESC_RING_ALIGN);
-
-	dest_ring->base_addr_owner_space = PTR_ALIGN(
-			dest_ring->base_addr_owner_space_unaligned,
-			CE_DESC_RING_ALIGN);
-	dest_ring->base_addr_ce_space = ALIGN(
-			dest_ring->base_addr_ce_space_unaligned,
-			CE_DESC_RING_ALIGN);
+	memset(dest_ring->base_addr_owner_space, 0,
+	       nentries * sizeof(struct ce_desc));
 
 	return dest_ring;
+error:
+	if (dest_ring->shadow_base)
+		contigfree(dest_ring->shadow_base,
+		    (nentries * sizeof(struct ce_desc)),
+		    M_ATHPDEV);
+	athp_descdma_free(sc, &dest_ring->hw_desc);
+	free(dest_ring, M_ATHPDEV);
+	return (NULL);
 }
 
 /*
@@ -1196,7 +1199,6 @@ ath10k_ce_alloc_pipe(struct athp_softc *sc, int ce_id,
 {
 	struct athp_pci_softc *psc = sc->sc_psc;
 	struct ath10k_ce_pipe *ce_state = &psc->ce_states[ce_id];
-	int ret;
 
 	/*
 	 * Make sure there's enough CE ringbuffer entries for HTT TX to avoid
@@ -1227,24 +1229,22 @@ ath10k_ce_alloc_pipe(struct athp_softc *sc, int ce_id,
 
 	if (attr->src_nentries) {
 		ce_state->src_ring = ath10k_ce_alloc_src_ring(sc, ce_id, attr);
-		if (IS_ERR(ce_state->src_ring)) {
-			ret = PTR_ERR(ce_state->src_ring);
-			ATHP_ERR(sc, "failed to allocate copy engine source ring %d: %d\n",
-				   ce_id, ret);
+		if (ce_state->src_ring == NULL) {
+			ATHP_ERR(sc, "failed to allocate copy engine source ring %d\n",
+				   ce_id);
 			ce_state->src_ring = NULL;
-			return ret;
+			return (ENOMEM);
 		}
 	}
 
 	if (attr->dest_nentries) {
 		ce_state->dest_ring = ath10k_ce_alloc_dest_ring(sc, ce_id,
 								attr);
-		if (IS_ERR(ce_state->dest_ring)) {
-			ret = PTR_ERR(ce_state->dest_ring);
-			ATHP_ERR(sc, "failed to allocate copy engine destination ring %d: %d\n",
-				   ce_id, ret);
+		if (ce_state->dest_ring == NULL) {
+			ATHP_ERR(sc, "failed to allocate copy engine destination ring %d\n",
+				   ce_id);
 			ce_state->dest_ring = NULL;
-			return ret;
+			return (ENOMEM);
 		}
 	}
 
@@ -1271,9 +1271,11 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 #else
 	if (ce_state->src_ring) {
 		device_printf(sc->sc_dev, "%s: TODO\n", __func__);
-		contigfree(ce_state->shadow_base_unaligned,
-		    (ce_state->src_ring->nentries * sizeof(struct ce_desc)),	/* size */
-		    M_ATHPDEV);
+		if (ce_state->src_ring->shadow_base) {
+			contigfree(ce_state->src_ring->shadow_base,
+			    (ce_state->src_ring->nentries * sizeof(struct ce_desc)),	/* size */
+			    M_ATHPDEV);
+		}
 		free(ce_state->src_ring, M_ATHPDEV);
 	}
 #endif
@@ -1291,9 +1293,11 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 #else
 	if (ce_state->dest_ring) {
 		device_printf(sc->sc_dev, "%s: TODO\n", __func__);
-		contigfree(ce_state->shadow_base_unaligned,
-		    (ce_state->dest_ring->nentries * sizeof(struct ce_desc)),	/* size */
-		    M_ATHPDEV);
+		if (ce_state->dest_ring->shadow_base) {
+			contigfree(ce_state->dest_ring->shadow_base,
+			    (ce_state->dest_ring->nentries * sizeof(struct ce_desc)),	/* size */
+			    M_ATHPDEV);
+		}
 		free(ce_state->dest_ring, M_ATHPDEV);
 	}
 #endif

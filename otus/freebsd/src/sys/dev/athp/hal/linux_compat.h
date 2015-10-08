@@ -29,4 +29,6 @@ roundup_pow_of_two(unsigned long n)
 	return 1UL << flsl(n - 1);
 }
 
+#define BUILD_BUG_ON(x) CTASSERT(!(x))
+
 #endif	/* __LINUX_COMPAT_H__ */

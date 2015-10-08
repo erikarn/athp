@@ -77,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_var.h"
+#include "if_athp_desc.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci.h"
 #include "if_athp_regio.h"
@@ -474,10 +475,7 @@ ath10k_pci_irq_disable(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
 
-	device_printf(sc->sc_dev, "%s: TODO: call ath10k_ce_disable_interrupts\n", __func__);
-#if 0
-	ath10k_ce_disable_interrupts(ar);
-#endif
+	ath10k_ce_disable_interrupts(sc);
 	ath10k_pci_disable_and_clear_legacy_irq(psc);
 	ath10k_pci_irq_msi_fw_mask(psc);
 	return (0);
@@ -502,10 +500,7 @@ ath10k_pci_irq_enable(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
 
-	device_printf(sc->sc_dev, "%s: TODO: call ath10k_ce_enable_interrupts\n", __func__);
-#if 0
-	ath10k_ce_enable_interrupts(ar);
-#endif
+	ath10k_ce_enable_interrupts(sc);
 	ath10k_pci_enable_legacy_irq(psc);
 	ath10k_pci_irq_msi_fw_unmask(psc);
 }

@@ -86,27 +86,24 @@ struct ath10k_ce_ring {
 	/* cached copy */
 	unsigned int hw_index;
 
-	/* Start of DMA-coherent area reserved for descriptors */
-	/* Host address space */
-	void *base_addr_owner_space_unaligned;
-	/* CE address space */
-	uint32_t base_addr_ce_space_unaligned;
-
 	/*
 	 * Actual start of descriptors.
 	 * Aligned to descriptor-size boundary.
 	 * Points into reserved DMA-coherent area, above.
 	 */
+	struct athp_descdma hw_desc;
+
 	/* Host address space */
 	void *base_addr_owner_space;
 
 	/* CE address space */
+	/* XXX TODO: should be bus_addr_t */
 	uint32_t base_addr_ce_space;
+
 	/*
 	 * Start of shadow copy of descriptors, within regular memory.
 	 * Aligned to descriptor-size boundary.
 	 */
-	void *shadow_base_unaligned;
 	struct ce_desc *shadow_base;
 
 	/* keep last */
