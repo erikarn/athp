@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_desc.h"
 #include "if_athp_var.h"
 #include "if_athp_pci_ce.h"
+#include "if_athp_pci_pipe.h"
 #include "if_athp_pci.h"
 
 #include "if_athp_main.h"
@@ -283,6 +284,16 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
+	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
+	    NULL, psc);
+	(void) taskqueue_start_threads(&psc->pipe_taskq, 1, PI_NET, "%s pipe taskq",
+	    device_get_nameunit(dev));
+	if (psc->pipe_taskq == NULL) {
+		device_printf(dev, "%s: couldn't create pipe taskq\n",
+		    __func__);
+		err = ENXIO;
+		goto bad;
+	}
 
 	/*
 	 * Look at the device/vendor ID and choose which register offset
@@ -462,6 +473,10 @@ bad:
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
 	mtx_destroy(&sc->sc_mtx);
+	if (psc->pipe_taskq) {
+		taskqueue_drain_all(psc->pipe_taskq);
+		taskqueue_free(psc->pipe_taskq);
+	}
 	return (err);
 }
 
@@ -502,6 +517,12 @@ athp_pci_detach(device_t dev)
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
 	mtx_destroy(&sc->sc_mtx);
+
+	/* Tear down the pipe taskqueue */
+	if (psc->pipe_taskq) {
+		taskqueue_drain_all(psc->pipe_taskq);
+		taskqueue_free(psc->pipe_taskq);
+	}
 
 	return (0);
 }

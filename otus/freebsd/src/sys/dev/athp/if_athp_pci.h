@@ -43,6 +43,10 @@ struct athp_pci_softc {
 	struct mtx		ce_mtx;
 	struct ath10k_ce_pipe	*ce_diag;
 	struct ath10k_ce_pipe	ce_states[CE_COUNT_MAX];
+
+	/* Pipe state */
+	struct ath10k_pci_pipe	pipe_info[CE_COUNT_MAX];
+	struct taskqueue	*pipe_taskq;
 };
 
 #endif	/* __IF_ATHP_PCI_H__ */
