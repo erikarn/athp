@@ -178,3 +178,41 @@ athp_descdma_free(struct athp_softc *sc, struct athp_descdma *dd)
 
 	memset(dd, 0, sizeof(*dd));
 }
+
+/*
+ * Allocate a DMA tag with the given buffer size.
+ *
+ * Each copyengine ring has a different idea of what the maximum
+ * buffer size is.  This allows the CE/PCI pipe code to have
+ * a separate DMA tag for each with the relevant constraints.
+ */
+int
+athp_dma_head_alloc(struct athp_softc *sc, struct athp_dma_head *dh,
+    int buf_size)
+{
+	int error;
+
+	bzero(dh, sizeof(*dh));
+	error = bus_dma_tag_create(bus_get_dma_tag(sc->sc_dev), 1, 0,
+	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
+	    buf_size, 1, buf_size, BUS_DMA_NOWAIT, NULL, NULL,
+	    &dh->tag);
+	if (error != 0) {
+		ATHP_ERR(sc, "%s: bus_dma_tag_create failed: %d\n",
+		    __func__,
+		    error);
+		return (error);
+	}
+	dh->buf_size = buf_size;
+	return (0);
+}
+
+void
+athp_dma_head_free(struct athp_softc *sc, struct athp_dma_head *dh)
+{
+
+	if (dh->tag == NULL)
+		return;
+	bus_dma_tag_destroy(dh->tag);
+	bzero(dh, sizeof(*dh));
+}
