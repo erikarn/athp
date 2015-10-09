@@ -30,13 +30,15 @@ struct ath10k_pci_pipe {
 
 	/* Convenience back pointer to hif_ce_state. */
 	struct athp_softc *sc;
+	struct athp_pci_softc *psc;
+
+	/* busdma tag for doing said DMA */
+	struct athp_dma_head dmatag;
 
 	size_t buf_sz;
 
 	/* protects compl_free and num_send_allowed */
 	struct mtx pipe_lock;
-
-	struct athp_pci_softc *psc;
 
 	/* Interrupt task - scheduled to do transmit/receive work */
 	struct task intr;

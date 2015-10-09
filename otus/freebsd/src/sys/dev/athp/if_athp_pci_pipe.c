@@ -117,17 +117,44 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	struct athp_softc *sc = pipe->sc;
 	struct ath10k_pci *psc = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
-	struct sk_buff *skb;
-	dma_addr_t paddr;
+	struct mbuf *m;
 	int ret;
 
-	lockdep_assert_held(&ar_pci->ce_lock);
+	ATHP_PCI_CE_LOCK_ASSERT(psc);
 
-	skb = dev_alloc_skb(pipe->buf_sz);
-	if (!skb)
+	m = m_get2(pipe->buf_sz, M_NOWAIT, MT_DATA, M_PKTHDR);
+	if (m == NULL)
 		return -ENOMEM;
 
+	/* XXX TODO need to ensure it's correctly aligned */
 	WARN_ONCE((unsigned long)skb->data & 3, "unaligned skb");
+
+	/*
+	 * Ok, here's the fun FreeBSD specific bit.
+	 *
+	 * Each slot in the ring needs to have the busdma state
+	 * in order to map/unmap/etc as appropriate.
+	 *
+	 * The linux driver doesn't have it; it creates a physical
+	 * mapping via dma_map_single() and stores the paddr;
+	 * it doesn't have a per-slot struct to store state in.
+	 * It then crafts some custom stuff in skb->cb to store
+	 * the paddr in and some hash membership for doing later
+	 * paddr -> vaddr lookups.  Odd, but okay.
+	 *
+	 * So, I need to go and craft that stuff (ie, what "ath_buf"
+	 * partially covers in the FreeBSD ath(4) driver) as part
+	 * of the transmit/receive infrastructure.
+	 */
+
+	/*
+	 * That per-slot state also needs to be kept in the ring,
+	 * like what's done in iwn for the RX ring management.
+	 * There's the 'per_transfer_context' that's used by the
+	 * CE code that I think we can piggyback this state struct
+	 * into, which will change how things work a little compared
+	 * to linux.
+	 */
 
 	paddr = dma_map_single(ar->dev, skb->data,
 			       skb->len + skb_tailroom(skb),
@@ -140,6 +167,11 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 
 	ATH10K_SKB_RXCB(skb)->paddr = paddr;
 
+	/*
+	 * Once the mapping is done and we've verified there's only
+	 * a single physical segment, we can hand it to the copy engine
+	 * to queue for receive.
+	 */
 	ret = __ath10k_ce_rx_post_buf(ce_pipe, skb, paddr);
 	if (ret) {
 		ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
@@ -384,52 +416,56 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
  * not yet processed are on a completion queue. They
  * are handled when the completion thread shuts down.
  */
-static void ath10k_pci_buffer_cleanup(struct athp_softc *sc)
+static void
+ath10k_pci_buffer_cleanup(struct athp_softc *sc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = sc->sc_psc;
 	int pipe_num;
 
 	for (pipe_num = 0; pipe_num < CE_COUNT; pipe_num++) {
 		struct ath10k_pci_pipe *pipe_info;
 
-		pipe_info = &ar_pci->pipe_info[pipe_num];
+		pipe_info = &psc->pipe_info[pipe_num];
 		ath10k_pci_rx_pipe_cleanup(pipe_info);
 		ath10k_pci_tx_pipe_cleanup(pipe_info);
 	}
 }
 
-static void ath10k_pci_ce_deinit(struct athp_softc *sc)
+static void
+ath10k_pci_ce_deinit(struct athp_softc *sc)
 {
 	int i;
 
 	for (i = 0; i < CE_COUNT; i++)
-		ath10k_ce_deinit_pipe(ar, i);
+		ath10k_ce_deinit_pipe(sc, i);
 }
 
-static void ath10k_pci_flush(struct athp_softc *sc)
+static void
+ath10k_pci_flush(struct athp_softc *sc)
 {
-	ath10k_pci_kill_tasklet(ar);
-	ath10k_pci_buffer_cleanup(ar);
+	ath10k_pci_kill_tasklet(sc);
+	ath10k_pci_buffer_cleanup(sc);
 }
 
 static int ath10k_pci_alloc_pipes(struct athp_softc *sc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = sc->sc_psc;
 	struct ath10k_pci_pipe *pipe;
 	int i, ret;
 
 	for (i = 0; i < CE_COUNT; i++) {
-		pipe = &ar_pci->pipe_info[i];
-		pipe->ce_hdl = &ar_pci->ce_states[i];
+		pipe = &psc->pipe_info[i];
+		pipe->ce_hdl = &psc->ce_states[i];
 		pipe->pipe_num = i;
 		pipe->hif_ce_state = ar;
 
-		ret = ath10k_ce_alloc_pipe(ar, i, &host_ce_config_wlan[i],
+		ret = ath10k_ce_alloc_pipe(sc, i, &host_ce_config_wlan[i],
 					   ath10k_pci_ce_send_done,
 					   ath10k_pci_ce_recv_data);
 		if (ret) {
-			ath10k_err(ar, "failed to allocate copy engine pipe %d: %d\n",
-				   i, ret);
+			ATHP_ERR(sc,
+			    "failed to allocate copy engine pipe %d: %d\n",
+			    i, ret);
 			return ret;
 		}
 
@@ -439,29 +475,51 @@ static int ath10k_pci_alloc_pipes(struct athp_softc *sc)
 			continue;
 		}
 
+		/*
+		 * Set maximum transfer size for this pipe.
+		 */
 		pipe->buf_sz = (size_t)(host_ce_config_wlan[i].src_sz_max);
+
+		/*
+		 * And initialise a dmatag for this pipe that correctly
+		 * represents the maximum DMA transfer size.
+		 */
+		ret = athp_dma_head_alloc(sc, &pipe->dmatag, pipe->buf_sz);
+		if (ret) {
+			ATHP_ERR(sc, "failed to create dma tag for pipe %d\n",
+			    __func__,
+			    i);
+			return (ret);
+		}
 	}
 
 	return 0;
 }
 
-static void ath10k_pci_free_pipes(struct athp_softc *sc)
+static void
+ath10k_pci_free_pipes(struct athp_softc *sc)
 {
 	int i;
+	struct ath10k_pci_pipe *pipe;
 
-	for (i = 0; i < CE_COUNT; i++)
-		ath10k_ce_free_pipe(ar, i);
+	for (i = 0; i < CE_COUNT; i++) {
+		pipe = &psc->pipe_info[i];
+		ath10k_ce_free_pipe(sc, i);
+		athp_dma_head_free(sc, &pipe->dmatag);
+	}
 }
 
-static int ath10k_pci_init_pipes(struct athp_softc *sc)
+static int
+ath10k_pci_init_pipes(struct athp_softc *sc)
 {
 	int i, ret;
 
 	for (i = 0; i < CE_COUNT; i++) {
-		ret = ath10k_ce_init_pipe(ar, i, &host_ce_config_wlan[i]);
+		ret = ath10k_ce_init_pipe(sc, i, &host_ce_config_wlan[i]);
 		if (ret) {
-			ath10k_err(ar, "failed to initialize copy engine pipe %d: %d\n",
-				   i, ret);
+			ATHP_ERR(sc,
+			    "failed to initialize copy engine pipe %d: %d\n",
+			    i, ret);
 			return ret;
 		}
 	}
