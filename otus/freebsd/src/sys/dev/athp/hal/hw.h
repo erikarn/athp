@@ -411,7 +411,7 @@ enum ath10k_hw_rate_cck {
 #define TARGET_10_4_QWRAP_CONFIG		0
 
 /* Number of Copy Engines supported */
-#define CE_COUNT ar->hw_values->ce_count
+#define CE_COUNT(sc) (sc)->sc_regvals->ce_count
 
 /*
  * Total number of PCIe MSI interrupts requested for all interrupt sources.

@@ -6,6 +6,11 @@
 #define	ATHP_PCI_PS_LOCK_ASSERT(psc)	mtx_assert(&(psc)->ps_mtx, MA_OWNED)
 #define	ATHP_PCI_PS_UNLOCK_ASSERT(psc)	mtx_assert(&(psc)->ps_mtx, MA_NOTOWNED)
 
+#define	ATHP_PCI_CE_LOCK(psc)		mtx_lock(&(psc)->ce_mtx)
+#define	ATHP_PCI_CE_UNLOCK(psc)		mtx_unlock(&(psc)->ce_mtx)
+#define	ATHP_PCI_CE_LOCK_ASSERT(psc)	mtx_assert(&(psc)->ce_mtx, MA_OWNED)
+#define	ATHP_PCI_CE_UNLOCK_ASSERT(psc)	mtx_assert(&(psc)->ce_mtx, MA_NOTOWNED)
+
 /*
  * PCI specific glue for athp/ath10k.
  */
@@ -23,12 +28,25 @@ struct athp_pci_softc {
 	bus_space_tag_t		sc_st;          /* bus space tag */
 	bus_space_handle_t	sc_sh;          /* bus handle tag */
 
-	/* ath10k pci state */
+	/*
+	 * ath10k pci state
+	 */
 	int			num_msi_intrs;
 	uint16_t		link_ctl;
+
+	/* Power management state */
 	struct mtx		ps_mtx;
 	bool			ps_awake;
 	unsigned long		ps_wake_refcount;
+
+	/* Copy engine state */
+	struct mtx		ce_mtx;
+	struct ath10k_ce_pipe	*ce_diag;
+	struct ath10k_ce_pipe	ce_states[CE_COUNT_MAX];
+
+	/* Pipe state */
+	struct ath10k_pci_pipe	pipe_info[CE_COUNT_MAX];
+	struct taskqueue	*pipe_taskq;
 };
 
 #endif	/* __IF_ATHP_PCI_H__ */
