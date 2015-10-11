@@ -42,6 +42,18 @@ Bring-up order; more detail
 Then look at what calls init_pipes() - cold/warm reset, chip reset, etc.
 And hif_powerup().  The target is to complete hif_powerup / hif_powerdown.
 
+The mac80211 setup sequence ends up calling ath10k_core_probe_fw() which
+brings things up and then tears them down again so the ath10k_start() routine
+can bring it up again.  It's .. silly, but that's what ath10k does.
+ath10k_core_probe_fw() is a good finishing point to verify that the basic bits
+are working - I don't think I need interrupts working (yet); I don't think
+I need WMI/HTT working.
+
+However, to tear the state down afterwards (ie, put the core into suspend mode)
+I need to have WMI working as the target suspend call is a WMI message.
+So stub that part of the setup out and just verify that the core can be brought
+up and stopped.
+
 Ie:
 
 * init pipes, incl. replenishing rx mbufs, etc
@@ -58,4 +70,6 @@ At this point the diag read/write works, the CE bits work w/ polling, and
 basic locking is working.  Hopefully the target wakes up and accepts a pipe
 config, and we can make a start on porting the rest of the BMI code for
 firmware injection and start stubbing out the HIF layer for implementing.
+The only bits of HIF layer we need are power_on, stop, power_off and the BMI
+HIF wait for message routine.
 
