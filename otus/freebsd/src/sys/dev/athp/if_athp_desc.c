@@ -193,6 +193,10 @@ athp_dma_head_alloc(struct athp_softc *sc, struct athp_dma_head *dh,
 	int error;
 
 	bzero(dh, sizeof(*dh));
+	device_printf(sc->sc_dev, "%s: called; buf_size=%d\n",
+	    __func__,
+	    buf_size);
+
 	/*
 	 * NB: we require 8-byte alignment for at least RX descriptors;
 	 * I'm not sure yet about the transmit side.

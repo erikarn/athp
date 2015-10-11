@@ -582,6 +582,7 @@ ath10k_pci_alloc_pipes(struct athp_softc *sc)
 	struct athp_pci_softc *psc = sc->sc_psc;
 	struct ath10k_pci_pipe *pipe;
 	int i, ret;
+	int sz;
 
 	for (i = 0; i < CE_COUNT(sc); i++) {
 		pipe = &psc->pipe_info[i];
@@ -614,8 +615,22 @@ ath10k_pci_alloc_pipes(struct athp_softc *sc)
 		/*
 		 * And initialise a dmatag for this pipe that correctly
 		 * represents the maximum DMA transfer size.
+		 *
+		 * XXX TODO: sigh; some of these pipes have buf_sz set to 0
+		 * on the host side, but the target side has either 2k or 4k
+		 * limits.  I don't understand why yet.  So, to work around it
+		 * and hope that it doesn't come back to bite me - configure
+		 * up a mapping, but for 4KB.
 		 */
-		ret = athp_dma_head_alloc(sc, &pipe->dmatag, pipe->buf_sz);
+		if (pipe->buf_sz == 0) {
+			sz = 4096;
+			device_printf(sc->sc_dev,
+			    "%s: WARNING: configuring 4k dmamap size for pipe %d; figure out what to do instead\n",
+			    __func__, i);
+		} else {
+			sz = pipe->buf_sz;
+		}
+		ret = athp_dma_head_alloc(sc, &pipe->dmatag, sz);
 		if (ret) {
 			ATHP_ERR(sc, "%s: failed to create dma tag for pipe %d\n",
 			    __func__,
