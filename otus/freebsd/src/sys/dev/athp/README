@@ -53,3 +53,9 @@ to work.  And /these/ require the CE bits to work, DMA map/unmap to work, etc.
 It doesn't require interrupts; it's polled; so it should be pretty fun to bringup.
 
 I /think/ TX alignment is 4 bytes, not 8 bytes.  Hm.
+
+At this point the diag read/write works, the CE bits work w/ polling, and
+basic locking is working.  Hopefully the target wakes up and accepts a pipe
+config, and we can make a start on porting the rest of the BMI code for
+firmware injection and start stubbing out the HIF layer for implementing.
+
