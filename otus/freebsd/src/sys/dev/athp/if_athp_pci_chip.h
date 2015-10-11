@@ -8,6 +8,7 @@ extern	void ath10k_pci_sleep(struct athp_pci_softc *psc);
 extern	int ath10k_pci_irq_disable(struct athp_pci_softc *psc);
 extern	int ath10k_pci_init_irq(struct athp_pci_softc *psc);
 extern	int ath10k_pci_chip_reset(struct athp_pci_softc *psc);
+extern	bool ath10k_pci_irq_pending(struct athp_pci_softc *psc);
 
 extern	bool ath10k_pci_chip_is_supported(uint32_t dev_id,
 	    uint32_t chip_id);

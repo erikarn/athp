@@ -47,6 +47,14 @@ struct athp_pci_softc {
 	/* Pipe state */
 	struct ath10k_pci_pipe	pipe_info[CE_COUNT_MAX];
 	struct taskqueue	*pipe_taskq;
+
+	/* Various tasks */
+	/* Shared interrupt handler; deferred */
+	struct task		intr_task;
+	/* msi firmware task */
+	struct task		msi_fw_error;
+	/* rx post timeout retry task */
+	struct timeout_task	rx_post_retry;
 };
 
 #endif	/* __IF_ATHP_PCI_H__ */

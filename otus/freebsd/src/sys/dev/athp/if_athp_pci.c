@@ -131,12 +131,55 @@ athp_pci_probe(device_t dev)
 	return (ENXIO);
 }
 
+#if 0
+static void
+ath10k_msi_err_tasklet(void *arg, int npending)
+{
+	struct athp_pci_softc *psc = arg;
+	struct athp_softc *sc = &psc->sc_sc;
+
+	if (! ath10k_pci_fw_has_crashed(psc)) {
+		ATP_WARN(sc, "%s: received unsolicited fw crash interrupt\n",
+		    __func__);
+		return;
+	}
+
+	device_printf(sc->sc_dev, "%s: firmware crash\n", __func__);
+	ath10k_pci_irq_disable(psc);
+	ath10k_pci_fw_crashed_clear(psc);
+	ath10k_pci_fw_crashed_dump(psc);
+}
+#endif
+
+/*
+ * This is the single, shared interrupt task.
+ */
 static void
 athp_pci_intr(void *arg)
 {
 	struct athp_pci_softc *psc = arg;
+	struct athp_softc *sc = &psc->sc_sc;
 
 	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
+
+	if (sc->sc_invalid)
+		return;
+
+	/*
+	 * XXX for now, this is purely for non-MSI interrupts.
+	 */
+	if (! ath10k_pci_irq_pending(psc))
+		return;
+
+	/*
+	 * If this was a filter interrupt then we'd schedule locally.
+	 * (See ath10k_pci_tasklet() versus ath10_pci_interrupt_handler()).
+	 *
+	 * This takes the copy engine lock, updates things, releases the
+	 * lock and calls the callback.  It's going to make consistent and
+	 * predictable locking tricky.
+	 */
+	ath10k_ce_per_engine_service_any(sc);
 }
 
 #define	BS_BAR	0x10

@@ -334,7 +334,7 @@ ath10k_pci_sleep_sync(struct athp_pci_softc *psc)
 	ATHP_PCI_PS_UNLOCK(psc);
 }
 
-static bool
+bool
 ath10k_pci_irq_pending(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
