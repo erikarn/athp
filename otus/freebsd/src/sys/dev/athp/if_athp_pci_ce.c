@@ -1271,7 +1271,6 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 	}
 #else
 	if (ce_state->src_ring) {
-		device_printf(sc->sc_dev, "%s: TODO\n", __func__);
 		if (ce_state->src_ring->shadow_base) {
 			contigfree(ce_state->src_ring->shadow_base,
 			    (ce_state->src_ring->nentries * sizeof(struct ce_desc)),	/* size */
@@ -1293,7 +1292,6 @@ ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id)
 	}
 #else
 	if (ce_state->dest_ring) {
-		device_printf(sc->sc_dev, "%s: TODO\n", __func__);
 		if (ce_state->dest_ring->shadow_base) {
 			contigfree(ce_state->dest_ring->shadow_base,
 			    (ce_state->dest_ring->nentries * sizeof(struct ce_desc)),	/* size */
