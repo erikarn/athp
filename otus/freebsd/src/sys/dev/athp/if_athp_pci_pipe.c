@@ -656,7 +656,7 @@ ath10k_pci_free_pipes(struct athp_softc *sc)
 	}
 }
 
-static int
+int
 ath10k_pci_init_pipes(struct athp_softc *sc)
 {
 	int i, ret;

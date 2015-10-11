@@ -673,20 +673,13 @@ ath10k_pci_warm_reset(struct athp_pci_softc *psc)
 	 */
 	ath10k_pci_warm_reset_si0(psc);
 	ath10k_pci_warm_reset_cpu(psc);
-#if 0
-	ath10k_pci_init_pipes(psc);
-#else
-	device_printf(sc->sc_dev, "%s: TODO: call to pci_init_pipes\n", __func__);
-#endif
+	ath10k_pci_init_pipes(sc);
 	ath10k_pci_wait_for_target_init(psc);
 
 	ath10k_pci_warm_reset_clear_lf(psc);
 	ath10k_pci_warm_reset_ce(psc);
 	ath10k_pci_warm_reset_cpu(psc);
-
-#if 0
-	ath10k_pci_init_pipes(psc);
-#endif
+	ath10k_pci_init_pipes(sc);
 
 	ret = ath10k_pci_wait_for_target_init(psc);
 	if (ret) {
