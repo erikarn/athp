@@ -99,11 +99,11 @@ athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
 {
 	int error;
 
-	ATHP_DPRINTF(sc, ATHP_DEBUG_DESCDMA,
-	    "%s: %s DMA: %d bytes\n", __func__, name, (int) dd->dd_desc_len);
-
 	dd->dd_name = name;
 	dd->dd_desc_len = ds_size;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_DESCDMA,
+	    "%s: %s DMA: %d bytes\n", __func__, name, (int) dd->dd_desc_len);
 
 	/*
 	 * Setup DMA descriptor area.
