@@ -372,9 +372,12 @@ athp_pci_attach(device_t dev)
 
 	/*
 	 * Setup DMA descriptor area.
+	 *
+	 * XXX TODO: should we enforce > 1 byte alignment anywhere?
+	 * The descriptor rings are all 8 bytes.
 	 */
 	if (bus_dma_tag_create(bus_get_dma_tag(dev),    /* parent */
-	    1, 0,		    /* alignment, bounds */
+	    8, 0,		    /* alignment, bounds */
 	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
 	    BUS_SPACE_MAXADDR,       /* highaddr */
 	    NULL, NULL,	      /* filter, filterarg */

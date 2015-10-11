@@ -193,7 +193,11 @@ athp_dma_head_alloc(struct athp_softc *sc, struct athp_dma_head *dh,
 	int error;
 
 	bzero(dh, sizeof(*dh));
-	error = bus_dma_tag_create(bus_get_dma_tag(sc->sc_dev), 1, 0,
+	/*
+	 * NB: we require 8-byte alignment for at least RX descriptors;
+	 * I'm not sure yet about the transmit side.
+	 */
+	error = bus_dma_tag_create(bus_get_dma_tag(sc->sc_dev), 8, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    buf_size, 1, buf_size, BUS_DMA_NOWAIT, NULL, NULL,
 	    &dh->tag);
@@ -215,4 +219,84 @@ athp_dma_head_free(struct athp_softc *sc, struct athp_dma_head *dh)
 		return;
 	bus_dma_tag_destroy(dh->tag);
 	bzero(dh, sizeof(*dh));
+}
+
+/*
+ * Load/unload an mbuf into the given athp_dma_mbuf struct.
+ *
+ * For now, it's the callers responsibility to squish the mbuf down
+ * to a single buffer.
+ *
+ * Later on we'll look at supporting scatter/gather on the transmit
+ * side; the receive side will end up being multiple mbufs that we have
+ * to chain together.
+ */
+int
+athp_dma_mbuf_load(struct athp_softc *sc, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm, struct mbuf *m)
+{
+	int ret;
+	bus_addr_t paddr;
+
+	bzero(dm, sizeof(*dm));
+	/*
+	 * XXX Note: we're reusing athp_load_cb here; the above is
+	 * for descriptors and this is for data contents.
+	 * If we ever want to support loading >1 address or doing it
+	 * differently then we should use a different callback.
+	 */
+	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *),
+	    dh->buf_size, athp_load_cb, &paddr, BUS_DMA_NOWAIT);
+	if (ret != 0)
+		return (ret);
+	dm->paddr = paddr;
+	return (0);
+}
+
+void
+athp_dma_mbuf_unload(struct athp_softc *sc, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	bus_dmamap_unload(dh->tag, dm->map);
+	bzero(dm, sizeof(*dm));
+}
+
+/*
+ * Sync operations to do before/after transmit and receive.
+ */
+void
+athp_dma_mbuf_pre_xmit(struct athp_softc *sc, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_PREREAD |
+	    BUS_DMASYNC_PREWRITE);
+}
+
+void
+athp_dma_mbuf_post_xmit(struct athp_softc *sc, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_PREREAD |
+	    BUS_DMASYNC_POSTWRITE);
+}
+
+void
+athp_dma_mbuf_pre_recv(struct athp_softc *sc, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_PREREAD |
+	    BUS_DMASYNC_PREWRITE);
+}
+
+void
+athp_dma_mbuf_post_recv(struct athp_softc *sc, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_POSTREAD |
+	    BUS_DMASYNC_POSTWRITE);
 }

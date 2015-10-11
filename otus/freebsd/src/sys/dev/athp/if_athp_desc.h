@@ -71,8 +71,7 @@ extern	int athp_dma_mbuf_load(struct athp_softc *sc,
 	    struct mbuf *m);
 extern	void athp_dma_mbuf_unload(struct athp_softc *sc,
 	    struct athp_dma_head *dh,
-	    struct athp_dma_mbuf *dm,
-	    struct mbuf *m);
+	    struct athp_dma_mbuf *dm);
 /* Call before an mbuf is handed to the hardware for transmit. */
 extern	void athp_dma_mbuf_pre_xmit(struct athp_softc *sc,
 	    struct athp_dma_head *dh,
