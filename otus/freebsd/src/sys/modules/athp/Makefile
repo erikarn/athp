@@ -27,6 +27,6 @@ SRCS    += if_athp_desc.c
 SRCS    += if_athp_pci_ce.c
 
 # This is the PCI pipe code - linking the PCI bus code to the CE.
-# SRCS    += if_athp_pci_pipe.c
+SRCS    += if_athp_pci_pipe.c
 
 .include <bsd.kmod.mk>

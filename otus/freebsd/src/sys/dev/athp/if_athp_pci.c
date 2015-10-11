@@ -404,6 +404,16 @@ athp_pci_attach(device_t dev)
 	 */
 
 	/* Alloc pipes */
+	ret = ath10k_pci_alloc_pipes(sc);
+	if (ret) {
+		device_printf(sc->sc_dev, "%s: pci_alloc_pipes failed: %d\n",
+		    __func__,
+		    ret);
+		/* XXX cleanup */
+		err = ENXIO;
+		goto bad3;
+	}
+
 	/* deinit ce */
 	/* disable irq */
 	ret = ath10k_pci_irq_disable(psc);
@@ -504,9 +514,18 @@ athp_pci_detach(device_t dev)
 	/* detach main driver */
 	(void) athp_detach(sc);
 
-	/*
-	 * Detach PCI specific bits
-	 */
+	/* kill tasklet(s) */
+
+	/* deinit irq */
+
+	/* ce deinit */
+	ath10k_pci_ce_deinit(sc);
+
+	/* free pipes */
+	ath10k_pci_free_pipes(sc);
+
+	/* pci release */
+	/* sleep sync */
 
 	/* Free bus resources */
 	bus_generic_detach(dev);

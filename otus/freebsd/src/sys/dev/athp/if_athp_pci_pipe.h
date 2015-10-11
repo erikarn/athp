@@ -44,8 +44,8 @@ struct ath10k_pci_pipe {
 	struct task intr;
 };
 
-/*
- * XXX TODO: functions!
- */
+extern	void ath10k_pci_ce_deinit(struct athp_softc *sc);
+extern	int ath10k_pci_alloc_pipes(struct athp_softc *sc);
+extern	void ath10k_pci_free_pipes(struct athp_softc *sc);
 
 #endif /* __ATHP_PCI_PIPE_H__ */
