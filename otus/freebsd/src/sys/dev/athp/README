@@ -42,6 +42,9 @@ Bring-up order; more detail
 Then look at what calls init_pipes() - cold/warm reset, chip reset, etc.
 And hif_powerup().  The target is to complete hif_powerup / hif_powerdown.
 
+* then, just port / stub appropriately the hif layer, only implementing the
+  pieces we need and printf() stubbing the rest.
+
 The mac80211 setup sequence ends up calling ath10k_core_probe_fw() which
 brings things up and then tears them down again so the ath10k_start() routine
 can bring it up again.  It's .. silly, but that's what ath10k does.
