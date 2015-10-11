@@ -24,3 +24,32 @@ Notes:
 * it supports newer firmware, but chances are peregrine support is only 10.1 / 10.2
 * .. so don't cheat by hard-coding 10.1 or 10.2 APIs; we have to do this somewhat
   clean early on.
+
+
+Bring-up order; more detail
+
+* probe/attach
+* pci bits (chip)
+* sleep/wake
+* ce bits
+* busdma bits for mbuf, etc
+* pipe bits, stubbed out
+* wire up interrupts, enable/disable interrupts, even if it's legacy interrupts
+* .. and add per-pipe interrupt task, schedule it appropriately
+* wire up the global rx retry taskqueue as a taskqueue_timer
+* .. and ensure the above gets cleaned up during shutdown
+
+Then look at what calls init_pipes() - cold/warm reset, chip reset, etc.
+And hif_powerup().  The target is to complete hif_powerup / hif_powerdown.
+
+Ie:
+
+* init pipes, incl. replenishing rx mbufs, etc
+* init config
+* wake target cpu
+
+This requires pci_diag_read32(), pci_diag_write32(), pci_diag_writemem()
+to work.  And /these/ require the CE bits to work, DMA map/unmap to work, etc.
+It doesn't require interrupts; it's polled; so it should be pretty fun to bringup.
+
+I /think/ TX alignment is 4 bytes, not 8 bytes.  Hm.
