@@ -66,6 +66,7 @@ struct athp_vap {
  * is a little mini-HAL for talking to the MMIO register space.
  */
 struct athp_pci_softc;
+struct ath10k_hif_ops;
 struct athp_softc {
 	struct ieee80211com		sc_ic;
 	struct mbufq			sc_snd;
@@ -104,11 +105,16 @@ struct athp_softc {
 	/* Methods used to speak to the register space */
 	struct athp_regio_methods	sc_regio;
 
+	/* HIF */
+	struct {
+		struct ath10k_hif_ops *ops;
+	} hif;
+
+#if 0
 	/* How many pending, active transmit frames */
 	int				sc_tx_n_pending;
 	int				sc_tx_n_active;
 
-#if 0
 	struct athp_data		sc_rx[ATHP_RX_LIST_COUNT];
 	struct athp_data		sc_tx[ATHP_TX_LIST_COUNT];
 	struct athp_tx_cmd		sc_cmd[ATHP_CMD_LIST_COUNT];
