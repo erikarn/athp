@@ -16,4 +16,10 @@
 #define MS_SC(_sc, _v, _f) (((_v) & _f##_MASK(_sc)) >> _f##_LSB(_sc))
 #define SM_SC(_sc, _v, _f) (((_v) << _f##_LSB(_sc)) & _f##_MASK(_sc))
 
+static inline uint32_t
+host_interest_item_address(uint32_t item_offset)
+{
+	return QCA988X_HOST_INTEREST_ADDRESS + item_offset;
+}
+
 #endif
