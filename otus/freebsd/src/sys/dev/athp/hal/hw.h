@@ -351,7 +351,7 @@ enum ath10k_hw_rate_cck {
 /* Diagnostic Window */
 #define CE_DIAG_PIPE	7
 
-#define NUM_TARGET_CE_CONFIG_WLAN ar->hw_values->num_target_ce_config_wlan
+#define NUM_TARGET_CE_CONFIG_WLAN(sc) (sc)->sc_regvals->num_target_ce_config_wlan
 
 /* Target specific defines for 10.4 firmware */
 #define TARGET_10_4_NUM_VDEVS			16

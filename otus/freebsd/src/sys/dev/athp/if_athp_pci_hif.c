@@ -369,6 +369,7 @@ ath10k_pci_diag_read_mem(struct athp_softc *sc, u32 address, void *data,
 	remaining_bytes = orig_nbytes;
 	ce_data = ce_data_base;
 
+	/* XXX TODO: busdma operations on the descdma memory, just in case */
 	while (remaining_bytes) {
 		nbytes = MIN(remaining_bytes, DIAG_TRANSFER_LIMIT);
 		ret = __ath10k_ce_rx_post_buf(ce_diag, NULL, ce_data);
@@ -494,7 +495,8 @@ __ath10k_pci_diag_read_hi(struct athp_softc *sc, void *dest, u32 src, u32 len)
 #define ath10k_pci_diag_read_hi(sc, dest, src, len)		\
 	__ath10k_pci_diag_read_hi(sc, dest, HI_ITEM(src), len)
 
-static int ath10k_pci_diag_write_mem(struct athp_softc *sc, u32 address,
+static int
+ath10k_pci_diag_write_mem(struct athp_softc *sc, u32 address,
     const void *data, int nbytes)
 {
 	struct athp_pci_softc *psc = sc->sc_psc;
@@ -504,9 +506,10 @@ static int ath10k_pci_diag_write_mem(struct athp_softc *sc, u32 address,
 	unsigned int id;
 	unsigned int flags;
 	struct ath10k_ce_pipe *ce_diag;
+	struct athp_descdma dd;
 	void *data_buf = NULL;
 	u32 ce_data;	/* Host buffer address in CE space */
-	dma_addr_t ce_data_base = 0;
+	bus_addr_t ce_data_base = 0;
 	int i;
 
 	ATHP_PCI_CE_LOCK(psc);
@@ -519,15 +522,18 @@ static int ath10k_pci_diag_write_mem(struct athp_softc *sc, u32 address,
 	 *   1) 4-byte alignment
 	 *   2) Buffer in DMA-able space
 	 */
+	/*
+	 * XXX TODO: this allocates a whole separate tag
+	 * just to allocate a descriptor with the given alignment.
+	 * Ideally we'd just use contigmalloc() and get the paddr
+	 * for it.
+	 */
 	orig_nbytes = nbytes;
-	data_buf = (unsigned char *)dma_alloc_coherent(ar->dev,
-						       orig_nbytes,
-						       &ce_data_base,
-						       GFP_ATOMIC);
-	if (!data_buf) {
-		ret = -ENOMEM;
+	ret = athp_descdma_alloc(sc, &dd, "pci_diag_read_mem", 4, nbytes);
+	if (ret != 0)
 		goto done;
-	}
+	data_buf = dd.dd_desc;
+	ce_data_base = dd.dd_desc_paddr;
 
 	/* Copy caller's data to allocated DMA buf */
 	memcpy(data_buf, data, orig_nbytes);
@@ -546,6 +552,7 @@ static int ath10k_pci_diag_write_mem(struct athp_softc *sc, u32 address,
 
 	remaining_bytes = orig_nbytes;
 	ce_data = ce_data_base;
+	/* XXX TODO: busdma operations on the descdma memory, just in case */
 	while (remaining_bytes) {
 		/* FIXME: check cast */
 		nbytes = MIN(remaining_bytes, DIAG_TRANSFER_LIMIT);
@@ -614,21 +621,17 @@ static int ath10k_pci_diag_write_mem(struct athp_softc *sc, u32 address,
 	}
 
 done:
-	if (data_buf) {
-		dma_free_coherent(ar->dev, orig_nbytes, data_buf,
-				  ce_data_base);
-	}
-
+	athp_descdma_free(sc, &dd);
 	if (ret != 0)
 		ATHP_WARN(sc, "failed to write diag value at 0x%x: %d\n",
-			    address, ret);
-
+		    address, ret);
 	ATHP_PCI_CE_UNLOCK(psc);
 
 	return ret;
 }
 
-static int ath10k_pci_diag_write32(struct athp_softc *sc, u32 address, u32 value)
+static int
+ath10k_pci_diag_write32(struct athp_softc *sc, u32 address, u32 value)
 {
 	__le32 val = __cpu_to_le32(value);
 
@@ -638,6 +641,7 @@ static int ath10k_pci_diag_write32(struct athp_softc *sc, u32 address, u32 value
 static int
 ath10k_pci_init_config(struct athp_softc *sc)
 {
+	struct athp_pci_softc *psc = sc->sc_psc;
 	u32 interconnect_targ_addr;
 	u32 pcie_state_targ_addr = 0;
 	u32 pipe_cfg_targ_addr = 0;
@@ -685,7 +689,7 @@ ath10k_pci_init_config(struct athp_softc *sc)
 	ret = ath10k_pci_diag_write_mem(sc, pipe_cfg_targ_addr,
 					target_ce_config_wlan,
 					sizeof(struct ce_pipe_config) *
-					NUM_TARGET_CE_CONFIG_WLAN);
+					NUM_TARGET_CE_CONFIG_WLAN(sc));
 
 	if (ret != 0) {
 		ATHP_ERR(sc, "Failed to write pipe cfg: %d\n", ret);
@@ -747,7 +751,7 @@ ath10k_pci_init_config(struct athp_softc *sc)
 	/* first bank is switched to IRAM */
 	ealloc_value |= ((HI_EARLY_ALLOC_MAGIC << HI_EARLY_ALLOC_MAGIC_SHIFT) &
 			 HI_EARLY_ALLOC_MAGIC_MASK);
-	ealloc_value |= ((ath10k_pci_get_num_banks(ar) <<
+	ealloc_value |= ((ath10k_pci_get_num_banks(psc) <<
 			  HI_EARLY_ALLOC_IRAM_BANKS_SHIFT) &
 			 HI_EARLY_ALLOC_IRAM_BANKS_MASK);
 
@@ -779,11 +783,12 @@ ath10k_pci_init_config(struct athp_softc *sc)
 
 
 
-static int ath10k_pci_hif_tx_sg(struct athp_softc *sc, u8 pipe_id,
-				struct ath10k_hif_sg_item *items, int n_items)
+static int
+ath10k_pci_hif_tx_sg(struct athp_softc *sc, u8 pipe_id,
+    struct ath10k_hif_sg_item *items, int n_items)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	struct ath10k_pci_pipe *pci_pipe = &ar_pci->pipe_info[pipe_id];
+	struct athp_pci_softc *psc = sc->sc_psc;
+	struct ath10k_pci_pipe *pci_pipe = &psc->pipe_info[pipe_id];
 	struct ath10k_ce_pipe *ce_pipe = pci_pipe->ce_hdl;
 	struct ath10k_ce_ring *src_ring = ce_pipe->src_ring;
 	unsigned int nentries_mask;
@@ -791,7 +796,7 @@ static int ath10k_pci_hif_tx_sg(struct athp_softc *sc, u8 pipe_id,
 	unsigned int write_index;
 	int err, i = 0;
 
-	spin_lock_bh(&ar_pci->ce_lock);
+	ATHP_PCI_CE_LOCK(psc);
 
 	nentries_mask = src_ring->nentries_mask;
 	sw_index = src_ring->sw_index;
@@ -804,11 +809,11 @@ static int ath10k_pci_hif_tx_sg(struct athp_softc *sc, u8 pipe_id,
 	}
 
 	for (i = 0; i < n_items - 1; i++) {
-		ath10k_dbg(sc, ATH10K_DBG_PCI,
+		ATHP_DPRINTF(sc, ATHP_DEBUG_PCI,
 			   "pci tx item %d paddr 0x%08x len %d n_items %d\n",
 			   i, items[i].paddr, items[i].len, n_items);
-		ath10k_dbg_dump(sc, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
-				items[i].vaddr, items[i].len);
+		athp_debug_dump(sc, ATHP_DEBUG_PCI_DUMP, NULL, "pci tx data: ",
+		    items[i].vaddr, items[i].len);
 
 		err = ath10k_ce_send_nolock(ce_pipe,
 					    items[i].transfer_context,
@@ -822,10 +827,10 @@ static int ath10k_pci_hif_tx_sg(struct athp_softc *sc, u8 pipe_id,
 
 	/* `i` is equal to `n_items -1` after for() */
 
-	ath10k_dbg(sc, ATH10K_DBG_PCI,
+	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI,
 		   "pci tx item %d paddr 0x%08x len %d n_items %d\n",
 		   i, items[i].paddr, items[i].len, n_items);
-	ath10k_dbg_dump(sc, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
+	athp_debug_dump(sc, ATHP_DEBUG_PCI_DUMP, NULL, "pci tx data: ",
 			items[i].vaddr, items[i].len);
 
 	err = ath10k_ce_send_nolock(ce_pipe,
@@ -837,36 +842,38 @@ static int ath10k_pci_hif_tx_sg(struct athp_softc *sc, u8 pipe_id,
 	if (err)
 		goto err;
 
-	spin_unlock_bh(&ar_pci->ce_lock);
+	ATHP_PCI_CE_UNLOCK(psc);
 	return 0;
 
 err:
 	for (; i > 0; i--)
 		__ath10k_ce_send_revert(ce_pipe);
 
-	spin_unlock_bh(&ar_pci->ce_lock);
+	ATHP_PCI_CE_UNLOCK(psc);
 	return err;
 }
 
-static int ath10k_pci_hif_diag_read(struct athp_softc *sc, u32 address, void *buf,
-				    size_t buf_len)
+static int
+ath10k_pci_hif_diag_read(struct athp_softc *sc, u32 address, void *buf,
+    size_t buf_len)
 {
 	return ath10k_pci_diag_read_mem(sc, address, buf, buf_len);
 }
 
-static u16 ath10k_pci_hif_get_free_queue_number(struct athp_softc *sc, u8 pipe)
+static u16
+ath10k_pci_hif_get_free_queue_number(struct athp_softc *sc, u8 pipe)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = sc->sc_psc;
 
-	ath10k_dbg(sc, ATH10K_DBG_PCI, "pci hif get free queue number\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci hif get free queue number\n");
 
-	return ath10k_ce_num_free_src_entries(ar_pci->pipe_info[pipe].ce_hdl);
+	return ath10k_ce_num_free_src_entries(psc->pipe_info[pipe].ce_hdl);
 }
 
-static void ath10k_pci_hif_send_complete_check(struct athp_softc *sc, u8 pipe,
-					       int force)
+static void
+ath10k_pci_hif_send_complete_check(struct athp_softc *sc, u8 pipe, int force)
 {
-	ath10k_dbg(sc, ATH10K_DBG_PCI, "pci hif send complete check\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci hif send complete check\n");
 
 	if (!force) {
 		int resources;
@@ -894,7 +901,7 @@ static void ath10k_pci_hif_set_callbacks(struct athp_softc *sc,
 {
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 
-	ath10k_dbg(sc, ATH10K_DBG_PCI, "pci hif set callbacks\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci hif set callbacks\n");
 
 	memcpy(&ar_pci->msg_callbacks_current, callbacks,
 	       sizeof(ar_pci->msg_callbacks_current));
@@ -909,12 +916,12 @@ static int ath10k_pci_hif_map_service_to_pipe(struct athp_softc *sc,
 	bool ul_set = false, dl_set = false;
 	int i;
 
-	ath10k_dbg(sc, ATH10K_DBG_PCI, "pci hif map service\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci hif map service\n");
 
 	/* polling for received messages not supported */
 	*dl_is_polled = 0;
 
-	for (i = 0; i < ARRAY_SIZE(target_service_to_ce_map_wlan); i++) {
+	for (i = 0; i < nitems(target_service_to_ce_map_wlan); i++) {
 		entry = &target_service_to_ce_map_wlan[i];
 
 		if (__le32_to_cpu(entry->service_id) != service_id)
@@ -958,7 +965,7 @@ static void ath10k_pci_hif_get_default_pipe(struct athp_softc *sc,
 {
 	int ul_is_polled, dl_is_polled;
 
-	ath10k_dbg(sc, ATH10K_DBG_PCI, "pci hif get default pipe\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci hif get default pipe\n");
 
 	(void)ath10k_pci_hif_map_service_to_pipe(sc,
 						 ATH10K_HTC_SVC_ID_RSVD_CTRL,
@@ -968,26 +975,27 @@ static void ath10k_pci_hif_get_default_pipe(struct athp_softc *sc,
 						 &dl_is_polled);
 }
 
-static int ath10k_pci_hif_start(struct athp_softc *sc)
+static int
+ath10k_pci_hif_start(struct athp_softc *sc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	ath10k_dbg(sc, ATH10K_DBG_BOOT, "boot hif start\n");
+	struct athp_pci_softc *psc = sc->sc_psc;
 
-	ath10k_pci_irq_enable(ar);
-	ath10k_pci_rx_post(ar);
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif start\n");
 
-	pcie_capability_write_word(ar_pci->pdev, PCI_EXP_LNKCTL,
-				   ar_pci->link_ctl);
+	ath10k_pci_irq_enable(psc);
+	ath10k_pci_rx_post(psc);
+
+	pcie_capability_write_word(psc->pdev, PCI_EXP_LNKCTL,
+				   psc->link_ctl);
 
 	return 0;
 }
 
 static void ath10k_pci_hif_stop(struct athp_softc *sc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	unsigned long flags;
+	struct athp_pci_softc *psc = sc->sc_psc;
 
-	ath10k_dbg(sc, ATH10K_DBG_BOOT, "boot hif stop\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif stop\n");
 
 	/* Most likely the device has HTT Rx ring configured. The only way to
 	 * prevent the device from accessing (and possible corrupting) host
@@ -1000,15 +1008,19 @@ static void ath10k_pci_hif_stop(struct athp_softc *sc)
 	 * masked. To prevent the device from asserting the interrupt reset it
 	 * before proceeding with cleanup.
 	 */
-	ath10k_pci_safe_chip_reset(ar);
+	ath10k_pci_safe_chip_reset(psc);
 
-	ath10k_pci_irq_disable(ar);
-	ath10k_pci_irq_sync(ar);
-	ath10k_pci_flush(ar);
+	ath10k_pci_irq_disable(psc);
+	ath10k_pci_irq_sync(psc);
+	ath10k_pci_flush(psc);
 
-	spin_lock_irqsave(&ar_pci->ps_lock, flags);
-	WARN_ON(ar_pci->ps_wake_refcount > 0);
-	spin_unlock_irqrestore(&ar_pci->ps_lock, flags);
+	ATHP_PCI_PS_LOCK(psc);
+	device_printf(sc->sc_dev,
+	    "%s: TODO: ensure we go to sleep; wake_refcount=%d\n",
+	    __func__,
+	    psc->ps_wake_refcount);
+	//WARN_ON(ar_pci->ps_wake_refcount > 0);
+	ATHP_PCI_PS_UNLOCK(psc);
 }
 
 static int ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
@@ -1110,7 +1122,7 @@ static int ath10k_pci_hif_power_up(struct athp_softc *sc)
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	int ret;
 
-	ath10k_dbg(sc, ATH10K_DBG_BOOT, "boot hif power up\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif power up\n");
 
 	pcie_capability_read_word(ar_pci->pdev, PCI_EXP_LNKCTL,
 				  &ar_pci->link_ctl);
@@ -1168,7 +1180,7 @@ err_sleep:
 
 static void ath10k_pci_hif_power_down(struct athp_softc *sc)
 {
-	ath10k_dbg(sc, ATH10K_DBG_BOOT, "boot hif power down\n");
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif power down\n");
 
 	/* Currently hif_power_up performs effectively a reset and hif_stop
 	 * resets the chip as well so there's no point in resetting here.

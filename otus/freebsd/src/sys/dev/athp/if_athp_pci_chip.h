@@ -13,4 +13,6 @@ extern	bool ath10k_pci_irq_pending(struct athp_pci_softc *psc);
 extern	bool ath10k_pci_chip_is_supported(uint32_t dev_id,
 	    uint32_t chip_id);
 
+extern	int ath10k_pci_get_num_banks(struct athp_pci_softc *psc);
+
 #endif	/* __IF_ATHP_PCI_CHIP_H__ */

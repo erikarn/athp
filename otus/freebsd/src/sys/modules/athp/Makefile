@@ -6,6 +6,7 @@ KMOD    = if_athp
 
 # Top-level FreeBSD glue (device, netif, busdma, etc)
 SRCS    = if_athp_pci.c if_athp_main.c			\
+	  if_athp_debug.c				\
 	  if_athp_var.h					\
 	  bus_if.h device_if.h				\
 	  opt_wlan.h

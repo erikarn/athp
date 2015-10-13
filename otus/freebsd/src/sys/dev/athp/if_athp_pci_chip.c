@@ -534,7 +534,7 @@ ath10k_pci_wake_target_cpu(struct athp_pci_softc *psc)
 	return 0;
 }
 
-static int
+int
 ath10k_pci_get_num_banks(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
