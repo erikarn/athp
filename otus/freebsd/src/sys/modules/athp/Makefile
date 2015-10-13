@@ -29,4 +29,7 @@ SRCS    += if_athp_pci_ce.c
 # This is the PCI pipe code - linking the PCI bus code to the CE.
 SRCS    += if_athp_pci_pipe.c
 
+# Now, the PCI HIF code.
+SRCS    += if_athp_pci_hif.c
+
 .include <bsd.kmod.mk>
