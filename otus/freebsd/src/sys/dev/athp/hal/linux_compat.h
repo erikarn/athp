@@ -31,4 +31,6 @@ roundup_pow_of_two(unsigned long n)
 
 #define BUILD_BUG_ON(x) CTASSERT(!(x))
 
+#define	unlikely(x)	(x)
+
 #endif	/* __LINUX_COMPAT_H__ */
