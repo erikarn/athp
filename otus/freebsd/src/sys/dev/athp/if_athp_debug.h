@@ -32,6 +32,8 @@
 #define	ATHP_DEBUG_PCI_PS	0x00001000
 #define	ATHP_DEBUG_BOOT		0x00002000
 #define	ATHP_DEBUG_DESCDMA	0x00004000
+#define	ATHP_DEBUG_PCI		0x00008000
+#define	ATHP_DEBUG_PCI_DUMP	0x00010000
 #define	ATHP_DEBUG_ANY		0xffffffff
 
 #define	ATHP_DPRINTF(sc, dm, ...) \
@@ -49,5 +51,9 @@
 	do { \
 		device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
+
+struct athp_softc;
+extern	void athp_debug_dump(struct athp_softc *sc, uint64_t mask,
+	    const char *msg, const char *prefix, const void *buf, size_t len);
 
 #endif	/* __ATHP_DEBUG_H__ */
