@@ -461,6 +461,7 @@ athp_pci_attach(device_t dev)
 	}
 
 	/* deinit ce */
+	ath10k_pci_ce_deinit(sc);
 
 	/* disable irq */
 	ret = ath10k_pci_irq_disable(psc);
@@ -484,7 +485,6 @@ athp_pci_attach(device_t dev)
 
 	/* (here's where ath10k requests IRQs */
 
-#if 1
 	/* pci_chip_reset */
 	ret = ath10k_pci_chip_reset(psc);
 	if (ret) {
@@ -494,10 +494,11 @@ athp_pci_attach(device_t dev)
 		err = ENXIO;
 		goto bad3;
 	}
-#endif
 
 	/* read SoC/chip version */
 	sc->sc_chipid = athp_pci_soc_read32(sc, SOC_CHIP_ID_ADDRESS(sc->sc_regofs));
+
+	/* Verify chip version is something we can use */
 	device_printf(sc->sc_dev, "%s: chipid: 0x%08x\n", __func__, sc->sc_chipid);
 	if (! ath10k_pci_chip_is_supported(psc->sc_deviceid, sc->sc_chipid)) {
 		device_printf(sc->sc_dev,
@@ -507,7 +508,6 @@ athp_pci_attach(device_t dev)
 		goto bad3;
 	}
 
-	/* Verify chip version is something we can use */
 	/* call core_register */
 
 	/* Call main attach method with given info */
