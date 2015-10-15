@@ -19,6 +19,7 @@ SRCS    += if_athp_regs.c if_athp_regio.c
 
 # This is the PCI chip interface - handling reset, enable/disable
 # interrupts, etc.
+SRCS    += if_athp_pci_config.c
 SRCS    += if_athp_pci_chip.c
 
 # This is the busdma memory layer.
