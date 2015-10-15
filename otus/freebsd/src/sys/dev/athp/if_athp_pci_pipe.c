@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci.h"
 #include "if_athp_regio.h"
 #include "if_athp_pci_chip.h"
+#include "if_athp_pci_config.h"
 
 /*
  * This is the PCI pipe related code from ath10k/pci.c.
@@ -110,104 +111,6 @@ __FBSDID("$FreeBSD$");
  * XXX TODO: make the functions take athp_pci_softc * as the top-level
  * state, instead of athp_softc * ?
  */
-
-static const struct ce_attr host_ce_config_wlan[] = {
-	/* CE0: host->target HTC control and raw streams */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 16,
-		.src_sz_max = 256,
-		.dest_nentries = 0,
-	},
-
-	/* CE1: target->host HTT + HTC control */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 2048,
-		.dest_nentries = 512,
-	},
-
-	/* CE2: target->host WMI */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 2048,
-		.dest_nentries = 128,
-	},
-
-	/* CE3: host->target WMI */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 32,
-		.src_sz_max = 2048,
-		.dest_nentries = 0,
-	},
-
-	/* CE4: host->target HTT */
-	{
-		.flags = CE_ATTR_FLAGS | CE_ATTR_DIS_INTR,
-		.src_nentries = CE_HTT_H2T_MSG_SRC_NENTRIES,
-		.src_sz_max = 256,
-		.dest_nentries = 0,
-	},
-
-	/* CE5: unused */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 0,
-		.dest_nentries = 0,
-	},
-
-	/* CE6: target autonomous hif_memcpy */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 0,
-		.dest_nentries = 0,
-	},
-
-	/* CE7: ce_diag, the Diagnostic Window */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 2,
-		.src_sz_max = DIAG_TRANSFER_LIMIT,
-		.dest_nentries = 2,
-	},
-
-	/* CE8: target->host pktlog */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 2048,
-		.dest_nentries = 128,
-	},
-
-	/* CE9 target autonomous qcache memcpy */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 0,
-		.dest_nentries = 0,
-	},
-
-	/* CE10: target autonomous hif memcpy */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 0,
-		.dest_nentries = 0,
-	},
-
-	/* CE11: target autonomous hif memcpy */
-	{
-		.flags = CE_ATTR_FLAGS,
-		.src_nentries = 0,
-		.src_sz_max = 0,
-		.dest_nentries = 0,
-	},
-};
 
 static int
 __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
