@@ -48,6 +48,9 @@ struct athp_pci_softc {
 	struct ath10k_pci_pipe	pipe_info[CE_COUNT_MAX];
 	struct taskqueue	*pipe_taskq;
 
+	/* Current callbacks */
+	struct ath10k_hif_cb msg_callbacks_current;
+
 	/* Various tasks */
 	/* Shared interrupt handler; deferred */
 	struct task		intr_task;

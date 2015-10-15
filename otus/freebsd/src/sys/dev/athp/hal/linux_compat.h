@@ -33,4 +33,7 @@ roundup_pow_of_two(unsigned long n)
 
 #define	unlikely(x)	(x)
 
+/* XXX TODO: should really implement this */
+#define	WARN_ON(x) (0)
+
 #endif	/* __LINUX_COMPAT_H__ */

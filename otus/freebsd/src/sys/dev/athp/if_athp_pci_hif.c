@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_pipe.h"
 #include "if_athp_pci.h"
 
+#include "if_athp_bmi.h"
 #include "if_athp_htc.h"
 
 #include "if_athp_main.h"
@@ -786,15 +787,16 @@ ath10k_pci_hif_send_complete_check(struct athp_softc *sc, u8 pipe, int force)
 	ath10k_ce_per_engine_service(sc, pipe);
 }
 
-static void ath10k_pci_hif_set_callbacks(struct athp_softc *sc,
-					 struct ath10k_hif_cb *callbacks)
+static void
+ath10k_pci_hif_set_callbacks(struct athp_softc *sc,
+    struct ath10k_hif_cb *callbacks)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = sc->sc_psc;
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci hif set callbacks\n");
 
-	memcpy(&ar_pci->msg_callbacks_current, callbacks,
-	       sizeof(ar_pci->msg_callbacks_current));
+	memcpy(&psc->msg_callbacks_current, callbacks,
+	    sizeof(psc->msg_callbacks_current));
 }
 
 static int ath10k_pci_hif_map_service_to_pipe(struct athp_softc *sc,
@@ -873,15 +875,16 @@ ath10k_pci_hif_start(struct athp_softc *sc)
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif start\n");
 
 	ath10k_pci_irq_enable(psc);
-	ath10k_pci_rx_post(psc);
+	ath10k_pci_rx_post(sc);
 
-	pcie_capability_write_word(psc->pdev, PCI_EXP_LNKCTL,
-				   psc->link_ctl);
+	device_printf(sc->sc_dev, "%s: LNKCTL: TODO\n", __func__);
+	//pcie_capability_write_word(psc->pdev, PCI_EXP_LNKCTL, psc->link_ctl);
 
 	return 0;
 }
 
-static void ath10k_pci_hif_stop(struct athp_softc *sc)
+static void
+ath10k_pci_hif_stop(struct athp_softc *sc)
 {
 	struct athp_pci_softc *psc = sc->sc_psc;
 
@@ -902,24 +905,24 @@ static void ath10k_pci_hif_stop(struct athp_softc *sc)
 
 	ath10k_pci_irq_disable(psc);
 	ath10k_pci_irq_sync(psc);
-	ath10k_pci_flush(psc);
+	ath10k_pci_flush(sc);
 
 	ATHP_PCI_PS_LOCK(psc);
 	device_printf(sc->sc_dev,
 	    "%s: TODO: ensure we go to sleep; wake_refcount=%d\n",
 	    __func__,
-	    psc->ps_wake_refcount);
-	//WARN_ON(ar_pci->ps_wake_refcount > 0);
+	    (int) psc->ps_wake_refcount);
+	WARN_ON(ar_pci->ps_wake_refcount > 0);
 	ATHP_PCI_PS_UNLOCK(psc);
 }
 
-static int ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
-					   void *req, u32 req_len,
-					   void *resp, u32 *resp_len)
+static int
+ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
+    void *req, u32 req_len, void *resp, u32 *resp_len)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	struct ath10k_pci_pipe *pci_tx = &ar_pci->pipe_info[BMI_CE_NUM_TO_TARG];
-	struct ath10k_pci_pipe *pci_rx = &ar_pci->pipe_info[BMI_CE_NUM_TO_HOST];
+	struct athp_pci_softc *psc = sc->sc_psc;
+	struct ath10k_pci_pipe *pci_tx = &psc->pipe_info[BMI_CE_NUM_TO_TARG];
+	struct ath10k_pci_pipe *pci_rx = &psc->pipe_info[BMI_CE_NUM_TO_HOST];
 	struct ath10k_ce_pipe *ce_tx = pci_tx->ce_hdl;
 	struct ath10k_ce_pipe *ce_rx = pci_rx->ce_hdl;
 	dma_addr_t req_paddr = 0;
@@ -1007,17 +1010,21 @@ err_dma:
 	return ret;
 }
 
-static int ath10k_pci_hif_power_up(struct athp_softc *sc)
+static int
+ath10k_pci_hif_power_up(struct athp_softc *sc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = sc->sc_psc;
 	int ret;
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif power up\n");
 
+	device_printf(sc->sc_dev, "%s: LNKCTL\n", __func__);
+#if 0
 	pcie_capability_read_word(ar_pci->pdev, PCI_EXP_LNKCTL,
 				  &ar_pci->link_ctl);
 	pcie_capability_write_word(ar_pci->pdev, PCI_EXP_LNKCTL,
 				   ar_pci->link_ctl & ~PCI_EXP_LNKCTL_ASPMC);
+#endif
 
 	/*
 	 * Bring the target up cleanly.
@@ -1029,31 +1036,31 @@ static int ath10k_pci_hif_power_up(struct athp_softc *sc)
 	 * is in an unexpected state. We try to catch that here in order to
 	 * reset the Target and retry the probe.
 	 */
-	ret = ath10k_pci_chip_reset(ar);
+	ret = ath10k_pci_chip_reset(psc);
 	if (ret) {
-		if (ath10k_pci_has_fw_crashed(ar)) {
+		if (ath10k_pci_has_fw_crashed(psc)) {
 			ATHP_WARN(sc, "firmware crashed during chip reset\n");
-			ath10k_pci_fw_crashed_clear(ar);
-			ath10k_pci_fw_crashed_dump(ar);
+			ath10k_pci_fw_crashed_clear(psc);
+			ath10k_pci_fw_crashed_dump(psc);
 		}
 
 		ATHP_ERR(sc, "failed to reset chip: %d\n", ret);
 		goto err_sleep;
 	}
 
-	ret = ath10k_pci_init_pipes(ar);
+	ret = ath10k_pci_init_pipes(sc);
 	if (ret) {
 		ATHP_ERR(sc, "failed to initialize CE: %d\n", ret);
 		goto err_sleep;
 	}
 
-	ret = ath10k_pci_init_config(ar);
+	ret = ath10k_pci_init_config(sc);
 	if (ret) {
 		ATHP_ERR(sc, "failed to setup init config: %d\n", ret);
 		goto err_ce;
 	}
 
-	ret = ath10k_pci_wake_target_cpu(ar);
+	ret = ath10k_pci_wake_target_cpu(psc);
 	if (ret) {
 		ATHP_ERR(sc, "could not wake up target CPU: %d\n", ret);
 		goto err_ce;
@@ -1062,13 +1069,14 @@ static int ath10k_pci_hif_power_up(struct athp_softc *sc)
 	return 0;
 
 err_ce:
-	ath10k_pci_ce_deinit(ar);
+	ath10k_pci_ce_deinit(sc);
 
 err_sleep:
 	return ret;
 }
 
-static void ath10k_pci_hif_power_down(struct athp_softc *sc)
+static void
+ath10k_pci_hif_power_down(struct athp_softc *sc)
 {
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif power down\n");
 
@@ -1077,24 +1085,29 @@ static void ath10k_pci_hif_power_down(struct athp_softc *sc)
 	 */
 }
 
-static int ath10k_pci_hif_suspend(struct athp_softc *sc)
+static int
+ath10k_pci_hif_suspend(struct athp_softc *sc)
 {
+	struct athp_pci_soft *psc = sc->sc_psc;
+
 	/* The grace timer can still be counting down and ar->ps_awake be true.
 	 * It is known that the device may be asleep after resuming regardless
 	 * of the SoC powersave state before suspending. Hence make sure the
 	 * device is asleep before proceeding.
 	 */
-	ath10k_pci_sleep_sync(ar);
+	ath10k_pci_sleep_sync(psc);
 
 	return 0;
 }
 
-static int ath10k_pci_hif_resume(struct athp_softc *sc)
+static int
+ath10k_pci_hif_resume(struct athp_softc *sc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	struct pci_dev *pdev = ar_pci->pdev;
+	struct athp_pci_softc *psc = sc->sc_psc;
+//	struct pci_dev *pdev = ar_pci->pdev;
 	u32 val;
 
+#if 0
 	/* Suspend/Resume resets the PCI configuration space, so we have to
 	 * re-disable the RETRY_TIMEOUT register (0x41) to keep PCI Tx retries
 	 * from interfering with C3 CPU state. pci_restore_state won't help
@@ -1103,7 +1116,9 @@ static int ath10k_pci_hif_resume(struct athp_softc *sc)
 	pci_read_config_dword(pdev, 0x40, &val);
 	if ((val & 0x0000ff00) != 0)
 		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
-
+#else
+	device_printf(sc->sc_dev, "%s: TODO: PCI RETRY_TIMEOUT\n", __func__);
+#endif
 	return 0;
 }
 

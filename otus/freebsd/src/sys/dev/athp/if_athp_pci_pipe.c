@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_desc.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
+#include "if_athp_hif.h"
 #include "if_athp_pci.h"
 #include "if_athp_regio.h"
 #include "if_athp_pci_chip.h"
@@ -231,7 +232,7 @@ ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 	ATHP_PCI_CE_UNLOCK(psc);
 }
 
-static void
+void
 ath10k_pci_rx_post(struct athp_softc *sc)
 {
 	struct athp_pci_softc *psc = sc->sc_psc;
@@ -472,7 +473,7 @@ ath10k_pci_ce_deinit(struct athp_softc *sc)
 		ath10k_ce_deinit_pipe(sc, i);
 }
 
-static void
+void
 ath10k_pci_flush(struct athp_softc *sc)
 {
 	ath10k_pci_kill_tasklet(sc);

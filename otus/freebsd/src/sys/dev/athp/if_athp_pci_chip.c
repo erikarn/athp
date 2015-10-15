@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_desc.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
+#include "if_athp_hif.h"
 #include "if_athp_pci.h"
 #include "if_athp_regio.h"
 #include "if_athp_pci_chip.h"
@@ -146,7 +147,6 @@ static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 
 static void ath10k_pci_buffer_cleanup(struct athp_pci_softc *ar);
 static int ath10k_pci_cold_reset(struct athp_pci_softc *ar);
-static int ath10k_pci_safe_chip_reset(struct athp_pci_softc *ar);
 static int ath10k_pci_wait_for_target_init(struct athp_pci_softc *ar);
 int ath10k_pci_init_irq(struct athp_pci_softc *ar);
 static int ath10k_pci_deinit_irq(struct athp_pci_softc *ar);
@@ -482,7 +482,7 @@ ath10k_pci_irq_disable(struct athp_pci_softc *psc)
 	return (0);
 }
 
-static void
+void
 ath10k_pci_irq_sync(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
@@ -496,7 +496,7 @@ ath10k_pci_irq_sync(struct athp_pci_softc *psc)
 #endif
 }
 
-static void
+void
 ath10k_pci_irq_enable(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
@@ -504,16 +504,6 @@ ath10k_pci_irq_enable(struct athp_pci_softc *psc)
 	ath10k_ce_enable_interrupts(sc);
 	ath10k_pci_enable_legacy_irq(psc);
 	ath10k_pci_irq_msi_fw_unmask(psc);
-}
-
-static void
-ath10k_pci_flush(struct athp_pci_softc *ar)
-{
-	printf("%s: called\n", __func__);
-#if 0
-	ath10k_pci_kill_tasklet(ar);
-	ath10k_pci_buffer_cleanup(ar);
-#endif
 }
 
 /*
@@ -692,7 +682,7 @@ ath10k_pci_warm_reset(struct athp_pci_softc *psc)
 	return 0;
 }
 
-static int
+int
 ath10k_pci_safe_chip_reset(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;

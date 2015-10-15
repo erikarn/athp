@@ -48,5 +48,7 @@ extern	void ath10k_pci_ce_deinit(struct athp_softc *sc);
 extern	int ath10k_pci_alloc_pipes(struct athp_softc *sc);
 extern	void ath10k_pci_free_pipes(struct athp_softc *sc);
 extern	int ath10k_pci_init_pipes(struct athp_softc *sc);
+extern	void ath10k_pci_rx_post(struct athp_softc *sc);
+extern	void ath10k_pci_flush(struct athp_softc *sc);
 
 #endif /* __ATHP_PCI_PIPE_H__ */
