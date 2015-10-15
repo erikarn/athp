@@ -18,8 +18,6 @@ typedef uint64_t	__le64;
 #define	__le32_to_cpu(a)	le32toh(a)
 #define	__le16_to_cpu(a)	le16toh(a)
 
-#define	WARN_ON_ONCE(a)		(a)
-
 //#define	PTR_ALIGN(ptr, a)
 
 static inline unsigned long
@@ -35,5 +33,8 @@ roundup_pow_of_two(unsigned long n)
 
 /* XXX TODO: should really implement this */
 #define	WARN_ON(x) (0)
+#define	WARN_ON_ONCE(x) (x)
+
+#define	might_sleep()
 
 #endif	/* __LINUX_COMPAT_H__ */

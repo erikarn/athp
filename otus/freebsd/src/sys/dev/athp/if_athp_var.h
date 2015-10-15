@@ -107,7 +107,7 @@ struct athp_softc {
 
 	/* HIF */
 	struct {
-		struct ath10k_hif_ops *ops;
+		const struct ath10k_hif_ops *ops;
 	} hif;
 
 #if 0

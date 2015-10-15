@@ -318,7 +318,7 @@ skip:
 }
 #endif
 
-static void
+void
 ath10k_pci_sleep_sync(struct athp_pci_softc *psc)
 {
 
@@ -510,7 +510,7 @@ ath10k_pci_irq_enable(struct athp_pci_softc *psc)
  * Send an interrupt to the device to wake up the Target CPU
  * so it has an opportunity to notice any changed state.
  */
-static int
+int
 ath10k_pci_wake_target_cpu(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
@@ -555,7 +555,7 @@ ath10k_pci_get_num_banks(struct athp_pci_softc *psc)
 	return 1;
 }
 
-static bool
+bool
 ath10k_pci_has_fw_crashed(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
@@ -564,7 +564,7 @@ ath10k_pci_has_fw_crashed(struct athp_pci_softc *psc)
 	       FW_IND_EVENT_PENDING;
 }
 
-static void
+void
 ath10k_pci_fw_crashed_clear(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;

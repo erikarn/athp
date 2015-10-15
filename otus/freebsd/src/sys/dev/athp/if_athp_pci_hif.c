@@ -187,6 +187,24 @@ const struct service_to_pipe target_service_to_ce_map_wlan[] = {
 	},
 };
 
+
+static void
+ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+struct ath10k_fw_crash_data;
+static void
+ath10k_pci_dump_registers(struct athp_pci_softc *psc,
+    struct ath10k_fw_crash_data *crash_data)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+
 static u32
 ath10k_pci_targ_cpu_to_ce_addr(struct athp_softc *sc, u32 addr)
 {
@@ -912,9 +930,74 @@ ath10k_pci_hif_stop(struct athp_softc *sc)
 	    "%s: TODO: ensure we go to sleep; wake_refcount=%d\n",
 	    __func__,
 	    (int) psc->ps_wake_refcount);
-	WARN_ON(ar_pci->ps_wake_refcount > 0);
+	WARN_ON(psc->ps_wake_refcount > 0);
 	ATHP_PCI_PS_UNLOCK(psc);
 }
+
+static void
+ath10k_pci_bmi_send_done(struct ath10k_ce_pipe *ce_state)
+{
+	struct bmi_xfer *xfer;
+	u32 ce_data;
+	unsigned int nbytes;
+	unsigned int transfer_id;
+
+	if (ath10k_ce_completed_send_next(ce_state, (void **)&xfer, &ce_data,
+					  &nbytes, &transfer_id))
+		return;
+
+	xfer->tx_done = true;
+}
+
+static void
+ath10k_pci_bmi_recv_data(struct ath10k_ce_pipe *ce_state)
+{
+	struct athp_softc *sc = ce_state->sc;
+	struct bmi_xfer *xfer;
+	u32 ce_data;
+	unsigned int nbytes;
+	unsigned int transfer_id;
+	unsigned int flags;
+
+	if (ath10k_ce_completed_recv_next(ce_state, (void **)&xfer, &ce_data,
+					  &nbytes, &transfer_id, &flags))
+		return;
+
+	if (WARN_ON_ONCE(!xfer))
+		return;
+
+	if (!xfer->wait_for_resp) {
+		ATHP_WARN(sc, "unexpected: BMI data received; ignoring\n");
+		return;
+	}
+
+	xfer->resp_len = nbytes;
+	xfer->rx_done = true;
+}
+
+static int ath10k_pci_bmi_wait(struct ath10k_ce_pipe *tx_pipe,
+			       struct ath10k_ce_pipe *rx_pipe,
+			       struct bmi_xfer *xfer)
+{
+//	unsigned long timeout = jiffies + BMI_COMMUNICATION_TIMEOUT_HZ;
+	int i;
+
+//	while (time_before_eq(jiffies, timeout)) {
+	/* Hard code 200 * 10mS == 2 sec */
+	for (i = 0; i < 200; i++) {
+		ath10k_pci_bmi_send_done(tx_pipe);
+		ath10k_pci_bmi_recv_data(rx_pipe);
+
+		if (xfer->tx_done && (xfer->rx_done == xfer->wait_for_resp))
+			return 0;
+
+		/* Wait 10mS each time */
+		DELAY(10 * 1000);
+	}
+
+	return -ETIMEDOUT;
+}
+
 
 static int
 ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
@@ -925,10 +1008,11 @@ ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
 	struct ath10k_pci_pipe *pci_rx = &psc->pipe_info[BMI_CE_NUM_TO_HOST];
 	struct ath10k_ce_pipe *ce_tx = pci_tx->ce_hdl;
 	struct ath10k_ce_pipe *ce_rx = pci_rx->ce_hdl;
-	dma_addr_t req_paddr = 0;
-	dma_addr_t resp_paddr = 0;
+	struct athp_descdma dd_req, dd_resp;
 	struct bmi_xfer xfer = {};
-	void *treq, *tresp = NULL;
+	bus_addr_t req_paddr = 0;
+	bus_addr_t resp_paddr = 0;
+//	void *treq, *tresp = NULL;
 	int ret = 0;
 
 	might_sleep();
@@ -939,31 +1023,36 @@ ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
 	if (resp && resp_len && *resp_len == 0)
 		return -EINVAL;
 
-	treq = kmemdup(req, req_len, GFP_KERNEL);
-	if (!treq)
+	/*
+	 * Allocate temporary descriptor memory for the request.
+	 * Yes, it's a descriptor and a bit heavyweight.  Grr.
+	 *
+	 * These are zero'ed so freeing them if we don't allocate them
+	 * doesn't panic things.
+	 */
+	bzero(&dd_req, sizeof(dd_req));
+	bzero(&dd_resp, sizeof(dd_resp));
+
+	ret = athp_descdma_alloc(sc, &dd_req, "bmi_msg_req", 8, req_len);
+	if (ret != 0)
 		return -ENOMEM;
 
-	req_paddr = dma_map_single(ar->dev, treq, req_len, DMA_TO_DEVICE);
-	ret = dma_mapping_error(ar->dev, req_paddr);
-	if (ret) {
-		ret = -EIO;
-		goto err_dma;
-	}
+	/* Copy request into the allocate descriptor */
+	memcpy(dd_req.dd_desc, req, req_len);
+
+	/* Get physical mapping for the allocated descriptor */
+	req_paddr = dd_req.dd_desc_paddr;
+
+	/* Get a descriptor w/ physical mapping for the response */
 
 	if (resp && resp_len) {
-		tresp = kzalloc(*resp_len, GFP_KERNEL);
-		if (!tresp) {
+		ret = athp_descdma_alloc(sc, &dd_resp, "bmi_msg_resp", 8,
+		    *resp_len);
+		if (ret != 0) {
 			ret = -ENOMEM;
 			goto err_req;
 		}
-
-		resp_paddr = dma_map_single(ar->dev, tresp, *resp_len,
-					    DMA_FROM_DEVICE);
-		ret = dma_mapping_error(ar->dev, resp_paddr);
-		if (ret) {
-			ret = EIO;
-			goto err_req;
-		}
+		resp_paddr = dd_resp.dd_desc_paddr;
 
 		xfer.wait_for_resp = true;
 		xfer.resp_len = 0;
@@ -991,21 +1080,17 @@ ath10k_pci_hif_exchange_bmi_msg(struct athp_softc *sc,
 err_resp:
 	if (resp) {
 		u32 unused_buffer;
-
 		ath10k_ce_revoke_recv_next(ce_rx, NULL, &unused_buffer);
-		dma_unmap_single(ar->dev, resp_paddr,
-				 *resp_len, DMA_FROM_DEVICE);
 	}
 err_req:
-	dma_unmap_single(ar->dev, req_paddr, req_len, DMA_TO_DEVICE);
-
 	if (ret == 0 && resp_len) {
 		*resp_len = min(*resp_len, xfer.resp_len);
-		memcpy(resp, tresp, xfer.resp_len);
+		/* Copy result from response descriptor to caller */
+		memcpy(resp, dd_resp.dd_desc, xfer.resp_len);
 	}
-err_dma:
-	kfree(treq);
-	kfree(tresp);
+//err_dma:
+	athp_descdma_free(sc, &dd_req);
+	athp_descdma_free(sc, &dd_resp);
 
 	return ret;
 }
@@ -1088,7 +1173,7 @@ ath10k_pci_hif_power_down(struct athp_softc *sc)
 static int
 ath10k_pci_hif_suspend(struct athp_softc *sc)
 {
-	struct athp_pci_soft *psc = sc->sc_psc;
+	struct athp_pci_softc *psc = sc->sc_psc;
 
 	/* The grace timer can still be counting down and ar->ps_awake be true.
 	 * It is known that the device may be asleep after resuming regardless
@@ -1103,11 +1188,11 @@ ath10k_pci_hif_suspend(struct athp_softc *sc)
 static int
 ath10k_pci_hif_resume(struct athp_softc *sc)
 {
+#if 0
 	struct athp_pci_softc *psc = sc->sc_psc;
 //	struct pci_dev *pdev = ar_pci->pdev;
 	u32 val;
 
-#if 0
 	/* Suspend/Resume resets the PCI configuration space, so we have to
 	 * re-disable the RETRY_TIMEOUT register (0x41) to keep PCI Tx retries
 	 * from interfering with C3 CPU state. pci_restore_state won't help
@@ -1122,7 +1207,7 @@ ath10k_pci_hif_resume(struct athp_softc *sc)
 	return 0;
 }
 
-static const struct ath10k_hif_ops ath10k_pci_hif_ops = {
+const struct ath10k_hif_ops ath10k_pci_hif_ops = {
 	.tx_sg			= ath10k_pci_hif_tx_sg,
 	.diag_read		= ath10k_pci_hif_diag_read,
 	.diag_write		= ath10k_pci_diag_write_mem,
@@ -1136,8 +1221,8 @@ static const struct ath10k_hif_ops ath10k_pci_hif_ops = {
 	.get_free_queue_number	= ath10k_pci_hif_get_free_queue_number,
 	.power_up		= ath10k_pci_hif_power_up,
 	.power_down		= ath10k_pci_hif_power_down,
-	.read32			= ath10k_pci_read32,
-	.write32		= ath10k_pci_write32,
+	.read32			= athp_pci_read32,
+	.write32		= athp_pci_write32,
 	.suspend		= ath10k_pci_hif_suspend,
 	.resume			= ath10k_pci_hif_resume,
 };

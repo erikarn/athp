@@ -78,10 +78,9 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
 #include "if_athp_pci.h"
-
 #include "if_athp_main.h"
-
 #include "if_athp_pci_chip.h"
+#include "if_athp_pci_hif.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -447,6 +446,9 @@ athp_pci_attach(device_t dev)
 	 * USB endpoints.
 	 */
 
+	/* HIF ops attach */
+	sc->hif.ops = &ath10k_pci_hif_ops;
+
 	/* Alloc pipes */
 	ret = ath10k_pci_alloc_pipes(sc);
 	if (ret) {
@@ -459,6 +461,7 @@ athp_pci_attach(device_t dev)
 	}
 
 	/* deinit ce */
+
 	/* disable irq */
 	ret = ath10k_pci_irq_disable(psc);
 	if (ret) {

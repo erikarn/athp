@@ -18,4 +18,10 @@ extern	int ath10k_pci_get_num_banks(struct athp_pci_softc *psc);
 extern	void ath10k_pci_irq_enable(struct athp_pci_softc *psc);
 extern	void ath10k_pci_irq_sync(struct athp_pci_softc *psc);
 
+extern	bool ath10k_pci_has_fw_crashed(struct athp_pci_softc *psc);
+extern	void ath10k_pci_fw_crashed_clear(struct athp_pci_softc *psc);
+
+extern	int ath10k_pci_wake_target_cpu(struct athp_pci_softc *psc);
+extern	void ath10k_pci_sleep_sync(struct athp_pci_softc *psc);
+
 #endif	/* __IF_ATHP_PCI_CHIP_H__ */
