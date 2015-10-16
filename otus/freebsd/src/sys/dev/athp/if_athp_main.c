@@ -74,17 +74,79 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_regio.h"
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
+#include "if_athp_bmi.h"
 
 #include "if_athp_main.h"
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
 
+static void
+athp_core_stop(struct athp_softc *sc)
+{
+
+}
+
+/*
+ * Probe the firmware / target information and then tear things back down.
+ */
+static int
+athp_core_probe_fw(struct athp_softc *sc)
+{
+	struct bmi_target_info target_info;
+	int ret = 0;
+
+
+	/* Wake up the hardware and prime the HIF */
+	ret = ath10k_hif_power_up(sc);
+	if (ret) {
+		ATHP_ERR(sc, "could not start pci hif (%d)\n", ret);
+		return ret;
+	}
+
+	/* Read the target info from the boot environment */
+	memset(&target_info, 0, sizeof(target_info));
+	ret = ath10k_bmi_get_target_info(sc, &target_info);
+	if (ret) {
+		ATHP_ERR(sc, "could not get target info (%d)\n", ret);
+		goto err_power_down;
+	}
+	/* XXX endian */
+	device_printf(sc->sc_dev, "%s: BMI info: version=0x%08x, type=0x%08x\n",
+	    __func__,
+	    target_info.version,
+	    target_info.type);
+
+#if 0
+	ar->target_version = target_info.version;
+	ar->hw->wiphy->hw_version = target_info.version;
+	ret = ath10k_init_hw_params(ar);
+	if (ret) {
+		ATHP_ERR(sc, "could not get hw params (%d)\n", ret);
+		goto err_power_down;
+	}
+#endif
+
+	/* TODO: the rest */
+
+	/* Finished up - power down */
+	ath10k_hif_power_down(sc);
+	return (0);
+
+err_power_down:
+	ath10k_hif_power_down(sc);
+
+	return (ret);
+}
 
 int
 athp_attach(struct athp_softc *sc)
 {
 
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
+
+	/* Initial: probe firmware/target info */
+	(void) athp_core_probe_fw(sc);
+
 	return (0);
 }
 
