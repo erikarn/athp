@@ -303,7 +303,7 @@ ath10k_init_configure_target(struct athp_softc *sc)
 	 * required to boot QCA6164.
 	 */
 	ret = ath10k_bmi_write32(sc, hi_hci_uart_pwr_mgmt_params_ext,
-				 sc->dev_id);
+				 sc->sc_chipid);
 	if (ret) {
 		ATHP_ERR(sc, "failed to set pwr_mgmt_params: %d\n", ret);
 		return ret;
@@ -312,30 +312,33 @@ ath10k_init_configure_target(struct athp_softc *sc)
 	return 0;
 }
 
-static const struct firmware *ath10k_fetch_fw_file(struct athp_softc *sc,
-						   const char *dir,
-						   const char *file)
+static const struct firmware *
+ath10k_fetch_fw_file(struct athp_softc *sc, const char *dir, const char *file)
 {
-	char filename[100];
+//	char filename[100];
 	const struct firmware *fw;
-	int ret;
+//	int ret;
 
 	if (file == NULL)
-		return ERR_PTR(-ENOENT);
+		return (NULL);
 
 	if (dir == NULL)
 		dir = ".";
 
-	snprintf(filename, sizeof(filename), "%s/%s", dir, file);
-	ret = request_firmware(&fw, filename, sc->dev);
-	if (ret)
-		return ERR_PTR(ret);
-
+	/*
+	 * FreeBSD's firmware API doesn't .. do directories, so ignore
+	 * the directory for now.
+	 */
+//	snprintf(filename, sizeof(filename), "%s/%s", dir, file);
+	/* This allocates a firmware struct and returns it in fw */
+	/* Note: will return 'NULL' upon error */
+	fw = firmware_get(file);
 	return fw;
 }
 
-static int ath10k_push_board_ext_data(struct athp_softc *sc, const void *data,
-				      size_t data_len)
+static int
+ath10k_push_board_ext_data(struct athp_softc *sc, const char *data,
+    size_t data_len)
 {
 	u32 board_data_size = sc->hw_params.fw.board_size;
 	u32 board_ext_data_size = sc->hw_params.fw.board_ext_size;
@@ -422,14 +425,11 @@ static int ath10k_download_cal_file(struct athp_softc *sc)
 {
 	int ret;
 
-	if (!sc->cal_file)
+	if (sc->cal_file == NULL)
 		return -ENOENT;
 
-	if (IS_ERR(sc->cal_file))
-		return PTR_ERR(sc->cal_file);
-
 	ret = ath10k_download_board_data(sc, sc->cal_file->data,
-					 sc->cal_file->size);
+	    sc->cal_file->datasize);
 	if (ret) {
 		ATHP_ERR(sc, "failed to download cal_file data: %d\n", ret);
 		return ret;
@@ -440,8 +440,12 @@ static int ath10k_download_cal_file(struct athp_softc *sc)
 	return 0;
 }
 
+/*
+ * This is for device tree related stuff.
+ */
 static int ath10k_download_cal_dt(struct athp_softc *sc)
 {
+#if 0
 	struct device_node *node;
 	int data_len;
 	void *data;
@@ -495,6 +499,9 @@ out_free:
 
 out:
 	return ret;
+#else
+	return (-ENOENT);
+#endif
 }
 
 static int ath10k_download_and_run_otp(struct athp_softc *sc)
@@ -593,16 +600,16 @@ static int ath10k_download_fw(struct athp_softc *sc, enum ath10k_firmware_mode m
 static void ath10k_core_free_firmware_files(struct athp_softc *sc)
 {
 	if (!IS_ERR(sc->board))
-		release_firmware(sc->board);
+		firmware_put(sc->board);
 
 	if (!IS_ERR(sc->otp))
-		release_firmware(sc->otp);
+		firmware_put(sc->otp);
 
 	if (!IS_ERR(sc->firmware))
-		release_firmware(sc->firmware);
+		firmware_put(sc->firmware);
 
 	if (!IS_ERR(sc->cal_file))
-		release_firmware(sc->cal_file);
+		firmware_put(sc->cal_file);
 
 	ath10k_swap_code_seg_release(ar);
 
