@@ -15,8 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __TARGADDRS_H__
-#define __TARGADDRS_H__
+#ifndef __ATHP_HAL_TARGADDRS_H__
+#define __ATHP_HAL_TARGADDRS_H__
 
 /*
  * xxx_HOST_INTEREST_ADDRESS is the address in Target RAM of the
@@ -451,4 +451,4 @@ Fw Mode/SubMode Mask
 #define QCA99X0_BOARD_DATA_SZ	  12288
 #define QCA99X0_BOARD_EXT_DATA_SZ 0
 
-#endif /* __TARGADDRS_H__ */
+#endif /* __ATHP_HAL_TARGADDRS_H__ */

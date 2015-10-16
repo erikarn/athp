@@ -15,8 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _HW_H_
-#define _HW_H_
+#ifndef _ATHP_HAL_HW_H_
+#define _ATHP_HAL_HW_H_
 
 #define ATH10K_FW_DIR			"ath10k"
 
@@ -636,4 +636,4 @@ enum ath10k_hw_rate_cck {
 
 #define RTC_STATE_V_GET(x) (((x) & RTC_STATE_V_MASK) >> RTC_STATE_V_LSB)
 
-#endif /* _HW_H_ */
+#endif /* _ATHP_HAL_HW_H_ */

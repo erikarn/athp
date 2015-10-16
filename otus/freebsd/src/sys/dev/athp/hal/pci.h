@@ -15,8 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _ATHP_PCI_H_
-#define _ATHP_PCI_H_
+#ifndef _ATHP_HAL_PCI_H_
+#define _ATHP_HAL_PCI_H_
 
 /*
  * maximum number of bytes that can be handled atomically by DiagRead/DiagWrite
@@ -150,4 +150,4 @@ struct athp_pci_supp_chip {
  */
 #define ATH10K_PCI_SLEEP_GRACE_PERIOD_MSEC 60
 
-#endif /* _PCI_H_ */
+#endif /* _ATHP_HALPCI_H_ */
