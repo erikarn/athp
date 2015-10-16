@@ -500,6 +500,7 @@ out_free:
 out:
 	return ret;
 #else
+	device_printf(sc->sc_dev, "%s: TODO: device tree check\n", __func__);
 	return (-ENOENT);
 #endif
 }
@@ -599,17 +600,17 @@ static int ath10k_download_fw(struct athp_softc *sc, enum ath10k_firmware_mode m
 
 static void ath10k_core_free_firmware_files(struct athp_softc *sc)
 {
-	if (!IS_ERR(sc->board))
-		firmware_put(sc->board);
+	if (sc->board)
+		firmware_put(sc->board, FIRMWARE_UNLOAD);
 
-	if (!IS_ERR(sc->otp))
-		firmware_put(sc->otp);
+	if (sc->otp)
+		firmware_put(sc->otp, FIRMWARE_UNLOAD);
 
-	if (!IS_ERR(sc->firmware))
-		firmware_put(sc->firmware);
+	if (sc->firmware)
+		firmware_put(sc->firmware, FIRMWARE_UNLOAD);
 
-	if (!IS_ERR(sc->cal_file))
-		firmware_put(sc->cal_file);
+	if (sc->cal_file)
+		firmware_put(sc->cal_file, FIRMWARE_UNLOAD);
 
 	ath10k_swap_code_seg_release(ar);
 
