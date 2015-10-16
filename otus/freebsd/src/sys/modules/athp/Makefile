@@ -39,6 +39,10 @@ SRCS    += if_athp_pci_hif.c
 # for speaking to the bootloader for setup and firmware loading
 SRCS    += if_athp_bmi.c
 
+# This is to implement the 'swap' feature - running some of the firmware
+# code in host memory.
+SRCS    += if_athp_swap.c
+
 # This is the core routines for firmware load, HIF wakeup/sleep,
 # programming the target features, etc.
 SRCS    += if_athp_core.c
