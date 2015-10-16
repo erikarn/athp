@@ -49,4 +49,6 @@ roundup_pow_of_two(unsigned long n)
 #define	set_bit(i, n)		bit_set(n, i)
 #define	clear_bit(i, n)		bit_clear(n, i)
 
+#define	min_t(t, a, b)		MIN(a, b)
+
 #endif	/* __LINUX_COMPAT_H__ */
