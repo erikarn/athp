@@ -73,6 +73,8 @@ __FBSDID("$FreeBSD$");
 #include "hal/hw.h"
 #include "hal/chip_id.h"
 #include "hal/targaddrs.h"
+#include "hal/wmi.h"
+#include "hal/core.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
