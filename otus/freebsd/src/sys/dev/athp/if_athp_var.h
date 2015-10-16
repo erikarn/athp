@@ -110,6 +110,11 @@ struct athp_softc {
 		const struct ath10k_hif_ops *ops;
 	} hif;
 
+	/* BMI */
+	struct {
+		bool done_sent;
+	} bmi;
+
 #if 0
 	/* How many pending, active transmit frames */
 	int				sc_tx_n_pending;

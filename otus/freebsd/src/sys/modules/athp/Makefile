@@ -31,7 +31,12 @@ SRCS    += if_athp_pci_ce.c
 # This is the PCI pipe code - linking the PCI bus code to the CE.
 SRCS    += if_athp_pci_pipe.c
 
-# Now, the PCI HIF code.
+# This is the PCI HIF (host interface) code - providing the HIF
+# abstraction for PCI.
 SRCS    += if_athp_pci_hif.c
+
+# This is the BMI (bootloader messaging interface) code
+# for speaking to the bootloader for setup and firmware loading
+SRCS    += if_athp_bmi.c
 
 .include <bsd.kmod.mk>

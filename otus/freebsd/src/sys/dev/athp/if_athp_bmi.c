@@ -1,0 +1,399 @@
+/*-
+ * Copyright (c) 2015 Adrian Chadd <adrian@FreeBSD.org>
+ * Copyright (c) 2005-2011 Atheros Communications Inc.
+ * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/*
+ * Playground for QCA988x chipsets.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include "opt_wlan.h"
+
+#include <sys/param.h>
+#include <sys/endian.h>
+#include <sys/sockio.h>
+#include <sys/mbuf.h>
+#include <sys/kernel.h>
+#include <sys/socket.h>
+#include <sys/systm.h>
+#include <sys/conf.h>
+#include <sys/bus.h>
+#include <sys/rman.h>
+#include <sys/firmware.h>
+#include <sys/module.h>
+#include <sys/taskqueue.h>
+
+#include <machine/bus.h>
+#include <machine/resource.h>
+
+#include <net/bpf.h>
+#include <net/if.h>
+#include <net/if_var.h>
+#include <net/if_arp.h>
+#include <net/if_dl.h>
+#include <net/if_media.h>
+#include <net/if_types.h>
+
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/in_var.h>
+#include <netinet/if_ether.h>
+#include <netinet/ip.h>
+
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_regdomain.h>
+#include <net80211/ieee80211_radiotap.h>
+#include <net80211/ieee80211_ratectl.h>
+#include <net80211/ieee80211_input.h>
+#ifdef	IEEE80211_SUPPORT_SUPERG
+#include <net80211/ieee80211_superg.h>
+#endif
+
+#include "hal/linux_compat.h"
+#include "hal/hw.h"
+#include "hal/chip_id.h"
+
+#include "if_athp_debug.h"
+#include "if_athp_regio.h"
+#include "if_athp_desc.h"
+#include "if_athp_var.h"
+#include "if_athp_hif.h"
+#include "if_athp_pci_ce.h"
+#include "if_athp_pci_pipe.h"
+#include "if_athp_pci.h"
+#include "if_athp_bmi.h"
+#include "if_athp_main.h"
+#include "if_athp_pci_chip.h"
+
+/*
+ * The BMI (Bootloader Messaging Interface) is a simple API designed
+ * to interface with the bootload ROM to set up the boot environment
+ * and load firmware.
+ *
+ * See if_athp_bmi.h for more information.
+ */
+
+void
+ath10k_bmi_start(struct athp_softc *sc)
+{
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi start\n");
+
+	sc->bmi.done_sent = false;
+}
+
+int
+ath10k_bmi_done(struct athp_softc *sc)
+{
+	struct bmi_cmd cmd;
+	u32 cmdlen = sizeof(cmd.id) + sizeof(cmd.done);
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi done\n");
+
+	if (sc->bmi.done_sent) {
+		ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi skipped\n");
+		return 0;
+	}
+
+	sc->bmi.done_sent = true;
+	cmd.id = __cpu_to_le32(BMI_DONE);
+
+	ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, cmdlen, NULL, NULL);
+	if (ret) {
+		ATHP_WARN(sc, "unable to write to the device: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+int
+ath10k_bmi_get_target_info(struct athp_softc *sc,
+    struct bmi_target_info *target_info)
+{
+	struct bmi_cmd cmd;
+	union bmi_resp resp;
+	u32 cmdlen = sizeof(cmd.id) + sizeof(cmd.get_target_info);
+	u32 resplen = sizeof(resp.get_target_info);
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi get target info\n");
+
+	if (sc->bmi.done_sent) {
+		ATHP_WARN(sc, "BMI Get Target Info Command disallowed\n");
+		return -EBUSY;
+	}
+
+	cmd.id = __cpu_to_le32(BMI_GET_TARGET_INFO);
+
+	ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, cmdlen, &resp, &resplen);
+	if (ret) {
+		ATHP_WARN(sc, "unable to get target info from device\n");
+		return ret;
+	}
+
+	if (resplen < sizeof(resp.get_target_info)) {
+		ATHP_WARN(sc, "invalid get_target_info response length (%d)\n",
+			    resplen);
+		return -EIO;
+	}
+
+	target_info->version = __le32_to_cpu(resp.get_target_info.version);
+	target_info->type    = __le32_to_cpu(resp.get_target_info.type);
+
+	return 0;
+}
+
+int
+ath10k_bmi_read_memory(struct athp_softc *sc,
+    u32 address, void *buffer, u32 length)
+{
+	struct bmi_cmd cmd;
+	union bmi_resp resp;
+	u32 cmdlen = sizeof(cmd.id) + sizeof(cmd.read_mem);
+	u32 rxlen;
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi read address 0x%x length %d\n",
+		   address, length);
+
+	if (sc->bmi.done_sent) {
+		ATHP_WARN(sc, "command disallowed\n");
+		return -EBUSY;
+	}
+
+	while (length) {
+		rxlen = min_t(u32, length, BMI_MAX_DATA_SIZE);
+
+		cmd.id            = __cpu_to_le32(BMI_READ_MEMORY);
+		cmd.read_mem.addr = __cpu_to_le32(address);
+		cmd.read_mem.len  = __cpu_to_le32(rxlen);
+
+		ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, cmdlen,
+						  &resp, &rxlen);
+		if (ret) {
+			ATHP_WARN(sc, "unable to read from the device (%d)\n",
+				    ret);
+			return ret;
+		}
+
+		memcpy(buffer, resp.read_mem.payload, rxlen);
+		address += rxlen;
+		buffer  += rxlen;
+		length  -= rxlen;
+	}
+
+	return 0;
+}
+
+int
+ath10k_bmi_write_memory(struct athp_softc *sc, u32 address,const void *buffer,
+    u32 length)
+{
+	struct bmi_cmd cmd;
+	u32 hdrlen = sizeof(cmd.id) + sizeof(cmd.write_mem);
+	u32 txlen;
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi write address 0x%x length %d\n",
+		   address, length);
+
+	if (sc->bmi.done_sent) {
+		ATHP_WARN(sc, "command disallowed\n");
+		return -EBUSY;
+	}
+
+	while (length) {
+		txlen = min(length, BMI_MAX_DATA_SIZE - hdrlen);
+
+		/* copy before roundup to avoid reading beyond buffer*/
+		memcpy(cmd.write_mem.payload, buffer, txlen);
+		txlen = roundup(txlen, 4);
+
+		cmd.id             = __cpu_to_le32(BMI_WRITE_MEMORY);
+		cmd.write_mem.addr = __cpu_to_le32(address);
+		cmd.write_mem.len  = __cpu_to_le32(txlen);
+
+		ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, hdrlen + txlen,
+						  NULL, NULL);
+		if (ret) {
+			ATHP_WARN(sc, "unable to write to the device (%d)\n",
+				    ret);
+			return ret;
+		}
+
+		/* fixup roundup() so `length` zeroes out for last chunk */
+		txlen = min(txlen, length);
+
+		address += txlen;
+		buffer  += txlen;
+		length  -= txlen;
+	}
+
+	return 0;
+}
+
+int
+ath10k_bmi_execute(struct athp_softc *sc, u32 address, u32 param, u32 *result)
+{
+	struct bmi_cmd cmd;
+	union bmi_resp resp;
+	u32 cmdlen = sizeof(cmd.id) + sizeof(cmd.execute);
+	u32 resplen = sizeof(resp.execute);
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi execute address 0x%x param 0x%x\n",
+		   address, param);
+
+	if (sc->bmi.done_sent) {
+		ATHP_WARN(sc, "command disallowed\n");
+		return -EBUSY;
+	}
+
+	cmd.id            = __cpu_to_le32(BMI_EXECUTE);
+	cmd.execute.addr  = __cpu_to_le32(address);
+	cmd.execute.param = __cpu_to_le32(param);
+
+	ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, cmdlen, &resp, &resplen);
+	if (ret) {
+		ATHP_WARN(sc, "unable to read from the device\n");
+		return ret;
+	}
+
+	if (resplen < sizeof(resp.execute)) {
+		ATHP_WARN(sc, "invalid execute response length (%d)\n",
+			    resplen);
+		return -EIO;
+	}
+
+	*result = __le32_to_cpu(resp.execute.result);
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi execute result 0x%x\n", *result);
+
+	return 0;
+}
+
+int
+ath10k_bmi_lz_data(struct athp_softc *sc, const void *buffer, u32 length)
+{
+	struct bmi_cmd cmd;
+	u32 hdrlen = sizeof(cmd.id) + sizeof(cmd.lz_data);
+	u32 txlen;
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi lz data buffer 0x%p length %d\n",
+		   buffer, length);
+
+	if (sc->bmi.done_sent) {
+		ATHP_WARN(sc, "command disallowed\n");
+		return -EBUSY;
+	}
+
+	while (length) {
+		txlen = min(length, BMI_MAX_DATA_SIZE - hdrlen);
+
+		WARN_ON(txlen & 3);
+
+		cmd.id          = __cpu_to_le32(BMI_LZ_DATA);
+		cmd.lz_data.len = __cpu_to_le32(txlen);
+		memcpy(cmd.lz_data.payload, buffer, txlen);
+
+		ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, hdrlen + txlen,
+						  NULL, NULL);
+		if (ret) {
+			ATHP_WARN(sc, "unable to write to the device\n");
+			return ret;
+		}
+
+		buffer += txlen;
+		length -= txlen;
+	}
+
+	return 0;
+}
+
+int
+ath10k_bmi_lz_stream_start(struct athp_softc *sc, u32 address)
+{
+	struct bmi_cmd cmd;
+	u32 cmdlen = sizeof(cmd.id) + sizeof(cmd.lz_start);
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI, "bmi lz stream start address 0x%x\n",
+		   address);
+
+	if (sc->bmi.done_sent) {
+		ATHP_WARN(sc, "command disallowed\n");
+		return -EBUSY;
+	}
+
+	cmd.id            = __cpu_to_le32(BMI_LZ_STREAM_START);
+	cmd.lz_start.addr = __cpu_to_le32(address);
+
+	ret = ath10k_hif_exchange_bmi_msg(sc, &cmd, cmdlen, NULL, NULL);
+	if (ret) {
+		ATHP_WARN(sc, "unable to Start LZ Stream to the device\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+int
+ath10k_bmi_fast_download(struct athp_softc *sc, u32 address, const void *buffer,
+    u32 length)
+{
+	u8 trailer[4] = {};
+	u32 head_len = rounddown(length, 4);
+	u32 trailer_len = length - head_len;
+	int ret;
+
+	ATHP_DPRINTF(sc, ATHP_DEBUG_BMI,
+		   "bmi fast download address 0x%x buffer 0x%p length %d\n",
+		   address, buffer, length);
+
+	ret = ath10k_bmi_lz_stream_start(sc, address);
+	if (ret)
+		return ret;
+
+	/* copy the last word into a zero padded buffer */
+	if (trailer_len > 0)
+		memcpy(trailer, buffer + head_len, trailer_len);
+
+	ret = ath10k_bmi_lz_data(sc, buffer, head_len);
+	if (ret)
+		return ret;
+
+	if (trailer_len > 0)
+		ret = ath10k_bmi_lz_data(sc, trailer, 4);
+
+	if (ret != 0)
+		return ret;
+
+	/*
+	 * Close compressed stream and open a new (fake) one.
+	 * This serves mainly to flush Target caches.
+	 */
+	ret = ath10k_bmi_lz_stream_start(sc, 0x00);
+
+	return ret;
+}
