@@ -115,7 +115,37 @@ struct athp_softc {
 		bool done_sent;
 	} bmi;
 
-	//struct cv target_suspend;
+	struct cv target_suspend;
+
+	struct ath10k_hw_params hw_params;
+
+	const struct firmware *board;
+	const void *board_data;
+	size_t board_len;
+
+	const struct firmware *otp;
+	const void *otp_data;
+	size_t otp_len;
+
+	const struct firmware *firmware;
+	const void *firmware_data;
+	size_t firmware_len;
+
+	const struct firmware *cal_file;
+
+	struct {
+		const void *firmware_codeswap_data;
+		size_t firmware_codeswap_len;
+		struct ath10k_swap_code_seg_info *firmware_swap_code_seg_info;
+	} swap;
+
+	char spec_board_id[100];
+	bool spec_board_loaded;
+
+	int fw_api;
+	enum ath10k_cal_mode cal_mode;
+
+
 
 	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
 
