@@ -155,7 +155,7 @@ ath10k_swap_code_seg_fill(struct athp_softc *sc,
 
 static void
 ath10k_swap_code_seg_free(struct athp_softc *sc,
-			  struct ath10k_swap_code_seg_info *seg_info)
+    struct ath10k_swap_code_seg_info *seg_info)
 {
 	u32 seg_size;
 
@@ -230,7 +230,7 @@ int ath10k_swap_code_seg_configure(struct athp_softc *sc,
 	}
 
 	ret = ath10k_bmi_write_memory(sc, seg_info->target_addr,
-				      &seg_info->seg_hw_info,
+				      (const char *) &seg_info->seg_hw_info,
 				      sizeof(seg_info->seg_hw_info));
 	if (ret) {
 		ATHP_ERR(sc, "failed to write Code swap segment information (%d)\n",
