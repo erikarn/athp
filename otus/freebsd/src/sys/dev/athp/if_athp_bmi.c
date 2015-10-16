@@ -165,7 +165,7 @@ ath10k_bmi_get_target_info(struct athp_softc *sc,
 
 int
 ath10k_bmi_read_memory(struct athp_softc *sc,
-    u32 address, void *buffer, u32 length)
+    u32 address, char *buffer, u32 length)
 {
 	struct bmi_cmd cmd;
 	union bmi_resp resp;
@@ -182,7 +182,7 @@ ath10k_bmi_read_memory(struct athp_softc *sc,
 	}
 
 	while (length) {
-		rxlen = min_t(u32, length, BMI_MAX_DATA_SIZE);
+		rxlen = MIN(length, BMI_MAX_DATA_SIZE);
 
 		cmd.id            = __cpu_to_le32(BMI_READ_MEMORY);
 		cmd.read_mem.addr = __cpu_to_le32(address);
@@ -206,7 +206,7 @@ ath10k_bmi_read_memory(struct athp_softc *sc,
 }
 
 int
-ath10k_bmi_write_memory(struct athp_softc *sc, u32 address,const void *buffer,
+ath10k_bmi_write_memory(struct athp_softc *sc, u32 address, const char *buffer,
     u32 length)
 {
 	struct bmi_cmd cmd;
@@ -293,7 +293,7 @@ ath10k_bmi_execute(struct athp_softc *sc, u32 address, u32 param, u32 *result)
 }
 
 int
-ath10k_bmi_lz_data(struct athp_softc *sc, const void *buffer, u32 length)
+ath10k_bmi_lz_data(struct athp_softc *sc, const char *buffer, u32 length)
 {
 	struct bmi_cmd cmd;
 	u32 hdrlen = sizeof(cmd.id) + sizeof(cmd.lz_data);
@@ -359,7 +359,7 @@ ath10k_bmi_lz_stream_start(struct athp_softc *sc, u32 address)
 }
 
 int
-ath10k_bmi_fast_download(struct athp_softc *sc, u32 address, const void *buffer,
+ath10k_bmi_fast_download(struct athp_softc *sc, u32 address, const char *buffer,
     u32 length)
 {
 	u8 trailer[4] = {};

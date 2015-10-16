@@ -186,9 +186,9 @@ int ath10k_bmi_done(struct athp_softc *sc);
 int ath10k_bmi_get_target_info(struct athp_softc *sc,
 			       struct bmi_target_info *target_info);
 int ath10k_bmi_read_memory(struct athp_softc *sc, u32 address,
-			   void *buffer, u32 length);
+			   char *buffer, u32 length);
 int ath10k_bmi_write_memory(struct athp_softc *sc, u32 address,
-			    const void *buffer, u32 length);
+			    const char *buffer, u32 length);
 
 #define ath10k_bmi_read32(ar, item, val)				\
 	({								\
@@ -218,8 +218,8 @@ int ath10k_bmi_write_memory(struct athp_softc *sc, u32 address,
 extern	int ath10k_bmi_execute(struct athp_softc *sc, u32 address, u32 param,
 	    u32 *result);
 extern	int ath10k_bmi_lz_stream_start(struct athp_softc *sc, u32 address);
-extern	int ath10k_bmi_lz_data(struct athp_softc *sc, const void *buffer,
+extern	int ath10k_bmi_lz_data(struct athp_softc *sc, const char *buffer,
 	    u32 length);
 extern	int ath10k_bmi_fast_download(struct athp_softc *sc, u32 address,
-	    const void *buffer, u32 length);
+	    const char *buffer, u32 length);
 #endif /* __IF_ATHP_BMI_H__ */
