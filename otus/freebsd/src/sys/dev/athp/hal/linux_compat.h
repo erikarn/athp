@@ -37,4 +37,16 @@ roundup_pow_of_two(unsigned long n)
 
 #define	might_sleep()
 
+#define	ARRAY_SIZE(n)	nitems(n)
+
+#define scnprintf(...) snprintf(__VA_ARGS__)
+
+/* Bitfield things; include sys/bitstring.h */
+#include <sys/bitstring.h>
+
+#define	DECLARE_BITMAP(n, s)	bitstr_t bit_decl(n, s)
+#define	test_bit(i, n)		bit_test(n, i)
+#define	set_bit(i, n)		bit_set(n, i)
+#define	clear_bit(i, n)		bit_clear(n, i)
+
 #endif	/* __LINUX_COMPAT_H__ */
