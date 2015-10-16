@@ -115,6 +115,10 @@ struct athp_softc {
 		bool done_sent;
 	} bmi;
 
+	//struct cv target_suspend;
+
+	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
+
 #if 0
 	/* How many pending, active transmit frames */
 	int				sc_tx_n_pending;

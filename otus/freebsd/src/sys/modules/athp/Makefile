@@ -39,4 +39,8 @@ SRCS    += if_athp_pci_hif.c
 # for speaking to the bootloader for setup and firmware loading
 SRCS    += if_athp_bmi.c
 
+# This is the core routines for firmware load, HIF wakeup/sleep,
+# programming the target features, etc.
+SRCS    += if_athp_core.c
+
 .include <bsd.kmod.mk>

@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_desc.h"
+#include "if_athp_core.h"
 #include "if_athp_var.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"

@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
+#include "if_athp_core.h"
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
@@ -125,7 +126,6 @@ athp_core_probe_fw(struct athp_softc *sc)
 		goto err_power_down;
 	}
 #endif
-
 	/* TODO: the rest */
 
 	/* Finished up - power down */
