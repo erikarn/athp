@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include "hal/targaddrs.h"
 #include "hal/wmi.h"
 #include "hal/core.h"
+#include "hal/swap.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
@@ -88,6 +89,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_bmi.h"
 #include "if_athp_main.h"
 #include "if_athp_pci_chip.h"
+#include "if_athp_swap.h"
 
 /*
  * This is the "core" interface part of ath10k (core.c.)
