@@ -334,6 +334,7 @@ ath10k_fetch_fw_file(struct athp_softc *sc, const char *dir, const char *file)
 //	snprintf(filename, sizeof(filename), "%s/%s", dir, file);
 	/* This allocates a firmware struct and returns it in fw */
 	/* Note: will return 'NULL' upon error */
+	device_printf(sc->sc_dev, "%s: firmware_get: %s\n", __func__, file);
 	fw = firmware_get(file);
 	return fw;
 }
