@@ -908,7 +908,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 			if (ie_len != sizeof(u32))
 				break;
 
-			version = (__le32 *)data;
+			version = (const __le32 *)data;
 
 			sc->htt.op_version = le32_to_cpup(version);
 
@@ -949,7 +949,8 @@ err:
 	return ret;
 }
 
-static int ath10k_core_fetch_firmware_files(struct athp_softc *sc)
+static int
+ath10k_core_fetch_firmware_files(struct athp_softc *sc)
 {
 	int ret;
 
@@ -1003,7 +1004,8 @@ success:
 	return 0;
 }
 
-static int ath10k_download_cal_data(struct athp_softc *sc)
+static int
+ath10k_download_cal_data(struct athp_softc *sc)
 {
 	int ret;
 
@@ -1041,7 +1043,8 @@ done:
 	return 0;
 }
 
-static int ath10k_init_uart(struct athp_softc *sc)
+static int
+ath10k_init_uart(struct athp_softc *sc)
 {
 	int ret;
 
@@ -1081,9 +1084,10 @@ static int ath10k_init_uart(struct athp_softc *sc)
 	return 0;
 }
 
-static int ath10k_init_hw_params(struct athp_softc *sc)
+static int
+ath10k_init_hw_params(struct athp_softc *sc)
 {
-	const struct ath10k_hw_params *uninitialized_var(hw_params);
+	const struct ath10k_hw_params *hw_params;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ath10k_hw_params_list); i++) {
@@ -1107,12 +1111,15 @@ static int ath10k_init_hw_params(struct athp_softc *sc)
 	return 0;
 }
 
-static void ath10k_core_restart(struct work_struct *work)
+static void
+ath10k_core_restart(void *arg, int npending)
 {
-	struct athp_softc *sc = container_of(work, struct ath10k, restart_work);
+	struct athp_softc *sc = arg;
 
+	/* XXX lock? */
 	set_bit(ATH10K_FLAG_CRASH_FLUSH, &sc->dev_flags);
 
+#if 0
 	/* Place a barrier to make sure the compiler doesn't reorder
 	 * CRASH_FLUSH and calling other functions.
 	 */
@@ -1160,9 +1167,13 @@ static void ath10k_core_restart(struct work_struct *work)
 	}
 
 	mutex_unlock(&sc->conf_mutex);
+#else
+	device_printf(sc->sc_dev, "%s: TODO: called\n", __func__);
+#endif
 }
 
-static int ath10k_core_init_firmware_features(struct athp_softc *sc)
+static int
+ath10k_core_init_firmware_features(struct athp_softc *sc)
 {
 	if (test_bit(ATH10K_FW_FEATURE_WMI_10_2, sc->fw_features) &&
 	    !test_bit(ATH10K_FW_FEATURE_WMI_10X, sc->fw_features)) {
@@ -1176,6 +1187,7 @@ static int ath10k_core_init_firmware_features(struct athp_softc *sc)
 		return -EINVAL;
 	}
 
+#if 0
 	sc->wmi.rx_decap_mode = ATH10K_HW_TXRX_NATIVE_WIFI;
 	switch (ath10k_cryptmode_param) {
 	case ATH10K_CRYPT_MODE_HW:
@@ -1301,12 +1313,16 @@ static int ath10k_core_init_firmware_features(struct athp_softc *sc)
 			return -EINVAL;
 		}
 	}
+#else
+	device_printf(sc->sc_dev, "%s: TODO: called\n", __func__);
+#endif
 
 	return 0;
 }
 
 int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 {
+#if 0
 	int status;
 
 	lockdep_assert_held(&sc->conf_mutex);
@@ -1482,15 +1498,20 @@ err_wmi_detach:
 	ath10k_wmi_detach(sc);
 err:
 	return status;
+#else
+	device_printf(sc->sc_dev, "%s: TODO: called\n", __func__);
+	return (-1);
+#endif
 }
-EXPORT_SYMBOL(ath10k_core_start);
 
-int ath10k_wait_for_suspend(struct athp_softc *sc, u32 suspend_opt)
+int
+ath10k_wait_for_suspend(struct athp_softc *sc, u32 suspend_opt)
 {
+#if 0
 	int ret;
 	unsigned long time_left;
 
-	reinit_completion(&sc->target_suspend);
+//	reinit_completion(&sc->target_suspend);
 
 	ret = ath10k_wmi_pdev_suspend_target(sc, suspend_opt);
 	if (ret) {
@@ -1506,12 +1527,18 @@ int ath10k_wait_for_suspend(struct athp_softc *sc, u32 suspend_opt)
 	}
 
 	return 0;
+#else
+	device_printf(sc->sc_dev, "%s: TODO: called\n", __func__);
+	return (-1);
+#endif
 }
 
-void ath10k_core_stop(struct athp_softc *sc)
+void
+ath10k_core_stop(struct athp_softc *sc)
 {
-	lockdep_assert_held(&sc->conf_mutex);
-	ath10k_debug_stop(sc);
+
+	ATHP_CONF_LOCK_ASSERT(sc);
+	athp_debug_stop(sc);
 
 	/* try to suspend target */
 	if (sc->state != ATH10K_STATE_RESTARTING &&
@@ -1519,24 +1546,28 @@ void ath10k_core_stop(struct athp_softc *sc)
 		ath10k_wait_for_suspend(sc, WMI_PDEV_SUSPEND_AND_DISABLE_INTR);
 
 	ath10k_hif_stop(sc);
+#if 0
 	ath10k_htt_tx_free(&sc->htt);
 	ath10k_htt_rx_free(&sc->htt);
 	ath10k_wmi_detach(sc);
+#else
+	device_printf(sc->sc_dev, "%s: TODO: htt free/wmi detach\n", __func__);
+#endif
 }
-EXPORT_SYMBOL(ath10k_core_stop);
 
 /* mac80211 manages fw/hw initialization through start/stop hooks. However in
  * order to know what hw capabilities should be advertised to mac80211 it is
  * necessary to load the firmware (and tear it down immediately since start
  * hook will try to init it again) before registering */
-static int ath10k_core_probe_fw(struct athp_softc *sc)
+int
+ath10k_core_probe_fw(struct athp_softc *sc)
 {
 	struct bmi_target_info target_info;
 	int ret = 0;
 
 	ret = ath10k_hif_power_up(sc);
 	if (ret) {
-		ATHP_ERR(sc, "could not start pci hif (%d)\n", ret);
+		ATHP_ERR(sc, "could not start hif (%d)\n", ret);
 		return ret;
 	}
 
@@ -1548,7 +1579,7 @@ static int ath10k_core_probe_fw(struct athp_softc *sc)
 	}
 
 	sc->target_version = target_info.version;
-	sc->hw->wiphy->hw_version = target_info.version;
+	//sc->hw->wiphy->hw_version = target_info.version;
 
 	ret = ath10k_init_hw_params(sc);
 	if (ret) {
@@ -1576,7 +1607,7 @@ static int ath10k_core_probe_fw(struct athp_softc *sc)
 		goto err_free_firmware_files;
 	}
 
-	mutex_lock(&sc->conf_mutex);
+	ATHP_CONF_LOCK(sc);
 
 	ret = ath10k_core_start(sc, ATH10K_FIRMWARE_MODE_NORMAL);
 	if (ret) {
@@ -1587,13 +1618,13 @@ static int ath10k_core_probe_fw(struct athp_softc *sc)
 	ath10k_print_driver_info(sc);
 	ath10k_core_stop(sc);
 
-	mutex_unlock(&sc->conf_mutex);
+	ATHP_CONF_UNLOCK(sc);
 
 	ath10k_hif_power_down(sc);
 	return 0;
 
 err_unlock:
-	mutex_unlock(&sc->conf_mutex);
+	ATHP_CONF_UNLOCK(sc);
 
 err_free_firmware_files:
 	ath10k_core_free_firmware_files(sc);
@@ -1604,9 +1635,9 @@ err_power_down:
 	return ret;
 }
 
-static void ath10k_core_register_work(struct work_struct *work)
+void
+ath10k_core_register_work(struct athp_softc *sc)
 {
-	struct athp_softc *sc = container_of(work, struct ath10k, register_work);
 	int status;
 
 	status = ath10k_core_probe_fw(sc);
@@ -1615,6 +1646,7 @@ static void ath10k_core_register_work(struct work_struct *work)
 		goto err;
 	}
 
+#if 0
 	status = ath10k_mac_register(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not register to mac80211 (%d)\n", status);
@@ -1639,10 +1671,15 @@ static void ath10k_core_register_work(struct work_struct *work)
 			   status);
 		goto err_spectral_destroy;
 	}
-
+#else
+	device_printf(sc->sc_dev,
+	    "%s: TODO: mac/debug/spectral/thermal register\n",
+	    __func__);
+#endif
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &sc->dev_flags);
 	return;
 
+#if 0
 err_spectral_destroy:
 	ath10k_spectral_destroy(sc);
 err_debug_destroy:
@@ -1651,6 +1688,7 @@ err_unregister_mac:
 	ath10k_mac_unregister(sc);
 err_release_fw:
 	ath10k_core_free_firmware_files(sc);
+#endif
 err:
 	/* TODO: It's probably a good idea to release device from the driver
 	 * but calling device_release_driver() here will cause a deadlock.
@@ -1658,7 +1696,9 @@ err:
 	return;
 }
 
-int ath10k_core_register(struct athp_softc *sc, u32 chip_id)
+#if 0
+int
+ath10k_core_register(struct athp_softc *sc, u32 chip_id)
 {
 	sc->chip_id = chip_id;
 	queue_work(sc->workqueue, &sc->register_work);
@@ -1666,6 +1706,7 @@ int ath10k_core_register(struct athp_softc *sc, u32 chip_id)
 	return 0;
 }
 EXPORT_SYMBOL(ath10k_core_register);
+#endif
 
 void ath10k_core_unregister(struct athp_softc *sc)
 {
