@@ -325,6 +325,8 @@ athp_pci_attach(device_t dev)
 	/* XXX TODO: unique names */
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
+	mtx_init(&sc->sc_conf_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	    MTX_DEF);
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
@@ -535,6 +537,7 @@ bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
+	mtx_destroy(&sc->sc_conf_mtx);
 	mtx_destroy(&sc->sc_mtx);
 	if (psc->pipe_taskq) {
 		taskqueue_drain_all(psc->pipe_taskq);
@@ -588,6 +591,7 @@ athp_pci_detach(device_t dev)
 
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
+	mtx_destroy(&sc->sc_conf_mtx);
 	mtx_destroy(&sc->sc_mtx);
 
 	/* Tear down the pipe taskqueue */

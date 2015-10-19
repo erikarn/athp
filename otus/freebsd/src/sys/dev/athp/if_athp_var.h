@@ -61,6 +61,23 @@ struct athp_vap {
 
 #define	ATHP_FW_VER_STR		128
 
+#define	ATHP_CONF_LOCK(sc)		mtx_lock(&(sc)->sc_conf_mtx)
+#define	ATHP_CONF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_conf_mtx)
+#define	ATHP_CONF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
+#define	ATHP_CONF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
+
+/*
+ * XXX temporary placeholders until we get the full WMI/HTT
+ * layer up.
+ */
+struct ath10k_wmi {
+	int op_version;
+};
+
+struct ath10k_htt {
+	int op_version;
+};
+
 /*
  * This is the top-level driver state.
  *
@@ -74,6 +91,7 @@ struct athp_softc {
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
+	struct mtx			sc_conf_mtx;
 	int				sc_invalid;
 	uint64_t			sc_debug;
 
@@ -97,6 +115,27 @@ struct athp_softc {
 	enum ath10k_hw_rev		sc_hwrev;
 	int				sc_chipid;
 
+	/* ath10k bits start here; attempt to migrate everything? */
+	u32 target_version;
+	u8 fw_version_major;
+	u32 fw_version_minor;
+	u16 fw_version_release;
+	u16 fw_version_build;
+	u32 fw_stats_req_mask;
+	u32 phy_capability;
+	u32 hw_min_tx_power;
+	u32 hw_max_tx_power;
+	u32 ht_cap_info;
+	u32 vht_cap_info;
+	u32 num_rf_chains;
+	u32 max_spatial_stream;
+	/* protected by conf_mutex */
+	bool ani_enabled;
+	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
+	bool p2p;
+	unsigned long dev_flags;
+	enum ath10k_state state;
+
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;
 	const struct ath10k_hw_values	*sc_regvals;
@@ -119,6 +158,12 @@ struct athp_softc {
 	struct {
 		bool done_sent;
 	} bmi;
+
+	/* HTT */
+
+	/* WMI */
+	struct ath10k_wmi wmi;
+	struct ath10k_htt htt;
 
 	struct cv target_suspend;
 
@@ -149,8 +194,6 @@ struct athp_softc {
 
 	int fw_api;
 	enum ath10k_cal_mode cal_mode;
-
-	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
 
 	/*
 	 *  XXX TODO: reorder/rename/etc ot make this match the ath10k struct

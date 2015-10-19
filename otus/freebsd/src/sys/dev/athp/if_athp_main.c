@@ -118,6 +118,8 @@ athp_core_probe_fw(struct athp_softc *sc)
 	    target_info.version,
 	    target_info.type);
 
+	/* XXX endian? */
+	sc->target_version = target_info.version;
 #if 0
 	ar->target_version = target_info.version;
 	ar->hw->wiphy->hw_version = target_info.version;
