@@ -386,8 +386,9 @@ ath10k_push_board_ext_data(struct athp_softc *sc, const char *data,
 	return 0;
 }
 
-static int ath10k_download_board_data(struct athp_softc *sc, const void *data,
-				      size_t data_len)
+static int
+ath10k_download_board_data(struct athp_softc *sc, const void *data,
+    size_t data_len)
 {
 	u32 board_data_size = sc->hw_params.fw.board_size;
 	u32 address;
@@ -423,7 +424,8 @@ exit:
 	return ret;
 }
 
-static int ath10k_download_cal_file(struct athp_softc *sc)
+static int
+ath10k_download_cal_file(struct athp_softc *sc)
 {
 	int ret;
 
@@ -445,7 +447,8 @@ static int ath10k_download_cal_file(struct athp_softc *sc)
 /*
  * This is for device tree related stuff.
  */
-static int ath10k_download_cal_dt(struct athp_softc *sc)
+static int
+ath10k_download_cal_dt(struct athp_softc *sc)
 {
 #if 0
 	struct device_node *node;
@@ -507,7 +510,8 @@ out:
 #endif
 }
 
-static int ath10k_download_and_run_otp(struct athp_softc *sc)
+static int
+ath10k_download_and_run_otp(struct athp_softc *sc)
 {
 	u32 result, address = sc->hw_params.patch_load_addr;
 	u32 bmi_otp_exe_param = sc->hw_params.otp_exe_param;
@@ -554,7 +558,8 @@ static int ath10k_download_and_run_otp(struct athp_softc *sc)
 	return 0;
 }
 
-static int ath10k_download_fw(struct athp_softc *sc, enum ath10k_firmware_mode mode)
+static int
+ath10k_download_fw(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 {
 	u32 address, data_len;
 	const char *mode_name;
@@ -578,7 +583,7 @@ static int ath10k_download_fw(struct athp_softc *sc, enum ath10k_firmware_mode m
 		break;
 	case ATH10K_FIRMWARE_MODE_UTF:
 		data = sc->testmode.utf->data;
-		data_len = sc->testmode.utf->size;
+		data_len = sc->testmode.utf->datasize;
 		mode_name = "utf";
 		break;
 	default:
@@ -600,7 +605,8 @@ static int ath10k_download_fw(struct athp_softc *sc, enum ath10k_firmware_mode m
 	return ret;
 }
 
-static void ath10k_core_free_firmware_files(struct athp_softc *sc)
+static void
+ath10k_core_free_firmware_files(struct athp_softc *sc)
 {
 	if (sc->board)
 		firmware_put(sc->board, FIRMWARE_UNLOAD);
@@ -614,7 +620,7 @@ static void ath10k_core_free_firmware_files(struct athp_softc *sc)
 	if (sc->cal_file)
 		firmware_put(sc->cal_file, FIRMWARE_UNLOAD);
 
-	ath10k_swap_code_seg_release(ar);
+	ath10k_swap_code_seg_release(sc);
 
 	sc->board = NULL;
 	sc->board_data = NULL;
@@ -632,18 +638,19 @@ static void ath10k_core_free_firmware_files(struct athp_softc *sc)
 
 }
 
-static int ath10k_fetch_cal_file(struct athp_softc *sc)
+static int
+ath10k_fetch_cal_file(struct athp_softc *sc)
 {
 	char filename[100];
 
 	/* cal-<bus>-<id>.bin */
 	scnprintf(filename, sizeof(filename), "cal-%s-%s.bin",
-		  ath10k_bus_str(sc->hif.bus), dev_name(sc->dev));
+		  ath10k_bus_str(sc->hif.bus), device_get_nameunit(sc->sc_dev));
 
 	sc->cal_file = ath10k_fetch_fw_file(sc, ATH10K_FW_DIR, filename);
-	if (IS_ERR(sc->cal_file))
+	if (sc->cal_file == NULL)
 		/* calibration file is optional, don't print any warnings */
-		return PTR_ERR(sc->cal_file);
+		return (-1);
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "found calibration file %s/%s\n",
 		   ATH10K_FW_DIR, filename);
@@ -651,7 +658,8 @@ static int ath10k_fetch_cal_file(struct athp_softc *sc)
 	return 0;
 }
 
-static int ath10k_core_fetch_spec_board_file(struct athp_softc *sc)
+static int
+ath10k_core_fetch_spec_board_file(struct athp_softc *sc)
 {
 	char filename[100];
 
@@ -659,17 +667,18 @@ static int ath10k_core_fetch_spec_board_file(struct athp_softc *sc)
 		  ath10k_bus_str(sc->hif.bus), sc->spec_board_id);
 
 	sc->board = ath10k_fetch_fw_file(sc, sc->hw_params.fw.dir, filename);
-	if (IS_ERR(sc->board))
-		return PTR_ERR(sc->board);
+	if (sc->board == NULL)
+		return (-1);
 
 	sc->board_data = sc->board->data;
-	sc->board_len = sc->board->size;
+	sc->board_len = sc->board->datasize;
 	sc->spec_board_loaded = true;
 
 	return 0;
 }
 
-static int ath10k_core_fetch_generic_board_file(struct athp_softc *sc)
+static int
+ath10k_core_fetch_generic_board_file(struct athp_softc *sc)
 {
 	if (!sc->hw_params.fw.board) {
 		ATHP_ERR(sc, "failed to find board file fw entry\n");
@@ -679,22 +688,23 @@ static int ath10k_core_fetch_generic_board_file(struct athp_softc *sc)
 	sc->board = ath10k_fetch_fw_file(sc,
 					 sc->hw_params.fw.dir,
 					 sc->hw_params.fw.board);
-	if (IS_ERR(sc->board))
-		return PTR_ERR(sc->board);
+	if (sc->board == NULL)
+		return (-1);
 
 	sc->board_data = sc->board->data;
-	sc->board_len = sc->board->size;
+	sc->board_len = sc->board->datasize;
 	sc->spec_board_loaded = false;
 
 	return 0;
 }
 
-static int ath10k_core_fetch_board_file(struct athp_softc *sc)
+static int
+ath10k_core_fetch_board_file(struct athp_softc *sc)
 {
 	int ret;
 
 	if (strlen(sc->spec_board_id) > 0) {
-		ret = ath10k_core_fetch_spec_board_file(ar);
+		ret = ath10k_core_fetch_spec_board_file(sc);
 		if (ret) {
 			ATHP_INFO(sc, "failed to load spec board file, falling back to generic: %d\n",
 				    ret);
@@ -707,7 +717,7 @@ static int ath10k_core_fetch_board_file(struct athp_softc *sc)
 	}
 
 generic:
-	ret = ath10k_core_fetch_generic_board_file(ar);
+	ret = ath10k_core_fetch_generic_board_file(sc);
 	if (ret) {
 		ATHP_ERR(sc, "failed to fetch generic board data: %d\n", ret);
 		return ret;
@@ -716,7 +726,8 @@ generic:
 	return 0;
 }
 
-static int ath10k_core_fetch_firmware_api_1(struct athp_softc *sc)
+static int
+ath10k_core_fetch_firmware_api_1(struct athp_softc *sc)
 {
 	int ret = 0;
 
@@ -728,14 +739,14 @@ static int ath10k_core_fetch_firmware_api_1(struct athp_softc *sc)
 	sc->firmware = ath10k_fetch_fw_file(sc,
 					    sc->hw_params.fw.dir,
 					    sc->hw_params.fw.fw);
-	if (IS_ERR(sc->firmware)) {
-		ret = PTR_ERR(sc->firmware);
+	if (sc->firmware == NULL) {
+		ret = -1;
 		ATHP_ERR(sc, "could not fetch firmware (%d)\n", ret);
 		goto err;
 	}
 
 	sc->firmware_data = sc->firmware->data;
-	sc->firmware_len = sc->firmware->size;
+	sc->firmware_len = sc->firmware->datasize;
 
 	/* OTP may be undefined. If so, don't fetch it at all */
 	if (sc->hw_params.fw.otp == NULL)
@@ -744,23 +755,24 @@ static int ath10k_core_fetch_firmware_api_1(struct athp_softc *sc)
 	sc->otp = ath10k_fetch_fw_file(sc,
 				       sc->hw_params.fw.dir,
 				       sc->hw_params.fw.otp);
-	if (IS_ERR(sc->otp)) {
-		ret = PTR_ERR(sc->otp);
+	if (sc->otp == NULL) {
+		ret = -1;
 		ATHP_ERR(sc, "could not fetch otp (%d)\n", ret);
 		goto err;
 	}
 
 	sc->otp_data = sc->otp->data;
-	sc->otp_len = sc->otp->size;
+	sc->otp_len = sc->otp->datasize;
 
 	return 0;
 
 err:
-	ath10k_core_free_firmware_files(ar);
+	ath10k_core_free_firmware_files(sc);
 	return ret;
 }
 
-static int ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
+static int
+ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 {
 	size_t magic_len, len, ie_len;
 	int ie_id, i, index, bit, ret;
@@ -770,14 +782,14 @@ static int ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *n
 
 	/* first fetch the firmware file (firmware-*.bin) */
 	sc->firmware = ath10k_fetch_fw_file(sc, sc->hw_params.fw.dir, name);
-	if (IS_ERR(sc->firmware)) {
-		ATHP_ERR(sc, "could not fetch firmware file '%s/%s': %ld\n",
-			   sc->hw_params.fw.dir, name, PTR_ERR(sc->firmware));
-		return PTR_ERR(sc->firmware);
+	if (sc->firmware == NULL) {
+		ATHP_ERR(sc, "could not fetch firmware file '%s/%s': %d\n",
+			   sc->hw_params.fw.dir, name, -1);
+		return (-1);
 	}
 
 	data = sc->firmware->data;
-	len = sc->firmware->size;
+	len = sc->firmware->datasize;
 
 	/* magic also includes the null byte, check that as well */
 	magic_len = strlen(ATH10K_FIRMWARE_MAGIC) + 1;
