@@ -19,6 +19,7 @@
 
 struct ath10k_swap_code_seg_info {
 	struct ath10k_swap_code_seg_hw_info seg_hw_info;
+	struct athp_descdma seg_dd;
 	void *virt_address[ATH10K_SWAP_CODE_SEG_NUM_SUPPORTED];
 	u32 target_addr;
 	bus_addr_t paddr[ATH10K_SWAP_CODE_SEG_NUM_SUPPORTED];

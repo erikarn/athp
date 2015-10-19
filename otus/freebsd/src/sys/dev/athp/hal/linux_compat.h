@@ -66,4 +66,11 @@ roundup_pow_of_two(unsigned long n)
 
 #define	ETH_ALEN		ETHER_ADDR_LEN
 
+/* XXX TODO: only for 32 bit values */
+static inline int
+ilog2(uint32_t val)
+{
+	return fls(val);
+}
+
 #endif	/* __LINUX_COMPAT_H__ */

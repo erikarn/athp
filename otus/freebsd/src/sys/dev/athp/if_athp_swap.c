@@ -89,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_chip.h"
 #include "if_athp_swap.h"
 
+MALLOC_DECLARE(M_ATHPDEV);
+
 /*
  * This file has implementation for code swap logic. With code swap feature,
  * target can run the fw binary with even smaller IRAM size by using host
@@ -157,17 +159,12 @@ static void
 ath10k_swap_code_seg_free(struct athp_softc *sc,
     struct ath10k_swap_code_seg_info *seg_info)
 {
-	u32 seg_size;
 
 	if (!seg_info)
 		return;
 
-	if (!seg_info->virt_address[0])
-		return;
-
-	seg_size = __le32_to_cpu(seg_info->seg_hw_info.size);
-	dma_free_coherent(sc->dev, seg_size, seg_info->virt_address[0],
-			  seg_info->paddr[0]);
+	athp_descdma_free(sc, &seg_info->seg_dd);
+	free(seg_info, M_ATHPDEV);
 }
 
 static struct ath10k_swap_code_seg_info *
@@ -175,7 +172,7 @@ ath10k_swap_code_seg_alloc(struct athp_softc *sc, size_t swap_bin_len)
 {
 	struct ath10k_swap_code_seg_info *seg_info;
 	void *virt_addr;
-	dma_addr_t paddr;
+	bus_addr_t paddr;
 
 	swap_bin_len = roundup(swap_bin_len, 2);
 	if (swap_bin_len > ATH10K_SWAP_CODE_SEG_BIN_LEN_MAX) {
@@ -184,16 +181,18 @@ ath10k_swap_code_seg_alloc(struct athp_softc *sc, size_t swap_bin_len)
 		return NULL;
 	}
 
-	seg_info = devm_kzalloc(sc->dev, sizeof(*seg_info), GFP_KERNEL);
+	seg_info = malloc(sizeof(*seg_info), M_ATHPDEV, M_NOWAIT | M_ZERO);
 	if (!seg_info)
 		return NULL;
 
-	virt_addr = dma_alloc_coherent(sc->dev, swap_bin_len, &paddr,
-				       GFP_KERNEL);
-	if (!virt_addr) {
+	if (athp_descdma_alloc(sc, &seg_info->seg_dd, "ath10k code seg", 8,
+	    swap_bin_len) != 0) {
 		ATHP_ERR(sc, "failed to allocate dma coherent memory\n");
+		free(seg_info, M_ATHPDEV);
 		return NULL;
 	}
+	virt_addr = seg_info->seg_dd.dd_desc;
+	paddr = seg_info->seg_dd.dd_desc_paddr;
 
 	seg_info->seg_hw_info.bus_addr[0] = __cpu_to_le32(paddr);
 	seg_info->seg_hw_info.size = __cpu_to_le32(swap_bin_len);
