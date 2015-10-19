@@ -945,7 +945,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 	return 0;
 
 err:
-	ath10k_core_free_firmware_files(ar);
+	ath10k_core_free_firmware_files(sc);
 	return ret;
 }
 
@@ -954,9 +954,9 @@ static int ath10k_core_fetch_firmware_files(struct athp_softc *sc)
 	int ret;
 
 	/* calibration file is optional, don't check for any errors */
-	ath10k_fetch_cal_file(ar);
+	ath10k_fetch_cal_file(sc);
 
-	ret = ath10k_core_fetch_board_file(ar);
+	ret = ath10k_core_fetch_board_file(sc);
 	if (ret) {
 		ATHP_ERR(sc, "failed to fetch board file: %d\n", ret);
 		return ret;
@@ -993,7 +993,7 @@ static int ath10k_core_fetch_firmware_files(struct athp_softc *sc)
 	sc->fw_api = 1;
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "trying fw api %d\n", sc->fw_api);
 
-	ret = ath10k_core_fetch_firmware_api_1(ar);
+	ret = ath10k_core_fetch_firmware_api_1(sc);
 	if (ret)
 		return ret;
 
@@ -1007,7 +1007,7 @@ static int ath10k_download_cal_data(struct athp_softc *sc)
 {
 	int ret;
 
-	ret = ath10k_download_cal_file(ar);
+	ret = ath10k_download_cal_file(sc);
 	if (ret == 0) {
 		sc->cal_mode = ATH10K_CAL_MODE_FILE;
 		goto done;
@@ -1017,7 +1017,7 @@ static int ath10k_download_cal_data(struct athp_softc *sc)
 		   "boot did not find a calibration file, try DT next: %d\n",
 		   ret);
 
-	ret = ath10k_download_cal_dt(ar);
+	ret = ath10k_download_cal_dt(sc);
 	if (ret == 0) {
 		sc->cal_mode = ATH10K_CAL_MODE_DT;
 		goto done;
@@ -1027,7 +1027,7 @@ static int ath10k_download_cal_data(struct athp_softc *sc)
 		   "boot did not find DT entry, try OTP next: %d\n",
 		   ret);
 
-	ret = ath10k_download_and_run_otp(ar);
+	ret = ath10k_download_and_run_otp(sc);
 	if (ret) {
 		ATHP_ERR(sc, "failed to run otp: %d\n", ret);
 		return ret;
@@ -1119,7 +1119,7 @@ static void ath10k_core_restart(struct work_struct *work)
 	barrier();
 
 	ieee80211_stop_queues(sc->hw);
-	ath10k_drain_tx(ar);
+	ath10k_drain_tx(sc);
 	complete_all(&sc->scan.started);
 	complete_all(&sc->scan.completed);
 	complete_all(&sc->scan.on_channel);
@@ -1136,8 +1136,8 @@ static void ath10k_core_restart(struct work_struct *work)
 	switch (sc->state) {
 	case ATH10K_STATE_ON:
 		sc->state = ATH10K_STATE_RESTARTING;
-		ath10k_hif_stop(ar);
-		ath10k_scan_finish(ar);
+		ath10k_hif_stop(sc);
+		ath10k_scan_finish(sc);
 		ieee80211_restart_hw(sc->hw);
 		break;
 	case ATH10K_STATE_OFF:
@@ -1313,14 +1313,14 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 
 	clear_bit(ATH10K_FLAG_CRASH_FLUSH, &sc->dev_flags);
 
-	ath10k_bmi_start(ar);
+	ath10k_bmi_start(sc);
 
-	if (ath10k_init_configure_target(ar)) {
+	if (ath10k_init_configure_target(sc)) {
 		status = -EINVAL;
 		goto err;
 	}
 
-	status = ath10k_download_cal_data(ar);
+	status = ath10k_download_cal_data(sc);
 	if (status)
 		goto err;
 
@@ -1344,30 +1344,30 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	if (status)
 		goto err;
 
-	status = ath10k_init_uart(ar);
+	status = ath10k_init_uart(sc);
 	if (status)
 		goto err;
 
 	sc->htc.htc_ops.target_send_suspend_complete =
 		ath10k_send_suspend_complete;
 
-	status = ath10k_htc_init(ar);
+	status = ath10k_htc_init(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not init HTC (%d)\n", status);
 		goto err;
 	}
 
-	status = ath10k_bmi_done(ar);
+	status = ath10k_bmi_done(sc);
 	if (status)
 		goto err;
 
-	status = ath10k_wmi_attach(ar);
+	status = ath10k_wmi_attach(sc);
 	if (status) {
 		ATHP_ERR(sc, "WMI attach failed: %d\n", status);
 		goto err;
 	}
 
-	status = ath10k_htt_init(ar);
+	status = ath10k_htt_init(sc);
 	if (status) {
 		ATHP_ERR(sc, "failed to init htt: %d\n", status);
 		goto err_wmi_detach;
@@ -1385,7 +1385,7 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 		goto err_htt_tx_detach;
 	}
 
-	status = ath10k_hif_start(ar);
+	status = ath10k_hif_start(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not start HIF: %d\n", status);
 		goto err_htt_rx_detach;
@@ -1405,7 +1405,7 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 		}
 	}
 
-	status = ath10k_wmi_connect(ar);
+	status = ath10k_wmi_connect(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not connect wmi: %d\n", status);
 		goto err_hif_stop;
@@ -1418,7 +1418,7 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	}
 
 	if (mode == ATH10K_FIRMWARE_MODE_NORMAL) {
-		status = ath10k_wmi_wait_for_service_ready(ar);
+		status = ath10k_wmi_wait_for_service_ready(sc);
 		if (status) {
 			ATHP_WARN(sc, "wmi service ready event not received");
 			goto err_hif_stop;
@@ -1428,14 +1428,14 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "firmware %s booted\n",
 		   sc->hw->wiphy->fw_version);
 
-	status = ath10k_wmi_cmd_init(ar);
+	status = ath10k_wmi_cmd_init(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not send WMI init command (%d)\n",
 			   status);
 		goto err_hif_stop;
 	}
 
-	status = ath10k_wmi_wait_for_unified_ready(ar);
+	status = ath10k_wmi_wait_for_unified_ready(sc);
 	if (status) {
 		ATHP_ERR(sc, "wmi unified ready event not received\n");
 		goto err_hif_stop;
@@ -1447,7 +1447,7 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	sc->htt.rx_ring.in_ord_rx = !!(test_bit(WMI_SERVICE_RX_FULL_REORDER,
 						sc->wmi.svc_map));
 
-	status = ath10k_htt_rx_ring_refill(ar);
+	status = ath10k_htt_rx_ring_refill(sc);
 	if (status) {
 		ATHP_ERR(sc, "failed to refill htt rx ring: %d\n", status);
 		goto err_hif_stop;
@@ -1462,7 +1462,7 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 		}
 	}
 
-	status = ath10k_debug_start(ar);
+	status = ath10k_debug_start(sc);
 	if (status)
 		goto err_hif_stop;
 
@@ -1473,13 +1473,13 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	return 0;
 
 err_hif_stop:
-	ath10k_hif_stop(ar);
+	ath10k_hif_stop(sc);
 err_htt_rx_detach:
 	ath10k_htt_rx_free(&sc->htt);
 err_htt_tx_detach:
 	ath10k_htt_tx_free(&sc->htt);
 err_wmi_detach:
-	ath10k_wmi_detach(ar);
+	ath10k_wmi_detach(sc);
 err:
 	return status;
 }
@@ -1511,17 +1511,17 @@ int ath10k_wait_for_suspend(struct athp_softc *sc, u32 suspend_opt)
 void ath10k_core_stop(struct athp_softc *sc)
 {
 	lockdep_assert_held(&sc->conf_mutex);
-	ath10k_debug_stop(ar);
+	ath10k_debug_stop(sc);
 
 	/* try to suspend target */
 	if (sc->state != ATH10K_STATE_RESTARTING &&
 	    sc->state != ATH10K_STATE_UTF)
 		ath10k_wait_for_suspend(sc, WMI_PDEV_SUSPEND_AND_DISABLE_INTR);
 
-	ath10k_hif_stop(ar);
+	ath10k_hif_stop(sc);
 	ath10k_htt_tx_free(&sc->htt);
 	ath10k_htt_rx_free(&sc->htt);
-	ath10k_wmi_detach(ar);
+	ath10k_wmi_detach(sc);
 }
 EXPORT_SYMBOL(ath10k_core_stop);
 
@@ -1534,7 +1534,7 @@ static int ath10k_core_probe_fw(struct athp_softc *sc)
 	struct bmi_target_info target_info;
 	int ret = 0;
 
-	ret = ath10k_hif_power_up(ar);
+	ret = ath10k_hif_power_up(sc);
 	if (ret) {
 		ATHP_ERR(sc, "could not start pci hif (%d)\n", ret);
 		return ret;
@@ -1550,26 +1550,26 @@ static int ath10k_core_probe_fw(struct athp_softc *sc)
 	sc->target_version = target_info.version;
 	sc->hw->wiphy->hw_version = target_info.version;
 
-	ret = ath10k_init_hw_params(ar);
+	ret = ath10k_init_hw_params(sc);
 	if (ret) {
 		ATHP_ERR(sc, "could not get hw params (%d)\n", ret);
 		goto err_power_down;
 	}
 
-	ret = ath10k_core_fetch_firmware_files(ar);
+	ret = ath10k_core_fetch_firmware_files(sc);
 	if (ret) {
 		ATHP_ERR(sc, "could not fetch firmware files (%d)\n", ret);
 		goto err_power_down;
 	}
 
-	ret = ath10k_core_init_firmware_features(ar);
+	ret = ath10k_core_init_firmware_features(sc);
 	if (ret) {
 		ATHP_ERR(sc, "fatal problem with firmware features: %d\n",
 			   ret);
 		goto err_free_firmware_files;
 	}
 
-	ret = ath10k_swap_code_seg_init(ar);
+	ret = ath10k_swap_code_seg_init(sc);
 	if (ret) {
 		ATHP_ERR(sc, "failed to initialize code swap segment: %d\n",
 			   ret);
@@ -1584,22 +1584,22 @@ static int ath10k_core_probe_fw(struct athp_softc *sc)
 		goto err_unlock;
 	}
 
-	ath10k_print_driver_info(ar);
-	ath10k_core_stop(ar);
+	ath10k_print_driver_info(sc);
+	ath10k_core_stop(sc);
 
 	mutex_unlock(&sc->conf_mutex);
 
-	ath10k_hif_power_down(ar);
+	ath10k_hif_power_down(sc);
 	return 0;
 
 err_unlock:
 	mutex_unlock(&sc->conf_mutex);
 
 err_free_firmware_files:
-	ath10k_core_free_firmware_files(ar);
+	ath10k_core_free_firmware_files(sc);
 
 err_power_down:
-	ath10k_hif_power_down(ar);
+	ath10k_hif_power_down(sc);
 
 	return ret;
 }
@@ -1609,31 +1609,31 @@ static void ath10k_core_register_work(struct work_struct *work)
 	struct athp_softc *sc = container_of(work, struct ath10k, register_work);
 	int status;
 
-	status = ath10k_core_probe_fw(ar);
+	status = ath10k_core_probe_fw(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not probe fw (%d)\n", status);
 		goto err;
 	}
 
-	status = ath10k_mac_register(ar);
+	status = ath10k_mac_register(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not register to mac80211 (%d)\n", status);
 		goto err_release_fw;
 	}
 
-	status = ath10k_debug_register(ar);
+	status = ath10k_debug_register(sc);
 	if (status) {
 		ATHP_ERR(sc, "unable to initialize debugfs\n");
 		goto err_unregister_mac;
 	}
 
-	status = ath10k_spectral_create(ar);
+	status = ath10k_spectral_create(sc);
 	if (status) {
 		ATHP_ERR(sc, "failed to initialize spectral\n");
 		goto err_debug_destroy;
 	}
 
-	status = ath10k_thermal_register(ar);
+	status = ath10k_thermal_register(sc);
 	if (status) {
 		ATHP_ERR(sc, "could not register thermal device: %d\n",
 			   status);
@@ -1644,13 +1644,13 @@ static void ath10k_core_register_work(struct work_struct *work)
 	return;
 
 err_spectral_destroy:
-	ath10k_spectral_destroy(ar);
+	ath10k_spectral_destroy(sc);
 err_debug_destroy:
-	ath10k_debug_destroy(ar);
+	ath10k_debug_destroy(sc);
 err_unregister_mac:
-	ath10k_mac_unregister(ar);
+	ath10k_mac_unregister(sc);
 err_release_fw:
-	ath10k_core_free_firmware_files(ar);
+	ath10k_core_free_firmware_files(sc);
 err:
 	/* TODO: It's probably a good idea to release device from the driver
 	 * but calling device_release_driver() here will cause a deadlock.
@@ -1674,23 +1674,23 @@ void ath10k_core_unregister(struct athp_softc *sc)
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &sc->dev_flags))
 		return;
 
-	ath10k_thermal_unregister(ar);
+	ath10k_thermal_unregister(sc);
 	/* Stop spectral before unregistering from mac80211 to remove the
 	 * relayfs debugfs file cleanly. Otherwise the parent debugfs tree
 	 * would be already be free'd recursively, leading to a double free.
 	 */
-	ath10k_spectral_destroy(ar);
+	ath10k_spectral_destroy(sc);
 
 	/* We must unregister from mac80211 before we stop HTC and HIF.
 	 * Otherwise we will fail to submit commands to FW and mac80211 will be
 	 * unhappy about callback failures. */
-	ath10k_mac_unregister(ar);
+	ath10k_mac_unregister(sc);
 
-	ath10k_testmode_destroy(ar);
+	ath10k_testmode_destroy(sc);
 
-	ath10k_core_free_firmware_files(ar);
+	ath10k_core_free_firmware_files(sc);
 
-	ath10k_debug_unregister(ar);
+	ath10k_debug_unregister(sc);
 }
 EXPORT_SYMBOL(ath10k_core_unregister);
 
@@ -1771,7 +1771,7 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 	INIT_WORK(&sc->register_work, ath10k_core_register_work);
 	INIT_WORK(&sc->restart_work, ath10k_core_restart);
 
-	ret = ath10k_debug_create(ar);
+	ret = ath10k_debug_create(sc);
 	if (ret)
 		goto err_free_aux_wq;
 
@@ -1783,7 +1783,7 @@ err_free_wq:
 	destroy_workqueue(sc->workqueue);
 
 err_free_mac:
-	ath10k_mac_destroy(ar);
+	ath10k_mac_destroy(sc);
 
 	return NULL;
 }
@@ -1798,6 +1798,6 @@ ath10k_core_destroy(struct athp_softc *sc)
 	flush_workqueue(sc->workqueue_aux);
 	destroy_workqueue(sc->workqueue_aux);
 
-	ath10k_debug_destroy(ar);
-	ath10k_mac_destroy(ar);
+	ath10k_debug_destroy(sc);
+	ath10k_mac_destroy(sc);
 }
