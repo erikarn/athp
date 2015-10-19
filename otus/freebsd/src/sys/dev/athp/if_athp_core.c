@@ -808,7 +808,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 	}
 
 	/* jump over the padding */
-	magic_len = ALIGN(magic_len, 4);
+	magic_len = ALIGN_LINUX(magic_len, 4);
 
 	len -= magic_len;
 	data += magic_len;
@@ -929,7 +929,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 		}
 
 		/* jump over the padding */
-		ie_len = ALIGN(ie_len, 4);
+		ie_len = ALIGN_LINUX(ie_len, 4);
 
 		len -= ie_len;
 		data += ie_len;

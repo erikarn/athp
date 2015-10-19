@@ -73,4 +73,9 @@ ilog2(uint32_t val)
 	return fls(val);
 }
 
+/* XXX lifted from linux-2.6 */
+#define	__ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)
+#define	__ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+#define	ALIGN_LINUX(x, a) __ALIGN_KERNEL((x), (a))
+
 #endif	/* __LINUX_COMPAT_H__ */
