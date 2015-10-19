@@ -104,7 +104,7 @@ __FBSDID("$FreeBSD$");
 /*
  * XXX TODO: these should be per-softc parameters, not global
  */
-static unsigned int ath10k_cryptmode_param = 1;	/* 0 = hw crypto, 1 = sw crypto */
+//static unsigned int ath10k_cryptmode_param = 1;	/* 0 = hw crypto, 1 = sw crypto */
 static bool uart_print = 0; /* uart (on NIC) printing */
 static bool skip_otp = 0; /* skip otp failure for calibration in testmode */
 
@@ -1696,6 +1696,11 @@ err:
 	return;
 }
 
+/*
+ * XXX TODO: ensure that these pieces are migrated out of if_athp_main.c
+ * and fleshed out.
+ */
+
 #if 0
 int
 ath10k_core_register(struct athp_softc *sc, u32 chip_id)
@@ -1708,6 +1713,7 @@ ath10k_core_register(struct athp_softc *sc, u32 chip_id)
 EXPORT_SYMBOL(ath10k_core_register);
 #endif
 
+#if 0
 void ath10k_core_unregister(struct athp_softc *sc)
 {
 	cancel_work_sync(&sc->register_work);
@@ -1733,7 +1739,6 @@ void ath10k_core_unregister(struct athp_softc *sc)
 
 	ath10k_debug_unregister(sc);
 }
-EXPORT_SYMBOL(ath10k_core_unregister);
 
 struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 				  enum ath10k_bus bus,
@@ -1828,7 +1833,9 @@ err_free_mac:
 
 	return NULL;
 }
+#endif
 
+#if 0
 void
 ath10k_core_destroy(struct athp_softc *sc)
 {
@@ -1842,3 +1849,4 @@ ath10k_core_destroy(struct athp_softc *sc)
 	ath10k_debug_destroy(sc);
 	ath10k_mac_destroy(sc);
 }
+#endif

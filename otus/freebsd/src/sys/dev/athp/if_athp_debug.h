@@ -61,6 +61,7 @@
 struct athp_softc;
 extern	void athp_debug_dump(struct athp_softc *sc, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);
+extern	void ath10k_print_driver_info(struct athp_softc *sc);
 
 static inline void athp_debug_stop(struct athp_softc *sc)
 {

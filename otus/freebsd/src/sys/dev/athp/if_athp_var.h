@@ -76,6 +76,8 @@ struct ath10k_wmi {
 
 struct ath10k_htt {
 	int op_version;
+	int target_version_major;
+	int target_version_minor;
 };
 
 /*
@@ -135,6 +137,7 @@ struct athp_softc {
 	bool p2p;
 	unsigned long dev_flags;
 	enum ath10k_state state;
+	int max_num_stations;
 
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;

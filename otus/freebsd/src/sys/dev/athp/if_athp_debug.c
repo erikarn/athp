@@ -105,3 +105,41 @@ athp_debug_dump(struct athp_softc *sc, uint64_t mask,
 	device_printf(sc->sc_dev, "%s: TODO: implement debug_dump\n",
 	    __func__);
 }
+
+void
+ath10k_print_driver_info(struct athp_softc *sc)
+{
+	char fw_features[128] = {};
+
+	ath10k_core_get_fw_features_str(sc, fw_features, sizeof(fw_features));
+
+	device_printf(sc->sc_dev,
+	    "%s (0x%08x, 0x%08x%s%s%s) fw %s api %d htt-ver %d.%d wmi-op %d htt-op %d cal %s max-sta %d raw %d hwcrypto %d features %s\n",
+		    sc->hw_params.name,
+		    sc->target_version,
+		    sc->sc_chipid,
+		    (strlen(sc->spec_board_id) > 0 ? ", " : ""),
+		    sc->spec_board_id,
+		    (strlen(sc->spec_board_id) > 0 && !sc->spec_board_loaded
+		     ? " fallback" : ""),
+		    sc->fw_version_str,
+		    sc->fw_api,
+		    sc->htt.target_version_major,
+		    sc->htt.target_version_minor,
+		    sc->wmi.op_version,
+		    sc->htt.op_version,
+		    ath10k_cal_mode_str(sc->cal_mode),
+		    sc->max_num_stations,
+		    (int) test_bit(ATH10K_FLAG_RAW_MODE, &sc->dev_flags),
+		    (int) !test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &sc->dev_flags),
+		    fw_features);
+#if 0
+	device_printf(sc->sc_dev,
+	    "debug %d debugfs %d tracing %d dfs %d testmode %d\n",
+		    config_enabled(CONFIG_ATH10K_DEBUG),
+		    config_enabled(CONFIG_ATH10K_DEBUGFS),
+		    config_enabled(CONFIG_ATH10K_TRACING),
+		    config_enabled(CONFIG_ATH10K_DFS_CERTIFIED),
+		    config_enabled(CONFIG_NL80211_TESTMODE));
+#endif
+}
