@@ -53,6 +53,11 @@
 		device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
+#define	ATHP_INFO(sc, ...) \
+	do { \
+		device_printf(sc->sc_dev, __VA_ARGS__); \
+	} while (0)
+
 struct athp_softc;
 extern	void athp_debug_dump(struct athp_softc *sc, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);
