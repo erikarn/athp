@@ -776,9 +776,9 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 {
 	size_t magic_len, len, ie_len;
 	int ie_id, i, index, bit, ret;
-	struct ath10k_fw_ie *hdr;
+	const struct ath10k_fw_ie *hdr;
 	const u8 *data;
-	__le32 *timestamp, *version;
+	const __le32 *timestamp, *version;
 
 	/* first fetch the firmware file (firmware-*.bin) */
 	sc->firmware = ath10k_fetch_fw_file(sc, sc->hw_params.fw.dir, name);
@@ -815,7 +815,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 
 	/* loop elements */
 	while (len > sizeof(struct ath10k_fw_ie)) {
-		hdr = (struct ath10k_fw_ie *)data;
+		hdr = (const struct ath10k_fw_ie *)data;
 
 		ie_id = le32_to_cpu(hdr->id);
 		ie_len = le32_to_cpu(hdr->len);
@@ -832,21 +832,21 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 
 		switch (ie_id) {
 		case ATH10K_FW_IE_FW_VERSION:
-			if (ie_len > sizeof(sc->hw->wiphy->fw_version) - 1)
+			if (ie_len > sizeof(sc->fw_version_str) - 1)
 				break;
 
-			memcpy(sc->hw->wiphy->fw_version, data, ie_len);
-			sc->hw->wiphy->fw_version[ie_len] = '\0';
+			memcpy(sc->fw_version_str, data, ie_len);
+			sc->fw_version_str[ie_len] = '\0';
 
 			ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT,
 				   "found fw version %s\n",
-				    sc->hw->wiphy->fw_version);
+				    sc->fw_version_str);
 			break;
 		case ATH10K_FW_IE_TIMESTAMP:
 			if (ie_len != sizeof(u32))
 				break;
 
-			timestamp = (__le32 *)data;
+			timestamp = (const __le32 *)data;
 
 			ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "found fw timestamp %d\n",
 				   le32_to_cpup(timestamp));
@@ -871,7 +871,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 				}
 			}
 
-			ath10k_debug_dump(sc, ATHP_DEBUG_BOOT, "features", "",
+			athp_debug_dump(sc, ATHP_DEBUG_BOOT, "features", "",
 					sc->fw_features,
 					sizeof(sc->fw_features));
 			break;
@@ -897,7 +897,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 			if (ie_len != sizeof(u32))
 				break;
 
-			version = (__le32 *)data;
+			version = (const __le32 *)data;
 
 			sc->wmi.op_version = le32_to_cpup(version);
 
@@ -938,7 +938,7 @@ ath10k_core_fetch_firmware_api_n(struct athp_softc *sc, const char *name)
 	if (!sc->firmware_data || !sc->firmware_len) {
 		ATHP_WARN(sc, "No ATH10K_FW_IE_FW_IMAGE found from '%s/%s', skipping\n",
 			    sc->hw_params.fw.dir, name);
-		ret = -ENOMEDIUM;
+		ret = -ENOENT;
 		goto err;
 	}
 

@@ -59,6 +59,8 @@ struct athp_vap {
 #define	ATHP_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_mtx, MA_OWNED)
 #define	ATHP_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_mtx, MA_NOTOWNED)
 
+#define	ATHP_FW_VER_STR		128
+
 /*
  * This is the top-level driver state.
  *
@@ -83,6 +85,8 @@ struct athp_softc {
 	struct task			wme_update_task;
 	struct timeout_task		scan_to;
 	struct timeout_task		calib_to;
+
+	char				fw_version_str[ATHP_FW_VER_STR];
 
 	/* XXX TODO: Cheating, until all the layering is fixed */
 	struct athp_pci_softc		*sc_psc;
