@@ -450,6 +450,7 @@ athp_pci_attach(device_t dev)
 
 	/* HIF ops attach */
 	sc->hif.ops = &ath10k_pci_hif_ops;
+	sc->hif.bus = ATH10K_BUS_PCI;
 
 	/* Alloc pipes */
 	ret = ath10k_pci_alloc_pipes(sc);

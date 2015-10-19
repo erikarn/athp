@@ -107,6 +107,7 @@ struct athp_softc {
 
 	/* HIF */
 	struct {
+		enum ath10k_bus bus;
 		const struct ath10k_hif_ops *ops;
 	} hif;
 
@@ -145,9 +146,29 @@ struct athp_softc {
 	int fw_api;
 	enum ath10k_cal_mode cal_mode;
 
-
-
 	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
+
+	/*
+	 *  XXX TODO: reorder/rename/etc ot make this match the ath10k struct
+	 * as much as possible.
+	 */
+
+	struct {
+	/* protected by conf_mutex */
+		const struct firmware *utf;
+		DECLARE_BITMAP(orig_fw_features, ATH10K_FW_FEATURE_COUNT);
+		enum ath10k_fw_wmi_op_version orig_wmi_op_version;
+
+		/* protected by data_lock */
+		bool utf_monitor;
+	} testmode;
+
+	struct {
+		/* protected by data_lock */
+		u32 fw_crash_counter;
+		u32 fw_warm_reset_counter;
+		u32 fw_cold_reset_counter;
+	} stats;
 
 #if 0
 	/* How many pending, active transmit frames */
