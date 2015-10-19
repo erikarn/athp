@@ -62,4 +62,8 @@ struct athp_softc;
 extern	void athp_debug_dump(struct athp_softc *sc, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);
 
+static inline void athp_debug_stop(struct athp_softc *sc)
+{
+}
+
 #endif	/* __ATHP_DEBUG_H__ */
