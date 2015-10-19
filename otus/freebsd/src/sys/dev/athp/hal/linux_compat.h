@@ -78,4 +78,7 @@ ilog2(uint32_t val)
 #define	__ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 #define	ALIGN_LINUX(x, a) __ALIGN_KERNEL((x), (a))
 
+#define	le32_to_cpu(v)		le32toh(v)
+#define	le32_to_cpup(v)		le32toh(*(v))
+
 #endif	/* __LINUX_COMPAT_H__ */
