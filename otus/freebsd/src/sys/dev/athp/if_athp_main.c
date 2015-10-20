@@ -80,7 +80,7 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_main.h"
 
-MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
+MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
 int
 athp_attach(struct athp_softc *sc)
