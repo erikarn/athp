@@ -288,7 +288,8 @@ ath10k_pci_sleep(struct athp_pci_softc *psc)
 
 	psc->ps_wake_refcount--;
 
-	device_printf(sc->sc_dev, "%s: TODO: ps_timer\n", __func__);
+	/* XXX TODO: ps_timer */
+//	device_printf(sc->sc_dev, "%s: TODO: ps_timer\n", __func__);
 #if 0
 	mod_timer(&ar_pci->ps_timer, jiffies +
 		  msecs_to_jiffies(ATH10K_PCI_SLEEP_GRACE_PERIOD_MSEC));
