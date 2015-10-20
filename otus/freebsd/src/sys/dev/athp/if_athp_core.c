@@ -317,7 +317,7 @@ ath10k_init_configure_target(struct athp_softc *sc)
 static const struct firmware *
 ath10k_fetch_fw_file(struct athp_softc *sc, const char *dir, const char *file)
 {
-//	char filename[100];
+	char filename[100];
 	const struct firmware *fw;
 //	int ret;
 
@@ -327,15 +327,11 @@ ath10k_fetch_fw_file(struct athp_softc *sc, const char *dir, const char *file)
 	if (dir == NULL)
 		dir = ".";
 
-	/*
-	 * FreeBSD's firmware API doesn't .. do directories, so ignore
-	 * the directory for now.
-	 */
-//	snprintf(filename, sizeof(filename), "%s/%s", dir, file);
+	snprintf(filename, sizeof(filename), "%s_%s", dir, file);
 	/* This allocates a firmware struct and returns it in fw */
 	/* Note: will return 'NULL' upon error */
-	device_printf(sc->sc_dev, "%s: firmware_get: %s\n", __func__, file);
-	fw = firmware_get(file);
+	device_printf(sc->sc_dev, "%s: firmware_get: %s\n", __func__, filename);
+	fw = firmware_get(filename);
 	return fw;
 }
 
