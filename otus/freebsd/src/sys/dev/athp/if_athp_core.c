@@ -104,7 +104,7 @@ __FBSDID("$FreeBSD$");
 /*
  * XXX TODO: these should be per-softc parameters, not global
  */
-//static unsigned int ath10k_cryptmode_param = 1;	/* 0 = hw crypto, 1 = sw crypto */
+static unsigned int ath10k_cryptmode_param = 1;	/* 0 = hw crypto, 1 = sw crypto */
 static bool uart_print = 0; /* uart (on NIC) printing */
 static bool skip_otp = 0; /* skip otp failure for calibration in testmode */
 
@@ -1184,7 +1184,6 @@ ath10k_core_init_firmware_features(struct athp_softc *sc)
 		return -EINVAL;
 	}
 
-#if 0
 	sc->wmi.rx_decap_mode = ATH10K_HW_TXRX_NATIVE_WIFI;
 	switch (ath10k_cryptmode_param) {
 	case ATH10K_CRYPT_MODE_HW:
@@ -1310,9 +1309,6 @@ ath10k_core_init_firmware_features(struct athp_softc *sc)
 			return -EINVAL;
 		}
 	}
-#else
-	device_printf(sc->sc_dev, "%s: TODO: called\n", __func__);
-#endif
 
 	return 0;
 }

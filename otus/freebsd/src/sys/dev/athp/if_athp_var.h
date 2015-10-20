@@ -72,12 +72,24 @@ struct athp_vap {
  */
 struct ath10k_wmi {
 	int op_version;
+	int num_mem_chunks;
+	int rx_decap_mode;
 };
+
+#define	ATH10K_HTT_MAX_NUM_AMSDU_DEFAULT	3
+#define	ATH10K_HTT_MAX_NUM_AMPDU_DEFAULT	64
 
 struct ath10k_htt {
 	int op_version;
 	int target_version_major;
 	int target_version_minor;
+	int max_num_ampdu;
+	int max_num_amsdu;
+	int max_num_pending_tx;
+};
+
+struct ath10k_wow {
+	int max_num_patterns;
 };
 
 /*
@@ -137,7 +149,13 @@ struct athp_softc {
 	bool p2p;
 	unsigned long dev_flags;
 	enum ath10k_state state;
+
 	int max_num_stations;
+	int max_num_peers;
+	int max_num_vdevs;
+	int max_num_tdls_vdevs;
+	int num_active_peers;
+	int num_tids;
 
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;
@@ -167,6 +185,7 @@ struct athp_softc {
 	/* WMI */
 	struct ath10k_wmi wmi;
 	struct ath10k_htt htt;
+	struct ath10k_wow wow;
 
 	struct cv target_suspend;
 
