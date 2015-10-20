@@ -67,4 +67,12 @@ static inline void athp_debug_stop(struct athp_softc *sc)
 {
 }
 
+static inline void athp_debug_register(struct athp_softc *sc)
+{
+}
+
+static inline void athp_debug_unregister(struct athp_softc *sc)
+{
+}
+
 #endif	/* __ATHP_DEBUG_H__ */

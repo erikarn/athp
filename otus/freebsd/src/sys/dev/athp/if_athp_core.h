@@ -258,6 +258,7 @@ extern	int ath10k_core_start(struct athp_softc *sc,
 extern	int ath10k_wait_for_suspend(struct athp_softc *sc, u32 suspend_opt);
 extern	void ath10k_core_stop(struct athp_softc *sc);
 extern	int ath10k_core_probe_fw(struct athp_softc *sc);
-extern	void ath10k_core_register_work(struct athp_softc *sc);
+extern	int ath10k_core_register(struct athp_softc *sc);
+extern	void ath10k_core_unregister(struct athp_softc *sc);
 
 #endif /* __IF_ATHP_CORE_H__ */

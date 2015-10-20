@@ -85,13 +85,18 @@ MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 int
 athp_attach(struct athp_softc *sc)
 {
+	int ret;
 
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
 
 	/* Initial: probe firmware/target info */
-	(void) ath10k_core_probe_fw(sc);
+	ret = ath10k_core_register(sc);
+	if (ret != 0)
+		goto err;
 
 	return (0);
+err:
+	return (ret);
 }
 
 int
@@ -99,5 +104,9 @@ athp_detach(struct athp_softc *sc)
 {
 
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
+
+	/* XXX TODO: look at ath10k_pci_remove */
+	ath10k_core_unregister(sc);
+
 	return (0);
 }

@@ -1626,8 +1626,8 @@ err_power_down:
 	return ret;
 }
 
-void
-ath10k_core_register_work(struct athp_softc *sc)
+int
+ath10k_core_register(struct athp_softc *sc)
 {
 	int status;
 
@@ -1668,7 +1668,7 @@ ath10k_core_register_work(struct athp_softc *sc)
 	    __func__);
 #endif
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &sc->dev_flags);
-	return;
+	return (0);
 
 #if 0
 err_spectral_destroy:
@@ -1684,7 +1684,7 @@ err:
 	/* TODO: It's probably a good idea to release device from the driver
 	 * but calling device_release_driver() here will cause a deadlock.
 	 */
-	return;
+	return (-1);
 }
 
 /*
@@ -1704,14 +1704,19 @@ ath10k_core_register(struct athp_softc *sc, u32 chip_id)
 EXPORT_SYMBOL(ath10k_core_register);
 #endif
 
-#if 0
-void ath10k_core_unregister(struct athp_softc *sc)
+void
+ath10k_core_unregister(struct athp_softc *sc)
 {
+
+	device_printf(sc->sc_dev, "%s: TODO\n", __func__);
+#if 0
 	cancel_work_sync(&sc->register_work);
+#endif
 
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &sc->dev_flags))
 		return;
 
+#if 0
 	ath10k_thermal_unregister(sc);
 	/* Stop spectral before unregistering from mac80211 to remove the
 	 * relayfs debugfs file cleanly. Otherwise the parent debugfs tree
@@ -1725,12 +1730,13 @@ void ath10k_core_unregister(struct athp_softc *sc)
 	ath10k_mac_unregister(sc);
 
 	ath10k_testmode_destroy(sc);
-
+#endif
 	ath10k_core_free_firmware_files(sc);
 
-	ath10k_debug_unregister(sc);
+	athp_debug_unregister(sc);
 }
 
+#if 0
 struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 				  enum ath10k_bus bus,
 				  enum ath10k_hw_rev hw_rev,
