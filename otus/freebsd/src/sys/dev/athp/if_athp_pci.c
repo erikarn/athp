@@ -199,10 +199,12 @@ static uint32_t
 athp_pci_regio_read_reg(void *arg, uint32_t reg)
 {
 	struct athp_pci_softc *psc = arg;
+	struct athp_softc *sc = &psc->sc_sc;
 	uint32_t val;
 
 	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
-	device_printf(psc->sc_sc.sc_dev, "%s: %08x -> %08x\n",
+	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	    "%s: %08x -> %08x\n",
 	    __func__, reg, val);
 
 	return (val);
@@ -212,8 +214,10 @@ static void
 athp_pci_regio_write_reg(void *arg, uint32_t reg, uint32_t val)
 {
 	struct athp_pci_softc *psc = arg;
+	struct athp_softc *sc = &psc->sc_sc;
 
-	device_printf(psc->sc_sc.sc_dev, "%s: %08x <- %08x\n",
+	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	    "%s: %08x <- %08x\n",
 	    __func__, reg, val);
 	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
 }
@@ -236,7 +240,8 @@ athp_pci_regio_s_read_reg(void *arg, uint32_t reg)
 		return (0);
 	}
 	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
-	device_printf(psc->sc_sc.sc_dev, "%s: %08x -> %08x\n",
+	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	    "%s: %08x -> %08x\n",
 	    __func__, reg, val);
 	ath10k_pci_sleep(psc);
 
@@ -259,7 +264,8 @@ athp_pci_regio_s_write_reg(void *arg, uint32_t reg, uint32_t val)
 		    tmp);
 		return;
 	}
-	device_printf(psc->sc_sc.sc_dev, "%s: %08x <- %08x\n",
+	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	    "%s: %08x <- %08x\n",
 	    __func__, reg, val);
 	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
 	ath10k_pci_sleep(psc);
@@ -319,8 +325,10 @@ athp_pci_attach(device_t dev)
 
 	sc->sc_dev = dev;
 	sc->sc_invalid = 1;
-	sc->sc_debug = -1;
+	sc->sc_debug = 0;
 	sc->sc_psc = psc;
+
+	/* XXX TODO: initialize sc_debug from TUNABLE */
 
 	/* XXX TODO: unique names */
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
