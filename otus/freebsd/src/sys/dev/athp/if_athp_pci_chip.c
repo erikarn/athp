@@ -931,10 +931,9 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 	int i;
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot waiting target to initialise\n");
-	device_printf(sc->sc_dev, "%s: TODO: make DELAY 10ms again\n", __func__);
 
 	//for (i = 0; i < ATH10K_PCI_TARGET_WAIT / 10; i++) {
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < 500; i++) {
 		val = athp_pci_read32(sc, FW_INDICATOR_ADDRESS(sc->sc_regofs));
 
 		ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot target indicator %x\n",
@@ -962,7 +961,7 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 		 * Fix this to be more responsive once this is debugged.
 		 */
 //		DELAY(10 * 1000);
-		DELAY(1000 * 1000);
+		DELAY(10 * 1000);
 	}
 
 	ath10k_pci_disable_and_clear_legacy_irq(psc);
