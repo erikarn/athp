@@ -1313,7 +1313,8 @@ ath10k_core_init_firmware_features(struct athp_softc *sc)
 	return 0;
 }
 
-int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
+int
+ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 {
 	int status;
 

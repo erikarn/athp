@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include "hal/pci.h"
 #include "hal/targaddrs.h"
 #include "hal/core.h"
+#include "hal/htc.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
