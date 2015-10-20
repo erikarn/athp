@@ -1319,10 +1319,9 @@ ath10k_core_init_firmware_features(struct athp_softc *sc)
 
 int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 {
-#if 0
 	int status;
 
-	lockdep_assert_held(&sc->conf_mutex);
+	ATHP_CONF_LOCK_ASSERT(sc);
 
 	clear_bit(ATH10K_FLAG_CRASH_FLUSH, &sc->dev_flags);
 
@@ -1361,6 +1360,7 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	if (status)
 		goto err;
 
+#if 0
 	sc->htc.htc_ops.target_send_suspend_complete =
 		ath10k_send_suspend_complete;
 
@@ -1482,9 +1482,10 @@ int ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	sc->free_vdev_map = (1LL << sc->max_num_vdevs) - 1;
 
 	INIT_LIST_HEAD(&sc->arvifs);
+#endif
 
 	return 0;
-
+#if 0
 err_hif_stop:
 	ath10k_hif_stop(sc);
 err_htt_rx_detach:
@@ -1493,12 +1494,9 @@ err_htt_tx_detach:
 	ath10k_htt_tx_free(&sc->htt);
 err_wmi_detach:
 	ath10k_wmi_detach(sc);
+#endif
 err:
 	return status;
-#else
-	device_printf(sc->sc_dev, "%s: TODO: called\n", __func__);
-	return (-1);
-#endif
 }
 
 int
