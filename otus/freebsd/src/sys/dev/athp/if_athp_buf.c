@@ -20,6 +20,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_wlan.h"
 
 #include <sys/param.h>
+#include <sys/proc.h>
+#include <sys/condvar.h>
 #include <sys/endian.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
@@ -59,276 +61,220 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_superg.h>
 #endif
 
+#include "hal/linux_compat.h"
+#include "hal/targaddrs.h"
+#include "hal/hw.h"
+
 #include "if_athp_debug.h"
-#include "if_athp_buf.h"
+#include "if_athp_regio.h"
+#include "if_athp_core.h"
 #include "if_athp_var.h"
+#include "if_athp_hif.h"
+#include "if_athp_bmi.h"
+
+#include "if_athp_buf.h"
 
 /*
- * This is a simpleish implementation of busdma memory mapped buffers.
- * It's intended to be used for basic bring-up where we have some fixed size
+ * This is a simpleish implementation of mbuf + local state buffers.
+ * It's intended to be used for basic bring-up where we have some mbufs
  * things we'd like to send/receive over the copy engine paths.
  *
- * Later on it'll grow to include tx/rx using mbufs, scatter/gather DMA, etc.
+ * Later on it'll grow to include tx/rx using scatter/gather DMA, etc.
+ */
+
+/*
+ * XXX TODO: let's move the buffer state itself into a struct that gets
+ * included by if_athp_var.h into athp_softc so we don't need the whole
+ * driver worth of includes for what should just be pointers to things.
  */
 
 MALLOC_DECLARE(M_ATHPDEV);
 
+/*
+ * Receive buffers.
+ */
+
+/*
+ * Unmap an RX buffer.
+ *
+ * This unloads the DMA map for the given RX buffer.
+ *
+ * It's used in the RX buffer free path and in the RX buffer "it's mine now!"
+ * claiming path when the driver wants the mbuf for itself.
+ */
+void
+athp_unmap_rx_buf(struct athp_softc *sc, struct athp_rx_buf *rxbuf)
+{
+
+	/* no mbuf? skip */
+	if (rxbuf->m == NULL)
+		return;
+
+	bus_dmamap_sync(sc->buf_rx.sc_rx_dmatag, rxbuf->map, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_unload(sc->buf_rx.sc_rx_dmatag, rxbuf->map);
+	rxbuf->paddr = 0;
+}
+
+/*
+ * Free an individual buffer.
+ *
+ * This doesn't update the linked list state; it just handles freeing it.
+ */
 static void
-athp_free_cmd_list(struct athp_softc *sc, struct athp_tx_cmd cmd[], int ndata)
+_athp_free_rx_buf(struct athp_softc *sc, struct athp_rx_buf *rxbuf)
 {
-	int i;
 
-	/* XXX TODO: someone has to have waken up waiters! */
-	for (i = 0; i < ndata; i++) {
-		struct athp_tx_cmd *dp = &cmd[i];
-
-		if (dp->buf != NULL) {
-			free(dp->buf, M_ATHPDEV);
-			dp->buf = NULL;
-		}
+	/* XXX TODO */
+	/* If there's an mbuf, then unmap, and free */
+	if (rxbuf->m != NULL) {
+		athp_unmap_rx_buf(sc, rxbuf);
+		m_freem(rxbuf->m);
 	}
 }
 
-static int
-athp_alloc_cmd_list(struct athp_softc *sc, struct athp_tx_cmd cmd[],
-    int ndata, int maxsz)
-{
-	int i, error;
-
-	for (i = 0; i < ndata; i++) {
-		struct athp_tx_cmd *dp = &cmd[i];
-		dp->buf = malloc(maxsz, M_ATHPDEV, M_NOWAIT);
-		dp->odata = NULL;
-		if (dp->buf == NULL) {
-			device_printf(sc->sc_dev,
-			    "could not allocate buffer\n");
-			error = ENOMEM;
-			goto fail;
-		}
-	}
-
-	return (0);
-fail:
-	athp_free_cmd_list(sc, cmd, ndata);
-	return (error);
-}
-
-static int
-athp_alloc_tx_cmd_list(struct athp_softc *sc)
-{
-	int error, i;
-
-	error = athp_alloc_cmd_list(sc, sc->sc_cmd, ATHP_CMD_LIST_COUNT,
-	    ATHP_MAX_TXCMDSZ);
-	if (error != 0)
-		return (error);
-
-	STAILQ_INIT(&sc->sc_cmd_active);
-	STAILQ_INIT(&sc->sc_cmd_inactive);
-	STAILQ_INIT(&sc->sc_cmd_pending);
-	STAILQ_INIT(&sc->sc_cmd_waiting);
-
-	for (i = 0; i < ATHP_CMD_LIST_COUNT; i++)
-		STAILQ_INSERT_HEAD(&sc->sc_cmd_inactive, &sc->sc_cmd[i],
-		    next_cmd);
-
-	return (0);
-}
-
-static void
-athp_free_tx_cmd_list(struct athp_softc *sc)
-{
-
-	/*
-	 * XXX TODO: something needs to wake up any pending/sleeping
-	 * waiters!
-	 */
-	STAILQ_INIT(&sc->sc_cmd_active);
-	STAILQ_INIT(&sc->sc_cmd_inactive);
-	STAILQ_INIT(&sc->sc_cmd_pending);
-	STAILQ_INIT(&sc->sc_cmd_waiting);
-
-	athp_free_cmd_list(sc, sc->sc_cmd, ATHP_CMD_LIST_COUNT);
-}
-
-static int
-athp_alloc_list(struct athp_softc *sc, struct athp_data data[],
-    int ndata, int maxsz)
-{
-	int i, error;
-
-	for (i = 0; i < ndata; i++) {
-		struct athp_data *dp = &data[i];
-		dp->sc = sc;
-		dp->m = NULL;
-		dp->buf = malloc(maxsz, M_ATHPDEV, M_NOWAIT);
-		if (dp->buf == NULL) {
-			device_printf(sc->sc_dev,
-			    "could not allocate buffer\n");
-			error = ENOMEM;
-			goto fail;
-		}
-		dp->ni = NULL;
-	}
-
-	return (0);
-fail:
-	athp_free_list(sc, data, ndata);
-	return (error);
-}
-
-static int
-athp_alloc_rx_list(struct athp_softc *sc)
-{
-	int error, i;
-
-	error = athp_alloc_list(sc, sc->sc_rx, ATHP_RX_LIST_COUNT,
-	    ATHP_RXBUFSZ);
-	if (error != 0)
-		return (error);
-
-	STAILQ_INIT(&sc->sc_rx_active);
-	STAILQ_INIT(&sc->sc_rx_inactive);
-
-	for (i = 0; i < ATHP_RX_LIST_COUNT; i++)
-		STAILQ_INSERT_HEAD(&sc->sc_rx_inactive, &sc->sc_rx[i], next);
-
-	return (0);
-}
-
-static int
-athp_alloc_tx_list(struct athp_softc *sc)
-{
-	int error, i;
-
-	error = athp_alloc_list(sc, sc->sc_tx, ATHP_TX_LIST_COUNT,
-	    ATHP_TXBUFSZ);
-	if (error != 0)
-		return (error);
-
-	STAILQ_INIT(&sc->sc_tx_inactive);
-
-	for (i = 0; i != ATHP_N_XFER; i++) {
-		STAILQ_INIT(&sc->sc_tx_active[i]);
-		STAILQ_INIT(&sc->sc_tx_pending[i]);
-	}
-
-	for (i = 0; i < ATHP_TX_LIST_COUNT; i++) {
-		STAILQ_INSERT_HEAD(&sc->sc_tx_inactive, &sc->sc_tx[i], next);
-	}
-
-	return (0);
-}
-
-static void
-athp_free_tx_list(struct athp_softc *sc)
-{
-	int i;
-
-	/* prevent further allocations from TX list(s) */
-	STAILQ_INIT(&sc->sc_tx_inactive);
-
-	for (i = 0; i != ATHP_N_XFER; i++) {
-		STAILQ_INIT(&sc->sc_tx_active[i]);
-		STAILQ_INIT(&sc->sc_tx_pending[i]);
-	}
-
-	athp_free_list(sc, sc->sc_tx, ATHP_TX_LIST_COUNT);
-}
-
+/*
+ * Free all buffers in the rx ring.
+ *
+ * This should only be called during driver teardown; it will unmap/free each
+ * mbuf without worrying about the linked list / allocation state.
+ */
 static void
 athp_free_rx_list(struct athp_softc *sc)
 {
-	/* prevent further allocations from RX list(s) */
-	STAILQ_INIT(&sc->sc_rx_inactive);
-	STAILQ_INIT(&sc->sc_rx_active);
+	int i;
 
-	athp_free_list(sc, sc->sc_rx, ATHP_RX_LIST_COUNT);
+	/* prevent further allocations from RX list(s) */
+	STAILQ_INIT(&sc->buf_rx.sc_rx_inactive);
+
+	for (i = 0; i < ATHP_RX_LIST_COUNT; i++) {
+		struct athp_rx_buf *dp = &sc->buf_rx.sc_rx[i];
+		_athp_free_rx_buf(sc, dp);
+	}
 }
 
-static void
-athp_free_list(struct athp_softc *sc, struct athp_data data[], int ndata)
+/*
+ * Setup the driver side of the list allocations and insert them
+ * all into the inactive list.
+ */
+static int
+athp_alloc_rx_list(struct athp_softc *sc)
 {
 	int i;
 
-	for (i = 0; i < ndata; i++) {
-		struct athp_data *dp = &data[i];
-
-		if (dp->buf != NULL) {
-			free(dp->buf, M_ATHPDEV);
-			dp->buf = NULL;
-		}
-		if (dp->ni != NULL) {
-			ieee80211_free_node(dp->ni);
-			dp->ni = NULL;
-		}
+	/* Setup initial state for each entry */
+	for (i = 0; i < ATHP_RX_LIST_COUNT; i++) {
+		struct athp_rx_buf *dp = &sc->buf_rx.sc_rx[i];
+		dp->flags = 0;
+		dp->paddr = 0;
+		dp->m = NULL;
 	}
+
+	/* Lists */
+	STAILQ_INIT(&sc->buf_rx.sc_rx_inactive);
+
+	for (i = 0; i < ATHP_RX_LIST_COUNT; i++)
+		STAILQ_INSERT_HEAD(&sc->buf_rx.sc_rx_inactive,
+		    &sc->buf_rx.sc_rx[i], next);
+
+	return (0);
 }
 
-static struct athp_data *
-_athp_getbuf(struct athp_softc *sc)
+/*
+ * Return an RX buffer.
+ *
+ * This doesn't allocate the mbuf.
+ */
+static struct athp_rx_buf *
+_athp_rx_getbuf(struct athp_softc *sc)
 {
-	struct athp_data *bf;
+	struct athp_rx_buf *bf;
 
-	bf = STAILQ_FIRST(&sc->sc_tx_inactive);
+	/* Allocate a buffer */
+	bf = STAILQ_FIRST(&sc->buf_rx.sc_rx_inactive);
 	if (bf != NULL)
-		STAILQ_REMOVE_HEAD(&sc->sc_tx_inactive, next);
+		STAILQ_REMOVE_HEAD(&sc->buf_rx.sc_rx_inactive, next);
 	else
 		bf = NULL;
 	return (bf);
 }
 
-static struct athp_data *
-athp_getbuf(struct athp_softc *sc)
-{
-	struct athp_data *bf;
-
-	ATHP_LOCK_ASSERT(sc);
-
-	bf = _athp_getbuf(sc);
-	return (bf);
-}
-
 static void
-athp_freebuf(struct athp_softc *sc, struct athp_data *bf)
+athp_rx_freebuf(struct athp_softc *sc, struct athp_rx_buf *bf)
 {
 
 	ATHP_LOCK_ASSERT(sc);
-	STAILQ_INSERT_TAIL(&sc->sc_tx_inactive, bf, next);
-}
 
-static struct athp_tx_cmd *
-_athp_get_txcmd(struct athp_softc *sc)
-{
-	struct athp_tx_cmd *bf;
-
-	bf = STAILQ_FIRST(&sc->sc_cmd_inactive);
-	if (bf != NULL)
-		STAILQ_REMOVE_HEAD(&sc->sc_cmd_inactive, next_cmd);
-	else
-		bf = NULL;
-	return (bf);
-}
-
-static struct athp_tx_cmd *
-athp_get_txcmd(struct athp_softc *sc)
-{
-	struct athp_tx_cmd *bf;
-
-	ATHP_LOCK_ASSERT(sc);
-
-	bf = _athp_get_txcmd(sc);
-	if (bf == NULL) {
-		device_printf(sc->sc_dev, "%s: no tx cmd buffers\n",
-		    __func__);
+	/* if there's an mbuf - unmap (if needed) and free it */
+	if (bf->m != NULL) {
+		_athp_free_rx_buf(sc, bf);
 	}
+
+	/* Push it into the RX inactive queue */
+	STAILQ_INSERT_TAIL(&sc->buf_rx.sc_rx_inactive, bf, next);
+}
+
+/*
+ * Return an RX buffer with an mbuf loaded.
+ *
+ * Note: the mbuf length is just that - the mbuf length.
+ * It's up to the caller to reserve the required header/descriptor
+ * bits before the actual payload.
+ */
+static struct athp_rx_buf *
+athp_rx_getbuf(struct athp_softc *sc, int bufsize)
+{
+	/*
+	 * XXX TODO: this should be part of the rxbuf and it should
+	 * support sg DMA
+	 */
+	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
+	struct athp_rx_buf *bf;
+	struct mbuf *m;
+	int err;
+	int nsegs;
+
+	ATHP_LOCK_ASSERT(sc);
+
+	/* Allocate mbuf; fail if we can't allocate one */
+	m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, ATHP_RBUF_SIZE);
+	if (m == NULL) {
+		device_printf(sc->sc_dev, "%s: failed to allocate mbuf\n", __func__);
+		return (NULL);
+	}
+
+	/* Allocate buffer */
+
+	bf = _athp_rx_getbuf(sc);
+	if (! bf) {
+		m_freem(m);
+		return (NULL);
+	}
+
+	/* mbuf busdma load */
+	nsegs = 0;
+	err = bus_dmamap_load_mbuf_sg(sc->buf_rx.sc_rx_dmatag,
+	    bf->map, m, segs, &nsegs, BUS_DMA_NOWAIT);
+	if (err != 0 || nsegs != 1) {
+		device_printf(sc->sc_dev,
+		    "%s: mbuf dmamap load failed (err=%d, nsegs=%d)\n",
+		    __func__,
+		    err,
+		    nsegs);
+		m_freem(m);
+		athp_rx_freebuf(sc, bf);
+		return (NULL);
+	}
+
+	/* XXX TODO: only support a single descriptor per buffer for now */
+	bf->paddr = segs[0].ds_addr;
+	bf->m = m;
+
+	/* XXX TODO: set flag */
+
 	return (bf);
 }
 
-static void
-athp_free_txcmd(struct athp_softc *sc, struct athp_tx_cmd *bf)
-{
-
-	ATHP_LOCK_ASSERT(sc);
-	STAILQ_INSERT_TAIL(&sc->sc_cmd_inactive, bf, next_cmd);
-}
+/*
+ * XXX TODO: need to setup the tx/rx buffer dma tags in if_athp_pci.c.
+ * (Since it's a function of the bus/chip..)
+ */

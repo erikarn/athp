@@ -18,25 +18,30 @@
 #ifndef	__IF_ATHP_VAR_H__
 #define	__IF_ATHP_VAR_H__
 
-/* Firmware commands */
-struct athp_softc;
-struct athp_tx_cmd {
-	uint8_t		*buf;
-	uint16_t	buflen;
-	void *		*odata;
-	uint16_t	odatalen;
-	uint16_t	token;
-	STAILQ_ENTRY(athp_tx_cmd)	next_cmd;
+#define	ATHP_RXBUF_MAX_SCATTER	1
+#define	ATHP_RBUF_SIZE		2048
+#define	ATHP_RX_LIST_COUNT	1024
+#define	ATHP_TX_LIST_COUNT	1024
+
+#define	ATHP_BUF_ACTIVE		0x00000001
+#define	ATHP_BUF_MAPPED		0x00000002
+
+struct athp_rx_buf {
+	bus_dmamap_t map;
+	bus_addr_t paddr;
+	struct mbuf *m;
+	STAILQ_ENTRY(athp_rx_buf) next;
+	uint32_t flags;
 };
 
-/* TX, RX buffers */
-struct athp_data {
-	struct athp_softc	*sc;
-	uint8_t			*buf;
-	uint16_t		buflen;
-	struct mbuf		*m;
-	struct ieee80211_node	*ni;
-	STAILQ_ENTRY(athp_data)	next;
+/* XXX TODO: ath10k wants a bit more state here .. */
+struct athp_tx_buf {
+	bus_dmamap_t map;
+	bus_addr_t paddr;
+	struct mbuf *m;
+	STAILQ_ENTRY(athp_tx_buf) next;
+	uint32_t flags;
+	/* XXX other state */
 };
 
 struct athp_node {
@@ -239,26 +244,20 @@ struct athp_softc {
 		u32 fw_cold_reset_counter;
 	} stats;
 
-#if 0
-	/* How many pending, active transmit frames */
-	int				sc_tx_n_pending;
-	int				sc_tx_n_active;
+	struct {
+		/* RX packet buffer state */
+		bus_dma_tag_t sc_rx_dmatag;
+		struct athp_rx_buf sc_rx[ATHP_RX_LIST_COUNT];
+		STAILQ_HEAD(, athp_rx_buf) sc_rx_inactive;
+	} buf_rx;
 
-	struct athp_data		sc_rx[ATHP_RX_LIST_COUNT];
-	struct athp_data		sc_tx[ATHP_TX_LIST_COUNT];
-	struct athp_tx_cmd		sc_cmd[ATHP_CMD_LIST_COUNT];
+	struct {
+		/* TX packet buffer state */
+		bus_dma_tag_t sc_tx_dmatag;
+		struct athp_tx_buf sc_tx[ATHP_TX_LIST_COUNT];
+		STAILQ_HEAD(, athp_tx_buf) sc_tx_inactive;
+	} buf_tx;
 
-	STAILQ_HEAD(, athp_data)	sc_rx_active;
-	STAILQ_HEAD(, athp_data)	sc_rx_inactive;
-	STAILQ_HEAD(, athp_data)	sc_tx_active[ATHP_N_XFER];
-	STAILQ_HEAD(, athp_data)	sc_tx_inactive;
-	STAILQ_HEAD(, athp_data)	sc_tx_pending[ATHP_N_XFER];
-
-	STAILQ_HEAD(, athp_tx_cmd)	sc_cmd_active;
-	STAILQ_HEAD(, athp_tx_cmd)	sc_cmd_inactive;
-	STAILQ_HEAD(, athp_tx_cmd)	sc_cmd_pending;
-	STAILQ_HEAD(, athp_tx_cmd)	sc_cmd_waiting;
-#endif
 };
 
 #endif	/* __IF_ATHP_VAR_H__ */
