@@ -25,6 +25,9 @@ SRCS    += if_athp_pci_chip.c
 # This is the busdma memory layer.
 SRCS    += if_athp_desc.c
 
+# This is the athp buffer layer.
+SRCS    += if_athp_buf.c
+
 # This is the Copy Engine interface - the DMA ring hardware access.
 SRCS    += if_athp_pci_ce.c
 
@@ -50,6 +53,6 @@ SRCS    += if_athp_core.c
 # This is the host-target control protocol (HTC).
 # It forms the basis of host/target communications - control and
 # data commands are layered on top of this.
-SRCS    += if_athp_htc.c
+# SRCS    += if_athp_htc.c
 
 .include <bsd.kmod.mk>
