@@ -219,6 +219,12 @@ athp_rx_freebuf(struct athp_softc *sc, struct athp_buf *bf)
  * Note: the mbuf length is just that - the mbuf length.
  * It's up to the caller to reserve the required header/descriptor
  * bits before the actual payload.
+ *
+ * XXX TODO: need to pass in a dmatag to use, rather than a global
+ * XXX TX/RX tag.  Check ath10k_pci_alloc_pipes() - each pipe has
+ * XXX a different dmatag with different properties.
+ *
+ * XXX Be careful!
  */
 struct athp_buf *
 athp_rx_getbuf(struct athp_softc *sc, int bufsize)
