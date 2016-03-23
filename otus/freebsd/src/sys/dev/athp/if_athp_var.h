@@ -26,20 +26,12 @@
 #define	ATHP_BUF_ACTIVE		0x00000001
 #define	ATHP_BUF_MAPPED		0x00000002
 
-struct athp_rx_buf {
+/* XXX TODO: ath10k wants a bit more state here for TX .. */
+struct athp_buf {
 	bus_dmamap_t map;
 	bus_addr_t paddr;
 	struct mbuf *m;
-	STAILQ_ENTRY(athp_rx_buf) next;
-	uint32_t flags;
-};
-
-/* XXX TODO: ath10k wants a bit more state here .. */
-struct athp_tx_buf {
-	bus_dmamap_t map;
-	bus_addr_t paddr;
-	struct mbuf *m;
-	STAILQ_ENTRY(athp_tx_buf) next;
+	STAILQ_ENTRY(athp_buf) next;
 	uint32_t flags;
 	/* XXX other state */
 };
@@ -247,15 +239,15 @@ struct athp_softc {
 	struct {
 		/* RX packet buffer state */
 		bus_dma_tag_t sc_rx_dmatag;
-		struct athp_rx_buf sc_rx[ATHP_RX_LIST_COUNT];
-		STAILQ_HEAD(, athp_rx_buf) sc_rx_inactive;
+		struct athp_buf sc_rx[ATHP_RX_LIST_COUNT];
+		STAILQ_HEAD(, athp_buf) sc_rx_inactive;
 	} buf_rx;
 
 	struct {
 		/* TX packet buffer state */
 		bus_dma_tag_t sc_tx_dmatag;
-		struct athp_tx_buf sc_tx[ATHP_TX_LIST_COUNT];
-		STAILQ_HEAD(, athp_tx_buf) sc_tx_inactive;
+		struct athp_buf sc_tx[ATHP_TX_LIST_COUNT];
+		STAILQ_HEAD(, athp_buf) sc_tx_inactive;
 	} buf_tx;
 
 };

@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_main.h"
 #include "if_athp_pci_chip.h"
 #include "if_athp_pci_hif.h"
+#include "if_athp_buf.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -315,6 +316,49 @@ athp_pci_hw_lookup(struct athp_pci_softc *psc)
 }
 
 static int
+athp_pci_setup_bufs(struct athp_pci_softc *psc)
+{
+	struct athp_softc *sc = &psc->sc_sc;
+
+	/* Create dma tag for RX buffers. 8 byte alignment, etc */
+	if (bus_dma_tag_create(sc->sc_dmat,    /* parent */
+	    8, 0,		    /* alignment, bounds */
+	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
+	    BUS_SPACE_MAXADDR,       /* highaddr */
+	    NULL, NULL,	      /* filter, filterarg */
+	    0x4000,		 /* maxsize XXX */
+	    ATHP_MAX_SCATTER,	 /* nsegments */
+	    0x4000,		 /* maxsegsize XXX */
+	    BUS_DMA_ALLOCNOW,	/* flags */
+	    NULL,		    /* lockfunc */
+	    NULL,		    /* lockarg */
+	    &sc->buf_rx.sc_rx_dmatag)) {
+		device_printf(sc->sc_dev, "%s: cannot allocate RX DMA tag\n",
+		    __func__);
+			return (-1);
+	}
+
+	/* XXX tx dma tag */
+
+	athp_alloc_rx_list(sc);
+	/* XXX tx list */
+
+	return (0);
+}
+
+static void
+athp_pci_free_bufs(struct athp_pci_softc *psc)
+{
+	struct athp_softc *sc = &psc->sc_sc;
+
+	athp_free_rx_list(sc);
+	/* XXX tx */
+
+	bus_dma_tag_destroy(sc->buf_rx.sc_rx_dmatag);
+	/* XXX tx */
+}
+
+static int
 athp_pci_attach(device_t dev)
 {
 	struct athp_pci_softc *psc = device_get_softc(dev);
@@ -458,6 +502,9 @@ athp_pci_attach(device_t dev)
 	 * USB endpoints.
 	 */
 
+	if (athp_pci_setup_bufs(psc) < 0)
+		goto bad4;
+
 	/* HIF ops attach */
 	sc->hif.ops = &ath10k_pci_hif_ops;
 	sc->hif.bus = ATH10K_BUS_PCI;
@@ -530,9 +577,8 @@ athp_pci_attach(device_t dev)
 
 	/* Fallthrough for setup failure */
 
-#ifdef	ATHP_EEPROM_FIRMWARE
 bad4:
-#endif
+	athp_pci_free_bufs(psc);
 	bus_dma_tag_destroy(sc->sc_dmat);
 bad3:
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
@@ -587,6 +633,9 @@ athp_pci_detach(device_t dev)
 
 	/* pci release */
 	/* sleep sync */
+
+	/* buffers */
+	athp_pci_free_bufs(psc);
 
 	/* Free bus resources */
 	bus_generic_detach(dev);

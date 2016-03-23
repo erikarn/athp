@@ -103,7 +103,7 @@ MALLOC_DECLARE(M_ATHPDEV);
  * claiming path when the driver wants the mbuf for itself.
  */
 void
-athp_unmap_rx_buf(struct athp_softc *sc, struct athp_rx_buf *rxbuf)
+athp_unmap_rx_buf(struct athp_softc *sc, struct athp_buf *rxbuf)
 {
 
 	/* no mbuf? skip */
@@ -121,7 +121,7 @@ athp_unmap_rx_buf(struct athp_softc *sc, struct athp_rx_buf *rxbuf)
  * This doesn't update the linked list state; it just handles freeing it.
  */
 static void
-_athp_free_rx_buf(struct athp_softc *sc, struct athp_rx_buf *rxbuf)
+_athp_free_rx_buf(struct athp_softc *sc, struct athp_buf *rxbuf)
 {
 
 	/* XXX TODO */
@@ -138,7 +138,7 @@ _athp_free_rx_buf(struct athp_softc *sc, struct athp_rx_buf *rxbuf)
  * This should only be called during driver teardown; it will unmap/free each
  * mbuf without worrying about the linked list / allocation state.
  */
-static void
+void
 athp_free_rx_list(struct athp_softc *sc)
 {
 	int i;
@@ -147,7 +147,7 @@ athp_free_rx_list(struct athp_softc *sc)
 	STAILQ_INIT(&sc->buf_rx.sc_rx_inactive);
 
 	for (i = 0; i < ATHP_RX_LIST_COUNT; i++) {
-		struct athp_rx_buf *dp = &sc->buf_rx.sc_rx[i];
+		struct athp_buf *dp = &sc->buf_rx.sc_rx[i];
 		_athp_free_rx_buf(sc, dp);
 	}
 }
@@ -156,14 +156,14 @@ athp_free_rx_list(struct athp_softc *sc)
  * Setup the driver side of the list allocations and insert them
  * all into the inactive list.
  */
-static int
+int
 athp_alloc_rx_list(struct athp_softc *sc)
 {
 	int i;
 
 	/* Setup initial state for each entry */
 	for (i = 0; i < ATHP_RX_LIST_COUNT; i++) {
-		struct athp_rx_buf *dp = &sc->buf_rx.sc_rx[i];
+		struct athp_buf *dp = &sc->buf_rx.sc_rx[i];
 		dp->flags = 0;
 		dp->paddr = 0;
 		dp->m = NULL;
@@ -184,10 +184,10 @@ athp_alloc_rx_list(struct athp_softc *sc)
  *
  * This doesn't allocate the mbuf.
  */
-static struct athp_rx_buf *
+static struct athp_buf *
 _athp_rx_getbuf(struct athp_softc *sc)
 {
-	struct athp_rx_buf *bf;
+	struct athp_buf *bf;
 
 	/* Allocate a buffer */
 	bf = STAILQ_FIRST(&sc->buf_rx.sc_rx_inactive);
@@ -198,8 +198,8 @@ _athp_rx_getbuf(struct athp_softc *sc)
 	return (bf);
 }
 
-static void
-athp_rx_freebuf(struct athp_softc *sc, struct athp_rx_buf *bf)
+void
+athp_rx_freebuf(struct athp_softc *sc, struct athp_buf *bf)
 {
 
 	ATHP_LOCK_ASSERT(sc);
@@ -220,7 +220,7 @@ athp_rx_freebuf(struct athp_softc *sc, struct athp_rx_buf *bf)
  * It's up to the caller to reserve the required header/descriptor
  * bits before the actual payload.
  */
-static struct athp_rx_buf *
+struct athp_buf *
 athp_rx_getbuf(struct athp_softc *sc, int bufsize)
 {
 	/*
@@ -228,7 +228,7 @@ athp_rx_getbuf(struct athp_softc *sc, int bufsize)
 	 * support sg DMA
 	 */
 	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
-	struct athp_rx_buf *bf;
+	struct athp_buf *bf;
 	struct mbuf *m;
 	int err;
 	int nsegs;
