@@ -332,16 +332,32 @@ athp_pci_setup_bufs(struct athp_pci_softc *psc)
 	    BUS_DMA_ALLOCNOW,	/* flags */
 	    NULL,		    /* lockfunc */
 	    NULL,		    /* lockarg */
-	    &sc->buf_rx.sc_rx_dmatag)) {
+	    &sc->buf_rx.br_dmatag)) {
 		device_printf(sc->sc_dev, "%s: cannot allocate RX DMA tag\n",
 		    __func__);
 			return (-1);
 	}
 
-	/* XXX tx dma tag */
+	/* Create dma tag for TX buffers. 8 byte alignment, etc */
+	if (bus_dma_tag_create(sc->sc_dmat,    /* parent */
+	    8, 0,		    /* alignment, bounds */
+	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
+	    BUS_SPACE_MAXADDR,       /* highaddr */
+	    NULL, NULL,	      /* filter, filterarg */
+	    0x4000,		 /* maxsize XXX */
+	    ATHP_MAX_SCATTER,	 /* nsegments */
+	    0x4000,		 /* maxsegsize XXX */
+	    BUS_DMA_ALLOCNOW,	/* flags */
+	    NULL,		    /* lockfunc */
+	    NULL,		    /* lockarg */
+	    &sc->buf_tx.br_dmatag)) {
+		device_printf(sc->sc_dev, "%s: cannot allocate TX DMA tag\n",
+		    __func__);
+			return (-1);
+	}
 
-	athp_alloc_rx_list(sc);
-	/* XXX tx list */
+	athp_alloc_list(sc, &sc->buf_rx, ATHP_RX_LIST_COUNT);
+	athp_alloc_list(sc, &sc->buf_tx, ATHP_TX_LIST_COUNT);
 
 	return (0);
 }
@@ -351,11 +367,11 @@ athp_pci_free_bufs(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
 
-	athp_free_rx_list(sc);
-	/* XXX tx */
+	athp_free_list(sc, &sc->buf_rx);
+	athp_free_list(sc, &sc->buf_tx);
 
-	bus_dma_tag_destroy(sc->buf_rx.sc_rx_dmatag);
-	/* XXX tx */
+	bus_dma_tag_destroy(sc->buf_rx.br_dmatag);
+	bus_dma_tag_destroy(sc->buf_tx.br_dmatag);
 }
 
 static int

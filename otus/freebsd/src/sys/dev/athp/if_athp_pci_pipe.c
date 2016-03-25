@@ -129,7 +129,7 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	ATHP_PCI_CE_LOCK_ASSERT(psc);
 
 
-	pbuf = athp_rx_getbuf(sc, pipe->buf_sz);
+	pbuf = athp_getbuf(sc, &sc->buf_rx, pipe->buf_sz);
 	if (pbuf == NULL)
 		return (-ENOMEM);
 
@@ -145,7 +145,7 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->paddr);
 	if (ret) {
 		ATHP_WARN(sc, "failed to post pci rx buf: %d\n", ret);
-		athp_rx_freebuf(sc, pbuf);
+		athp_freebuf(sc, &sc->buf_rx, pbuf);
 		return ret;
 	}
 
@@ -219,6 +219,11 @@ ath10k_pci_rx_replenish_retry(unsigned long ptr)
 }
 
 /* Called by lower (CE) layer when a send to Target completes. */
+/*
+ * XXX TODO: in order to support the TXCB state, we should just
+ * stuff that into the pbuf struct and pass that in.  Which means,
+ * yes, we can't just use mbuf as the state tag!
+ */
 static void
 ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 {
@@ -274,11 +279,11 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		pbuf = ctx;
 		max_nbytes = m->m_len;
 		m = pbuf->m;		/* XXX TODO: should be a method */
-		athp_unmap_rx_buf(sc, pbuf);
+		athp_unmap_buf(sc, &sc->buf_rx, pbuf);
 		pbuf->m = NULL;	/* XXX TODO: should be a method */
 
 		/* Reclaim pbuf; we're done with it now */
-		athp_rx_freebuf(sc, pbuf);
+		athp_freebuf(sc, &sc->buf_rx, pbuf);
 
 		if (unlikely(max_nbytes < nbytes)) {
 			ATHP_WARN(sc, "rxed more than expected (nbytes %d, max %d)",
@@ -354,7 +359,7 @@ ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pipe)
 			continue;
 
 		ce_ring->per_transfer_context[i] = NULL;
-		athp_rx_freebuf(sc, pbuf);
+		athp_freebuf(sc, &sc->buf_rx, pbuf);
 	}
 }
 

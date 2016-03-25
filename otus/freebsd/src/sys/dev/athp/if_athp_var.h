@@ -36,6 +36,13 @@ struct athp_buf {
 	/* XXX other state */
 };
 
+struct athp_buf_ring {
+	bus_dma_tag_t br_dmatag;
+	int br_count;
+	struct athp_buf *br_list;
+	STAILQ_HEAD(, athp_buf) br_inactive;
+};
+
 struct athp_node {
 	struct ieee80211_node	ni;
 	uint64_t		tx_done;
@@ -236,20 +243,8 @@ struct athp_softc {
 		u32 fw_cold_reset_counter;
 	} stats;
 
-	struct {
-		/* RX packet buffer state */
-		bus_dma_tag_t sc_rx_dmatag;
-		struct athp_buf sc_rx[ATHP_RX_LIST_COUNT];
-		STAILQ_HEAD(, athp_buf) sc_rx_inactive;
-	} buf_rx;
-
-	struct {
-		/* TX packet buffer state */
-		bus_dma_tag_t sc_tx_dmatag;
-		struct athp_buf sc_tx[ATHP_TX_LIST_COUNT];
-		STAILQ_HEAD(, athp_buf) sc_tx_inactive;
-	} buf_tx;
-
+	struct athp_buf_ring buf_rx;
+	struct athp_buf_ring buf_tx;
 };
 
 #endif	/* __IF_ATHP_VAR_H__ */

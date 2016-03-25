@@ -91,28 +91,29 @@ __FBSDID("$FreeBSD$");
 MALLOC_DECLARE(M_ATHPDEV);
 
 /*
- * Receive buffers.
+ * Driver buffers!
  */
 
 /*
- * Unmap an RX buffer.
+ * Unmap a buffer.
  *
- * This unloads the DMA map for the given RX buffer.
+ * This unloads the DMA map for the given buffer.
  *
- * It's used in the RX buffer free path and in the RX buffer "it's mine now!"
+ * It's used in the buffer free path and in the buffer "it's mine now!"
  * claiming path when the driver wants the mbuf for itself.
  */
 void
-athp_unmap_rx_buf(struct athp_softc *sc, struct athp_buf *rxbuf)
+athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
+    struct athp_buf *bf)
 {
 
 	/* no mbuf? skip */
-	if (rxbuf->m == NULL)
+	if (bf->m == NULL)
 		return;
 
-	bus_dmamap_sync(sc->buf_rx.sc_rx_dmatag, rxbuf->map, BUS_DMASYNC_POSTREAD);
-	bus_dmamap_unload(sc->buf_rx.sc_rx_dmatag, rxbuf->map);
-	rxbuf->paddr = 0;
+	bus_dmamap_sync(br->br_dmatag, bf->map, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_unload(br->br_dmatag, bf->map);
+	bf->paddr = 0;
 }
 
 /*
@@ -121,14 +122,14 @@ athp_unmap_rx_buf(struct athp_softc *sc, struct athp_buf *rxbuf)
  * This doesn't update the linked list state; it just handles freeing it.
  */
 static void
-_athp_free_rx_buf(struct athp_softc *sc, struct athp_buf *rxbuf)
+_athp_free_buf(struct athp_softc *sc, struct athp_buf_ring *br,
+    struct athp_buf *bf)
 {
 
-	/* XXX TODO */
 	/* If there's an mbuf, then unmap, and free */
-	if (rxbuf->m != NULL) {
-		athp_unmap_rx_buf(sc, rxbuf);
-		m_freem(rxbuf->m);
+	if (bf->m != NULL) {
+		athp_unmap_buf(sc, br, bf);
+		m_freem(bf->m);
 	}
 }
 
@@ -139,17 +140,19 @@ _athp_free_rx_buf(struct athp_softc *sc, struct athp_buf *rxbuf)
  * mbuf without worrying about the linked list / allocation state.
  */
 void
-athp_free_rx_list(struct athp_softc *sc)
+athp_free_list(struct athp_softc *sc, struct athp_buf_ring *br)
 {
 	int i;
 
 	/* prevent further allocations from RX list(s) */
-	STAILQ_INIT(&sc->buf_rx.sc_rx_inactive);
+	STAILQ_INIT(&br->br_inactive);
 
-	for (i = 0; i < ATHP_RX_LIST_COUNT; i++) {
-		struct athp_buf *dp = &sc->buf_rx.sc_rx[i];
-		_athp_free_rx_buf(sc, dp);
+	for (i = 0; i < br->br_count; i++) {
+		struct athp_buf *dp = &br->br_list[i];
+		_athp_free_buf(sc, br, dp);
 	}
+	free(br->br_list, M_ATHPDEV);
+	br->br_list = NULL;
 }
 
 /*
@@ -157,24 +160,31 @@ athp_free_rx_list(struct athp_softc *sc)
  * all into the inactive list.
  */
 int
-athp_alloc_rx_list(struct athp_softc *sc)
+athp_alloc_list(struct athp_softc *sc, struct athp_buf_ring *br, int count)
 {
 	int i;
 
+	/* Allocate initial buffer list */
+	br->br_list = malloc(sizeof(struct athp_buf) * count, M_ATHPDEV,
+	    M_ZERO | M_NOWAIT);
+	if (br->br_list == NULL) {
+		ATHP_ERR(sc, "%s: malloc failed!\n", __func__);
+		return (-1);
+	}
+
 	/* Setup initial state for each entry */
-	for (i = 0; i < ATHP_RX_LIST_COUNT; i++) {
-		struct athp_buf *dp = &sc->buf_rx.sc_rx[i];
+	for (i = 0; i < count; i++) {
+		struct athp_buf *dp = &br->br_list[i];
 		dp->flags = 0;
 		dp->paddr = 0;
 		dp->m = NULL;
 	}
 
 	/* Lists */
-	STAILQ_INIT(&sc->buf_rx.sc_rx_inactive);
+	STAILQ_INIT(&br->br_inactive);
 
-	for (i = 0; i < ATHP_RX_LIST_COUNT; i++)
-		STAILQ_INSERT_HEAD(&sc->buf_rx.sc_rx_inactive,
-		    &sc->buf_rx.sc_rx[i], next);
+	for (i = 0; i < count; i++)
+		STAILQ_INSERT_HEAD(&br->br_inactive, &br->br_list[i], next);
 
 	return (0);
 }
@@ -185,36 +195,36 @@ athp_alloc_rx_list(struct athp_softc *sc)
  * This doesn't allocate the mbuf.
  */
 static struct athp_buf *
-_athp_rx_getbuf(struct athp_softc *sc)
+_athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br)
 {
 	struct athp_buf *bf;
 
 	/* Allocate a buffer */
-	bf = STAILQ_FIRST(&sc->buf_rx.sc_rx_inactive);
+	bf = STAILQ_FIRST(&br->br_inactive);
 	if (bf != NULL)
-		STAILQ_REMOVE_HEAD(&sc->buf_rx.sc_rx_inactive, next);
+		STAILQ_REMOVE_HEAD(&br->br_inactive, next);
 	else
 		bf = NULL;
 	return (bf);
 }
 
 void
-athp_rx_freebuf(struct athp_softc *sc, struct athp_buf *bf)
+athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
+    struct athp_buf *bf)
 {
 
 	ATHP_LOCK_ASSERT(sc);
 
 	/* if there's an mbuf - unmap (if needed) and free it */
-	if (bf->m != NULL) {
-		_athp_free_rx_buf(sc, bf);
-	}
+	if (bf->m != NULL)
+		_athp_free_buf(sc, br, bf);
 
-	/* Push it into the RX inactive queue */
-	STAILQ_INSERT_TAIL(&sc->buf_rx.sc_rx_inactive, bf, next);
+	/* Push it into the inactive queue */
+	STAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
 }
 
 /*
- * Return an RX buffer with an mbuf loaded.
+ * Return an buffer with an mbuf loaded.
  *
  * Note: the mbuf length is just that - the mbuf length.
  * It's up to the caller to reserve the required header/descriptor
@@ -227,11 +237,13 @@ athp_rx_freebuf(struct athp_softc *sc, struct athp_buf *bf)
  * XXX Be careful!
  */
 struct athp_buf *
-athp_rx_getbuf(struct athp_softc *sc, int bufsize)
+athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 {
 	/*
-	 * XXX TODO: this should be part of the rxbuf and it should
+	 * XXX TODO: this should be part of the buffer and it should
 	 * support sg DMA
+	 *
+	 * XXX TODO: RXBUF_MAX_SCATTER, not right for TX
 	 */
 	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
 	struct athp_buf *bf;
@@ -250,7 +262,7 @@ athp_rx_getbuf(struct athp_softc *sc, int bufsize)
 
 	/* Allocate buffer */
 
-	bf = _athp_rx_getbuf(sc);
+	bf = _athp_getbuf(sc, br);
 	if (! bf) {
 		m_freem(m);
 		return (NULL);
@@ -258,7 +270,7 @@ athp_rx_getbuf(struct athp_softc *sc, int bufsize)
 
 	/* mbuf busdma load */
 	nsegs = 0;
-	err = bus_dmamap_load_mbuf_sg(sc->buf_rx.sc_rx_dmatag,
+	err = bus_dmamap_load_mbuf_sg(br->br_dmatag,
 	    bf->map, m, segs, &nsegs, BUS_DMA_NOWAIT);
 	if (err != 0 || nsegs != 1) {
 		device_printf(sc->sc_dev,
@@ -267,7 +279,7 @@ athp_rx_getbuf(struct athp_softc *sc, int bufsize)
 		    err,
 		    nsegs);
 		m_freem(m);
-		athp_rx_freebuf(sc, bf);
+		athp_freebuf(sc, br, bf);
 		return (NULL);
 	}
 
