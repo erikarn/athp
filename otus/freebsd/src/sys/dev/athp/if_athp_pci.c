@@ -369,7 +369,7 @@ athp_pci_attach(device_t dev)
 
 	sc->sc_dev = dev;
 	sc->sc_invalid = 1;
-	sc->sc_debug = 0;
+	sc->sc_debug = ATHP_DEBUG_BOOT;
 	sc->sc_psc = psc;
 
 	/* XXX TODO: initialize sc_debug from TUNABLE */
@@ -377,11 +377,11 @@ athp_pci_attach(device_t dev)
 	/* XXX TODO: unique names */
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
-	mtx_init(&sc->sc_conf_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	mtx_init(&sc->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
 	    MTX_DEF);
-	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
 	    MTX_DEF);
-	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), "athp ce",
 	    MTX_DEF);
 	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
 	    NULL, psc);
