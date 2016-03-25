@@ -223,6 +223,43 @@ athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
 	STAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
 }
 
+int
+athp_loadbuf(struct athp_softc *sc, struct athp_buf_ring *br,
+    struct athp_buf *bf, struct mbuf *m)
+{
+	/*
+	 * XXX TODO: this should be part of the buffer and it should
+	 * support sg DMA
+	 *
+	 * XXX TODO: RXBUF_MAX_SCATTER, not right for TX
+	 */
+	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
+	int err;
+	int nsegs;
+
+	ATHP_LOCK_ASSERT(sc);
+
+	/* mbuf busdma load */
+	nsegs = 0;
+	err = bus_dmamap_load_mbuf_sg(br->br_dmatag,
+	    bf->map, m, segs, &nsegs, BUS_DMA_NOWAIT);
+	if (err != 0 || nsegs != 1) {
+		device_printf(sc->sc_dev,
+		    "%s: mbuf dmamap load failed (err=%d, nsegs=%d)\n",
+		    __func__,
+		    err,
+		    nsegs);
+		return (err);
+	}
+
+	/* XXX TODO: only support a single descriptor per buffer for now */
+	bf->paddr = segs[0].ds_addr;
+	bf->m = m;
+
+	/* XXX TODO: set flag */
+	return (0);
+}
+
 /*
  * Return an buffer with an mbuf loaded.
  *
@@ -239,17 +276,9 @@ athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
 struct athp_buf *
 athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 {
-	/*
-	 * XXX TODO: this should be part of the buffer and it should
-	 * support sg DMA
-	 *
-	 * XXX TODO: RXBUF_MAX_SCATTER, not right for TX
-	 */
-	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
 	struct athp_buf *bf;
 	struct mbuf *m;
-	int err;
-	int nsegs;
+	int ret;
 
 	ATHP_LOCK_ASSERT(sc);
 
@@ -261,35 +290,31 @@ athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 	}
 
 	/* Allocate buffer */
-
 	bf = _athp_getbuf(sc, br);
 	if (! bf) {
 		m_freem(m);
 		return (NULL);
 	}
 
-	/* mbuf busdma load */
-	nsegs = 0;
-	err = bus_dmamap_load_mbuf_sg(br->br_dmatag,
-	    bf->map, m, segs, &nsegs, BUS_DMA_NOWAIT);
-	if (err != 0 || nsegs != 1) {
-		device_printf(sc->sc_dev,
-		    "%s: mbuf dmamap load failed (err=%d, nsegs=%d)\n",
-		    __func__,
-		    err,
-		    nsegs);
+	/* Map mbuf into buffer */
+
+	ret = athp_loadbuf(sc, br, bf, m);
+	if (ret != 0) {
 		m_freem(m);
 		athp_freebuf(sc, br, bf);
 		return (NULL);
 	}
 
-	/* XXX TODO: only support a single descriptor per buffer for now */
-	bf->paddr = segs[0].ds_addr;
-	bf->m = m;
-
-	/* XXX TODO: set flag */
-
 	return (bf);
+}
+
+struct athp_buf *
+athp_getbuf_tx(struct athp_softc *sc, struct athp_buf_ring *br)
+{
+
+	ATHP_LOCK_ASSERT(sc);
+
+	return (_athp_getbuf(sc, br));
 }
 
 /*
