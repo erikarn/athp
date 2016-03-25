@@ -88,6 +88,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_chip.h"
 #include "if_athp_pci_config.h"
 
+#include "if_athp_buf.h"
+
 /*
  * This is the PCI pipe related code from ath10k/pci.c.
  *
@@ -119,75 +121,34 @@ static int
 __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 {
 	struct athp_softc *sc = pipe->sc;
-#if 0
-	struct ath10k_pci *psc = pipe->psc;
+	struct athp_pci_softc *psc = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
-	struct mbuf *m;
+	struct athp_buf *pbuf;
 	int ret;
 
 	ATHP_PCI_CE_LOCK_ASSERT(psc);
 
-	m = m_get2(pipe->buf_sz, M_NOWAIT, MT_DATA, M_PKTHDR);
-	if (m == NULL)
-		return -ENOMEM;
 
-	/* XXX TODO need to ensure it's correctly aligned */
-	WARN_ONCE((unsigned long)skb->data & 3, "unaligned skb");
+	pbuf = athp_rx_getbuf(sc, pipe->buf_sz);
+	if (pbuf == NULL)
+		return (-ENOMEM);
 
-	/*
-	 * Ok, here's the fun FreeBSD specific bit.
-	 *
-	 * Each slot in the ring needs to have the busdma state
-	 * in order to map/unmap/etc as appropriate.
-	 *
-	 * The linux driver doesn't have it; it creates a physical
-	 * mapping via dma_map_single() and stores the paddr;
-	 * it doesn't have a per-slot struct to store state in.
-	 * It then crafts some custom stuff in skb->cb to store
-	 * the paddr in and some hash membership for doing later
-	 * paddr -> vaddr lookups.  Odd, but okay.
-	 *
-	 * So, I need to go and craft that stuff (ie, what "ath_buf"
-	 * partially covers in the FreeBSD ath(4) driver) as part
-	 * of the transmit/receive infrastructure.
-	 */
-
-	/*
-	 * That per-slot state also needs to be kept in the ring,
-	 * like what's done in iwn for the RX ring management.
-	 * There's the 'per_transfer_context' that's used by the
-	 * CE code that I think we can piggyback this state struct
-	 * into, which will change how things work a little compared
-	 * to linux.
-	 */
-
-	paddr = dma_map_single(ar->dev, skb->data,
-			       skb->len + skb_tailroom(skb),
-			       DMA_FROM_DEVICE);
-	if (unlikely(dma_mapping_error(ar->dev, paddr))) {
-		ath10k_warn(ar, "failed to dma map pci rx buf\n");
-		dev_kfree_skb_any(skb);
-		return -EIO;
+	if (pbuf->paddr & 3) {
+		ATHP_WARN(sc, "%s: unaligned mbuf\n", __func__);
 	}
-
-	ATH10K_SKB_RXCB(skb)->paddr = paddr;
 
 	/*
 	 * Once the mapping is done and we've verified there's only
 	 * a single physical segment, we can hand it to the copy engine
 	 * to queue for receive.
 	 */
-	ret = __ath10k_ce_rx_post_buf(ce_pipe, skb, paddr);
+	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->paddr);
 	if (ret) {
-		ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
-		dma_unmap_single(ar->dev, paddr, skb->len + skb_tailroom(skb),
-				 DMA_FROM_DEVICE);
-		dev_kfree_skb_any(skb);
+		ATHP_WARN(sc, "failed to post pci rx buf: %d\n", ret);
+		athp_rx_freebuf(sc, pbuf);
 		return ret;
 	}
-#else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-#endif
+
 	return 0;
 }
 
@@ -195,12 +156,11 @@ static void
 __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
 	struct athp_softc *sc = pipe->sc;
-#if 0
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	int ret, num;
 
-	lockdep_assert_held(&ar_pci->ce_lock);
+	ATHP_PCI_CE_LOCK_ASSERT(psc);
 
 	if (pipe->buf_sz == 0)
 		return;
@@ -212,15 +172,15 @@ __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 	while (num--) {
 		ret = __ath10k_pci_rx_post_buf(pipe);
 		if (ret) {
-			ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
+			ATHP_WARN(sc, "failed to post pci rx buf: %d\n", ret);
+			/* XXX TODO: retry filling; implement callout */
+#if 0
 			mod_timer(&ar_pci->rx_post_retry, jiffies +
 				  ATH10K_PCI_RX_POST_RETRY_MS);
+#endif
 			break;
 		}
 	}
-#else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-#endif
 }
 
 static void
@@ -367,40 +327,30 @@ ath10k_pci_kill_tasklet(struct athp_softc *sc)
 }
 
 static void
-ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
+ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pipe)
 {
-	struct athp_softc *sc = pci_pipe->sc;
-#if 0
-	struct ath10k_ce_pipe *ce_pipe;
+	struct athp_softc *sc = pipe->sc;
+	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	struct ath10k_ce_ring *ce_ring;
-	struct sk_buff *skb;
+	struct athp_buf *pbuf;
 	int i;
 
-	ar = pci_pipe->hif_ce_state;
-	ce_pipe = pci_pipe->ce_hdl;
 	ce_ring = ce_pipe->dest_ring;
 
 	if (!ce_ring)
 		return;
 
-	if (!pci_pipe->buf_sz)
+	if (! pipe->buf_sz)
 		return;
 
 	for (i = 0; i < ce_ring->nentries; i++) {
-		skb = ce_ring->per_transfer_context[i];
-		if (!skb)
+		pbuf = ce_ring->per_transfer_context[i];
+		if (! pbuf)
 			continue;
 
 		ce_ring->per_transfer_context[i] = NULL;
-
-		dma_unmap_single(ar->dev, ATH10K_SKB_RXCB(skb)->paddr,
-				 skb->len + skb_tailroom(skb),
-				 DMA_FROM_DEVICE);
-		dev_kfree_skb_any(skb);
+		athp_rx_freebuf(sc, pbuf);
 	}
-#else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-#endif
 }
 
 static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
