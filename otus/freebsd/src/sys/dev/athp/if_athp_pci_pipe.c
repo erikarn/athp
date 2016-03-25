@@ -228,30 +228,27 @@ static void
 ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 {
 	struct athp_softc *sc = ce_state->sc;
-#if 0
-	struct athp_softc *psc = ce_state->psc;
-	struct ath10k_hif_cb *cb = &ar_pci->msg_callbacks_current;
-	struct sk_buff_head list;
-	struct sk_buff *skb;
-	u32 ce_data;
+	struct athp_pci_softc *psc = ce_state->psc;
+	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
+	STAILQ_HEAD(, athp_buf) br_list;
+	struct athp_buf *pbuf;
+	uint32_t ce_data;
 	unsigned int nbytes;
 	unsigned int transfer_id;
 
-	__skb_queue_head_init(&list);
-	while (ath10k_ce_completed_send_next(ce_state, (void **)&skb, &ce_data,
-					     &nbytes, &transfer_id) == 0) {
+	STAILQ_INIT(&br_list);
+	while (ath10k_ce_completed_send_next(ce_state, (void **)&pbuf,
+	    &ce_data, &nbytes, &transfer_id) == 0) {
 		/* no need to call tx completion for NULL pointers */
-		if (skb == NULL)
+		if (pbuf == NULL)
 			continue;
-
-		__skb_queue_tail(&list, skb);
+		STAILQ_INSERT_TAIL(&br_list, pbuf, next);
 	}
 
-	while ((skb = __skb_dequeue(&list)))
-		cb->tx_completion(ar, skb);
-#else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-#endif
+	while ((pbuf = STAILQ_FIRST(&br_list)) != NULL) {
+		STAILQ_REMOVE_HEAD(&br_list, next);
+		cb->tx_completion(sc, pbuf);
+	}
 }
 
 /* Called by lower (CE) layer when data is received from the Target. */
@@ -366,16 +363,13 @@ ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pipe)
 static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 {
 	struct athp_softc *sc = pci_pipe->sc;
-#if 0
-	struct ath10k_pci *ar_pci;
+	struct athp_pci_softc *psc = pci_pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe;
 	struct ath10k_ce_ring *ce_ring;
 	struct ce_desc *ce_desc;
-	struct sk_buff *skb;
+	struct athp_buf *pbuf;
 	int i;
 
-	ar = pci_pipe->hif_ce_state;
-	ar_pci = ath10k_pci_priv(ar);
 	ce_pipe = pci_pipe->ce_hdl;
 	ce_ring = ce_pipe->src_ring;
 
@@ -390,17 +384,14 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 		return;
 
 	for (i = 0; i < ce_ring->nentries; i++) {
-		skb = ce_ring->per_transfer_context[i];
-		if (!skb)
+		pbuf = ce_ring->per_transfer_context[i];
+		if (!pbuf)
 			continue;
 
 		ce_ring->per_transfer_context[i] = NULL;
 
-		ar_pci->msg_callbacks_current.tx_completion(ar, skb);
+		psc->msg_callbacks_current.tx_completion(sc, pbuf);
 	}
-#else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-#endif
 }
 
 /*
