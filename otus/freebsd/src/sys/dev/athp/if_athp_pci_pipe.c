@@ -254,51 +254,56 @@ static void
 ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 {
 	struct athp_softc *sc = ce_state->sc;
-#if 0
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	struct ath10k_pci_pipe *pipe_info =  &ar_pci->pipe_info[ce_state->id];
-	struct ath10k_hif_cb *cb = &ar_pci->msg_callbacks_current;
-	struct sk_buff *skb;
-	struct sk_buff_head list;
-	void *transfer_context;
-	u32 ce_data;
+	struct athp_pci_softc *psc = ce_state->psc;
+	struct ath10k_pci_pipe *pipe_info =  &psc->pipe_info[ce_state->id];
+	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
+	struct athp_buf *pbuf;
+	struct mbuf *m;
+	struct mbufq mq;
+	void *ctx;
+	uint32_t ce_data;
 	unsigned int nbytes, max_nbytes;
 	unsigned int transfer_id;
 	unsigned int flags;
 
-	__skb_queue_head_init(&list);
-	while (ath10k_ce_completed_recv_next(ce_state, &transfer_context,
-					     &ce_data, &nbytes, &transfer_id,
-					     &flags) == 0) {
-		skb = transfer_context;
-		max_nbytes = skb->len + skb_tailroom(skb);
-		dma_unmap_single(ar->dev, ATH10K_SKB_RXCB(skb)->paddr,
-				 max_nbytes, DMA_FROM_DEVICE);
+	/* XXX sigh, I wish mbufq's could have no limit here */
+	mbufq_init(&mq, 1024);
+
+	while (ath10k_ce_completed_recv_next(ce_state, &ctx,
+		    &ce_data, &nbytes, &transfer_id, &flags) == 0) {
+		pbuf = ctx;
+		max_nbytes = m->m_len;
+		m = pbuf->m;		/* XXX TODO: should be a method */
+		athp_unmap_rx_buf(sc, pbuf);
+		pbuf->m = NULL;	/* XXX TODO: should be a method */
+
+		/* Reclaim pbuf; we're done with it now */
+		athp_rx_freebuf(sc, pbuf);
 
 		if (unlikely(max_nbytes < nbytes)) {
-			ath10k_warn(ar, "rxed more than expected (nbytes %d, max %d)",
-				    nbytes, max_nbytes);
-			dev_kfree_skb_any(skb);
+			ATHP_WARN(sc, "rxed more than expected (nbytes %d, max %d)",
+			    nbytes, max_nbytes);
+			m_freem(m);
 			continue;
 		}
 
-		skb_put(skb, nbytes);
-		__skb_queue_tail(&list, skb);
+		/* Assign actual packet buffer length */
+		/* XXX TODO: this should be a method! */
+		m->m_pkthdr.len = m->m_len = nbytes;
+
+		mbufq_enqueue(&mq, m);	/* XXX TODO: check return value */
 	}
 
-	while ((skb = __skb_dequeue(&list))) {
-		ath10k_dbg(ar, ATH10K_DBG_PCI, "pci rx ce pipe %d len %d\n",
-			   ce_state->id, skb->len);
-		ath10k_dbg_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
-				skb->data, skb->len);
+	while ((m = mbufq_dequeue(&mq))) {
+		ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci rx ce pipe %d len %d\n",
+			   ce_state->id, m->m_len);
+		athp_debug_dump(sc, ATHP_DEBUG_PCI_DUMP, NULL, "pci rx: ",
+			    m->m_data, m->m_len);
 
-		cb->rx_completion(ar, skb);
+		cb->rx_completion(sc, m);
 	}
 
 	ath10k_pci_rx_post_pipe(pipe_info);
-#else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-#endif
 }
 
 /*
