@@ -984,6 +984,7 @@ static int ath10k_pci_bmi_wait(struct ath10k_ce_pipe *tx_pipe,
 //	unsigned long timeout = jiffies + BMI_COMMUNICATION_TIMEOUT_HZ;
 	int i;
 
+	/* XXX TODO */
 //	while (time_before_eq(jiffies, timeout)) {
 	/* Hard code 200 * 10mS == 2 sec */
 	for (i = 0; i < 200; i++) {
@@ -996,6 +997,8 @@ static int ath10k_pci_bmi_wait(struct ath10k_ce_pipe *tx_pipe,
 		/* Wait 10mS each time */
 		DELAY(10 * 1000);
 	}
+
+	printf("%s: timed out\n", __func__);
 
 	return -ETIMEDOUT;
 }
@@ -1105,7 +1108,7 @@ ath10k_pci_hif_power_up(struct athp_softc *sc)
 
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot hif power up\n");
 
-	device_printf(sc->sc_dev, "%s: LNKCTL\n", __func__);
+	device_printf(sc->sc_dev, "%s: TODO LNKCTL\n", __func__);
 #if 0
 	pcie_capability_read_word(ar_pci->pdev, PCI_EXP_LNKCTL,
 				  &ar_pci->link_ctl);
