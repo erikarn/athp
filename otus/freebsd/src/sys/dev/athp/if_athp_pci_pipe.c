@@ -274,13 +274,9 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 	while (ath10k_ce_completed_recv_next(ce_state, &ctx,
 		    &ce_data, &nbytes, &transfer_id, &flags) == 0) {
 		pbuf = ctx;
-		max_nbytes = m->m_len;
+		max_nbytes = bf->mb.size; /* XXX TODO: should be a method */
 		m = pbuf->m;		/* XXX TODO: should be a method */
 		athp_unmap_buf(sc, &sc->buf_rx, pbuf);
-		pbuf->m = NULL;	/* XXX TODO: should be a method */
-
-		/* Reclaim pbuf; we're done with it now */
-		athp_freebuf(sc, &sc->buf_rx, pbuf);
 
 		if (unlikely(max_nbytes < nbytes)) {
 			ATHP_WARN(sc, "rxed more than expected (nbytes %d, max %d)",
@@ -289,9 +285,12 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 			continue;
 		}
 
-		/* Assign actual packet buffer length */
-		/* XXX TODO: this should be a method! */
-		m->m_pkthdr.len = m->m_len = nbytes;
+		/* Assign actual packet buffer length to pbuf AND mbuf */
+		athp_buf_set_len(pbuf, nbytes);
+
+		/* Done; free pbuf */
+		pbuf->m = NULL;	/* XXX TODO: should be a method */
+		athp_freebuf(sc, &sc->buf_rx, pbuf);
 
 		mbufq_enqueue(&mq, m);	/* XXX TODO: check return value */
 	}
