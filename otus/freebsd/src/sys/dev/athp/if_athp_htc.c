@@ -109,23 +109,32 @@ ath10k_htc_control_tx_complete(struct athp_softc *sc, struct mbuf *m)
 }
 
 static struct mbuf *
-ath10k_htc_build_tx_ctrl_skb(void *ar)
+ath10k_htc_build_tx_ctrl_skb(struct athp_softc *sc)
 {
-	struct sk_buff *skb;
-	struct ath10k_skb_cb *skb_cb;
+	struct athp_buf *pbuf;
 
-	skb = dev_alloc_skb(ATH10K_HTC_CONTROL_BUFFER_SIZE);
-	if (!skb)
+	pbuf = athp_getbuf(sc, &sc->buf_rx, ATH10K_HTC_CONTROL_BUFFER_SIZE);
+	if (! pbuf) {
+		device_printf(sc->sc_dev, "%s: athp_getbuf failed!\n",
+		    __func__);
 		return NULL;
+	}
 
+	/*
+	 * XXX TODO: figure out why this wants to reserve 20 bytes
+	 * for a control buffer.
+	 */
 	skb_reserve(skb, 20); /* FIXME: why 20 bytes? */
+
+#if 0
 	WARN_ONCE((unsigned long)skb->data & 3, "unaligned skb");
+#endif
 
-	skb_cb = ATH10K_SKB_CB(skb);
-	memset(skb_cb, 0, sizeof(*skb_cb));
+	athp_buf_cb_clear(pbuf);
 
-	ATHP_DPRINTF(sc, ATHP_DEBUG_HTC, "%s: skb %p\n", __func__, skb);
-	return skb;
+	ATHP_DPRINTF(sc, ATHP_DEBUG_HTC, "%s: pbuf %p mbuf %p\n",
+	    __func__, pbuf, pbuf->m);
+	return pbuf;
 }
 
 static inline void ath10k_htc_restore_tx_skb(struct ath10k_htc *htc,
