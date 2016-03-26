@@ -297,7 +297,6 @@ athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 	}
 
 	/* Map mbuf into buffer */
-
 	ret = athp_loadbuf(sc, br, bf, m);
 	if (ret != 0) {
 		m_freem(m);
@@ -305,19 +304,46 @@ athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 		return (NULL);
 	}
 
+	/* Setup initial mbuf tracking state */
+	bf->mb.size = bufsize;
+	bf->mb.len = 0;
+
 	return (bf);
 }
 
 struct athp_buf *
 athp_getbuf_tx(struct athp_softc *sc, struct athp_buf_ring *br)
 {
+	struct athp_buf *bf;
 
 	ATHP_LOCK_ASSERT(sc);
 
-	return (_athp_getbuf(sc, br));
+	bf = _athp_getbuf(sc, br);
+	if (bf == NULL)
+		return NULL;
+
+	/* No mbuf yet! */
+	bf->mb.size = 0;
+	bf->mb.len = 0;
+
+	return bf;
 }
+
+/*
+ * XXX TODO: write a routine to assign a pbuf to a given mbuf or
+ * something, for the transmit side to have everything it needs
+ * to transmit a payload, complete with correct 'len'.
+ */
 
 /*
  * XXX TODO: need to setup the tx/rx buffer dma tags in if_athp_pci.c.
  * (Since it's a function of the bus/chip..)
  */
+
+void
+athp_buf_cb_clear(struct athp_buf *bf)
+{
+
+	bzero(&bf->tx, sizeof(bf->tx));
+	bzero(&bf->rx, sizeof(bf->rx));
+}

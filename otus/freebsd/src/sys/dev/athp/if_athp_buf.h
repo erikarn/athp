@@ -12,8 +12,28 @@ extern struct athp_buf * athp_getbuf_tx(struct athp_softc *sc,
 extern	void athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
 	    struct athp_buf *bf);
 
+extern void athp_buf_cb_clear(struct athp_buf *bf);
+
 extern	int athp_alloc_list(struct athp_softc *sc, struct athp_buf_ring *br,
 	    int count);
 extern	void athp_free_list(struct athp_softc *sc, struct athp_buf_ring *br);
+
+/*
+ * Set the length of the given pbuf to something.
+ *
+ * This is used by receive code to override the mbuf length and tracking
+ * length after we've received data and we know how big it is.
+ */
+static inline void
+athp_buf_set_len(struct athp_buf *bf, int len)
+{
+	if (bf->m == NULL) {
+		printf("%s: called on NULL mbuf!\n", __func__);
+		return;
+	}
+	bf->m->m_len = len;
+	bf->m->m_pkthdr.len = len;
+	bf->mb.len = len;
+}
 
 #endif	/* __IF_ATHP_BUF_H__ */

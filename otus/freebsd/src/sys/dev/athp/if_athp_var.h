@@ -26,14 +26,63 @@
 #define	ATHP_BUF_ACTIVE		0x00000001
 #define	ATHP_BUF_MAPPED		0x00000002
 
-/* XXX TODO: ath10k wants a bit more state here for TX .. */
+/* XXX TODO: ath10k wants a bit more state here for TX and a little more for RX .. */
 struct athp_buf {
 	bus_dmamap_t map;
 	bus_addr_t paddr;
-	struct mbuf *m;
 	STAILQ_ENTRY(athp_buf) next;
 	uint32_t flags;
+
+	/*
+	 * 'len' and 'size' deserves some uhm, explanation.
+	 *
+	 * ath10k does a bunch of stuff to handle assemble messages using
+	 * normal linux-isms - skb_reserve(), skb_push(), skb_put().
+	 *
+	 * But, mbufs are created with their original size in m_len /
+	 * m_pkthdr.m_len, and then we go and stomp on it with the
+	 * actual size of what we're copying around.
+	 *
+	 * Which means we can't bounds check and we can't really do
+	 * the hijinx the linux driver wants cleanly.
+	 *
+	 * So, sigh, I'm going to change the API a bit to use athp_bufs
+	 * which we then call the linux-isms on to reserve space,
+	 * append data, etc.
+	 *
+	 * + When we create the pbuf with an mbuf, we set size=m_len and
+	 *   len=0.
+	 * + When we call the skb_reserve() analog it'll update the mbuf
+	 *   length and m_data/m_len/etc, but leave len where it is.
+	 *   When we call skb_push() analog it'll update m_data, m_len, etc
+	 *   and increment len to include it.
+	 * + When we call skb_put() analog it'll return a pointer to the
+	 *   current buffer tail (m_data + len) and then increment
+	 *   len appropriate.
+	 *
+	 * This way hopefully(!) the existing code used to do skb hijinx
+	 * can be used by mbufs to do things.
+	 *
+	 * For packet RX we still override the mbuf with the relevant
+	 * length and we'll update 'len' too when we've done it, so it's
+	 * consistent (and we can flip an rx'ed pbuf to tx if something
+	 * wants to do that.)
+	 */
+
+	struct mbuf *m;
+	struct {
+		int len;
+		int size;
+	} mb;
+
 	/* XXX other state */
+	struct {
+		uint8_t eid;
+		uint8_t vif;
+	} tx;
+	struct {
+		int placeholder;
+	} rx;
 };
 
 struct athp_buf_ring {
