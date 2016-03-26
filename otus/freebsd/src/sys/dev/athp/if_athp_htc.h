@@ -86,6 +86,14 @@ struct ath10k_htc {
 	int target_credit_size;
 };
 
+#define	ATHP_HTC_TX_LOCK_INIT(ht)	mtx_init(&ht->tx_lock,		\
+	    device_get_nameunit(htc->sc->sc_dev, "athp htc tx", MTX_DEF)
+#define	ATHP_HTC_TX_LOCK_FREE(ht)	mtx_destroy(&ht->tx_lock)
+#define	ATHP_HTC_TX_LOCK(ht)		mtx_lock(&ht->tx_lock)
+#define	ATHP_HTC_TX_UNLOCK(ht)		mtx_unlock(&ht->tx_lock)
+#define	ATHP_HTC_TX_LOCK_ASSERT(ht)	mtx_assert(&ht->tx_lock, MA_OWNED)
+#define	ATHP_HTC_TX_UNLOCK_ASSERT(ht)	mtx_unlock(&ht->tx_lock, MA_NOTOWNED)
+
 extern	int ath10k_htc_init(struct athp_softc *sc);
 extern	int ath10k_htc_wait_target(struct ath10k_htc *htc);
 extern	int ath10k_htc_start(struct ath10k_htc *htc);
