@@ -274,7 +274,7 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 	while (ath10k_ce_completed_recv_next(ce_state, &ctx,
 		    &ce_data, &nbytes, &transfer_id, &flags) == 0) {
 		pbuf = ctx;
-		max_nbytes = pbuf->mb.size; /* XXX TODO: should be a method */
+		max_nbytes = pbuf->m_size; /* XXX TODO: should be a method */
 		m = pbuf->m;		/* XXX TODO: should be a method */
 		athp_unmap_buf(sc, &sc->buf_rx, pbuf);
 

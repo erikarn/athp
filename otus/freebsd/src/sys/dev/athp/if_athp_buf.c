@@ -305,8 +305,7 @@ athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 	}
 
 	/* Setup initial mbuf tracking state */
-	bf->mb.size = bufsize;
-	bf->mb.len = 0;
+	bf->m_size = bufsize;
 
 	return (bf);
 }
@@ -323,8 +322,7 @@ athp_getbuf_tx(struct athp_softc *sc, struct athp_buf_ring *br)
 		return NULL;
 
 	/* No mbuf yet! */
-	bf->mb.size = 0;
-	bf->mb.len = 0;
+	bf->m_size = 0;
 
 	return bf;
 }
