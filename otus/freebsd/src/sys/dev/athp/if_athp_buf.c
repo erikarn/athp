@@ -105,7 +105,7 @@ MALLOC_DECLARE(M_ATHPDEV);
  * It's used in the buffer free path and in the buffer "it's mine now!"
  * claiming path when the driver wants the mbuf for itself.
  */
-void
+static void
 athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
@@ -219,26 +219,8 @@ athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
 	STAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
 }
 
-int
-athp_loadbuf(struct athp_softc *sc, struct athp_buf_ring *br,
-    struct athp_buf *bf, struct mbuf *m)
-{
-	int err;
-
-	ATHP_LOCK_ASSERT(sc);
-
-	/* XXX TODO: check if mbuf already exists and free it? */
-
-	err = athp_dma_mbuf_load(sc, &br->dh, &bf->mb, m);
-	if (err != 0)
-		return (err);
-
-	/* XXX TODO: set flag */
-	return (0);
-}
-
 /*
- * Return an buffer with an mbuf loaded.
+ * Return an buffer with an mbuf allocated.
  *
  * Note: the mbuf length is just that - the mbuf length.
  * It's up to the caller to reserve the required header/descriptor
@@ -248,19 +230,19 @@ athp_loadbuf(struct athp_softc *sc, struct athp_buf_ring *br,
  * XXX TX/RX tag.  Check ath10k_pci_alloc_pipes() - each pipe has
  * XXX a different dmatag with different properties.
  *
- * XXX Be careful!
+ * Note: this doesn't load anything; that's done by the caller
+ * before it passes it into the hardware.
  */
 struct athp_buf *
 athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 {
 	struct athp_buf *bf;
 	struct mbuf *m;
-	int ret;
 
 	ATHP_LOCK_ASSERT(sc);
 
 	/* Allocate mbuf; fail if we can't allocate one */
-	m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, ATHP_RBUF_SIZE);
+	m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, bufsize);
 	if (m == NULL) {
 		device_printf(sc->sc_dev, "%s: failed to allocate mbuf\n", __func__);
 		return (NULL);
@@ -270,14 +252,6 @@ athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 	bf = _athp_getbuf(sc, br);
 	if (! bf) {
 		m_freem(m);
-		return (NULL);
-	}
-
-	/* Map mbuf into buffer */
-	ret = athp_loadbuf(sc, br, bf, m);
-	if (ret != 0) {
-		m_freem(m);
-		athp_freebuf(sc, br, bf);
 		return (NULL);
 	}
 

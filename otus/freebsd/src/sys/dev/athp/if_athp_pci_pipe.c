@@ -130,13 +130,22 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 
 	ATHP_PCI_CE_LOCK_ASSERT(psc);
 
-
 	pbuf = athp_getbuf(sc, &sc->buf_rx, pipe->buf_sz);
 	if (pbuf == NULL)
 		return (-ENOMEM);
 
 	if (pbuf->mb.paddr & 3) {
 		ATHP_WARN(sc, "%s: unaligned mbuf\n", __func__);
+	}
+
+	/* DMA Load */
+	ret = athp_dma_mbuf_load(sc, &sc->buf_rx.dh, &pbuf->mb, pbuf->m);
+	if (ret != 0) {
+		ATHP_WARN(sc, "%s: failed to DMA mbuf load: %d\n",
+		    __func__,
+		    ret);
+		athp_freebuf(sc, &sc->buf_rx, pbuf);
+		return (-ENOMEM);
 	}
 
 	/* Pre-recv sync */
