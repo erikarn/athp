@@ -83,4 +83,13 @@ ilog2(uint32_t val)
 
 #define	ECOMM		ESTALE
 
+#define	HZ		hz
+
+static inline int
+IS_ALIGNED(unsigned long ptr, int a)
+{
+
+	return (ptr % a == 0);
+}
+
 #endif	/* __LINUX_COMPAT_H__ */
