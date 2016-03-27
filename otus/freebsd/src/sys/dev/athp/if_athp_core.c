@@ -1359,7 +1359,6 @@ ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	if (status)
 		goto err;
 
-#if 0
 	sc->htc.htc_ops.target_send_suspend_complete =
 		ath10k_send_suspend_complete;
 
@@ -1373,6 +1372,7 @@ ath10k_core_start(struct athp_softc *sc, enum ath10k_firmware_mode mode)
 	if (status)
 		goto err;
 
+#if 0
 	status = ath10k_wmi_attach(sc);
 	if (status) {
 		ATHP_ERR(sc, "WMI attach failed: %d\n", status);
