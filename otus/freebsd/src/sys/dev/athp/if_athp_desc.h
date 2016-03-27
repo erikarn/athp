@@ -36,7 +36,6 @@ struct athp_dma_head {
 };
 
 struct athp_dma_mbuf {
-	struct mbuf *m;
 	bus_dmamap_t map;
 	bus_addr_t paddr;
 };

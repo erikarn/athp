@@ -282,21 +282,22 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		/* Post-RX sync */
 		athp_dma_mbuf_post_recv(sc, &sc->buf_rx.dh, &pbuf->mb);
 
-		/* Grab mbuf */
-		m = pbuf->mb.m;		/* XXX TODO: should be a method */
-
-		/* Assign actual packet buffer length to pbuf AND mbuf */
-		athp_buf_set_len(pbuf, nbytes);
-
-		/* Finish mapping and zero mbuf; don't need it anymore */
+		/* Finish mapping; don't need it anymore */
 		athp_dma_mbuf_unload(sc, &sc->buf_rx.dh, &pbuf->mb);
 
 		if (unlikely(max_nbytes < nbytes)) {
 			ATHP_WARN(sc, "rxed more than expected (nbytes %d, max %d)",
 			    nbytes, max_nbytes);
-			m_freem(m);
+			athp_freebuf(sc, &sc->buf_rx, pbuf);
 			continue;
 		}
+
+		/* Assign actual packet buffer length to pbuf AND mbuf */
+		athp_buf_set_len(pbuf, nbytes);
+
+		/* Grab mbuf */
+		m = pbuf->m;		/* XXX TODO: should be a method */
+		pbuf->m = NULL;
 
 		/* Done; free pbuf */
 		athp_freebuf(sc, &sc->buf_rx, pbuf);

@@ -34,6 +34,7 @@ struct ath10k_skb_cb {
 
 struct athp_buf {
 	struct athp_dma_mbuf mb;
+	struct mbuf *m;
 	int m_size;	/* size of initial allocation */
 
 	STAILQ_ENTRY(athp_buf) next;

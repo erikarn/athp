@@ -109,7 +109,7 @@ athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
 {
 
 	/* no mbuf? skip */
-	if (bf->mb.m == NULL)
+	if (bf->m == NULL)
 		return;
 
 	athp_dma_mbuf_unload(sc, &br->dh, &bf->mb);
@@ -126,9 +126,9 @@ _athp_free_buf(struct athp_softc *sc, struct athp_buf_ring *br,
 {
 
 	/* If there's an mbuf, then unmap, and free */
-	if (bf->mb.m != NULL) {
+	if (bf->m != NULL) {
 		athp_unmap_buf(sc, br, bf);
-		m_freem(bf->mb.m);
+		m_freem(bf->m);
 	}
 }
 
@@ -210,7 +210,7 @@ athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
 	ATHP_LOCK_ASSERT(sc);
 
 	/* if there's an mbuf - unmap (if needed) and free it */
-	if (bf->mb.m != NULL)
+	if (bf->m != NULL)
 		_athp_free_buf(sc, br, bf);
 
 	/* Push it into the inactive queue */
