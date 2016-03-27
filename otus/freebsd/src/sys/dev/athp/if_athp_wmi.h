@@ -18,9 +18,6 @@
 #ifndef _WMI_H_
 #define _WMI_H_
 
-#include <linux/types.h>
-#include <net/mac80211.h>
-
 /*
  * This file specifies the WMI interface for the Unified Software
  * Architecture.

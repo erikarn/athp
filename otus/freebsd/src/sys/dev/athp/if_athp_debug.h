@@ -36,6 +36,7 @@
 #define	ATHP_DEBUG_PCI_DUMP	0x00010000
 #define	ATHP_DEBUG_BMI		0x00020000
 #define	ATHP_DEBUG_HTC		0x00040000
+#define	ATHP_DEBUG_WMI		0x00080000
 #define	ATHP_DEBUG_ANY		0xffffffff
 
 #define	ATHP_DPRINTF(sc, dm, ...) \
