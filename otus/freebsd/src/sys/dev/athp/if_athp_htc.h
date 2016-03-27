@@ -88,7 +88,7 @@ struct ath10k_htc {
 };
 
 #define	ATHP_HTC_TX_LOCK_INIT(ht)	mtx_init(&ht->tx_lock,		\
-	    device_get_nameunit(htc->sc->sc_dev, "athp htc tx", MTX_DEF)
+	    device_get_nameunit(htc->sc->sc_dev), "athp htc tx", MTX_DEF)
 #define	ATHP_HTC_TX_LOCK_FREE(ht)	mtx_destroy(&ht->tx_lock)
 #define	ATHP_HTC_TX_LOCK(ht)		mtx_lock(&ht->tx_lock)
 #define	ATHP_HTC_TX_UNLOCK(ht)		mtx_unlock(&ht->tx_lock)
