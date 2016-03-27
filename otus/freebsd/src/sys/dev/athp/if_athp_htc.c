@@ -177,9 +177,9 @@ static void ath10k_htc_prepare_tx_skb(struct ath10k_htc_ep *ep,
 	hdr->flags = 0;
 	hdr->flags |= ATH10K_HTC_FLAG_NEED_CREDIT_UPDATE;
 
-	ATHP_TX_LOCK(ep->htc);
+	ATHP_HTC_TX_LOCK(ep->htc);
 	hdr->seq_no = ep->seq_no++;
-	ATHP_TX_UNLOCK(ep->htc);
+	ATHP_HTC_TX_UNLOCK(ep->htc);
 }
 
 int ath10k_htc_send(struct ath10k_htc *htc,
@@ -206,9 +206,9 @@ int ath10k_htc_send(struct ath10k_htc *htc,
 
 	if (ep->tx_credit_flow_enabled) {
 		credits = DIV_ROUND_UP(skb->len, htc->target_credit_size);
-		ATHP_TX_LOCK(htc);
+		ATHP_HTC_TX_LOCK(htc);
 		if (ep->tx_credits < credits) {
-			ATHP_TX_UNLOCK(htc);
+			ATHP_HTC_TX_UNLOCK(htc);
 			ret = -EAGAIN;
 			goto err_pull;
 		}
@@ -216,7 +216,7 @@ int ath10k_htc_send(struct ath10k_htc *htc,
 		ATHP_DPRINTF(sc, ATHP_DEBUG_HTC,
 			   "htc ep %d consumed %d credits (total %d)\n",
 			   eid, credits, ep->tx_credits);
-		ATHP_TX_UNLOCK(htc);
+		ATHP_HTC_TX_UNLOCK(htc);
 	}
 
 	ath10k_htc_prepare_tx_skb(ep, skb);
@@ -245,12 +245,12 @@ err_unmap:
 	dma_unmap_single(dev, skb_cb->paddr, skb->len, DMA_TO_DEVICE);
 err_credits:
 	if (ep->tx_credit_flow_enabled) {
-		ATHP_TX_LOCK(htc);
+		ATHP_HTC_TX_LOCK(htc);
 		ep->tx_credits += credits;
 		ATHP_DPRINTF(sc, ATHP_DEBUG_HTC,
 			   "htc ep %d reverted %d credits back (total %d)\n",
 			   eid, credits, ep->tx_credits);
-		ATHP_TX_UNLOCK(htc);
+		ATHP_HTC_TX_UNLOCK(htc);
 
 		if (ep->ep_ops.ep_tx_credits)
 			ep->ep_ops.ep_tx_credits(htc->sc);
@@ -298,7 +298,7 @@ ath10k_htc_process_credit_report(struct ath10k_htc *htc,
 
 	n_reports = len / sizeof(*report);
 
-	ATHP_TX_LOCK(htc);
+	ATHP_HTC_TX_LOCK(htc);
 	for (i = 0; i < n_reports; i++, report++) {
 		if (report->eid >= ATH10K_HTC_EP_COUNT)
 			break;
@@ -311,12 +311,12 @@ ath10k_htc_process_credit_report(struct ath10k_htc *htc,
 
 		if (ep->ep_ops.ep_tx_credits) {
 			/* XXX ugh, it's doing unlock/relock, sigh */
-			ATHP_TX_UNLOCK(htc);
+			ATHP_HTC_TX_UNLOCK(htc);
 			ep->ep_ops.ep_tx_credits(htc->sc);
-			ATHP_TX_LOCK(htc);
+			ATHP_HTC_TX_LOCK(htc);
 		}
 	}
-	ATHP_TX_UNLOCK(htc);
+	ATHP_HTC_TX_UNLOCK(htc);
 }
 
 static int ath10k_htc_process_trailer(struct ath10k_htc *htc,
