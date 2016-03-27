@@ -199,6 +199,9 @@ struct athp_softc {
 		bool done_sent;
 	} bmi;
 
+	/* HTC */
+	struct ath10k_htc htc;
+
 	/* HTT */
 
 	/* WMI */

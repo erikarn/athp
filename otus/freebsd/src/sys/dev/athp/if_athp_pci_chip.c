@@ -73,12 +73,14 @@ __FBSDID("$FreeBSD$");
 #include "hal/targaddrs.h"
 #include "hal/core.h"
 #include "hal/hw.h"
+#include "hal/htc.h"
 #include "hal/pci.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_core.h"
 #include "if_athp_desc.h"
+#include "if_athp_htc.h"
 #include "if_athp_var.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
@@ -933,7 +935,7 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 	ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot waiting target to initialise\n");
 
 	//for (i = 0; i < ATH10K_PCI_TARGET_WAIT / 10; i++) {
-	for (i = 0; i < 500; i++) {
+	for (i = 0; i < 300; i++) {
 		val = athp_pci_read32(sc, FW_INDICATOR_ADDRESS(sc->sc_regofs));
 
 		ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot target indicator %x\n",
@@ -961,7 +963,7 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 		 * Fix this to be more responsive once this is debugged.
 		 */
 //		DELAY(10 * 1000);
-		DELAY(10 * 1000);
+		DELAY(1 * 1000);
 	}
 
 	ath10k_pci_disable_and_clear_legacy_irq(psc);

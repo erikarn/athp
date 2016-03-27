@@ -63,11 +63,13 @@ __FBSDID("$FreeBSD$");
 
 #include "hal/linux_compat.h"
 #include "hal/targaddrs.h"
+#include "hal/htc.h"
 #include "hal/hw.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_core.h"
+#include "if_athp_htc.h"
 #include "if_athp_desc.h"
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
@@ -319,4 +321,15 @@ athp_buf_cb_clear(struct athp_buf *bf)
 
 	bzero(&bf->tx, sizeof(bf->tx));
 	bzero(&bf->rx, sizeof(bf->rx));
+}
+
+void
+athp_buf_set_len(struct athp_buf *bf, int len)
+{
+	if (bf->m == NULL) {
+		printf("%s: called on NULL mbuf!\n", __func__);
+		return;
+	}
+	bf->m->m_len = len;
+	bf->m->m_pkthdr.len = len;
 }
