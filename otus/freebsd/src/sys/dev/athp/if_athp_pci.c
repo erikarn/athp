@@ -112,6 +112,7 @@ static devclass_t athp_devclass;
 DRIVER_MODULE(athp, pci, athp_driver, athp_devclass, NULL, 0);
 MODULE_DEPEND(athp, wlan, 1, 1, 1);
 MODULE_DEPEND(athp, firmware, 1, 1, 1);
+MODULE_DEPEND(athp, linuxkpi, 1, 1, 1);
 MODULE_VERSION(athp, 1);
 
 /*
