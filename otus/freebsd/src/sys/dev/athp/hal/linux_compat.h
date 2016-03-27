@@ -92,4 +92,6 @@ IS_ALIGNED(unsigned long ptr, int a)
 	return (ptr % a == 0);
 }
 
+#define	DIV_ROUND_UP(x, n)	howmany(x, n)
+
 #endif	/* __LINUX_COMPAT_H__ */
