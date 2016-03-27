@@ -242,21 +242,26 @@ int
 athp_dma_mbuf_load(struct athp_softc *sc, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm, struct mbuf *m)
 {
+	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
 	int ret;
-	bus_addr_t paddr;
+	int nsegs;
 
 	bzero(dm, sizeof(*dm));
-	/*
-	 * XXX Note: we're reusing athp_load_cb here; the above is
-	 * for descriptors and this is for data contents.
-	 * If we ever want to support loading >1 address or doing it
-	 * differently then we should use a different callback.
-	 */
-	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *),
-	    dh->buf_size, athp_load_cb, &paddr, BUS_DMA_NOWAIT);
+	nsegs = 0;
+	ret = bus_dmamap_load_mbuf_sg(dh->tag, dm->map, m, segs,
+	    &nsegs, BUS_DMA_NOWAIT);
 	if (ret != 0)
 		return (ret);
-	dm->paddr = paddr;
+	if (nsegs > 1) {
+		device_printf(sc->sc_dev, "%s: nsegs > 1 (%d)\n",
+		    __func__, nsegs);
+		bus_dmamap_unload(dh->tag, dm->map);
+		return (ENOMEM);
+	}
+
+	/* XXX Yes, we only support a single address for now */
+	dm->paddr = segs[0].ds_addr;
+
 	return (0);
 }
 
