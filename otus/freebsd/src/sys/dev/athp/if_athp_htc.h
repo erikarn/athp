@@ -24,13 +24,14 @@ struct athp_softc;
 /* HTC protocol */
 /****************/
 
+struct athp_buf;
 
 struct ath10k_htc_ops {
 	void (*target_send_suspend_complete)(struct athp_softc *sc);
 };
 
 struct ath10k_htc_ep_ops {
-	void (*ep_tx_complete)(struct athp_softc *, struct mbuf *);
+	void (*ep_tx_complete)(struct athp_softc *, struct athp_buf *);
 	void (*ep_rx_complete)(struct athp_softc *, struct mbuf *);
 	void (*ep_tx_credits)(struct athp_softc *);
 };
@@ -101,7 +102,7 @@ extern	int ath10k_htc_connect_service(struct ath10k_htc *htc,
 	    struct ath10k_htc_svc_conn_req  *conn_req,
 	    struct ath10k_htc_svc_conn_resp *conn_resp);
 int ath10k_htc_send(struct ath10k_htc *htc, enum ath10k_htc_ep_id eid,
-	    struct mbuf *packet);
-struct mbuf * ath10k_htc_alloc_skb(struct athp_softc *sc, int size);
+	    struct athp_buf *packet);
+struct athp_buf * ath10k_htc_alloc_skb(struct athp_softc *sc, int size);
 
 #endif
