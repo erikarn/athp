@@ -81,4 +81,6 @@ ilog2(uint32_t val)
 #define	le32_to_cpu(v)		le32toh(v)
 #define	le32_to_cpup(v)		le32toh(*(v))
 
+#define	ECOMM		ESTALE
+
 #endif	/* __LINUX_COMPAT_H__ */
