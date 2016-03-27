@@ -78,8 +78,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_core.h"
-#include "if_athp_var.h"
 #include "if_athp_desc.h"
+#include "if_athp_var.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
 #include "if_athp_hif.h"
@@ -133,16 +133,19 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	if (pbuf == NULL)
 		return (-ENOMEM);
 
-	if (pbuf->paddr & 3) {
+	if (pbuf->mb.paddr & 3) {
 		ATHP_WARN(sc, "%s: unaligned mbuf\n", __func__);
 	}
+
+	/* Pre-recv sync */
+	athp_dma_mbuf_pre_recv(sc, &sc->buf_rx.dh, &pbuf->mb);
 
 	/*
 	 * Once the mapping is done and we've verified there's only
 	 * a single physical segment, we can hand it to the copy engine
 	 * to queue for receive.
 	 */
-	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->paddr);
+	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->mb.paddr);
 	if (ret) {
 		ATHP_WARN(sc, "failed to post pci rx buf: %d\n", ret);
 		athp_freebuf(sc, &sc->buf_rx, pbuf);
@@ -220,9 +223,9 @@ ath10k_pci_rx_replenish_retry(unsigned long ptr)
 
 /* Called by lower (CE) layer when a send to Target completes. */
 /*
- * XXX TODO: in order to support the TXCB state, we should just
- * stuff that into the pbuf struct and pass that in.  Which means,
- * yes, we can't just use mbuf as the state tag!
+ * Note: the RX pipe code here does indeed do the pre/post busdma sync,
+ * but the TX side doesn't do it here.  Instead, the TX code above
+ * in the HIF layer (yes, the HIF layer, sigh) does the busdma operations.
  */
 static void
 ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
@@ -275,8 +278,18 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		    &ce_data, &nbytes, &transfer_id, &flags) == 0) {
 		pbuf = ctx;
 		max_nbytes = pbuf->m_size; /* XXX TODO: should be a method */
-		m = pbuf->m;		/* XXX TODO: should be a method */
-		athp_unmap_buf(sc, &sc->buf_rx, pbuf);
+
+		/* Post-RX sync */
+		athp_dma_mbuf_post_recv(sc, &sc->buf_rx.dh, &pbuf->mb);
+
+		/* Grab mbuf */
+		m = pbuf->mb.m;		/* XXX TODO: should be a method */
+
+		/* Assign actual packet buffer length to pbuf AND mbuf */
+		athp_buf_set_len(pbuf, nbytes);
+
+		/* Finish mapping and zero mbuf; don't need it anymore */
+		athp_dma_mbuf_unload(sc, &sc->buf_rx.dh, &pbuf->mb);
 
 		if (unlikely(max_nbytes < nbytes)) {
 			ATHP_WARN(sc, "rxed more than expected (nbytes %d, max %d)",
@@ -285,11 +298,7 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 			continue;
 		}
 
-		/* Assign actual packet buffer length to pbuf AND mbuf */
-		athp_buf_set_len(pbuf, nbytes);
-
 		/* Done; free pbuf */
-		pbuf->m = NULL;	/* XXX TODO: should be a method */
 		athp_freebuf(sc, &sc->buf_rx, pbuf);
 
 		mbufq_enqueue(&mq, m);	/* XXX TODO: check return value */

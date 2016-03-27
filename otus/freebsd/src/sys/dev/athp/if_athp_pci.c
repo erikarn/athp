@@ -319,41 +319,23 @@ static int
 athp_pci_setup_bufs(struct athp_pci_softc *psc)
 {
 	struct athp_softc *sc = &psc->sc_sc;
+	int ret;
 
 	/* Create dma tag for RX buffers. 8 byte alignment, etc */
-	if (bus_dma_tag_create(sc->sc_dmat,    /* parent */
-	    8, 0,		    /* alignment, bounds */
-	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
-	    BUS_SPACE_MAXADDR,       /* highaddr */
-	    NULL, NULL,	      /* filter, filterarg */
-	    0x4000,		 /* maxsize XXX */
-	    ATHP_MAX_SCATTER,	 /* nsegments */
-	    0x4000,		 /* maxsegsize XXX */
-	    BUS_DMA_ALLOCNOW,	/* flags */
-	    NULL,		    /* lockfunc */
-	    NULL,		    /* lockarg */
-	    &sc->buf_rx.br_dmatag)) {
+	ret = athp_dma_head_alloc(sc, &sc->buf_rx.dh, 0x4000);
+	if (ret != 0) {
 		device_printf(sc->sc_dev, "%s: cannot allocate RX DMA tag\n",
 		    __func__);
-			return (-1);
+		return (ret);
 	}
 
 	/* Create dma tag for TX buffers. 8 byte alignment, etc */
-	if (bus_dma_tag_create(sc->sc_dmat,    /* parent */
-	    8, 0,		    /* alignment, bounds */
-	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
-	    BUS_SPACE_MAXADDR,       /* highaddr */
-	    NULL, NULL,	      /* filter, filterarg */
-	    0x4000,		 /* maxsize XXX */
-	    ATHP_MAX_SCATTER,	 /* nsegments */
-	    0x4000,		 /* maxsegsize XXX */
-	    BUS_DMA_ALLOCNOW,	/* flags */
-	    NULL,		    /* lockfunc */
-	    NULL,		    /* lockarg */
-	    &sc->buf_tx.br_dmatag)) {
+	ret = athp_dma_head_alloc(sc, &sc->buf_tx.dh, 0x4000);
+	if (ret != 0) {
 		device_printf(sc->sc_dev, "%s: cannot allocate TX DMA tag\n",
 		    __func__);
-			return (-1);
+		athp_dma_head_free(sc, &sc->buf_rx.dh);
+		return (ret);
 	}
 
 	athp_alloc_list(sc, &sc->buf_rx, ATHP_RX_LIST_COUNT);
@@ -370,8 +352,8 @@ athp_pci_free_bufs(struct athp_pci_softc *psc)
 	athp_free_list(sc, &sc->buf_rx);
 	athp_free_list(sc, &sc->buf_tx);
 
-	bus_dma_tag_destroy(sc->buf_rx.br_dmatag);
-	bus_dma_tag_destroy(sc->buf_tx.br_dmatag);
+	athp_dma_head_free(sc, &sc->buf_rx.dh);
+	athp_dma_head_free(sc, &sc->buf_tx.dh);
 }
 
 static int
@@ -518,8 +500,10 @@ athp_pci_attach(device_t dev)
 	 * USB endpoints.
 	 */
 
-	if (athp_pci_setup_bufs(psc) < 0)
+	if (athp_pci_setup_bufs(psc) != 0) {
+		err = ENXIO;
 		goto bad4;
+	}
 
 	/* HIF ops attach */
 	sc->hif.ops = &ath10k_pci_hif_ops;

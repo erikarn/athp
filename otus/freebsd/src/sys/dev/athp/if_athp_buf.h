@@ -21,12 +21,12 @@ extern	void athp_free_list(struct athp_softc *sc, struct athp_buf_ring *br);
 static inline void
 athp_buf_set_len(struct athp_buf *bf, int len)
 {
-	if (bf->m == NULL) {
+	if (bf->mb.m == NULL) {
 		printf("%s: called on NULL mbuf!\n", __func__);
 		return;
 	}
-	bf->m->m_len = len;
-	bf->m->m_pkthdr.len = len;
+	bf->mb.m->m_len = len;
+	bf->mb.m->m_pkthdr.len = len;
 }
 
 #endif	/* __IF_ATHP_BUF_H__ */

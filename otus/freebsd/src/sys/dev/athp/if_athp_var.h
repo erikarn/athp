@@ -33,13 +33,11 @@ struct ath10k_skb_cb {
 };
 
 struct athp_buf {
-	bus_dmamap_t map;
-	bus_addr_t paddr;
+	struct athp_dma_mbuf mb;
+	int m_size;	/* size of initial allocation */
+
 	STAILQ_ENTRY(athp_buf) next;
 	uint32_t flags;
-
-	struct mbuf *m;
-	int m_size;	/* size of initial allocation */
 
 	// TX state
 	struct ath10k_skb_cb tx;
@@ -53,7 +51,7 @@ struct athp_buf {
 #define	ATH10K_SKB_CB(pbuf)	(&pbuf->tx)
 
 struct athp_buf_ring {
-	bus_dma_tag_t br_dmatag;
+	struct athp_dma_head dh;
 	int br_count;
 	struct athp_buf *br_list;
 	STAILQ_HEAD(, athp_buf) br_inactive;

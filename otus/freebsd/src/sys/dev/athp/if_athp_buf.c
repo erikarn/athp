@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
 #include "if_athp_core.h"
+#include "if_athp_desc.h"
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
@@ -108,12 +109,10 @@ athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
 {
 
 	/* no mbuf? skip */
-	if (bf->m == NULL)
+	if (bf->mb.m == NULL)
 		return;
 
-	bus_dmamap_sync(br->br_dmatag, bf->map, BUS_DMASYNC_POSTREAD);
-	bus_dmamap_unload(br->br_dmatag, bf->map);
-	bf->paddr = 0;
+	athp_dma_mbuf_unload(sc, &br->dh, &bf->mb);
 }
 
 /*
@@ -127,9 +126,9 @@ _athp_free_buf(struct athp_softc *sc, struct athp_buf_ring *br,
 {
 
 	/* If there's an mbuf, then unmap, and free */
-	if (bf->m != NULL) {
+	if (bf->mb.m != NULL) {
 		athp_unmap_buf(sc, br, bf);
-		m_freem(bf->m);
+		m_freem(bf->mb.m);
 	}
 }
 
@@ -173,12 +172,7 @@ athp_alloc_list(struct athp_softc *sc, struct athp_buf_ring *br, int count)
 	}
 
 	/* Setup initial state for each entry */
-	for (i = 0; i < count; i++) {
-		struct athp_buf *dp = &br->br_list[i];
-		dp->flags = 0;
-		dp->paddr = 0;
-		dp->m = NULL;
-	}
+	/* XXX it's all zero, so we're okay for now */
 
 	/* Lists */
 	STAILQ_INIT(&br->br_inactive);
@@ -216,7 +210,7 @@ athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
 	ATHP_LOCK_ASSERT(sc);
 
 	/* if there's an mbuf - unmap (if needed) and free it */
-	if (bf->m != NULL)
+	if (bf->mb.m != NULL)
 		_athp_free_buf(sc, br, bf);
 
 	/* Push it into the inactive queue */
@@ -227,34 +221,15 @@ int
 athp_loadbuf(struct athp_softc *sc, struct athp_buf_ring *br,
     struct athp_buf *bf, struct mbuf *m)
 {
-	/*
-	 * XXX TODO: this should be part of the buffer and it should
-	 * support sg DMA
-	 *
-	 * XXX TODO: RXBUF_MAX_SCATTER, not right for TX
-	 */
-	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
 	int err;
-	int nsegs;
 
 	ATHP_LOCK_ASSERT(sc);
 
-	/* mbuf busdma load */
-	nsegs = 0;
-	err = bus_dmamap_load_mbuf_sg(br->br_dmatag,
-	    bf->map, m, segs, &nsegs, BUS_DMA_NOWAIT);
-	if (err != 0 || nsegs != 1) {
-		device_printf(sc->sc_dev,
-		    "%s: mbuf dmamap load failed (err=%d, nsegs=%d)\n",
-		    __func__,
-		    err,
-		    nsegs);
-		return (err);
-	}
+	/* XXX TODO: check if mbuf already exists and free it? */
 
-	/* XXX TODO: only support a single descriptor per buffer for now */
-	bf->paddr = segs[0].ds_addr;
-	bf->m = m;
+	err = athp_dma_mbuf_load(sc, &br->dh, &bf->mb, m);
+	if (err != 0)
+		return (err);
 
 	/* XXX TODO: set flag */
 	return (0);
