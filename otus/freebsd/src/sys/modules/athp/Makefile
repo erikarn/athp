@@ -4,6 +4,9 @@
 
 KMOD    = if_athp
 
+# Ok, I'll start using more linux-y things soon.
+CFLAGS+=	-I${SYSDIR}/compat/linuxkpi/common/include/
+
 # Top-level FreeBSD glue (device, netif, busdma, etc)
 SRCS    = if_athp_pci.c if_athp_main.c			\
 	  if_athp_debug.c				\
@@ -53,6 +56,6 @@ SRCS    += if_athp_core.c
 # This is the host-target control protocol (HTC).
 # It forms the basis of host/target communications - control and
 # data commands are layered on top of this.
-# SRCS    += if_athp_htc.c
+SRCS    += if_athp_htc.c
 
 .include <bsd.kmod.mk>
