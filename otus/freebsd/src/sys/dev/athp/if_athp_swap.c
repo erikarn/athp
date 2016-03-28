@@ -100,7 +100,7 @@ MALLOC_DECLARE(M_ATHPDEV);
  */
 
 static int
-ath10k_swap_code_seg_fill(struct athp_softc *sc,
+ath10k_swap_code_seg_fill(struct ath10k *ar,
     struct ath10k_swap_code_seg_info *seg_info,
     const void *data, size_t data_len)
 {
@@ -124,7 +124,7 @@ ath10k_swap_code_seg_fill(struct athp_softc *sc,
 		if ((payload_len > size_left) ||
 		    (payload_len == 0 &&
 		     size_left != sizeof(struct ath10k_swap_code_seg_tail))) {
-			ATHP_ERR(sc, "refusing to parse invalid tlv length %d\n",
+			ath10k_err(ar, "refusing to parse invalid tlv length %d\n",
 				   payload_len);
 			return -EINVAL;
 		}
@@ -132,7 +132,7 @@ ath10k_swap_code_seg_fill(struct athp_softc *sc,
 		if (payload_len == 0) {
 			if (memcmp(swap_item->tail.magic_signature, swap_magic,
 				   ATH10K_SWAP_CODE_SEG_MAGIC_BYTES_SZ)) {
-				ATHP_ERR(sc, "refusing an invalid swap file\n");
+				ath10k_err(ar, "refusing an invalid swap file\n");
 				return -EINVAL;
 			}
 			seg_info->target_addr =
@@ -149,7 +149,7 @@ ath10k_swap_code_seg_fill(struct athp_softc *sc,
 	}
 
 	if (seg_info->target_addr == -1) {
-		ATHP_ERR(sc, "failed to parse invalid swap file\n");
+		ath10k_err(ar, "failed to parse invalid swap file\n");
 		return -EINVAL;
 	}
 	seg_info->seg_hw_info.swap_size = __cpu_to_le32(total_payload_len);
@@ -158,19 +158,19 @@ ath10k_swap_code_seg_fill(struct athp_softc *sc,
 }
 
 static void
-ath10k_swap_code_seg_free(struct athp_softc *sc,
+ath10k_swap_code_seg_free(struct ath10k *ar,
     struct ath10k_swap_code_seg_info *seg_info)
 {
 
 	if (!seg_info)
 		return;
 
-	athp_descdma_free(sc, &seg_info->seg_dd);
+	athp_descdma_free(ar, &seg_info->seg_dd);
 	free(seg_info, M_ATHPDEV);
 }
 
 static struct ath10k_swap_code_seg_info *
-ath10k_swap_code_seg_alloc(struct athp_softc *sc, size_t swap_bin_len)
+ath10k_swap_code_seg_alloc(struct ath10k *ar, size_t swap_bin_len)
 {
 	struct ath10k_swap_code_seg_info *seg_info;
 	void *virt_addr;
@@ -178,7 +178,7 @@ ath10k_swap_code_seg_alloc(struct athp_softc *sc, size_t swap_bin_len)
 
 	swap_bin_len = roundup(swap_bin_len, 2);
 	if (swap_bin_len > ATH10K_SWAP_CODE_SEG_BIN_LEN_MAX) {
-		ATHP_ERR(sc, "refusing code swap bin because it is too big %zu > %d\n",
+		ath10k_err(ar, "refusing code swap bin because it is too big %zu > %d\n",
 			   swap_bin_len, ATH10K_SWAP_CODE_SEG_BIN_LEN_MAX);
 		return NULL;
 	}
@@ -187,9 +187,9 @@ ath10k_swap_code_seg_alloc(struct athp_softc *sc, size_t swap_bin_len)
 	if (!seg_info)
 		return NULL;
 
-	if (athp_descdma_alloc(sc, &seg_info->seg_dd, "ath10k code seg", 8,
+	if (athp_descdma_alloc(ar, &seg_info->seg_dd, "ath10k code seg", 8,
 	    swap_bin_len) != 0) {
-		ATHP_ERR(sc, "failed to allocate dma coherent memory\n");
+		ath10k_err(ar, "failed to allocate dma coherent memory\n");
 		free(seg_info, M_ATHPDEV);
 		return NULL;
 	}
@@ -208,7 +208,7 @@ ath10k_swap_code_seg_alloc(struct athp_softc *sc, size_t swap_bin_len)
 	return seg_info;
 }
 
-int ath10k_swap_code_seg_configure(struct athp_softc *sc,
+int ath10k_swap_code_seg_configure(struct ath10k *ar,
 				   enum ath10k_swap_code_seg_bin_type type)
 {
 	int ret;
@@ -216,25 +216,25 @@ int ath10k_swap_code_seg_configure(struct athp_softc *sc,
 
 	switch (type) {
 	case ATH10K_SWAP_CODE_SEG_BIN_TYPE_FW:
-		if (!sc->swap.firmware_swap_code_seg_info)
+		if (!ar->swap.firmware_swap_code_seg_info)
 			return 0;
 
-		ATHP_DPRINTF(sc, ATHP_DEBUG_BOOT, "boot found firmware code swap binary\n");
-		seg_info = sc->swap.firmware_swap_code_seg_info;
+		ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot found firmware code swap binary\n");
+		seg_info = ar->swap.firmware_swap_code_seg_info;
 		break;
 	default:
 	case ATH10K_SWAP_CODE_SEG_BIN_TYPE_OTP:
 	case ATH10K_SWAP_CODE_SEG_BIN_TYPE_UTF:
-		ATHP_WARN(sc, "ignoring unknown code swap binary type %d\n",
+		ath10k_warn(ar, "ignoring unknown code swap binary type %d\n",
 			    type);
 		return 0;
 	}
 
-	ret = ath10k_bmi_write_memory(sc, seg_info->target_addr,
+	ret = ath10k_bmi_write_memory(ar, seg_info->target_addr,
 				      (const char *) &seg_info->seg_hw_info,
 				      sizeof(seg_info->seg_hw_info));
 	if (ret) {
-		ATHP_ERR(sc, "failed to write Code swap segment information (%d)\n",
+		ath10k_err(ar, "failed to write Code swap segment information (%d)\n",
 			   ret);
 		return ret;
 	}
@@ -242,41 +242,41 @@ int ath10k_swap_code_seg_configure(struct athp_softc *sc,
 	return 0;
 }
 
-void ath10k_swap_code_seg_release(struct athp_softc *sc)
+void ath10k_swap_code_seg_release(struct ath10k *ar)
 {
-	ath10k_swap_code_seg_free(sc, sc->swap.firmware_swap_code_seg_info);
-	sc->swap.firmware_codeswap_data = NULL;
-	sc->swap.firmware_codeswap_len = 0;
-	sc->swap.firmware_swap_code_seg_info = NULL;
+	ath10k_swap_code_seg_free(ar, ar->swap.firmware_swap_code_seg_info);
+	ar->swap.firmware_codeswap_data = NULL;
+	ar->swap.firmware_codeswap_len = 0;
+	ar->swap.firmware_swap_code_seg_info = NULL;
 }
 
-int ath10k_swap_code_seg_init(struct athp_softc *sc)
+int ath10k_swap_code_seg_init(struct ath10k *ar)
 {
 	int ret;
 	struct ath10k_swap_code_seg_info *seg_info;
 
-	if (!sc->swap.firmware_codeswap_len || !sc->swap.firmware_codeswap_data)
+	if (!ar->swap.firmware_codeswap_len || !ar->swap.firmware_codeswap_data)
 		return 0;
 
-	seg_info = ath10k_swap_code_seg_alloc(sc,
-					      sc->swap.firmware_codeswap_len);
+	seg_info = ath10k_swap_code_seg_alloc(ar,
+					      ar->swap.firmware_codeswap_len);
 	if (!seg_info) {
-		ATHP_ERR(sc, "failed to allocate fw code swap segment\n");
+		ath10k_err(ar, "failed to allocate fw code swap segment\n");
 		return -ENOMEM;
 	}
 
-	ret = ath10k_swap_code_seg_fill(sc, seg_info,
-					sc->swap.firmware_codeswap_data,
-					sc->swap.firmware_codeswap_len);
+	ret = ath10k_swap_code_seg_fill(ar, seg_info,
+					ar->swap.firmware_codeswap_data,
+					ar->swap.firmware_codeswap_len);
 
 	if (ret) {
-		ATHP_WARN(sc, "failed to initialize fw code swap segment: %d\n",
+		ath10k_warn(ar, "failed to initialize fw code swap segment: %d\n",
 			    ret);
-		ath10k_swap_code_seg_free(sc, seg_info);
+		ath10k_swap_code_seg_free(ar, seg_info);
 		return ret;
 	}
 
-	sc->swap.firmware_swap_code_seg_info = seg_info;
+	ar->swap.firmware_swap_code_seg_info = seg_info;
 
 	return 0;
 }
