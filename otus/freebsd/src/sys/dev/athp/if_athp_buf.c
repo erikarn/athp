@@ -65,9 +65,12 @@ __FBSDID("$FreeBSD$");
 #include "hal/targaddrs.h"
 #include "hal/htc.h"
 #include "hal/hw.h"
+#include "hal/wmi.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
+#include "if_athp_stats.h"
+#include "if_athp_wmi.h"
 #include "if_athp_core.h"
 #include "if_athp_htc.h"
 #include "if_athp_desc.h"

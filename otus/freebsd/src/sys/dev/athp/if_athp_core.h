@@ -18,6 +18,8 @@
 #ifndef	__IF_ATHP_CORE_H__
 #define	__IF_ATHP_CORE_H__
 
+#include <linux/completion.h>
+
 #define ATH10K_SCAN_ID 0
 #define WMI_READY_TIMEOUT (5 * HZ)
 #define ATH10K_FLUSH_TIMEOUT_HZ (5*HZ)
@@ -57,6 +59,136 @@ ath10k_bus_str(enum ath10k_bus bus)
 
 	return "unknown";
 }
+
+#define ATH10K_MAX_NUM_PEER_IDS (1 << 11) /* htt rx_desc limit */
+
+struct ath10k_peer {
+	STAILQ_ENTRY(ath10k_peer) list;
+	int vdev_id;
+	u8 addr[ETH_ALEN];
+	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);
+
+	/* protected by ar->data_lock */
+	struct ieee80211_key_conf *keys[WMI_MAX_KEY_INDEX + 1];
+};
+
+struct ath10k_sta {
+	struct ath10k_vif *arvif;
+
+	/* the following are protected by ar->data_lock */
+	u32 changed; /* IEEE80211_RC_* */
+	u32 bw;
+	u32 nss;
+	u32 smps;
+
+	struct task update_wk;
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* protected by conf_mutex */
+	bool aggr_mode;
+#endif
+};
+
+#define ATH10K_VDEV_SETUP_TIMEOUT_HZ (5*HZ)
+
+enum ath10k_beacon_state {
+	ATH10K_BEACON_SCHEDULED = 0,
+	ATH10K_BEACON_SENDING,
+	ATH10K_BEACON_SENT,
+};
+
+struct ath10k_vif {
+	STAILQ_ENTRY(ath10k_vif) list;
+
+	u32 vdev_id;
+	enum wmi_vdev_type vdev_type;
+	enum wmi_vdev_subtype vdev_subtype;
+	u32 beacon_interval;
+	u32 dtim_period;
+//	struct sk_buff *beacon;
+	/* protected by data_lock */
+	enum ath10k_beacon_state beacon_state;
+//	void *beacon_buf;
+//	dma_addr_t beacon_paddr;
+	unsigned long tx_paused; /* arbitrary values defined by target */
+
+	struct ath10k *ar;
+	struct ieee80211_vif *vif;
+
+	bool is_started;
+	bool is_up;
+	bool spectral_enabled;
+	bool ps;
+	u32 aid;
+	u8 bssid[ETH_ALEN];
+
+	struct ieee80211_key_conf *wep_keys[WMI_MAX_KEY_INDEX + 1];
+	s8 def_wep_key_idx;
+
+	u16 tx_seq_no;
+
+	union {
+		struct {
+			u32 uapsd;
+		} sta;
+		struct {
+			/* 512 stations */
+			u8 tim_bitmap[64];
+			u8 tim_len;
+			u32 ssid_len;
+			u8 ssid[IEEE80211_NWID_LEN];
+			bool hidden_ssid;
+			/* P2P_IE with NoA attribute for P2P_GO case */
+			u32 noa_len;
+			u8 *noa_data;
+		} ap;
+	} u;
+
+	bool use_cts_prot;
+	bool nohwcrypt;
+	int num_legacy_stations;
+	int txpower;
+	struct wmi_wmm_params_all_arg wmm_params;
+	struct task ap_csa_work;
+	struct task connection_loss_work;
+//	struct cfg80211_bitrate_mask bitrate_mask;
+};
+
+struct ath10k_vif_iter {
+	u32 vdev_id;
+	struct ath10k_vif *arvif;
+};
+
+/* used for crash-dump storage, protected by data-lock */
+struct ath10k_fw_crash_data {
+	bool crashed_since_read;
+
+//	uuid_le uuid;
+	struct timespec timestamp;
+	__le32 registers[REG_DUMP_COUNT_QCA988X];
+};
+
+struct ath10k_debug {
+	struct dentry *debugfs_phy;
+
+	struct ath10k_fw_stats fw_stats;
+	struct completion fw_stats_complete;
+	bool fw_stats_done;
+
+	unsigned long htt_stats_mask;
+	struct task htt_stats_dwork;
+	struct ath10k_dfs_stats dfs_stats;
+//	struct ath_dfs_pool_stats dfs_pool_stats;
+
+	/* protected by conf_mutex */
+	u32 fw_dbglog_mask;
+	u32 fw_dbglog_level;
+	u32 pktlog_filter;
+	u32 reg_addr;
+	u32 nf_cal_period;
+
+	struct ath10k_fw_crash_data *fw_crash_data;
+};
 
 enum ath10k_state {
 	ATH10K_STATE_OFF = 0,

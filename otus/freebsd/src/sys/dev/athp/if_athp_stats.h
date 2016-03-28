@@ -19,7 +19,7 @@
 #define _CORE_STATS_H_
 
 struct ath10k_fw_stats_peer {
-	struct list_head list;
+	STAILQ_ENTRY(ath10k_fw_stats_peer) list;
 
 	u8 peer_macaddr[ETH_ALEN];
 	u32 peer_rssi;
@@ -28,7 +28,7 @@ struct ath10k_fw_stats_peer {
 };
 
 struct ath10k_fw_stats_vdev {
-	struct list_head list;
+	STAILQ_ENTRY(ath10k_fw_stats_vdev) list;
 
 	u32 vdev_id;
 	u32 beacon_snr;
@@ -47,7 +47,7 @@ struct ath10k_fw_stats_vdev {
 };
 
 struct ath10k_fw_stats_pdev {
-	struct list_head list;
+	STAILQ_ENTRY(ath10k_fw_stats_pdev) list;
 
 	/* PDEV stats */
 	s32 ch_noise_floor;
@@ -106,9 +106,9 @@ struct ath10k_fw_stats_pdev {
 };
 
 struct ath10k_fw_stats {
-	struct list_head pdevs;
-	struct list_head vdevs;
-	struct list_head peers;
+	STAILQ_HEAD(, ath10k_fw_stats_pdev) pdevs;
+	STAILQ_HEAD(, ath10k_fw_stats_vdev) vdevs;
+	STAILQ_HEAD(, ath10k_fw_stats_peer) peers;
 };
 
 struct ath10k_dfs_stats {
