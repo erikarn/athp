@@ -1,6 +1,18 @@
 #ifndef	__LINUX_COMPAT_SKB_H__
 #define	__LINUX_COMPAT_SKB_H__
 
+static inline char *
+mbuf_skb_data(struct mbuf *m)
+{
+	return m->m_data;
+}
+
+static inline int
+mbuf_skb_len(struct mbuf *m)
+{
+	return m->m_len;
+}
+
 /*
  * Only allowed for empty mbufs.
  */
