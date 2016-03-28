@@ -6061,6 +6061,7 @@ struct ath10k;
 struct ath10k_vif;
 struct ath10k_fw_stats_pdev;
 struct ath10k_fw_stats_peer;
+struct athp_buf;
 
 int ath10k_wmi_attach(struct ath10k *ar);
 void ath10k_wmi_detach(struct ath10k *ar);
@@ -6071,8 +6072,8 @@ struct sk_buff *ath10k_wmi_alloc_skb(struct ath10k *ar, u32 len);
 int ath10k_wmi_connect(struct ath10k *ar);
 
 struct sk_buff *ath10k_wmi_alloc_skb(struct ath10k *ar, u32 len);
-int ath10k_wmi_cmd_send(struct ath10k *ar, struct sk_buff *skb, u32 cmd_id);
-int ath10k_wmi_cmd_send_nowait(struct ath10k *ar, struct sk_buff *skb,
+int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id);
+int ath10k_wmi_cmd_send_nowait(struct ath10k *ar, struct athp_buf *pbuf,
 			       u32 cmd_id);
 void ath10k_wmi_start_scan_init(struct ath10k *ar, struct wmi_start_scan_arg *);
 
@@ -6096,49 +6097,49 @@ void ath10k_wmi_put_wmi_channel(struct wmi_channel *ch,
 				const struct wmi_channel_arg *arg);
 int ath10k_wmi_start_scan_verify(const struct wmi_start_scan_arg *arg);
 
-int ath10k_wmi_event_scan(struct ath10k *ar, struct sk_buff *skb);
-int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_chan_info(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_echo(struct ath10k *ar, struct sk_buff *skb);
-int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_update_stats(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_vdev_start_resp(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_vdev_stopped(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_host_swba(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_tbttoffset_update(struct ath10k *ar, struct sk_buff *skb);
+int ath10k_wmi_event_scan(struct ath10k *ar, struct athp_buf *pbuf);
+int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_echo(struct ath10k *ar, struct athp_buf *pbuf);
+int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_update_stats(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_vdev_start_resp(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_vdev_stopped(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_tbttoffset_update(struct ath10k *ar, struct athp_buf *pbuf);
 void ath10k_wmi_event_dfs(struct ath10k *ar,
 			  struct wmi_phyerr_ev_arg *phyerr, u64 tsf);
 void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 				    struct wmi_phyerr_ev_arg *phyerr,
 				    u64 tsf);
-void ath10k_wmi_event_phyerr(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_roam(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_profile_match(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_debug_print(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_pdev_qvit(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_wlan_profile_data(struct ath10k *ar, struct sk_buff *skb);
+void ath10k_wmi_event_phyerr(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_roam(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_profile_match(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_debug_print(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_pdev_qvit(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_wlan_profile_data(struct ath10k *ar, struct athp_buf *pbuf);
 void ath10k_wmi_event_rtt_measurement_report(struct ath10k *ar,
-					     struct sk_buff *skb);
+					     struct athp_buf *pbuf);
 void ath10k_wmi_event_tsf_measurement_report(struct ath10k *ar,
-					     struct sk_buff *skb);
-void ath10k_wmi_event_rtt_error_report(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_wow_wakeup_host(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_dcs_interference(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_pdev_tpc_config(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_pdev_ftm_intg(struct ath10k *ar, struct sk_buff *skb);
+					     struct athp_buf *pbuf);
+void ath10k_wmi_event_rtt_error_report(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_wow_wakeup_host(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_dcs_interference(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_pdev_tpc_config(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_pdev_ftm_intg(struct ath10k *ar, struct athp_buf *pbuf);
 void ath10k_wmi_event_gtk_offload_status(struct ath10k *ar,
-					 struct sk_buff *skb);
-void ath10k_wmi_event_gtk_rekey_fail(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_delba_complete(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_addba_complete(struct ath10k *ar, struct sk_buff *skb);
+					 struct athp_buf *pbuf);
+void ath10k_wmi_event_gtk_rekey_fail(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_delba_complete(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_addba_complete(struct ath10k *ar, struct athp_buf *pbuf);
 void ath10k_wmi_event_vdev_install_key_complete(struct ath10k *ar,
-						struct sk_buff *skb);
-void ath10k_wmi_event_inst_rssi_stats(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_vdev_standby_req(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_vdev_resume_req(struct ath10k *ar, struct sk_buff *skb);
-void ath10k_wmi_event_service_ready(struct ath10k *ar, struct sk_buff *skb);
-int ath10k_wmi_event_ready(struct ath10k *ar, struct sk_buff *skb);
+						struct athp_buf *pbuf);
+void ath10k_wmi_event_inst_rssi_stats(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_vdev_standby_req(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_vdev_resume_req(struct ath10k *ar, struct athp_buf *pbuf);
+void ath10k_wmi_event_service_ready(struct ath10k *ar, struct athp_buf *pbuf);
+int ath10k_wmi_event_ready(struct ath10k *ar, struct athp_buf *pbuf);
 int ath10k_wmi_op_pull_phyerr_ev(struct ath10k *ar, const void *phyerr_buf,
 				 int left_len, struct wmi_phyerr_ev_arg *arg);
 #endif /* _WMI_H_ */
