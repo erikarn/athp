@@ -149,7 +149,7 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
 	int i;
 
 	/* prevent further allocations from RX list(s) */
-	STAILQ_INIT(&br->br_inactive);
+	TAILQ_INIT(&br->br_inactive);
 
 	for (i = 0; i < br->br_count; i++) {
 		struct athp_buf *dp = &br->br_list[i];
@@ -180,10 +180,10 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
 	/* XXX it's all zero, so we're okay for now */
 
 	/* Lists */
-	STAILQ_INIT(&br->br_inactive);
+	TAILQ_INIT(&br->br_inactive);
 
 	for (i = 0; i < count; i++)
-		STAILQ_INSERT_HEAD(&br->br_inactive, &br->br_list[i], next);
+		TAILQ_INSERT_HEAD(&br->br_inactive, &br->br_list[i], next);
 
 	return (0);
 }
@@ -199,9 +199,9 @@ _athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br)
 	struct athp_buf *bf;
 
 	/* Allocate a buffer */
-	bf = STAILQ_FIRST(&br->br_inactive);
+	bf = TAILQ_FIRST(&br->br_inactive);
 	if (bf != NULL)
-		STAILQ_REMOVE_HEAD(&br->br_inactive, next);
+		TAILQ_REMOVE(&br->br_inactive, bf, next);
 	else
 		bf = NULL;
 	return (bf);
@@ -219,7 +219,7 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 		_athp_free_buf(ar, br, bf);
 
 	/* Push it into the inactive queue */
-	STAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
+	TAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
 }
 
 /*

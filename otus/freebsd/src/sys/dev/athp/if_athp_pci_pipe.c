@@ -247,23 +247,23 @@ ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 	struct ath10k *ar = ce_state->ar;
 	struct athp_pci_softc *psc = ce_state->psc;
 	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
-	STAILQ_HEAD(, athp_buf) br_list;
+	TAILQ_HEAD(, athp_buf) br_list;
 	struct athp_buf *pbuf;
 	uint32_t ce_data;
 	unsigned int nbytes;
 	unsigned int transfer_id;
 
-	STAILQ_INIT(&br_list);
+	TAILQ_INIT(&br_list);
 	while (ath10k_ce_completed_send_next(ce_state, (void **)&pbuf,
 	    &ce_data, &nbytes, &transfer_id) == 0) {
 		/* no need to call tx completion for NULL pointers */
 		if (pbuf == NULL)
 			continue;
-		STAILQ_INSERT_TAIL(&br_list, pbuf, next);
+		TAILQ_INSERT_TAIL(&br_list, pbuf, next);
 	}
 
-	while ((pbuf = STAILQ_FIRST(&br_list)) != NULL) {
-		STAILQ_REMOVE_HEAD(&br_list, next);
+	while ((pbuf = TAILQ_FIRST(&br_list)) != NULL) {
+		TAILQ_REMOVE(&br_list, pbuf, next);
 		cb->tx_completion(ar, pbuf);
 	}
 }

@@ -63,7 +63,7 @@ ath10k_bus_str(enum ath10k_bus bus)
 #define ATH10K_MAX_NUM_PEER_IDS (1 << 11) /* htt rx_desc limit */
 
 struct ath10k_peer {
-	STAILQ_ENTRY(ath10k_peer) list;
+	TAILQ_ENTRY(ath10k_peer) list;
 	int vdev_id;
 	u8 addr[ETH_ALEN];
 	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);
@@ -73,6 +73,9 @@ struct ath10k_peer {
 };
 
 struct ath10k_sta {
+	/* This must always be the first entry */
+	struct ieee80211_node an_node;
+
 	struct ath10k_vif *arvif;
 
 	/* the following are protected by ar->data_lock */
@@ -98,7 +101,10 @@ enum ath10k_beacon_state {
 };
 
 struct ath10k_vif {
-	STAILQ_ENTRY(ath10k_vif) list;
+	/* This must always be at the top */
+	struct ieee80211vap av_vap;
+
+	TAILQ_ENTRY(ath10k_vif) list;
 
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
@@ -113,7 +119,7 @@ struct ath10k_vif {
 	unsigned long tx_paused; /* arbitrary values defined by target */
 
 	struct ath10k *ar;
-	struct ieee80211_vif *vif;
+	struct ieee80211vap *vap;
 
 	bool is_started;
 	bool is_up;

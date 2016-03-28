@@ -37,7 +37,7 @@ struct athp_buf {
 	struct mbuf *m;
 	int m_size;	/* size of initial allocation */
 
-	STAILQ_ENTRY(athp_buf) next;
+	TAILQ_ENTRY(athp_buf) next;
 	uint32_t flags;
 
 	// TX state
@@ -55,7 +55,7 @@ struct athp_buf_ring {
 	struct athp_dma_head dh;
 	int br_count;
 	struct athp_buf *br_list;
-	STAILQ_HEAD(, athp_buf) br_inactive;
+	TAILQ_HEAD(, athp_buf) br_inactive;
 };
 
 struct athp_node {
