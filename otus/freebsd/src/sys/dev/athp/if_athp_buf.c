@@ -106,7 +106,7 @@ MALLOC_DECLARE(M_ATHPDEV);
  * claiming path when the driver wants the mbuf for itself.
  */
 static void
-athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
+athp_unmap_buf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
 
@@ -114,7 +114,7 @@ athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
 	if (bf->m == NULL)
 		return;
 
-	athp_dma_mbuf_unload(sc, &br->dh, &bf->mb);
+	athp_dma_mbuf_unload(ar, &br->dh, &bf->mb);
 }
 
 /*
@@ -123,13 +123,13 @@ athp_unmap_buf(struct athp_softc *sc, struct athp_buf_ring *br,
  * This doesn't update the linked list state; it just handles freeing it.
  */
 static void
-_athp_free_buf(struct athp_softc *sc, struct athp_buf_ring *br,
+_athp_free_buf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
 
 	/* If there's an mbuf, then unmap, and free */
 	if (bf->m != NULL) {
-		athp_unmap_buf(sc, br, bf);
+		athp_unmap_buf(ar, br, bf);
 		m_freem(bf->m);
 	}
 }
@@ -141,7 +141,7 @@ _athp_free_buf(struct athp_softc *sc, struct athp_buf_ring *br,
  * mbuf without worrying about the linked list / allocation state.
  */
 void
-athp_free_list(struct athp_softc *sc, struct athp_buf_ring *br)
+athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
 {
 	int i;
 
@@ -150,7 +150,7 @@ athp_free_list(struct athp_softc *sc, struct athp_buf_ring *br)
 
 	for (i = 0; i < br->br_count; i++) {
 		struct athp_buf *dp = &br->br_list[i];
-		_athp_free_buf(sc, br, dp);
+		_athp_free_buf(ar, br, dp);
 	}
 	free(br->br_list, M_ATHPDEV);
 	br->br_list = NULL;
@@ -161,7 +161,7 @@ athp_free_list(struct athp_softc *sc, struct athp_buf_ring *br)
  * all into the inactive list.
  */
 int
-athp_alloc_list(struct athp_softc *sc, struct athp_buf_ring *br, int count)
+athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
 {
 	int i;
 
@@ -169,7 +169,7 @@ athp_alloc_list(struct athp_softc *sc, struct athp_buf_ring *br, int count)
 	br->br_list = malloc(sizeof(struct athp_buf) * count, M_ATHPDEV,
 	    M_ZERO | M_NOWAIT);
 	if (br->br_list == NULL) {
-		ATHP_ERR(sc, "%s: malloc failed!\n", __func__);
+		ath10k_err(ar, "%s: malloc failed!\n", __func__);
 		return (-1);
 	}
 
@@ -191,7 +191,7 @@ athp_alloc_list(struct athp_softc *sc, struct athp_buf_ring *br, int count)
  * This doesn't allocate the mbuf.
  */
 static struct athp_buf *
-_athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br)
+_athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br)
 {
 	struct athp_buf *bf;
 
@@ -205,15 +205,15 @@ _athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br)
 }
 
 void
-athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
+athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
 
-	ATHP_LOCK_ASSERT(sc);
+	ATHP_LOCK_ASSERT(ar);
 
 	/* if there's an mbuf - unmap (if needed) and free it */
 	if (bf->m != NULL)
-		_athp_free_buf(sc, br, bf);
+		_athp_free_buf(ar, br, bf);
 
 	/* Push it into the inactive queue */
 	STAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
@@ -234,22 +234,22 @@ athp_freebuf(struct athp_softc *sc, struct athp_buf_ring *br,
  * before it passes it into the hardware.
  */
 struct athp_buf *
-athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
+athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 {
 	struct athp_buf *bf;
 	struct mbuf *m;
 
-	ATHP_LOCK_ASSERT(sc);
+	ATHP_LOCK_ASSERT(ar);
 
 	/* Allocate mbuf; fail if we can't allocate one */
 	m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, bufsize);
 	if (m == NULL) {
-		device_printf(sc->sc_dev, "%s: failed to allocate mbuf\n", __func__);
+		device_printf(ar->sc_dev, "%s: failed to allocate mbuf\n", __func__);
 		return (NULL);
 	}
 
 	/* Allocate buffer */
-	bf = _athp_getbuf(sc, br);
+	bf = _athp_getbuf(ar, br);
 	if (! bf) {
 		m_freem(m);
 		return (NULL);
@@ -262,13 +262,13 @@ athp_getbuf(struct athp_softc *sc, struct athp_buf_ring *br, int bufsize)
 }
 
 struct athp_buf *
-athp_getbuf_tx(struct athp_softc *sc, struct athp_buf_ring *br)
+athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 {
 	struct athp_buf *bf;
 
-	ATHP_LOCK_ASSERT(sc);
+	ATHP_LOCK_ASSERT(ar);
 
-	bf = _athp_getbuf(sc, br);
+	bf = _athp_getbuf(ar, br);
 	if (bf == NULL)
 		return NULL;
 
