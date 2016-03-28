@@ -143,15 +143,15 @@ static void
 ath10k_msi_err_tasklet(void *arg, int npending)
 {
 	struct athp_pci_softc *psc = arg;
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 
 	if (! ath10k_pci_fw_has_crashed(psc)) {
-		ATP_WARN(sc, "%s: received unsolicited fw crash interrupt\n",
+		ATP_WARN(ar, "%s: received unsolicited fw crash interrupt\n",
 		    __func__);
 		return;
 	}
 
-	device_printf(sc->sc_dev, "%s: firmware crash\n", __func__);
+	device_printf(ar->sc_dev, "%s: firmware crash\n", __func__);
 	ath10k_pci_irq_disable(psc);
 	ath10k_pci_fw_crashed_clear(psc);
 	ath10k_pci_fw_crashed_dump(psc);
@@ -165,11 +165,11 @@ static void
 athp_pci_intr(void *arg)
 {
 	struct athp_pci_softc *psc = arg;
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 
 	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
 
-	if (sc->sc_invalid)
+	if (ar->sc_invalid)
 		return;
 
 	/*
@@ -186,7 +186,7 @@ athp_pci_intr(void *arg)
 	 * lock and calls the callback.  It's going to make consistent and
 	 * predictable locking tricky.
 	 */
-	ath10k_ce_per_engine_service_any(sc);
+	ath10k_ce_per_engine_service_any(ar);
 }
 
 #define	BS_BAR	0x10
@@ -204,11 +204,11 @@ static uint32_t
 athp_pci_regio_read_reg(void *arg, uint32_t reg)
 {
 	struct athp_pci_softc *psc = arg;
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
 
 	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
-	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	ath10k_dbg(ar, ATH10K_DBG_REGIO,
 	    "%s: %08x -> %08x\n",
 	    __func__, reg, val);
 
@@ -219,9 +219,9 @@ static void
 athp_pci_regio_write_reg(void *arg, uint32_t reg, uint32_t val)
 {
 	struct athp_pci_softc *psc = arg;
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 
-	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	ath10k_dbg(ar, ATH10K_DBG_REGIO,
 	    "%s: %08x <- %08x\n",
 	    __func__, reg, val);
 	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
@@ -232,12 +232,12 @@ static uint32_t
 athp_pci_regio_s_read_reg(void *arg, uint32_t reg)
 {
 	struct athp_pci_softc *psc = arg;
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val, tmp;
 
 	tmp = ath10k_pci_wake(psc);
 	if (tmp) {
-		device_printf(sc->sc_dev,
+		device_printf(ar->sc_dev,
 		    "%s: (reg=0x%08x) couldn't wake; err=%d\n",
 		    __func__,
 		    reg,
@@ -245,7 +245,7 @@ athp_pci_regio_s_read_reg(void *arg, uint32_t reg)
 		return (0);
 	}
 	val = bus_space_read_4(psc->sc_st, psc->sc_sh, reg);
-	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	ath10k_dbg(ar, ATH10K_DBG_REGIO,
 	    "%s: %08x -> %08x\n",
 	    __func__, reg, val);
 	ath10k_pci_sleep(psc);
@@ -257,19 +257,19 @@ static void
 athp_pci_regio_s_write_reg(void *arg, uint32_t reg, uint32_t val)
 {
 	struct athp_pci_softc *psc = arg;
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 	int tmp;
 
 	tmp = ath10k_pci_wake(psc);
 	if (tmp) {
-		device_printf(sc->sc_dev,
+		device_printf(ar->sc_dev,
 		    "%s: (reg=0x%08x) couldn't wake; err=%d\n",
 		    __func__,
 		    reg,
 		    tmp);
 		return;
 	}
-	ATHP_DPRINTF(sc, ATHP_DEBUG_REGIO,
+	ath10k_dbg(ar, ATH10K_DBG_REGIO,
 	    "%s: %08x <- %08x\n",
 	    __func__, reg, val);
 	bus_space_write_4(psc->sc_st, psc->sc_sh, reg, val);
@@ -294,24 +294,24 @@ athp_pci_regio_flush_reg(void *arg)
 static int
 athp_pci_hw_lookup(struct athp_pci_softc *psc)
 {
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 
 	switch (psc->sc_deviceid) {
 	case QCA988X_2_0_DEVICE_ID:
-		sc->sc_hwrev = ATH10K_HW_QCA988X;
-		sc->sc_regofs = &qca988x_regs;
-		sc->sc_regvals = &qca988x_values;
+		ar->sc_hwrev = ATH10K_HW_QCA988X;
+		ar->sc_regofs = &qca988x_regs;
+		ar->sc_regvals = &qca988x_values;
 		break;
 	case QCA6164_2_1_DEVICE_ID:
 	case QCA6174_2_1_DEVICE_ID:
-		sc->sc_hwrev = ATH10K_HW_QCA6174;
-		sc->sc_regofs = &qca6174_regs;
-		sc->sc_regvals = &qca6174_values;
+		ar->sc_hwrev = ATH10K_HW_QCA6174;
+		ar->sc_regofs = &qca6174_regs;
+		ar->sc_regvals = &qca6174_values;
 		break;
 	case QCA99X0_2_0_DEVICE_ID:
-		sc->sc_hwrev = ATH10K_HW_QCA99X0;
-		sc->sc_regofs = &qca99x0_regs;
-		sc->sc_regvals = &qca99x0_values;
+		ar->sc_hwrev = ATH10K_HW_QCA99X0;
+		ar->sc_regofs = &qca99x0_regs;
+		ar->sc_regvals = &qca99x0_values;
 		break;
 	default:
 		return (-1);
@@ -322,28 +322,28 @@ athp_pci_hw_lookup(struct athp_pci_softc *psc)
 static int
 athp_pci_setup_bufs(struct athp_pci_softc *psc)
 {
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 	int ret;
 
 	/* Create dma tag for RX buffers. 8 byte alignment, etc */
-	ret = athp_dma_head_alloc(sc, &sc->buf_rx.dh, 0x4000);
+	ret = athp_dma_head_alloc(ar, &ar->buf_rx.dh, 0x4000);
 	if (ret != 0) {
-		device_printf(sc->sc_dev, "%s: cannot allocate RX DMA tag\n",
+		device_printf(ar->sc_dev, "%s: cannot allocate RX DMA tag\n",
 		    __func__);
 		return (ret);
 	}
 
 	/* Create dma tag for TX buffers. 8 byte alignment, etc */
-	ret = athp_dma_head_alloc(sc, &sc->buf_tx.dh, 0x4000);
+	ret = athp_dma_head_alloc(ar, &ar->buf_tx.dh, 0x4000);
 	if (ret != 0) {
-		device_printf(sc->sc_dev, "%s: cannot allocate TX DMA tag\n",
+		device_printf(ar->sc_dev, "%s: cannot allocate TX DMA tag\n",
 		    __func__);
-		athp_dma_head_free(sc, &sc->buf_rx.dh);
+		athp_dma_head_free(ar, &ar->buf_rx.dh);
 		return (ret);
 	}
 
-	athp_alloc_list(sc, &sc->buf_rx, ATHP_RX_LIST_COUNT);
-	athp_alloc_list(sc, &sc->buf_tx, ATHP_TX_LIST_COUNT);
+	athp_alloc_list(ar, &ar->buf_rx, ATHP_RX_LIST_COUNT);
+	athp_alloc_list(ar, &ar->buf_tx, ATHP_TX_LIST_COUNT);
 
 	return (0);
 }
@@ -351,35 +351,35 @@ athp_pci_setup_bufs(struct athp_pci_softc *psc)
 static void
 athp_pci_free_bufs(struct athp_pci_softc *psc)
 {
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 
-	athp_free_list(sc, &sc->buf_rx);
-	athp_free_list(sc, &sc->buf_tx);
+	athp_free_list(ar, &ar->buf_rx);
+	athp_free_list(ar, &ar->buf_tx);
 
-	athp_dma_head_free(sc, &sc->buf_rx.dh);
-	athp_dma_head_free(sc, &sc->buf_tx.dh);
+	athp_dma_head_free(ar, &ar->buf_rx.dh);
+	athp_dma_head_free(ar, &ar->buf_tx.dh);
 }
 
 static int
 athp_pci_attach(device_t dev)
 {
 	struct athp_pci_softc *psc = device_get_softc(dev);
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 	int rid;
 	int err = 0;
 	int ret;
 
-	sc->sc_dev = dev;
-	sc->sc_invalid = 1;
-	sc->sc_debug = ATHP_DEBUG_BOOT;
-	sc->sc_psc = psc;
+	ar->sc_dev = dev;
+	ar->sc_invalid = 1;
+	ar->sc_debug = ATH10K_DBG_BOOT;
+	ar->sc_psc = psc;
 
 	/* XXX TODO: initialize sc_debug from TUNABLE */
 
 	/* XXX TODO: unique names */
-	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	mtx_init(&ar->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
-	mtx_init(&sc->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
+	mtx_init(&ar->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
 	    MTX_DEF);
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
 	    MTX_DEF);
@@ -427,8 +427,8 @@ athp_pci_attach(device_t dev)
 	}
 
 	/* Driver copy; hopefully we can delete this */
-	sc->sc_st = rman_get_bustag(psc->sc_sr);
-	sc->sc_sh = rman_get_bushandle(psc->sc_sr);
+	ar->sc_st = rman_get_bustag(psc->sc_sr);
+	ar->sc_sh = rman_get_bushandle(psc->sc_sr);
 
 	/* Local copy for bus operations */
 	psc->sc_st = rman_get_bustag(psc->sc_sr);
@@ -438,7 +438,7 @@ athp_pci_attach(device_t dev)
 	 * Mark device invalid so any interrupts (shared or otherwise)
 	 * that arrive before the HAL is setup are discarded.
 	 */
-	sc->sc_invalid = 1;
+	ar->sc_invalid = 1;
 
 	/*
 	 * Arrange interrupt line.
@@ -455,7 +455,7 @@ athp_pci_attach(device_t dev)
 		goto bad1;
 	}
 	if (bus_setup_intr(dev, psc->sc_irq, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, athp_pci_intr, sc, &psc->sc_ih)) {
+	    NULL, athp_pci_intr, ar, &psc->sc_ih)) {
 		device_printf(dev, "could not establish interrupt\n");
 		err = ENXIO;
 		goto bad2;
@@ -464,12 +464,12 @@ athp_pci_attach(device_t dev)
 	/*
 	 * Attach register ops - needed for the caller to do register IO.
 	 */
-	sc->sc_regio.reg_read = athp_pci_regio_read_reg;
-	sc->sc_regio.reg_write = athp_pci_regio_write_reg;
-	sc->sc_regio.reg_s_read = athp_pci_regio_s_read_reg;
-	sc->sc_regio.reg_s_write = athp_pci_regio_s_write_reg;
-	sc->sc_regio.reg_flush = athp_pci_regio_flush_reg;
-	sc->sc_regio.reg_arg = psc;
+	ar->sc_regio.reg_read = athp_pci_regio_read_reg;
+	ar->sc_regio.reg_write = athp_pci_regio_write_reg;
+	ar->sc_regio.reg_s_read = athp_pci_regio_s_read_reg;
+	ar->sc_regio.reg_s_write = athp_pci_regio_s_write_reg;
+	ar->sc_regio.reg_flush = athp_pci_regio_flush_reg;
+	ar->sc_regio.reg_arg = psc;
 
 	/*
 	 * Setup DMA descriptor area.
@@ -488,7 +488,7 @@ athp_pci_attach(device_t dev)
 	    BUS_DMA_ALLOCNOW,	/* flags */
 	    NULL,		    /* lockfunc */
 	    NULL,		    /* lockarg */
-	    &sc->sc_dmat)) {
+	    &ar->sc_dmat)) {
 		device_printf(dev, "cannot allocate DMA tag\n");
 		err = ENXIO;
 		goto bad3;
@@ -510,13 +510,13 @@ athp_pci_attach(device_t dev)
 	}
 
 	/* HIF ops attach */
-	sc->hif.ops = &ath10k_pci_hif_ops;
-	sc->hif.bus = ATH10K_BUS_PCI;
+	ar->hif.ops = &ath10k_pci_hif_ops;
+	ar->hif.bus = ATH10K_BUS_PCI;
 
 	/* Alloc pipes */
-	ret = ath10k_pci_alloc_pipes(sc);
+	ret = ath10k_pci_alloc_pipes(ar);
 	if (ret) {
-		device_printf(sc->sc_dev, "%s: pci_alloc_pipes failed: %d\n",
+		device_printf(ar->sc_dev, "%s: pci_alloc_pipes failed: %d\n",
 		    __func__,
 		    ret);
 		/* XXX cleanup */
@@ -525,12 +525,12 @@ athp_pci_attach(device_t dev)
 	}
 
 	/* deinit ce */
-	ath10k_pci_ce_deinit(sc);
+	ath10k_pci_ce_deinit(ar);
 
 	/* disable irq */
 	ret = ath10k_pci_irq_disable(psc);
 	if (ret) {
-		device_printf(sc->sc_dev, "%s: irq_disable failed: %d\n",
+		device_printf(ar->sc_dev, "%s: irq_disable failed: %d\n",
 		    __func__,
 		    ret);
 		err = ENXIO;
@@ -540,7 +540,7 @@ athp_pci_attach(device_t dev)
 	/* init IRQ */
 	ret = ath10k_pci_init_irq(psc);
 	if (ret) {
-		device_printf(sc->sc_dev, "%s: init_irq failed: %d\n",
+		device_printf(ar->sc_dev, "%s: init_irq failed: %d\n",
 		    __func__,
 		    ret);
 		err = ENXIO;
@@ -552,7 +552,7 @@ athp_pci_attach(device_t dev)
 	/* pci_chip_reset */
 	ret = ath10k_pci_chip_reset(psc);
 	if (ret) {
-		device_printf(sc->sc_dev, "%s: chip_reset failed: %d\n",
+		device_printf(ar->sc_dev, "%s: chip_reset failed: %d\n",
 		    __func__,
 		    ret);
 		err = ENXIO;
@@ -560,14 +560,14 @@ athp_pci_attach(device_t dev)
 	}
 
 	/* read SoC/chip version */
-	sc->sc_chipid = athp_pci_soc_read32(sc, SOC_CHIP_ID_ADDRESS(sc->sc_regofs));
+	ar->sc_chipid = athp_pci_soc_read32(ar, SOC_CHIP_ID_ADDRESS(ar->sc_regofs));
 
 	/* Verify chip version is something we can use */
-	device_printf(sc->sc_dev, "%s: chipid: 0x%08x\n", __func__, sc->sc_chipid);
-	if (! ath10k_pci_chip_is_supported(psc->sc_deviceid, sc->sc_chipid)) {
-		device_printf(sc->sc_dev,
+	device_printf(ar->sc_dev, "%s: chipid: 0x%08x\n", __func__, ar->sc_chipid);
+	if (! ath10k_pci_chip_is_supported(psc->sc_deviceid, ar->sc_chipid)) {
+		device_printf(ar->sc_dev,
 		    "%s: unsupported chip; chipid: 0x%08x\n", __func__,
-		    sc->sc_chipid);
+		    ar->sc_chipid);
 		err = ENXIO;
 		goto bad3;
 	}
@@ -575,7 +575,7 @@ athp_pci_attach(device_t dev)
 	/* call core_register */
 
 	/* Call main attach method with given info */
-	err = athp_attach(sc);
+	err = athp_attach(ar);
 	if (err == 0)
 		return (0);
 
@@ -583,7 +583,7 @@ athp_pci_attach(device_t dev)
 
 bad4:
 	athp_pci_free_bufs(psc);
-	bus_dma_tag_destroy(sc->sc_dmat);
+	bus_dma_tag_destroy(ar->sc_dmat);
 bad3:
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 bad2:
@@ -595,8 +595,8 @@ bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	mtx_destroy(&sc->sc_conf_mtx);
-	mtx_destroy(&sc->sc_mtx);
+	mtx_destroy(&ar->sc_conf_mtx);
+	mtx_destroy(&ar->sc_mtx);
 	if (psc->pipe_taskq) {
 		taskqueue_drain_all(psc->pipe_taskq);
 		taskqueue_free(psc->pipe_taskq);
@@ -608,12 +608,12 @@ static int
 athp_pci_detach(device_t dev)
 {
 	struct athp_pci_softc *psc = device_get_softc(dev);
-	struct athp_softc *sc = &psc->sc_sc;
+	struct ath10k *ar = &psc->sc_sc;
 
 	/* Signal things we're going down.. */
-	ATHP_LOCK(sc);
-	sc->sc_invalid = 1;
-	ATHP_UNLOCK(sc);
+	ATHP_LOCK(ar);
+	ar->sc_invalid = 1;
+	ATHP_UNLOCK(ar);
 
 	/* XXX TODO: synchronise with running things first */
 
@@ -623,17 +623,17 @@ athp_pci_detach(device_t dev)
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
 	/* detach main driver */
-	(void) athp_detach(sc);
+	(void) athp_detach(ar);
 
 	/* kill tasklet(s) */
 
 	/* deinit irq */
 
 	/* ce deinit */
-	ath10k_pci_ce_deinit(sc);
+	ath10k_pci_ce_deinit(ar);
 
 	/* free pipes */
-	ath10k_pci_free_pipes(sc);
+	ath10k_pci_free_pipes(ar);
 
 	/* pci release */
 	/* sleep sync */
@@ -645,15 +645,15 @@ athp_pci_detach(device_t dev)
 	bus_generic_detach(dev);
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
-	bus_dma_tag_destroy(sc->sc_dmat);
+	bus_dma_tag_destroy(ar->sc_dmat);
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmastering? */
 
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	mtx_destroy(&sc->sc_conf_mtx);
-	mtx_destroy(&sc->sc_mtx);
+	mtx_destroy(&ar->sc_conf_mtx);
+	mtx_destroy(&ar->sc_mtx);
 
 	/* Tear down the pipe taskqueue */
 	if (psc->pipe_taskq) {

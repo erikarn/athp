@@ -88,59 +88,59 @@ __FBSDID("$FreeBSD$");
  * These indirect through the top-level MMIO functions available.
  */
 uint32_t
-athp_reg_read32(struct athp_softc *sc, uint32_t addr)
+athp_reg_read32(struct ath10k *ar, uint32_t addr)
 {
 
 	/* The users of these don't do explicit sleep/wake */
-	return (sc->sc_regio.reg_read(sc->sc_regio.reg_arg, addr));
+	return (ar->sc_regio.reg_read(ar->sc_regio.reg_arg, addr));
 }
 
 void
-athp_reg_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
+athp_reg_write32(struct ath10k *ar, uint32_t addr, uint32_t val)
 {
 
 	/* The users of these don't do explicit sleep/wake */
-	sc->sc_regio.reg_write(sc->sc_regio.reg_arg, addr, val);
+	ar->sc_regio.reg_write(ar->sc_regio.reg_arg, addr, val);
 }
 
 uint32_t
-athp_pci_read32(struct athp_softc *sc, uint32_t addr)
+athp_pci_read32(struct ath10k *ar, uint32_t addr)
 {
 
 	/* sleep/wake */
-	return (sc->sc_regio.reg_s_read(sc->sc_regio.reg_arg, addr));
+	return (ar->sc_regio.reg_s_read(ar->sc_regio.reg_arg, addr));
 }
 
 void
-athp_pci_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
+athp_pci_write32(struct ath10k *ar, uint32_t addr, uint32_t val)
 {
 
 	/* sleep/wake */
-	sc->sc_regio.reg_s_write(sc->sc_regio.reg_arg, addr, val);
+	ar->sc_regio.reg_s_write(ar->sc_regio.reg_arg, addr, val);
 }
 
 uint32_t
-athp_pci_soc_read32(struct athp_softc *sc, uint32_t addr)
+athp_pci_soc_read32(struct ath10k *ar, uint32_t addr)
 {
 
-	return (athp_pci_read32(sc, RTC_SOC_BASE_ADDRESS(sc->sc_regofs) + addr));
+	return (athp_pci_read32(ar, RTC_SOC_BASE_ADDRESS(ar->sc_regofs) + addr));
 }
 
 void
-athp_pci_soc_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
+athp_pci_soc_write32(struct ath10k *ar, uint32_t addr, uint32_t val)
 {
-	athp_pci_write32(sc, RTC_SOC_BASE_ADDRESS(sc->sc_regofs) + addr, val);
+	athp_pci_write32(ar, RTC_SOC_BASE_ADDRESS(ar->sc_regofs) + addr, val);
 }
 
 uint32_t
-athp_pci_reg_read32(struct athp_softc *sc, uint32_t addr)
+athp_pci_reg_read32(struct ath10k *ar, uint32_t addr)
 {
-	return (athp_pci_read32(sc, PCIE_LOCAL_BASE_ADDRESS(sc->sc_regofs) + addr));
+	return (athp_pci_read32(ar, PCIE_LOCAL_BASE_ADDRESS(ar->sc_regofs) + addr));
 }
 
 void
-athp_pci_reg_write32(struct athp_softc *sc, uint32_t addr, uint32_t val)
+athp_pci_reg_write32(struct ath10k *ar, uint32_t addr, uint32_t val)
 {
-	athp_pci_write32(sc, PCIE_LOCAL_BASE_ADDRESS(sc->sc_regofs) + addr, val);
+	athp_pci_write32(ar, PCIE_LOCAL_BASE_ADDRESS(ar->sc_regofs) + addr, val);
 }
 

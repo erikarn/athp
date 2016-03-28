@@ -92,51 +92,51 @@ __FBSDID("$FreeBSD$");
  */
 
 void
-athp_debug_dump(struct athp_softc *sc, uint64_t mask,
+athp_debug_dump(struct ath10k *ar, uint64_t mask,
     const char *msg, const char *prefix,
     const void *buf, size_t len)
 {
 
-	if ((sc->sc_debug & mask) == 0)
+	if ((ar->sc_debug & mask) == 0)
 		return;
 
 	if (msg)
-		ATHP_DPRINTF(sc, mask, "%s\n", msg);
+		ath10k_dbg(ar, mask, "%s\n", msg);
 
 	/* XXX TODO: dump data */
-	device_printf(sc->sc_dev, "%s: TODO: implement debug_dump\n",
+	device_printf(ar->sc_dev, "%s: TODO: implement debug_dump\n",
 	    __func__);
 }
 
 void
-ath10k_print_driver_info(struct athp_softc *sc)
+ath10k_print_driver_info(struct ath10k *ar)
 {
 	char fw_features[128] = {};
 
-	ath10k_core_get_fw_features_str(sc, fw_features, sizeof(fw_features));
+	ath10k_core_get_fw_features_str(ar, fw_features, sizeof(fw_features));
 
-	device_printf(sc->sc_dev,
+	device_printf(ar->sc_dev,
 	    "%s (0x%08x, 0x%08x%s%s%s) fw %s api %d htt-ver %d.%d wmi-op %d htt-op %d cal %s max-sta %d raw %d hwcrypto %d features %s\n",
-		    sc->hw_params.name,
-		    sc->target_version,
-		    sc->sc_chipid,
-		    (strlen(sc->spec_board_id) > 0 ? ", " : ""),
-		    sc->spec_board_id,
-		    (strlen(sc->spec_board_id) > 0 && !sc->spec_board_loaded
+		    ar->hw_params.name,
+		    ar->target_version,
+		    ar->sc_chipid,
+		    (strlen(ar->spec_board_id) > 0 ? ", " : ""),
+		    ar->spec_board_id,
+		    (strlen(ar->spec_board_id) > 0 && !ar->spec_board_loaded
 		     ? " fallback" : ""),
-		    sc->fw_version_str,
-		    sc->fw_api,
-		    sc->htt.target_version_major,
-		    sc->htt.target_version_minor,
-		    sc->wmi.op_version,
-		    sc->htt.op_version,
-		    ath10k_cal_mode_str(sc->cal_mode),
-		    sc->max_num_stations,
-		    (int) test_bit(ATH10K_FLAG_RAW_MODE, &sc->dev_flags),
-		    (int) !test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &sc->dev_flags),
+		    ar->fw_version_str,
+		    ar->fw_api,
+		    ar->htt.target_version_major,
+		    ar->htt.target_version_minor,
+		    ar->wmi.op_version,
+		    ar->htt.op_version,
+		    ath10k_cal_mode_str(ar->cal_mode),
+		    ar->max_num_stations,
+		    (int) test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags),
+		    (int) !test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags),
 		    fw_features);
 #if 0
-	device_printf(sc->sc_dev,
+	device_printf(ar->sc_dev,
 	    "debug %d debugfs %d tracing %d dfs %d testmode %d\n",
 		    config_enabled(CONFIG_ATH10K_DEBUG),
 		    config_enabled(CONFIG_ATH10K_DEBUGFS),

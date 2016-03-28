@@ -86,14 +86,14 @@ __FBSDID("$FreeBSD$");
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
 int
-athp_attach(struct athp_softc *sc)
+athp_attach(struct ath10k *ar)
 {
 	int ret;
 
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* Initial: probe firmware/target info */
-	ret = ath10k_core_register(sc);
+	ret = ath10k_core_register(ar);
 	if (ret != 0)
 		goto err;
 
@@ -103,13 +103,13 @@ err:
 }
 
 int
-athp_detach(struct athp_softc *sc)
+athp_detach(struct ath10k *ar)
 {
 
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* XXX TODO: look at ath10k_pci_remove */
-	ath10k_core_unregister(sc);
+	ath10k_core_unregister(ar);
 
 	return (0);
 }

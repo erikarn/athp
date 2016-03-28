@@ -99,7 +99,7 @@ athp_load_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
  * Allocate the descriptors and appropriate DMA tag/setup.
  */
 int
-athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
+athp_descdma_alloc(struct ath10k *ar, struct athp_descdma *dd,
 	const char *name, int alignment, int ds_size)
 {
 	int error;
@@ -107,7 +107,7 @@ athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
 	dd->dd_name = name;
 	dd->dd_desc_len = ds_size;
 
-	ATHP_DPRINTF(sc, ATHP_DEBUG_DESCDMA,
+	ath10k_dbg(ar, ATH10K_DBG_DESCDMA,
 	    "%s: %s DMA: %d bytes\n", __func__, name, (int) dd->dd_desc_len);
 
 	/*
@@ -116,7 +116,7 @@ athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
 	 * BUS_DMA_ALLOCNOW is not used; we never use bounce
 	 * buffers for the descriptors themselves.
 	 */
-	error = bus_dma_tag_create(bus_get_dma_tag(sc->sc_dev),	/* parent */
+	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev),	/* parent */
 		       PAGE_SIZE, 0,		/* alignment, bounds */
 		       BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 		       BUS_SPACE_MAXADDR,	/* highaddr */
@@ -129,7 +129,7 @@ athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
 		       NULL,			/* lockarg */
 		       &dd->dd_dmat);
 	if (error != 0) {
-		device_printf(sc->sc_dev,
+		device_printf(ar->sc_dev,
 		    "cannot allocate %s DMA tag\n", dd->dd_name);
 		return error;
 	}
@@ -139,7 +139,7 @@ athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
 				 BUS_DMA_NOWAIT | BUS_DMA_COHERENT,
 				 &dd->dd_dmamap);
 	if (error != 0) {
-		device_printf(sc->sc_dev,
+		device_printf(ar->sc_dev,
 		    "unable to alloc memory for %s descriptor, error %u\n",
 		    dd->dd_name, error);
 		goto fail1;
@@ -150,13 +150,13 @@ athp_descdma_alloc(struct athp_softc *sc, struct athp_descdma *dd,
 				athp_load_cb, &dd->dd_desc_paddr,
 				BUS_DMA_NOWAIT);
 	if (error != 0) {
-		device_printf(sc->sc_dev,
+		device_printf(ar->sc_dev,
 		    "unable to map %s descriptors, error %u\n",
 		    dd->dd_name, error);
 		goto fail2;
 	}
 
-	ATHP_DPRINTF(sc, ATHP_DEBUG_DESCDMA, "%s: %s DMA map: %p (%lu) -> %p (%lu)\n",
+	ath10k_dbg(ar, ATH10K_DBG_DESCDMA, "%s: %s DMA map: %p (%lu) -> %p (%lu)\n",
 	    __func__, dd->dd_name, (uint8_t *) dd->dd_desc,
 	    (u_long) dd->dd_desc_len, (caddr_t) dd->dd_desc_paddr,
 	    /*XXX*/ (u_long) dd->dd_desc_len);
@@ -172,7 +172,7 @@ fail1:
 }
 
 void
-athp_descdma_free(struct athp_softc *sc, struct athp_descdma *dd)
+athp_descdma_free(struct ath10k *ar, struct athp_descdma *dd)
 {
 
 	if (dd->dd_dmamap != 0) {
@@ -192,13 +192,13 @@ athp_descdma_free(struct athp_softc *sc, struct athp_descdma *dd)
  * a separate DMA tag for each with the relevant constraints.
  */
 int
-athp_dma_head_alloc(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_head_alloc(struct ath10k *ar, struct athp_dma_head *dh,
     int buf_size)
 {
 	int error;
 
 	bzero(dh, sizeof(*dh));
-	device_printf(sc->sc_dev, "%s: called; buf_size=%d\n",
+	device_printf(ar->sc_dev, "%s: called; buf_size=%d\n",
 	    __func__,
 	    buf_size);
 
@@ -206,12 +206,12 @@ athp_dma_head_alloc(struct athp_softc *sc, struct athp_dma_head *dh,
 	 * NB: we require 8-byte alignment for at least RX descriptors;
 	 * I'm not sure yet about the transmit side.
 	 */
-	error = bus_dma_tag_create(bus_get_dma_tag(sc->sc_dev), 8, 0,
+	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev), 8, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    buf_size, 1, buf_size, BUS_DMA_NOWAIT, NULL, NULL,
 	    &dh->tag);
 	if (error != 0) {
-		ATHP_ERR(sc, "%s: bus_dma_tag_create failed: %d\n",
+		ath10k_err(ar, "%s: bus_dma_tag_create failed: %d\n",
 		    __func__,
 		    error);
 		return (error);
@@ -221,7 +221,7 @@ athp_dma_head_alloc(struct athp_softc *sc, struct athp_dma_head *dh,
 }
 
 void
-athp_dma_head_free(struct athp_softc *sc, struct athp_dma_head *dh)
+athp_dma_head_free(struct ath10k *ar, struct athp_dma_head *dh)
 {
 
 	if (dh->tag == NULL)
@@ -241,7 +241,7 @@ athp_dma_head_free(struct athp_softc *sc, struct athp_dma_head *dh)
  * to chain together.
  */
 int
-athp_dma_mbuf_load(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm, struct mbuf *m)
 {
 	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
@@ -255,7 +255,7 @@ athp_dma_mbuf_load(struct athp_softc *sc, struct athp_dma_head *dh,
 	if (ret != 0)
 		return (ret);
 	if (nsegs > 1) {
-		device_printf(sc->sc_dev, "%s: nsegs > 1 (%d)\n",
+		device_printf(ar->sc_dev, "%s: nsegs > 1 (%d)\n",
 		    __func__, nsegs);
 		bus_dmamap_unload(dh->tag, dm->map);
 		return (ENOMEM);
@@ -268,7 +268,7 @@ athp_dma_mbuf_load(struct athp_softc *sc, struct athp_dma_head *dh,
 }
 
 void
-athp_dma_mbuf_unload(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_mbuf_unload(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
@@ -280,7 +280,7 @@ athp_dma_mbuf_unload(struct athp_softc *sc, struct athp_dma_head *dh,
  * Sync operations to do before/after transmit and receive.
  */
 void
-athp_dma_mbuf_pre_xmit(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_mbuf_pre_xmit(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
@@ -289,7 +289,7 @@ athp_dma_mbuf_pre_xmit(struct athp_softc *sc, struct athp_dma_head *dh,
 }
 
 void
-athp_dma_mbuf_post_xmit(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_mbuf_post_xmit(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
@@ -298,7 +298,7 @@ athp_dma_mbuf_post_xmit(struct athp_softc *sc, struct athp_dma_head *dh,
 }
 
 void
-athp_dma_mbuf_pre_recv(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_mbuf_pre_recv(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
@@ -307,7 +307,7 @@ athp_dma_mbuf_pre_recv(struct athp_softc *sc, struct athp_dma_head *dh,
 }
 
 void
-athp_dma_mbuf_post_recv(struct athp_softc *sc, struct athp_dma_head *dh,
+athp_dma_mbuf_post_recv(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
