@@ -58,4 +58,8 @@ SRCS    += if_athp_core.c
 # data commands are layered on top of this.
 SRCS    += if_athp_htc.c
 
+# This is the command structure format to speak to the firmware (WMI).
+# SRCS    += if_athp_wmi_tlv.c
+# SRCS    += if_athp_wmi.c
+
 .include <bsd.kmod.mk>
