@@ -1,6 +1,14 @@
 #ifndef	__LINUX_COMPAT_H__
 #define	__LINUX_COMPAT_H__
 
+#include <linux/types.h>
+#include <linux/kernel.h>
+#include <linux/completion.h>
+#include <linux/wait.h>
+#include <linux/if_ether.h>
+#include <linux/err.h>
+
+#if 0
 #include <sys/libkern.h>
 
 typedef uint8_t		u8;
@@ -21,12 +29,6 @@ typedef uint16_t	__be16;
 typedef uint32_t	__be32;
 typedef uint64_t	__be64;
 
-#define	__cpu_to_le32(a)	htole32(a)
-#define	__cpu_to_le16(a)	htole16(a)
-
-#define	__le32_to_cpu(a)	le32toh(a)
-#define	__le16_to_cpu(a)	le16toh(a)
-
 //#define	PTR_ALIGN(ptr, a)
 
 static inline unsigned long
@@ -40,15 +42,9 @@ roundup_pow_of_two(unsigned long n)
 
 #define	unlikely(x)	(x)
 
-/* XXX TODO: should really implement this */
-#define	WARN_ON(x) (0)
-#define	WARN_ON_ONCE(x) (x)
 
-#define	might_sleep()
 
 #define	ARRAY_SIZE(n)	nitems(n)
-
-#define scnprintf(...) snprintf(__VA_ARGS__)
 
 /* Bitfield things; include sys/bitstring.h */
 #include <sys/bitstring.h>
@@ -73,17 +69,26 @@ ilog2(uint32_t val)
 	return fls(val);
 }
 
-/* XXX lifted from linux-2.6 */
-#define	__ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)
-#define	__ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
-#define	ALIGN_LINUX(x, a) __ALIGN_KERNEL((x), (a))
-
-#define	le32_to_cpu(v)		le32toh(v)
-#define	le32_to_cpup(v)		le32toh(*(v))
 
 #define	ECOMM		ESTALE
 
 #define	HZ		hz
+
+#define	DIV_ROUND_UP(x, n)	howmany(x, n)
+#endif
+
+/* Bits not implemented by our linuxkpi layer so far */
+#define	__cpu_to_le32(a)	htole32(a)
+#define	__cpu_to_le16(a)	htole16(a)
+#define	__le32_to_cpu(a)	le32toh(a)
+#define	__le16_to_cpu(a)	le16toh(a)
+#define	might_sleep()
+#define scnprintf(...) snprintf(__VA_ARGS__)
+#define	__ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)
+#define	__ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+#define	ALIGN_LINUX(x, a) __ALIGN_KERNEL((x), (a))
+#undef	le32_to_cpup
+#define	le32_to_cpup(v)		le32toh(*(v))
 
 static inline int
 IS_ALIGNED(unsigned long ptr, int a)
@@ -91,7 +96,5 @@ IS_ALIGNED(unsigned long ptr, int a)
 
 	return (ptr % a == 0);
 }
-
-#define	DIV_ROUND_UP(x, n)	howmany(x, n)
 
 #endif	/* __LINUX_COMPAT_H__ */
