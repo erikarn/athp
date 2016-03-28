@@ -89,6 +89,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
+#include "if_athp_mac.h"
 
 #include "if_athp_main.h"
 
@@ -286,8 +287,11 @@ static int ath10k_wmi_tlv_event_bcn_tx_status(struct ath10k *ar,
 	}
 
 	arvif = ath10k_get_arvif(ar, vdev_id);
+#if 0
 	if (arvif && arvif->is_up && arvif->vif->csa_active)
 		ieee80211_queue_work(sc->hw, &arvif->ap_csa_work);
+#endif
+	device_printf(ar->sc_dev, "%s: TODO: check CSA active\n", __func__);
 
 	free(tb, M_ATHPDEV);
 	return 0;
@@ -417,7 +421,10 @@ static int ath10k_wmi_tlv_event_p2p_noa(struct ath10k *ar,
 		   "wmi tlv p2p noa vdev_id %i descriptors %hhu\n",
 		   vdev_id, noa->num_descriptors);
 
+#if 0
 	ath10k_p2p_noa_update_by_vdev_id(ar, vdev_id, noa);
+#endif
+	device_printf(ar->sc_dev, "%s: TODO: implement p2p_no_update\n", __func__);
 	free(tb, M_ATHPDEV);
 	return 0;
 }
@@ -1165,6 +1172,11 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 	num_bcnflt_stats = __le32_to_cpu(ev->num_bcnflt_stats);
 	num_chan_stats = __le32_to_cpu(ev->num_chan_stats);
 
+	/* XXX should we reinit the lists here? */
+	TAILQ_INIT(&stats->pdevs);
+	TAILQ_INIT(&stats->vdevs);
+	TAILQ_INIT(&stats->peers);
+
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
 		   "wmi tlv stats update pdev %i vdev %i peer %i bcnflt %i chan %i\n",
 		   num_pdev_stats, num_vdev_stats, num_peer_stats,
@@ -1188,7 +1200,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 		ath10k_wmi_pull_pdev_stats_base(&src->base, dst);
 		ath10k_wmi_pull_pdev_stats_tx(&src->tx, dst);
 		ath10k_wmi_pull_pdev_stats_rx(&src->rx, dst);
-		list_add_tail(&dst->list, &stats->pdevs);
+		TAILQ_INSERT_TAIL(&stats->pdevs, dst, list);
 	}
 
 	for (i = 0; i < num_vdev_stats; i++) {
@@ -1207,7 +1219,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 			continue;
 
 		ath10k_wmi_tlv_pull_vdev_stats(src, dst);
-		list_add_tail(&dst->list, &stats->vdevs);
+		TAILQ_INSERT_TAIL(&stats->vdevs, dst, list);
 	}
 
 	for (i = 0; i < num_peer_stats; i++) {
@@ -1227,7 +1239,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 
 		ath10k_wmi_pull_peer_stats(&src->old, dst);
 		dst->peer_rx_rate = __le32_to_cpu(src->peer_rx_rate);
-		list_add_tail(&dst->list, &stats->peers);
+		TAILQ_INSERT_TAIL(&stats->peers, dst, list);
 	}
 
 	free(tb, M_ATHPDEV);
@@ -2368,7 +2380,7 @@ ath10k_wmi_tlv_op_gen_scan_chan_list(struct ath10k *ar,
 	for (i = 0; i < arg->n_channels; i++) {
 		ch = &arg->channels[i];
 
-		tlv = chans;
+		tlv = (void *) chans;
 		tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_CHANNEL);
 		tlv->len = __cpu_to_le16(sizeof(*ci));
 		ci = (void *)tlv->value;
@@ -2635,7 +2647,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
 	      sizeof(*tlv) + sizeof(*info) + prb_ies_len +
-	      sizeof(*tlv) + roundup(bcn->len, 4);
+	      sizeof(*tlv) + roundup(mbuf_skb_len(bcn->m), 4);
 	pbuf = ath10k_wmi_alloc_skb(ar, len);
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
@@ -2647,7 +2659,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 	cmd = (void *)tlv->value;
 	cmd->vdev_id = __cpu_to_le32(vdev_id);
 	cmd->tim_ie_offset = __cpu_to_le32(tim_ie_offset);
-	cmd->buf_len = __cpu_to_le32(bcn->len);
+	cmd->buf_len = __cpu_to_le32(mbuf_skb_len(bcn->m));
 
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
@@ -2671,8 +2683,8 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
-	tlv->len = __cpu_to_le16(roundup(bcn->len, 4));
-	memcpy(tlv->value, bcn->data, bcn->len);
+	tlv->len = __cpu_to_le16(roundup(mbuf_skb_len(bcn->m), 4));
+	memcpy(tlv->value, mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m));
 
 	/* FIXME: Adjust TSF? */
 
@@ -2683,7 +2695,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 
 static struct athp_buf *
 ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
-			       struct sk_buff *prb)
+			       struct athp_buf *prb)
 {
 	struct wmi_tlv_prb_tmpl_cmd *cmd;
 	struct wmi_tlv_bcn_prb_info *info;
@@ -2694,7 +2706,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
 	      sizeof(*tlv) + sizeof(*info) +
-	      sizeof(*tlv) + roundup(prb->len, 4);
+	      sizeof(*tlv) + roundup(mbuf_skb_len(prb->m), 4);
 	pbuf = ath10k_wmi_alloc_skb(ar, len);
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
@@ -2705,7 +2717,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
 	cmd->vdev_id = __cpu_to_le32(vdev_id);
-	cmd->buf_len = __cpu_to_le32(prb->len);
+	cmd->buf_len = __cpu_to_le32(mbuf_skb_len(prb->m));
 
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
@@ -2722,8 +2734,8 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
-	tlv->len = __cpu_to_le16(roundup(prb->len, 4));
-	memcpy(tlv->value, prb->data, prb->len);
+	tlv->len = __cpu_to_le16(roundup(mbuf_skb_len(prb->m), 4));
+	memcpy(tlv->value, mbuf_skb_data(prb->m), mbuf_skb_len(prb->m));
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv prb tmpl vdev_id %i\n",
 		   vdev_id);
@@ -3137,7 +3149,7 @@ ath10k_wmi_tlv_op_gen_adaptive_qcs(struct ath10k *ar, bool enable)
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
 
-	ptr = (void *)mbuf_skb_data(skb->m);
+	ptr = (void *)mbuf_skb_data(pbuf->m);
 	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_RESMGR_ADAPTIVE_OCS_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
