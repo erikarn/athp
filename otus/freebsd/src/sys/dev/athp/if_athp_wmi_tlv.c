@@ -73,11 +73,14 @@ __FBSDID("$FreeBSD$");
 #include "hal/hw.h"
 #include "hal/htc.h"
 #include "hal/core.h"
+#include "hal/wmi.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_stats.h"
 #include "if_athp_regio.h"
 #include "if_athp_htc.h"
+#include "if_athp_stats.h"
+#include "if_athp_wmi.h"
 #include "if_athp_core.h"
 #include "if_athp_desc.h"
 #include "if_athp_buf.h"
@@ -1492,7 +1495,7 @@ static struct athp_buf *ath10k_wmi_tlv_op_gen_init(struct ath10k *ar)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 				 const struct wmi_start_scan_arg *arg)
 {
@@ -1590,7 +1593,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_stop_scan(struct ath10k *ar,
 				const struct wmi_stop_scan_arg *arg)
 {
@@ -1628,7 +1631,7 @@ ath10k_wmi_tlv_op_gen_stop_scan(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_create(struct ath10k *ar,
 				  u32 vdev_id,
 				  enum wmi_vdev_type vdev_type,
@@ -1656,7 +1659,7 @@ ath10k_wmi_tlv_op_gen_vdev_create(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_delete(struct ath10k *ar, u32 vdev_id)
 {
 	struct wmi_vdev_delete_cmd *cmd;
@@ -1677,7 +1680,7 @@ ath10k_wmi_tlv_op_gen_vdev_delete(struct ath10k *ar, u32 vdev_id)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 				 const struct wmi_vdev_start_request_arg *arg,
 				 bool restart)
@@ -1688,7 +1691,7 @@ ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
 	size_t len;
-	void *ptr;
+	char *ptr;
 	u32 flags = 0;
 
 	if (WARN_ON(arg->hidden_ssid && !arg->ssid))
@@ -1755,7 +1758,7 @@ ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_stop(struct ath10k *ar, u32 vdev_id)
 {
 	struct wmi_vdev_stop_cmd *cmd;
@@ -1776,7 +1779,7 @@ ath10k_wmi_tlv_op_gen_vdev_stop(struct ath10k *ar, u32 vdev_id)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_up(struct ath10k *ar, u32 vdev_id, u32 aid,
 			      const u8 *bssid)
 
@@ -1801,7 +1804,7 @@ ath10k_wmi_tlv_op_gen_vdev_up(struct ath10k *ar, u32 vdev_id, u32 aid,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_down(struct ath10k *ar, u32 vdev_id)
 {
 	struct wmi_vdev_down_cmd *cmd;
@@ -1822,7 +1825,7 @@ ath10k_wmi_tlv_op_gen_vdev_down(struct ath10k *ar, u32 vdev_id)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_set_param(struct ath10k *ar, u32 vdev_id,
 				     u32 param_id, u32 param_value)
 {
@@ -1846,7 +1849,7 @@ ath10k_wmi_tlv_op_gen_vdev_set_param(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_install_key(struct ath10k *ar,
 				       const struct wmi_vdev_install_key_arg *arg)
 {
@@ -1854,7 +1857,7 @@ ath10k_wmi_tlv_op_gen_vdev_install_key(struct ath10k *ar,
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
 	size_t len;
-	void *ptr;
+	char *ptr;
 
 	if (arg->key_cipher == WMI_CIPHER_NONE && arg->key_data != NULL)
 		return ERR_PTR(-EINVAL);
@@ -1899,7 +1902,7 @@ ath10k_wmi_tlv_op_gen_vdev_install_key(struct ath10k *ar,
 	return pbuf;
 }
 
-static void *ath10k_wmi_tlv_put_uapsd_ac(struct ath10k *ar, void *ptr,
+static void *ath10k_wmi_tlv_put_uapsd_ac(struct ath10k *ar, char *ptr,
 					 const struct wmi_sta_uapsd_auto_trig_arg *arg)
 {
 	struct wmi_sta_uapsd_auto_trig_param *ac;
@@ -1924,7 +1927,7 @@ static void *ath10k_wmi_tlv_put_uapsd_ac(struct ath10k *ar, void *ptr,
 	return ptr + sizeof(*tlv) + sizeof(*ac);
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_sta_uapsd(struct ath10k *ar, u32 vdev_id,
 				     const u8 peer_addr[ETH_ALEN],
 				     const struct wmi_sta_uapsd_auto_trig_arg *args,
@@ -1936,7 +1939,7 @@ ath10k_wmi_tlv_op_gen_vdev_sta_uapsd(struct ath10k *ar, u32 vdev_id,
 	struct athp_buf *pbuf;
 	size_t len;
 	size_t ac_tlv_len;
-	void *ptr;
+	char *ptr;
 	int i;
 
 	ac_tlv_len = num_ac * (sizeof(*tlv) + sizeof(*ac));
@@ -1947,7 +1950,7 @@ ath10k_wmi_tlv_op_gen_vdev_sta_uapsd(struct ath10k *ar, u32 vdev_id,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_STA_UAPSD_AUTO_TRIG_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -1958,7 +1961,7 @@ ath10k_wmi_tlv_op_gen_vdev_sta_uapsd(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(ac_tlv_len);
 	ac = (void *)tlv->value;
@@ -1971,13 +1974,13 @@ ath10k_wmi_tlv_op_gen_vdev_sta_uapsd(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static void *ath10k_wmi_tlv_put_wmm(void *ptr,
+static void *ath10k_wmi_tlv_put_wmm(char *ptr,
 				    const struct wmi_wmm_params_arg *arg)
 {
 	struct wmi_wmm_params *wmm;
 	struct wmi_tlv *tlv;
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_WMM_PARAMS);
 	tlv->len = __cpu_to_le16(sizeof(*wmm));
 	wmm = (void *)tlv->value;
@@ -1986,7 +1989,7 @@ static void *ath10k_wmi_tlv_put_wmm(void *ptr,
 	return ptr + sizeof(*tlv) + sizeof(*wmm);
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_vdev_wmm_conf(struct ath10k *ar, u32 vdev_id,
 				    const struct wmi_wmm_params_all_arg *arg)
 {
@@ -1994,7 +1997,7 @@ ath10k_wmi_tlv_op_gen_vdev_wmm_conf(struct ath10k *ar, u32 vdev_id,
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
 	size_t len;
-	void *ptr;
+	char *ptr;
 
 	len = sizeof(*tlv) + sizeof(*cmd);
 	pbuf = ath10k_wmi_alloc_skb(ar, len);
@@ -2002,7 +2005,7 @@ ath10k_wmi_tlv_op_gen_vdev_wmm_conf(struct ath10k *ar, u32 vdev_id,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_VDEV_SET_WMM_PARAMS_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2017,7 +2020,7 @@ ath10k_wmi_tlv_op_gen_vdev_wmm_conf(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_sta_keepalive(struct ath10k *ar,
 				    const struct wmi_sta_keepalive_arg *arg)
 {
@@ -2025,7 +2028,7 @@ ath10k_wmi_tlv_op_gen_sta_keepalive(struct ath10k *ar,
 	struct wmi_sta_keepalive_arp_resp *arp;
 	struct athp_buf *pbuf;
 	struct wmi_tlv *tlv;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
@@ -2035,7 +2038,7 @@ ath10k_wmi_tlv_op_gen_sta_keepalive(struct ath10k *ar,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_STA_KEEPALIVE_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2047,7 +2050,7 @@ ath10k_wmi_tlv_op_gen_sta_keepalive(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_STA_KEEPALVE_ARP_RESPONSE);
 	tlv->len = __cpu_to_le16(sizeof(*arp));
 	arp = (void *)tlv->value;
@@ -2061,7 +2064,7 @@ ath10k_wmi_tlv_op_gen_sta_keepalive(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_peer_create(struct ath10k *ar, u32 vdev_id,
 				  const u8 peer_addr[ETH_ALEN],
 				  enum wmi_peer_type peer_type)
@@ -2086,7 +2089,7 @@ ath10k_wmi_tlv_op_gen_peer_create(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_peer_delete(struct ath10k *ar, u32 vdev_id,
 				  const u8 peer_addr[ETH_ALEN])
 {
@@ -2109,7 +2112,7 @@ ath10k_wmi_tlv_op_gen_peer_delete(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_peer_flush(struct ath10k *ar, u32 vdev_id,
 				 const u8 peer_addr[ETH_ALEN], u32 tid_bitmap)
 {
@@ -2133,7 +2136,7 @@ ath10k_wmi_tlv_op_gen_peer_flush(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_peer_set_param(struct ath10k *ar, u32 vdev_id,
 				     const u8 *peer_addr,
 				     enum wmi_peer_param param_id,
@@ -2160,7 +2163,7 @@ ath10k_wmi_tlv_op_gen_peer_set_param(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 				 const struct wmi_peer_assoc_complete_arg *arg)
 {
@@ -2169,7 +2172,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
 	size_t len, legacy_rate_len, ht_rate_len;
-	void *ptr;
+	char *ptr;
 
 	if (arg->peer_mpdu_density > 16)
 		return ERR_PTR(-EINVAL);
@@ -2190,7 +2193,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_PEER_ASSOC_COMPLETE_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2215,7 +2218,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(legacy_rate_len);
 	memcpy(tlv->value, arg->peer_legacy_rates.rates,
@@ -2224,7 +2227,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += legacy_rate_len;
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(ht_rate_len);
 	memcpy(tlv->value, arg->peer_ht_rates.rates,
@@ -2233,7 +2236,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += ht_rate_len;
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_VHT_RATE_SET);
 	tlv->len = __cpu_to_le16(sizeof(*vht_rate));
 	vht_rate = (void *)tlv->value;
@@ -2250,7 +2253,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_set_psmode(struct ath10k *ar, u32 vdev_id,
 				 enum wmi_sta_ps_mode psmode)
 {
@@ -2273,7 +2276,7 @@ ath10k_wmi_tlv_op_gen_set_psmode(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_set_sta_ps(struct ath10k *ar, u32 vdev_id,
 				 enum wmi_sta_powersave_param param_id,
 				 u32 param_value)
@@ -2298,7 +2301,7 @@ ath10k_wmi_tlv_op_gen_set_sta_ps(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_set_ap_ps(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 				enum wmi_ap_ps_peer_param param_id, u32 value)
 {
@@ -2326,7 +2329,7 @@ ath10k_wmi_tlv_op_gen_set_ap_ps(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_scan_chan_list(struct ath10k *ar,
 				     const struct wmi_scan_chan_list_arg *arg)
 {
@@ -2337,7 +2340,7 @@ ath10k_wmi_tlv_op_gen_scan_chan_list(struct ath10k *ar,
 	struct athp_buf *pbuf;
 	size_t chans_len, len;
 	int i;
-	void *ptr, *chans;
+	char *ptr, *chans;
 
 	chans_len = arg->n_channels * (sizeof(*tlv) + sizeof(*ci));
 	len = (sizeof(*tlv) + sizeof(*cmd)) +
@@ -2348,7 +2351,7 @@ ath10k_wmi_tlv_op_gen_scan_chan_list(struct ath10k *ar,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_SCAN_CHAN_LIST_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2357,7 +2360,7 @@ ath10k_wmi_tlv_op_gen_scan_chan_list(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(chans_len);
 	chans = (void *)tlv->value;
@@ -2383,7 +2386,7 @@ ath10k_wmi_tlv_op_gen_scan_chan_list(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_beacon_dma(struct ath10k *ar, u32 vdev_id,
 				 const void *bcn, size_t bcn_len,
 				 u32 bcn_paddr, bool dtim_zero,
@@ -2424,7 +2427,7 @@ ath10k_wmi_tlv_op_gen_beacon_dma(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_pdev_set_wmm(struct ath10k *ar,
 				   const struct wmi_wmm_params_all_arg *arg)
 {
@@ -2433,7 +2436,7 @@ ath10k_wmi_tlv_op_gen_pdev_set_wmm(struct ath10k *ar,
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
 	size_t len;
-	void *ptr;
+	char *ptr;
 
 	len = (sizeof(*tlv) + sizeof(*cmd)) +
 	      (4 * (sizeof(*tlv) + sizeof(*wmm)));
@@ -2443,7 +2446,7 @@ ath10k_wmi_tlv_op_gen_pdev_set_wmm(struct ath10k *ar,
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_PDEV_SET_WMM_PARAMS_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2462,7 +2465,7 @@ ath10k_wmi_tlv_op_gen_pdev_set_wmm(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_request_stats(struct ath10k *ar, u32 stats_mask)
 {
 	struct wmi_request_stats_cmd *cmd;
@@ -2483,7 +2486,7 @@ ath10k_wmi_tlv_op_gen_request_stats(struct ath10k *ar, u32 stats_mask)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_force_fw_hang(struct ath10k *ar,
 				    enum wmi_force_fw_hang_type type,
 				    u32 delay_ms)
@@ -2507,7 +2510,7 @@ ath10k_wmi_tlv_op_gen_force_fw_hang(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_dbglog_cfg(struct ath10k *ar, u32 module_enable,
 				 u32 log_level) {
 	struct wmi_tlv_dbglog_cmd *cmd;
@@ -2515,7 +2518,7 @@ ath10k_wmi_tlv_op_gen_dbglog_cfg(struct ath10k *ar, u32 module_enable,
 	struct athp_buf *pbuf;
 	size_t len, bmap_len;
 	u32 value;
-	void *ptr;
+	char *ptr;
 
 	if (module_enable) {
 		value = WMI_TLV_DBGLOG_LOG_LEVEL_VALUE(
@@ -2535,7 +2538,7 @@ ath10k_wmi_tlv_op_gen_dbglog_cfg(struct ath10k *ar, u32 module_enable,
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_DEBUG_LOG_CONFIG_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2545,7 +2548,7 @@ ath10k_wmi_tlv_op_gen_dbglog_cfg(struct ath10k *ar, u32 module_enable,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_UINT32);
 	tlv->len = __cpu_to_le16(bmap_len);
 
@@ -2558,13 +2561,13 @@ ath10k_wmi_tlv_op_gen_dbglog_cfg(struct ath10k *ar, u32 module_enable,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_pktlog_enable(struct ath10k *ar, u32 filter)
 {
 	struct wmi_tlv_pktlog_enable *cmd;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd);
@@ -2573,7 +2576,7 @@ ath10k_wmi_tlv_op_gen_pktlog_enable(struct ath10k *ar, u32 filter)
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_PDEV_PKTLOG_ENABLE_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2587,13 +2590,13 @@ ath10k_wmi_tlv_op_gen_pktlog_enable(struct ath10k *ar, u32 filter)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_pktlog_disable(struct ath10k *ar)
 {
 	struct wmi_tlv_pktlog_disable *cmd;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd);
@@ -2602,7 +2605,7 @@ ath10k_wmi_tlv_op_gen_pktlog_disable(struct ath10k *ar)
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_PDEV_PKTLOG_DISABLE_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2614,9 +2617,9 @@ ath10k_wmi_tlv_op_gen_pktlog_disable(struct ath10k *ar)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
-			       u32 tim_ie_offset, struct sk_buff *bcn,
+			       u32 tim_ie_offset, struct athp_buf *bcn,
 			       u32 prb_caps, u32 prb_erp, void *prb_ies,
 			       size_t prb_ies_len)
 {
@@ -2624,7 +2627,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 	struct wmi_tlv_bcn_prb_info *info;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	if (WARN_ON(prb_ies_len > 0 && !prb_ies))
@@ -2638,7 +2641,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_BCN_TMPL_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2654,7 +2657,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 	 * This chunk is not used yet so if setting probe resp template yields
 	 * problems with beaconing or crashes firmware look here.
 	 */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_BCN_PRB_INFO);
 	tlv->len = __cpu_to_le16(sizeof(*info) + prb_ies_len);
 	info = (void *)tlv->value;
@@ -2666,7 +2669,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*info);
 	ptr += prb_ies_len;
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(roundup(bcn->len, 4));
 	memcpy(tlv->value, bcn->data, bcn->len);
@@ -2678,7 +2681,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 			       struct sk_buff *prb)
 {
@@ -2686,7 +2689,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 	struct wmi_tlv_bcn_prb_info *info;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
@@ -2697,7 +2700,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_PRB_TMPL_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2707,7 +2710,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_BCN_PRB_INFO);
 	tlv->len = __cpu_to_le16(sizeof(*info));
 	info = (void *)tlv->value;
@@ -2717,7 +2720,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*info);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(roundup(prb->len, 4));
 	memcpy(tlv->value, prb->data, prb->len);
@@ -2727,14 +2730,14 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_p2p_go_bcn_ie(struct ath10k *ar, u32 vdev_id,
 				    const u8 *p2p_ie)
 {
 	struct wmi_tlv_p2p_go_bcn_ie *cmd;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
@@ -2744,7 +2747,7 @@ ath10k_wmi_tlv_op_gen_p2p_go_bcn_ie(struct ath10k *ar, u32 vdev_id,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_P2P_GO_SET_BEACON_IE);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -2754,7 +2757,7 @@ ath10k_wmi_tlv_op_gen_p2p_go_bcn_ie(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(roundup(p2p_ie[1] + 2, 4));
 	memcpy(tlv->value, p2p_ie, p2p_ie[1] + 2);
@@ -2767,14 +2770,14 @@ ath10k_wmi_tlv_op_gen_p2p_go_bcn_ie(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_update_fw_tdls_state(struct ath10k *ar, u32 vdev_id,
 					   enum wmi_tdls_state state)
 {
 	struct wmi_tdls_set_state_cmd *cmd;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 	/* Set to options from wmi_tlv_tdls_options,
 	 * for now none of them are enabled.
@@ -2787,7 +2790,7 @@ ath10k_wmi_tlv_op_gen_update_fw_tdls_state(struct ath10k *ar, u32 vdev_id,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_TDLS_SET_STATE_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 
@@ -2832,7 +2835,7 @@ static u32 ath10k_wmi_tlv_prepare_peer_qos(u8 uapsd_queues, u8 sp)
 	return peer_qos;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_tdls_peer_update(struct ath10k *ar,
 				       const struct wmi_tdls_peer_update_cmd_arg *arg,
 				       const struct wmi_tdls_peer_capab_arg *cap,
@@ -2844,7 +2847,7 @@ ath10k_wmi_tlv_op_gen_tdls_peer_update(struct ath10k *ar,
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
 	u32 peer_qos;
-	void *ptr;
+	char *ptr;
 	int len;
 	int i;
 
@@ -2857,7 +2860,7 @@ ath10k_wmi_tlv_op_gen_tdls_peer_update(struct ath10k *ar,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_TDLS_PEER_UPDATE_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 
@@ -2869,7 +2872,7 @@ ath10k_wmi_tlv_op_gen_tdls_peer_update(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_TDLS_PEER_CAPABILITIES);
 	tlv->len = __cpu_to_le16(sizeof(*peer_cap));
 	peer_cap = (void *)tlv->value;
@@ -2893,14 +2896,14 @@ ath10k_wmi_tlv_op_gen_tdls_peer_update(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*peer_cap);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(cap->peer_chan_len * sizeof(*chan));
 
 	ptr += sizeof(*tlv);
 
 	for (i = 0; i < cap->peer_chan_len; i++) {
-		tlv = ptr;
+		tlv = (void *)ptr;
 		tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_CHANNEL);
 		tlv->len = __cpu_to_le16(sizeof(*chan));
 		chan = (void *)tlv->value;
@@ -2916,7 +2919,7 @@ ath10k_wmi_tlv_op_gen_tdls_peer_update(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_wow_enable(struct ath10k *ar)
 {
 	struct wmi_tlv_wow_enable_cmd *cmd;
@@ -2940,7 +2943,7 @@ ath10k_wmi_tlv_op_gen_wow_enable(struct ath10k *ar)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_wow_add_wakeup_event(struct ath10k *ar,
 					   u32 vdev_id,
 					   enum wmi_wow_wakeup_event event,
@@ -2970,7 +2973,7 @@ ath10k_wmi_tlv_op_gen_wow_add_wakeup_event(struct ath10k *ar,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_gen_wow_host_wakeup_ind(struct ath10k *ar)
 {
 	struct wmi_tlv_wow_host_wakeup_ind *cmd;
@@ -2992,7 +2995,7 @@ ath10k_wmi_tlv_gen_wow_host_wakeup_ind(struct ath10k *ar)
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_wow_add_pattern(struct ath10k *ar, u32 vdev_id,
 				      u32 pattern_id, const u8 *pattern,
 				      const u8 *bitmask, int pattern_len,
@@ -3002,7 +3005,7 @@ ath10k_wmi_tlv_op_gen_wow_add_pattern(struct ath10k *ar, u32 vdev_id,
 	struct wmi_tlv_wow_bitmap_pattern *bitmap;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
@@ -3020,7 +3023,7 @@ ath10k_wmi_tlv_op_gen_wow_add_pattern(struct ath10k *ar, u32 vdev_id,
 
 	/* cmd */
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_WOW_ADD_PATTERN_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -3033,13 +3036,13 @@ ath10k_wmi_tlv_op_gen_wow_add_pattern(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*cmd);
 
 	/* bitmap */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(sizeof(*tlv) + sizeof(*bitmap));
 
 	ptr += sizeof(*tlv);
 
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_WOW_BITMAP_PATTERN_T);
 	tlv->len = __cpu_to_le16(sizeof(*bitmap));
 	bitmap = (void *)tlv->value;
@@ -3055,35 +3058,35 @@ ath10k_wmi_tlv_op_gen_wow_add_pattern(struct ath10k *ar, u32 vdev_id,
 	ptr += sizeof(*bitmap);
 
 	/* ipv4 sync */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(0);
 
 	ptr += sizeof(*tlv);
 
 	/* ipv6 sync */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(0);
 
 	ptr += sizeof(*tlv);
 
 	/* magic */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(0);
 
 	ptr += sizeof(*tlv);
 
 	/* pattern info timeout */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_UINT32);
 	tlv->len = __cpu_to_le16(0);
 
 	ptr += sizeof(*tlv);
 
 	/* ratelimit interval */
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_UINT32);
 	tlv->len = __cpu_to_le16(sizeof(u32));
 
@@ -3092,7 +3095,7 @@ ath10k_wmi_tlv_op_gen_wow_add_pattern(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_wow_del_pattern(struct ath10k *ar, u32 vdev_id,
 				      u32 pattern_id)
 {
@@ -3120,13 +3123,13 @@ ath10k_wmi_tlv_op_gen_wow_del_pattern(struct ath10k *ar, u32 vdev_id,
 	return pbuf;
 }
 
-static struct sk_buff *
+static struct athp_buf *
 ath10k_wmi_tlv_op_gen_adaptive_qcs(struct ath10k *ar, bool enable)
 {
 	struct wmi_tlv_adaptive_qcs *cmd;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	void *ptr;
+	char *ptr;
 	size_t len;
 
 	len = sizeof(*tlv) + sizeof(*cmd);
@@ -3135,7 +3138,7 @@ ath10k_wmi_tlv_op_gen_adaptive_qcs(struct ath10k *ar, bool enable)
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(skb->m);
-	tlv = ptr;
+	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_RESMGR_ADAPTIVE_OCS_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
