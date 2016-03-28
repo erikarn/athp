@@ -119,7 +119,7 @@ struct ath10k_wow {
  */
 struct athp_pci_softc;
 struct ath10k_hif_ops;
-struct athp_softc {
+struct ath10k {
 	struct ieee80211com		sc_ic;
 	struct mbufq			sc_snd;
 	device_t			sc_dev;

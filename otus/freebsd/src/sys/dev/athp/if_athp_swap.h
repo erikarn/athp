@@ -25,9 +25,9 @@ struct ath10k_swap_code_seg_info {
 	bus_addr_t paddr[ATH10K_SWAP_CODE_SEG_NUM_SUPPORTED];
 };
 
-extern	int ath10k_swap_code_seg_configure(struct athp_softc *sc,
+extern	int ath10k_swap_code_seg_configure(struct ath10k *ar,
 	    enum ath10k_swap_code_seg_bin_type type);
-extern	void ath10k_swap_code_seg_release(struct athp_softc *sc);
-extern	int ath10k_swap_code_seg_init(struct athp_softc *sc);
+extern	void ath10k_swap_code_seg_release(struct ath10k *ar);
+extern	int ath10k_swap_code_seg_init(struct ath10k *ar);
 
 #endif

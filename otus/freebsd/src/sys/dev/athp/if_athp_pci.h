@@ -15,7 +15,7 @@
  * PCI specific glue for athp/ath10k.
  */
 struct athp_pci_softc {
-	struct athp_softc	sc_sc;
+	struct ath10k		sc_sc;
 	struct resource		*sc_sr;         /* memory resource */
 	struct resource		*sc_irq;        /* irq resource */
 	void			*sc_ih;         /* interrupt handler */

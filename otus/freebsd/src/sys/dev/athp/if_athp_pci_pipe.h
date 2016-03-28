@@ -19,7 +19,7 @@
 #define __ATHP_PCI_PIPE_H__
 
 /* Per-pipe state. */
-struct athp_softc;
+struct ath10k;
 struct athp_pci_softc;
 struct ath10k_pci_pipe {
 	/* Handle of underlying Copy Engine */
@@ -29,7 +29,7 @@ struct ath10k_pci_pipe {
 	u8 pipe_num;
 
 	/* Convenience back pointer to hif_ce_state. */
-	struct athp_softc *sc;
+	struct ath10k *ar;
 	struct athp_pci_softc *psc;
 
 	/* busdma tag for doing said DMA */
@@ -44,11 +44,11 @@ struct ath10k_pci_pipe {
 	struct task intr;
 };
 
-extern	void ath10k_pci_ce_deinit(struct athp_softc *sc);
-extern	int ath10k_pci_alloc_pipes(struct athp_softc *sc);
-extern	void ath10k_pci_free_pipes(struct athp_softc *sc);
-extern	int ath10k_pci_init_pipes(struct athp_softc *sc);
-extern	void ath10k_pci_rx_post(struct athp_softc *sc);
-extern	void ath10k_pci_flush(struct athp_softc *sc);
+extern	void ath10k_pci_ce_deinit(struct ath10k *ar);
+extern	int ath10k_pci_alloc_pipes(struct ath10k *ar);
+extern	void ath10k_pci_free_pipes(struct ath10k *ar);
+extern	int ath10k_pci_init_pipes(struct ath10k *ar);
+extern	void ath10k_pci_rx_post(struct ath10k *ar);
+extern	void ath10k_pci_flush(struct ath10k *ar);
 
 #endif /* __ATHP_PCI_PIPE_H__ */

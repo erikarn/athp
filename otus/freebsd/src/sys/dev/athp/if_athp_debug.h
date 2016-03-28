@@ -14,67 +14,67 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef	__ATHP_DEBUG_H__
-#define	__ATHP_DEBUG_H__
+#ifndef	__ATH10K_DEBUG_H__
+#define	__ATH10K_DEBUG_H__
 
-#define	ATHP_DEBUG_XMIT		0x00000001
-#define	ATHP_DEBUG_RECV		0x00000002
-#define	ATHP_DEBUG_TXDONE	0x00000004
-#define	ATHP_DEBUG_RXDONE	0x00000008
-#define	ATHP_DEBUG_CMD		0x00000010
-#define	ATHP_DEBUG_CMDDONE	0x00000020
-#define	ATHP_DEBUG_RESET	0x00000040
-#define	ATHP_DEBUG_STATE	0x00000080
-#define	ATHP_DEBUG_CMDNOTIFY	0x00000100
-#define	ATHP_DEBUG_REGIO	0x00000200
-#define	ATHP_DEBUG_IRQ		0x00000400
-#define	ATHP_DEBUG_TXCOMP	0x00000800
-#define	ATHP_DEBUG_PCI_PS	0x00001000
-#define	ATHP_DEBUG_BOOT		0x00002000
-#define	ATHP_DEBUG_DESCDMA	0x00004000
-#define	ATHP_DEBUG_PCI		0x00008000
-#define	ATHP_DEBUG_PCI_DUMP	0x00010000
-#define	ATHP_DEBUG_BMI		0x00020000
-#define	ATHP_DEBUG_HTC		0x00040000
-#define	ATHP_DEBUG_WMI		0x00080000
-#define	ATHP_DEBUG_ANY		0xffffffff
+#define	ATH10K_DBG_XMIT		0x00000001
+#define	ATH10K_DBG_RECV		0x00000002
+#define	ATH10K_DBG_TXDONE	0x00000004
+#define	ATH10K_DBG_RXDONE	0x00000008
+#define	ATH10K_DBG_CMD		0x00000010
+#define	ATH10K_DBG_CMDDONE	0x00000020
+#define	ATH10K_DBG_RESET	0x00000040
+#define	ATH10K_DBG_STATE	0x00000080
+#define	ATH10K_DBG_CMDNOTIFY	0x00000100
+#define	ATH10K_DBG_REGIO	0x00000200
+#define	ATH10K_DBG_IRQ		0x00000400
+#define	ATH10K_DBG_TXCOMP	0x00000800
+#define	ATH10K_DBG_PCI_PS	0x00001000
+#define	ATH10K_DBG_BOOT		0x00002000
+#define	ATH10K_DBG_DESCDMA	0x00004000
+#define	ATH10K_DBG_PCI		0x00008000
+#define	ATH10K_DBG_PCI_DUMP	0x00010000
+#define	ATH10K_DBG_BMI		0x00020000
+#define	ATH10K_DBG_HTC		0x00040000
+#define	ATH10K_DBG_WMI		0x00080000
+#define	ATH10K_DBG_ANY		0xffffffff
 
-#define	ATHP_DPRINTF(sc, dm, ...) \
+#define	ath10k_dbg(sc, dm, ...) \
 	do { \
-		if ((dm == ATHP_DEBUG_ANY) || (dm & (sc)->sc_debug)) \
+		if ((dm == ATH10K_DBG_ANY) || (dm & (sc)->sc_debug)) \
 			device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
-#define	ATHP_WARN(sc, ...) \
+#define	ath10k_warn(sc, ...) \
 	do { \
 		device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
-#define	ATHP_ERR(sc, ...) \
+#define	ath10k_err(sc, ...) \
 	do { \
 		device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
-#define	ATHP_INFO(sc, ...) \
+#define	ath10k_info(sc, ...) \
 	do { \
 		device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
-struct athp_softc;
-extern	void athp_debug_dump(struct athp_softc *sc, uint64_t mask,
+struct ath10k;
+extern	void athp_debug_dump(struct ath10k *ar, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);
-extern	void ath10k_print_driver_info(struct athp_softc *sc);
+extern	void ath10k_print_driver_info(struct ath10k *ar);
 
-static inline void athp_debug_stop(struct athp_softc *sc)
+static inline void athp_debug_stop(struct ath10k *ar)
 {
 }
 
-static inline void athp_debug_register(struct athp_softc *sc)
+static inline void athp_debug_register(struct ath10k *ar)
 {
 }
 
-static inline void athp_debug_unregister(struct athp_softc *sc)
+static inline void athp_debug_unregister(struct ath10k *ar)
 {
 }
 
-#endif	/* __ATHP_DEBUG_H__ */
+#endif	/* __ATH10K_DEBUG_H__ */

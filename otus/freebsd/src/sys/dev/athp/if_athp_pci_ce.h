@@ -36,7 +36,7 @@
 
 struct ath10k_ce_pipe;
 struct athp_pci_softc;
-struct athp_softc;
+struct ath10k;
 
 #define CE_DESC_FLAGS_GATHER         (1 << 0)
 #define CE_DESC_FLAGS_BYTE_SWAP      (1 << 1)
@@ -111,7 +111,7 @@ struct ath10k_ce_ring {
 };
 
 struct ath10k_ce_pipe {
-	struct athp_softc *sc;
+	struct ath10k *ar;
 	struct athp_pci_softc *psc;
 
 	unsigned int id;
@@ -206,14 +206,14 @@ int ath10k_ce_completed_send_next_nolock(struct ath10k_ce_pipe *ce_state,
 
 /*==================CE Engine Initialization=======================*/
 
-int ath10k_ce_init_pipe(struct athp_softc *sc, unsigned int ce_id,
+int ath10k_ce_init_pipe(struct ath10k *ar, unsigned int ce_id,
 			const struct ce_attr *attr);
-void ath10k_ce_deinit_pipe(struct athp_softc *sc, unsigned int ce_id);
-int ath10k_ce_alloc_pipe(struct athp_softc *sc, int ce_id,
+void ath10k_ce_deinit_pipe(struct ath10k *ar, unsigned int ce_id);
+int ath10k_ce_alloc_pipe(struct ath10k *ar, int ce_id,
 			 const struct ce_attr *attr,
 			 void (*send_cb)(struct ath10k_ce_pipe *),
 			 void (*recv_cb)(struct ath10k_ce_pipe *));
-void ath10k_ce_free_pipe(struct athp_softc *sc, int ce_id);
+void ath10k_ce_free_pipe(struct ath10k *ar, int ce_id);
 
 /*==================CE Engine Shutdown=======================*/
 /*
@@ -244,10 +244,10 @@ int ath10k_ce_cancel_send_next(struct ath10k_ce_pipe *ce_state,
 			       unsigned int *transfer_idp);
 
 /*==================CE Interrupt Handlers====================*/
-void ath10k_ce_per_engine_service_any(struct athp_softc *sc);
-void ath10k_ce_per_engine_service(struct athp_softc *sc, unsigned int ce_id);
-int ath10k_ce_disable_interrupts(struct athp_softc *sc);
-void ath10k_ce_enable_interrupts(struct athp_softc *sc);
+void ath10k_ce_per_engine_service_any(struct ath10k *ar);
+void ath10k_ce_per_engine_service(struct ath10k *ar, unsigned int ce_id);
+int ath10k_ce_disable_interrupts(struct ath10k *ar);
+void ath10k_ce_enable_interrupts(struct ath10k *ar);
 
 /* ce_attr.flags values */
 /* Use NonSnooping PCIe accesses? */
@@ -401,9 +401,9 @@ struct ce_attr {
 #define DST_WATERMARK_ADDRESS			0x0050
 
 static inline uint32_t
-ath10k_ce_base_address(struct athp_softc *sc, unsigned int ce_id)
+ath10k_ce_base_address(struct ath10k *ar, unsigned int ce_id)
 {
-	return CE0_BASE_ADDRESS(sc->sc_regofs) + (CE1_BASE_ADDRESS(sc->sc_regofs) - CE0_BASE_ADDRESS(sc->sc_regofs)) * ce_id;
+	return CE0_BASE_ADDRESS(ar->sc_regofs) + (CE1_BASE_ADDRESS(ar->sc_regofs) - CE0_BASE_ADDRESS(ar->sc_regofs)) * ce_id;
 }
 
 #define CE_WATERMARK_MASK (HOST_IS_SRC_RING_LOW_WATERMARK_MASK  | \
@@ -450,7 +450,7 @@ ath10k_ce_base_address(struct athp_softc *sc, unsigned int ce_id)
  * XXX from adrian; the above is a bit too evail for me.
  */
 static inline uint32_t
-CE_INTERRUPT_SUMMARY(struct athp_softc *sc)
+CE_INTERRUPT_SUMMARY(struct ath10k *ar)
 {
 	uint32_t val;
 

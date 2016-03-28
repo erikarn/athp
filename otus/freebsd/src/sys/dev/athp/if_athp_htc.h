@@ -18,7 +18,7 @@
 #ifndef	__ATHP_HTC_H__
 #define	__ATHP_HTC_H__
 
-struct athp_softc;
+struct ath10k;
 
 /****************/
 /* HTC protocol */
@@ -29,13 +29,13 @@ struct athp_softc;
 struct athp_buf;
 
 struct ath10k_htc_ops {
-	void (*target_send_suspend_complete)(struct athp_softc *sc);
+	void (*target_send_suspend_complete)(struct ath10k *ar);
 };
 
 struct ath10k_htc_ep_ops {
-	void (*ep_tx_complete)(struct athp_softc *, struct athp_buf *);
-	void (*ep_rx_complete)(struct athp_softc *, struct mbuf *);
-	void (*ep_tx_credits)(struct athp_softc *);
+	void (*ep_tx_complete)(struct ath10k *, struct athp_buf *);
+	void (*ep_rx_complete)(struct ath10k *, struct mbuf *);
+	void (*ep_tx_credits)(struct ath10k *);
 };
 
 /* service connection information */
@@ -71,7 +71,7 @@ struct ath10k_htc_svc_tx_credits {
 };
 
 struct ath10k_htc {
-	struct athp_softc *sc;
+	struct ath10k *ar;
 	struct ath10k_htc_ep endpoint[ATH10K_HTC_EP_COUNT];
 
 	/* protects endpoints */
@@ -90,14 +90,14 @@ struct ath10k_htc {
 };
 
 #define	ATHP_HTC_TX_LOCK_INIT(ht)	mtx_init(&ht->tx_lock,		\
-	    device_get_nameunit(htc->sc->sc_dev), "athp htc tx", MTX_DEF)
+	    device_get_nameunit(htc->ar->sc_dev), "athp htc tx", MTX_DEF)
 #define	ATHP_HTC_TX_LOCK_FREE(ht)	mtx_destroy(&ht->tx_lock)
 #define	ATHP_HTC_TX_LOCK(ht)		mtx_lock(&ht->tx_lock)
 #define	ATHP_HTC_TX_UNLOCK(ht)		mtx_unlock(&ht->tx_lock)
 #define	ATHP_HTC_TX_LOCK_ASSERT(ht)	mtx_assert(&ht->tx_lock, MA_OWNED)
 #define	ATHP_HTC_TX_UNLOCK_ASSERT(ht)	mtx_unlock(&ht->tx_lock, MA_NOTOWNED)
 
-extern	int ath10k_htc_init(struct athp_softc *sc);
+extern	int ath10k_htc_init(struct ath10k *ar);
 extern	int ath10k_htc_wait_target(struct ath10k_htc *htc);
 extern	int ath10k_htc_start(struct ath10k_htc *htc);
 extern	int ath10k_htc_connect_service(struct ath10k_htc *htc,
@@ -105,6 +105,6 @@ extern	int ath10k_htc_connect_service(struct ath10k_htc *htc,
 	    struct ath10k_htc_svc_conn_resp *conn_resp);
 int ath10k_htc_send(struct ath10k_htc *htc, enum ath10k_htc_ep_id eid,
 	    struct athp_buf *packet);
-struct athp_buf * ath10k_htc_alloc_skb(struct athp_softc *sc, int size);
+struct athp_buf * ath10k_htc_alloc_skb(struct ath10k *ar, int size);
 
 #endif

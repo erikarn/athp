@@ -41,7 +41,7 @@
 #define ATH10K_KEEPALIVE_MAX_IDLE 3895
 #define ATH10K_KEEPALIVE_MAX_UNRESPONSIVE 3900
 
-struct athp_softc;
+struct ath10k;
 
 enum ath10k_bus {
 	ATH10K_BUS_PCI,
@@ -251,14 +251,14 @@ struct ath10k_hw_params {
 	} fw;
 };
 
-extern	void ath10k_core_get_fw_features_str(struct athp_softc *sc, char *buf,
+extern	void ath10k_core_get_fw_features_str(struct ath10k *ar, char *buf,
 	    size_t buf_len);
-extern	int ath10k_core_start(struct athp_softc *sc,
+extern	int ath10k_core_start(struct ath10k *ar,
 	    enum ath10k_firmware_mode mode);
-extern	int ath10k_wait_for_suspend(struct athp_softc *sc, u32 suspend_opt);
-extern	void ath10k_core_stop(struct athp_softc *sc);
-extern	int ath10k_core_probe_fw(struct athp_softc *sc);
-extern	int ath10k_core_register(struct athp_softc *sc);
-extern	void ath10k_core_unregister(struct athp_softc *sc);
+extern	int ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt);
+extern	void ath10k_core_stop(struct ath10k *ar);
+extern	int ath10k_core_probe_fw(struct ath10k *ar);
+extern	int ath10k_core_register(struct ath10k *ar);
+extern	void ath10k_core_unregister(struct ath10k *ar);
 
 #endif /* __IF_ATHP_CORE_H__ */

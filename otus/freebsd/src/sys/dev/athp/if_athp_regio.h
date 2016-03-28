@@ -25,19 +25,19 @@ struct athp_regio_methods {
 };
 
 /* XXX TODO: this stuff should be in a different spot */
-struct athp_softc;
+struct ath10k;
 
-extern	uint32_t athp_reg_read32(struct athp_softc *sc, uint32_t addr);
-extern	void athp_reg_write32(struct athp_softc *sc, uint32_t addr,
+extern	uint32_t athp_reg_read32(struct ath10k *ar, uint32_t addr);
+extern	void athp_reg_write32(struct ath10k *ar, uint32_t addr,
 	    uint32_t val);
-extern	uint32_t athp_pci_read32(struct athp_softc *sc, uint32_t addr);
-extern	void athp_pci_write32(struct athp_softc *sc, uint32_t addr,
+extern	uint32_t athp_pci_read32(struct ath10k *ar, uint32_t addr);
+extern	void athp_pci_write32(struct ath10k *ar, uint32_t addr,
 	    uint32_t val);
-extern	uint32_t athp_pci_soc_read32(struct athp_softc *sc, uint32_t addr);
-extern	void athp_pci_soc_write32(struct athp_softc *sc, uint32_t addr,
+extern	uint32_t athp_pci_soc_read32(struct ath10k *ar, uint32_t addr);
+extern	void athp_pci_soc_write32(struct ath10k *ar, uint32_t addr,
 	    uint32_t val);
-extern	uint32_t athp_pci_reg_read32(struct athp_softc *sc, uint32_t addr);
-extern	void athp_pci_reg_write32(struct athp_softc *sc, uint32_t addr,
+extern	uint32_t athp_pci_reg_read32(struct ath10k *ar, uint32_t addr);
+extern	void athp_pci_reg_write32(struct ath10k *ar, uint32_t addr,
 	    uint32_t val);
 
 #endif	/* __IF_ATHP_REGIO_H__ */
