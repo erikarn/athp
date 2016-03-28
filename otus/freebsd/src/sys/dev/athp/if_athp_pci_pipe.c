@@ -122,7 +122,7 @@ __FBSDID("$FreeBSD$");
 static int
 __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 {
-	struct athp_softc *sc = pipe->sc;
+	struct ath10k *ar = pipe->ar;
 	struct athp_pci_softc *psc = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	struct athp_buf *pbuf;
@@ -130,26 +130,26 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 
 	ATHP_PCI_CE_LOCK_ASSERT(psc);
 
-	pbuf = athp_getbuf(sc, &sc->buf_rx, pipe->buf_sz);
+	pbuf = athp_getbuf(ar, &ar->buf_rx, pipe->buf_sz);
 	if (pbuf == NULL)
 		return (-ENOMEM);
 
 	if (pbuf->mb.paddr & 3) {
-		ATHP_WARN(sc, "%s: unaligned mbuf\n", __func__);
+		ath10k_warn(ar, "%s: unaligned mbuf\n", __func__);
 	}
 
 	/* DMA Load */
-	ret = athp_dma_mbuf_load(sc, &sc->buf_rx.dh, &pbuf->mb, pbuf->m);
+	ret = athp_dma_mbuf_load(ar, &ar->buf_rx.dh, &pbuf->mb, pbuf->m);
 	if (ret != 0) {
-		ATHP_WARN(sc, "%s: failed to DMA mbuf load: %d\n",
+		ath10k_warn(ar, "%s: failed to DMA mbuf load: %d\n",
 		    __func__,
 		    ret);
-		athp_freebuf(sc, &sc->buf_rx, pbuf);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return (-ENOMEM);
 	}
 
 	/* Pre-recv sync */
-	athp_dma_mbuf_pre_recv(sc, &sc->buf_rx.dh, &pbuf->mb);
+	athp_dma_mbuf_pre_recv(ar, &ar->buf_rx.dh, &pbuf->mb);
 
 	/*
 	 * Once the mapping is done and we've verified there's only
@@ -158,8 +158,8 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	 */
 	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->mb.paddr);
 	if (ret) {
-		ATHP_WARN(sc, "failed to post pci rx buf: %d\n", ret);
-		athp_freebuf(sc, &sc->buf_rx, pbuf);
+		ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return ret;
 	}
 
@@ -169,7 +169,7 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 static void
 __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
-	struct athp_softc *sc = pipe->sc;
+	struct ath10k *ar = pipe->ar;
 	struct athp_pci_softc *psc = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	int ret, num;
@@ -186,7 +186,7 @@ __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 	while (num--) {
 		ret = __ath10k_pci_rx_post_buf(pipe);
 		if (ret) {
-			ATHP_WARN(sc, "failed to post pci rx buf: %d\n", ret);
+			ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
 			/* XXX TODO: retry filling; implement callout */
 #if 0
 			mod_timer(&ar_pci->rx_post_retry, jiffies +
@@ -200,7 +200,7 @@ __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 static void
 ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
-//	struct athp_softc *sc = pipe->sc;
+//	struct ath10k *ar = pipe->ar;
 	struct athp_pci_softc *psc = pipe->psc;
 
 	ATHP_PCI_CE_LOCK(psc);
@@ -209,13 +209,13 @@ ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 }
 
 void
-ath10k_pci_rx_post(struct athp_softc *sc)
+ath10k_pci_rx_post(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = sc->sc_psc;
+	struct athp_pci_softc *psc = ar->sc_psc;
 	int i;
 
 	ATHP_PCI_CE_LOCK(psc);
-	for (i = 0; i < CE_COUNT(sc); i++)
+	for (i = 0; i < CE_COUNT(ar); i++)
 		__ath10k_pci_rx_post_pipe(&psc->pipe_info[i]);
 	ATHP_PCI_CE_UNLOCK(psc);
 }
@@ -227,9 +227,9 @@ ath10k_pci_rx_post(struct athp_softc *sc)
 static void
 ath10k_pci_rx_replenish_retry(unsigned long ptr)
 {
-	struct athp_softc *sc = (void *)ptr;
+	struct ath10k *ar = (void *)ptr;
 
-	ath10k_pci_rx_post(sc);
+	ath10k_pci_rx_post(ar);
 }
 
 /* Called by lower (CE) layer when a send to Target completes. */
@@ -241,7 +241,7 @@ ath10k_pci_rx_replenish_retry(unsigned long ptr)
 static void
 ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 {
-	struct athp_softc *sc = ce_state->sc;
+	struct ath10k *ar = ce_state->ar;
 	struct athp_pci_softc *psc = ce_state->psc;
 	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
 	STAILQ_HEAD(, athp_buf) br_list;
@@ -261,7 +261,7 @@ ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 
 	while ((pbuf = STAILQ_FIRST(&br_list)) != NULL) {
 		STAILQ_REMOVE_HEAD(&br_list, next);
-		cb->tx_completion(sc, pbuf);
+		cb->tx_completion(ar, pbuf);
 	}
 }
 
@@ -269,7 +269,7 @@ ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 static void
 ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 {
-	struct athp_softc *sc = ce_state->sc;
+	struct ath10k *ar = ce_state->ar;
 	struct athp_pci_softc *psc = ce_state->psc;
 	struct ath10k_pci_pipe *pipe_info =  &psc->pipe_info[ce_state->id];
 	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
@@ -291,15 +291,15 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		max_nbytes = pbuf->m_size; /* XXX TODO: should be a method */
 
 		/* Post-RX sync */
-		athp_dma_mbuf_post_recv(sc, &sc->buf_rx.dh, &pbuf->mb);
+		athp_dma_mbuf_post_recv(ar, &ar->buf_rx.dh, &pbuf->mb);
 
 		/* Finish mapping; don't need it anymore */
-		athp_dma_mbuf_unload(sc, &sc->buf_rx.dh, &pbuf->mb);
+		athp_dma_mbuf_unload(ar, &ar->buf_rx.dh, &pbuf->mb);
 
 		if (unlikely(max_nbytes < nbytes)) {
-			ATHP_WARN(sc, "rxed more than expected (nbytes %d, max %d)",
+			ath10k_warn(ar, "rxed more than expected (nbytes %d, max %d)",
 			    nbytes, max_nbytes);
-			athp_freebuf(sc, &sc->buf_rx, pbuf);
+			athp_freebuf(ar, &ar->buf_rx, pbuf);
 			continue;
 		}
 
@@ -311,18 +311,18 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		pbuf->m = NULL;
 
 		/* Done; free pbuf */
-		athp_freebuf(sc, &sc->buf_rx, pbuf);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 
 		mbufq_enqueue(&mq, m);	/* XXX TODO: check return value */
 	}
 
 	while ((m = mbufq_dequeue(&mq))) {
-		ATHP_DPRINTF(sc, ATHP_DEBUG_PCI, "pci rx ce pipe %d len %d\n",
+		ath10k_dbg(ar, ATH10K_DBG_PCI, "pci rx ce pipe %d len %d\n",
 			   ce_state->id, m->m_len);
-		athp_debug_dump(sc, ATHP_DEBUG_PCI_DUMP, NULL, "pci rx: ",
+		athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
 			    m->m_data, m->m_len);
 
-		cb->rx_completion(sc, m);
+		cb->rx_completion(ar, m);
 	}
 
 	ath10k_pci_rx_post_pipe(pipe_info);
@@ -335,7 +335,7 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
  * and we here kill the pipe/rx deferred tasks.
  */
 static void
-ath10k_pci_kill_tasklet(struct athp_softc *sc)
+ath10k_pci_kill_tasklet(struct ath10k *ar)
 {
 #if 0
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
@@ -349,14 +349,14 @@ ath10k_pci_kill_tasklet(struct athp_softc *sc)
 
 	del_timer_sync(&ar_pci->rx_post_retry);
 #else
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
 #endif
 }
 
 static void
 ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pipe)
 {
-	struct athp_softc *sc = pipe->sc;
+	struct ath10k *ar = pipe->ar;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	struct ath10k_ce_ring *ce_ring;
 	struct athp_buf *pbuf;
@@ -376,13 +376,13 @@ ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pipe)
 			continue;
 
 		ce_ring->per_transfer_context[i] = NULL;
-		athp_freebuf(sc, &sc->buf_rx, pbuf);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 	}
 }
 
 static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 {
-	struct athp_softc *sc = pci_pipe->sc;
+	struct ath10k *ar = pci_pipe->ar;
 	struct athp_pci_softc *psc = pci_pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe;
 	struct ath10k_ce_ring *ce_ring;
@@ -410,7 +410,7 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 
 		ce_ring->per_transfer_context[i] = NULL;
 
-		psc->msg_callbacks_current.tx_completion(sc, pbuf);
+		psc->msg_callbacks_current.tx_completion(ar, pbuf);
 	}
 }
 
@@ -423,12 +423,12 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
  * are handled when the completion thread shuts down.
  */
 static void
-ath10k_pci_buffer_cleanup(struct athp_softc *sc)
+ath10k_pci_buffer_cleanup(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = sc->sc_psc;
+	struct athp_pci_softc *psc = ar->sc_psc;
 	int pipe_num;
 
-	for (pipe_num = 0; pipe_num < CE_COUNT(sc); pipe_num++) {
+	for (pipe_num = 0; pipe_num < CE_COUNT(ar); pipe_num++) {
 		struct ath10k_pci_pipe *pipe_info;
 
 		pipe_info = &psc->pipe_info[pipe_num];
@@ -438,41 +438,41 @@ ath10k_pci_buffer_cleanup(struct athp_softc *sc)
 }
 
 void
-ath10k_pci_ce_deinit(struct athp_softc *sc)
+ath10k_pci_ce_deinit(struct ath10k *ar)
 {
 	int i;
 
-	for (i = 0; i < CE_COUNT(sc); i++)
-		ath10k_ce_deinit_pipe(sc, i);
+	for (i = 0; i < CE_COUNT(ar); i++)
+		ath10k_ce_deinit_pipe(ar, i);
 }
 
 void
-ath10k_pci_flush(struct athp_softc *sc)
+ath10k_pci_flush(struct ath10k *ar)
 {
-	ath10k_pci_kill_tasklet(sc);
-	ath10k_pci_buffer_cleanup(sc);
+	ath10k_pci_kill_tasklet(ar);
+	ath10k_pci_buffer_cleanup(ar);
 }
 
 int
-ath10k_pci_alloc_pipes(struct athp_softc *sc)
+ath10k_pci_alloc_pipes(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = sc->sc_psc;
+	struct athp_pci_softc *psc = ar->sc_psc;
 	struct ath10k_pci_pipe *pipe;
 	int i, ret;
 	int sz;
 
-	for (i = 0; i < CE_COUNT(sc); i++) {
+	for (i = 0; i < CE_COUNT(ar); i++) {
 		pipe = &psc->pipe_info[i];
 		pipe->ce_hdl = &psc->ce_states[i];
 		pipe->pipe_num = i;
-		pipe->sc = sc;
+		pipe->ar = ar;
 		pipe->psc = psc;
 
-		ret = ath10k_ce_alloc_pipe(sc, i, &host_ce_config_wlan[i],
+		ret = ath10k_ce_alloc_pipe(ar, i, &host_ce_config_wlan[i],
 					   ath10k_pci_ce_send_done,
 					   ath10k_pci_ce_recv_data);
 		if (ret) {
-			ATHP_ERR(sc,
+			ath10k_err(ar,
 			    "failed to allocate copy engine pipe %d: %d\n",
 			    i, ret);
 			return ret;
@@ -501,15 +501,15 @@ ath10k_pci_alloc_pipes(struct athp_softc *sc)
 		 */
 		if (pipe->buf_sz == 0) {
 			sz = 4096;
-			device_printf(sc->sc_dev,
+			device_printf(ar->sc_dev,
 			    "%s: WARNING: configuring 4k dmamap size for pipe %d; figure out what to do instead\n",
 			    __func__, i);
 		} else {
 			sz = pipe->buf_sz;
 		}
-		ret = athp_dma_head_alloc(sc, &pipe->dmatag, sz);
+		ret = athp_dma_head_alloc(ar, &pipe->dmatag, sz);
 		if (ret) {
-			ATHP_ERR(sc, "%s: failed to create dma tag for pipe %d\n",
+			ath10k_err(ar, "%s: failed to create dma tag for pipe %d\n",
 			    __func__,
 			    i);
 			return (ret);
@@ -520,28 +520,28 @@ ath10k_pci_alloc_pipes(struct athp_softc *sc)
 }
 
 void
-ath10k_pci_free_pipes(struct athp_softc *sc)
+ath10k_pci_free_pipes(struct ath10k *ar)
 {
 	int i;
-	struct athp_pci_softc *psc = sc->sc_psc;
+	struct athp_pci_softc *psc = ar->sc_psc;
 	struct ath10k_pci_pipe *pipe;
 
-	for (i = 0; i < CE_COUNT(sc); i++) {
+	for (i = 0; i < CE_COUNT(ar); i++) {
 		pipe = &psc->pipe_info[i];
-		ath10k_ce_free_pipe(sc, i);
-		athp_dma_head_free(sc, &pipe->dmatag);
+		ath10k_ce_free_pipe(ar, i);
+		athp_dma_head_free(ar, &pipe->dmatag);
 	}
 }
 
 int
-ath10k_pci_init_pipes(struct athp_softc *sc)
+ath10k_pci_init_pipes(struct ath10k *ar)
 {
 	int i, ret;
 
-	for (i = 0; i < CE_COUNT(sc); i++) {
-		ret = ath10k_ce_init_pipe(sc, i, &host_ce_config_wlan[i]);
+	for (i = 0; i < CE_COUNT(ar); i++) {
+		ret = ath10k_ce_init_pipe(ar, i, &host_ce_config_wlan[i]);
 		if (ret) {
-			ATHP_ERR(sc,
+			ath10k_err(ar,
 			    "failed to initialize copy engine pipe %d: %d\n",
 			    i, ret);
 			return ret;
