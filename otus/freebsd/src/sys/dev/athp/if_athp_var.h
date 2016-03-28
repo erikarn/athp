@@ -85,14 +85,26 @@ struct athp_vap {
 #define	ATHP_CONF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
 #define	ATHP_CONF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
 
-/*
- * XXX temporary placeholders until we get the full WMI/HTT
- * layer up.
- */
+struct ath10k_mem_chunk {
+	struct athp_descdma dd;
+	u32 req_id;
+};
+
 struct ath10k_wmi {
-	int op_version;
-	int num_mem_chunks;
-	int rx_decap_mode;
+	enum ath10k_fw_wmi_op_version op_version;
+	enum ath10k_htc_ep_id eid;
+	struct completion service_ready;
+	struct completion unified_ready;
+	wait_queue_head_t tx_credits_wq;
+	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
+	struct wmi_cmd_map *cmd;
+	struct wmi_vdev_param_map *vdev_param;
+	struct wmi_pdev_param_map *pdev_param;
+	const struct wmi_ops *ops;
+
+	u32 num_mem_chunks;
+	u32 rx_decap_mode;
+	struct ath10k_mem_chunk mem_chunks[WMI_MAX_MEM_REQS];
 };
 
 #define	ATH10K_HTT_MAX_NUM_AMSDU_DEFAULT	3

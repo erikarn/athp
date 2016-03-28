@@ -87,13 +87,12 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_wmi.h"
 #include "if_athp_wmi_tlv.h"
 #include "if_athp_var.h"
+#include "if_athp_wmi_ops.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
 
 #include "if_athp_main.h"
-
-#include <linux/err.h>
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
 
@@ -2408,15 +2407,17 @@ ath10k_wmi_tlv_op_gen_beacon_dma(struct ath10k *ar, u32 vdev_id,
 	struct wmi_bcn_tx_ref_cmd *cmd;
 	struct wmi_tlv *tlv;
 	struct athp_buf *pbuf;
-	struct ieee80211_hdr *hdr;
+	const struct ieee80211_frame *hdr;
 	u16 fc;
 
 	pbuf = ath10k_wmi_alloc_skb(ar, sizeof(*tlv) + sizeof(*cmd));
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
 
-	hdr = (struct ieee80211_hdr *)bcn;
-	fc = le16_to_cpu(hdr->frame_control);
+	hdr = bcn;
+	//fc = le16_to_cpu(hdr->frame_control);
+	/* XXX TODO: check I got this around the right way */
+	fc = le16_to_cpu(hdr->i_fc[1] << 8 | hdr->i_fc[0]);
 
 	tlv = (void *)mbuf_skb_data(pbuf->m);
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_BCN_SEND_FROM_HOST_CMD);
