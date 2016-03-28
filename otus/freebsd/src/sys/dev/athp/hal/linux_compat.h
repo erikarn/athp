@@ -7,6 +7,7 @@
 #include <linux/wait.h>
 #include <linux/if_ether.h>
 #include <linux/err.h>
+#include <linux/etherdevice.h>
 
 #if 0
 #include <sys/libkern.h>
