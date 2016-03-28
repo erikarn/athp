@@ -1130,7 +1130,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 {
 	const void **tb;
 	const struct wmi_tlv_stats_ev *ev;
-	const void *data;
+	const char *data;
 	u32 num_pdev_stats;
 	u32 num_vdev_stats;
 	u32 num_peer_stats;
@@ -1171,7 +1171,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 		const struct wmi_pdev_stats *src;
 		struct ath10k_fw_stats_pdev *dst;
 
-		src = data;
+		src = (const void *) data;
 		if (data_len < sizeof(*src))
 			return -EPROTO;
 
@@ -1192,7 +1192,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 		const struct wmi_tlv_vdev_stats *src;
 		struct ath10k_fw_stats_vdev *dst;
 
-		src = data;
+		src = (const void *) data;
 		if (data_len < sizeof(*src))
 			return -EPROTO;
 
@@ -1211,7 +1211,7 @@ static int ath10k_wmi_tlv_op_pull_fw_stats(struct ath10k *ar,
 		const struct wmi_10x_peer_stats *src;
 		struct ath10k_fw_stats_peer *dst;
 
-		src = data;
+		src = (const void *) data;
 		if (data_len < sizeof(*src))
 			return -EPROTO;
 
@@ -1268,7 +1268,7 @@ ath10k_wmi_tlv_op_pull_wow_ev(struct ath10k *ar, struct athp_buf *pbuf,
 	const struct wmi_tlv_wow_event_info *ev;
 	int ret;
 
-	tb = ath10k_wmi_tlv_parse_alloc(ar, mbuf_skb_data(m->pbuf), mbuf_skb_len(m->pbuf));
+	tb = ath10k_wmi_tlv_parse_alloc(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 	if (IS_ERR(tb)) {
 		ret = PTR_ERR(tb);
 		ath10k_warn(ar, "failed to parse tlv: %d\n", ret);
@@ -1388,7 +1388,7 @@ ath10k_wmi_tlv_op_gen_pdev_set_param(struct ath10k *ar, u32 param_id,
 	return pbuf;
 }
 
-static struct sk_buff *ath10k_wmi_tlv_op_gen_init(struct ath10k *ar)
+static struct athp_buf *ath10k_wmi_tlv_op_gen_init(struct ath10k *ar)
 {
 	struct athp_buf *pbuf;
 	struct wmi_tlv *tlv;
@@ -1396,7 +1396,7 @@ static struct sk_buff *ath10k_wmi_tlv_op_gen_init(struct ath10k *ar)
 	struct wmi_tlv_resource_config *cfg;
 	struct wmi_host_mem_chunks *chunks;
 	size_t len, chunks_len;
-	void *ptr;
+	char *ptr;
 
 	chunks_len = ar->wmi.num_mem_chunks * sizeof(struct host_memory_chunk);
 	len = (sizeof(*tlv) + sizeof(*cmd)) +
@@ -1409,21 +1409,21 @@ static struct sk_buff *ath10k_wmi_tlv_op_gen_init(struct ath10k *ar)
 
 	ptr = mbuf_skb_data(pbuf->m);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_INIT_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_RESOURCE_CONFIG);
 	tlv->len = __cpu_to_le16(sizeof(*cfg));
 	cfg = (void *)tlv->value;
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cfg);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = __cpu_to_le16(chunks_len);
 	chunks = (void *)tlv->value;
@@ -1503,7 +1503,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 	__le32 *chans;
 	struct wmi_ssid *ssids;
 	struct wmi_mac_addr *addrs;
-	void *ptr;
+	char *ptr;
 	int i, ret;
 
 	ret = ath10k_wmi_start_scan_verify(arg);
@@ -1525,7 +1525,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_START_SCAN_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -1546,7 +1546,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_UINT32);
 	tlv->len = __cpu_to_le16(chan_len);
 	chans = (void *)tlv->value;
@@ -1556,7 +1556,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += chan_len;
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_FIXED_STRUCT);
 	tlv->len = __cpu_to_le16(ssid_len);
 	ssids = (void *)tlv->value;
@@ -1568,7 +1568,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += ssid_len;
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_FIXED_STRUCT);
 	tlv->len = __cpu_to_le16(bssid_len);
 	addrs = (void *)tlv->value;
@@ -1578,7 +1578,7 @@ ath10k_wmi_tlv_op_gen_start_scan(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += bssid_len;
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(ie_len);
 	memcpy(tlv->value, arg->ie, arg->ie_len);
@@ -1710,7 +1710,7 @@ ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_VDEV_START_REQUEST_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -1730,7 +1730,7 @@ ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_CHANNEL);
 	tlv->len = __cpu_to_le16(sizeof(*ch));
 	ch = (void *)tlv->value;
@@ -1739,7 +1739,7 @@ ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*ch);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = 0;
 	noa = (void *)tlv->value;
@@ -1868,7 +1868,7 @@ ath10k_wmi_tlv_op_gen_vdev_install_key(struct ath10k *ar,
 		return ERR_PTR(-ENOMEM);
 
 	ptr = (void *)mbuf_skb_data(pbuf->m);
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_VDEV_INSTALL_KEY_CMD);
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
@@ -1886,7 +1886,7 @@ ath10k_wmi_tlv_op_gen_vdev_install_key(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
 	tlv->len = __cpu_to_le16(roundup(arg->key_len, sizeof(__le32)));
 	if (arg->key_data)
@@ -1905,7 +1905,7 @@ static void *ath10k_wmi_tlv_put_uapsd_ac(struct ath10k *ar, void *ptr,
 	struct wmi_sta_uapsd_auto_trig_param *ac;
 	struct wmi_tlv *tlv;
 
-	tlv = ptr;
+	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_STA_UAPSD_AUTO_TRIG_PARAM);
 	tlv->len = __cpu_to_le16(sizeof(*ac));
 	ac = (void *)tlv->value;
