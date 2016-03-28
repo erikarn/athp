@@ -37,6 +37,7 @@
 #define	ATH10K_DBG_BMI		0x00020000
 #define	ATH10K_DBG_HTC		0x00040000
 #define	ATH10K_DBG_WMI		0x00080000
+#define	ATH10K_DBG_MAC		0x00100000
 #define	ATH10K_DBG_ANY		0xffffffff
 
 #define	ath10k_dbg(sc, dm, ...) \
