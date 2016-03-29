@@ -29,7 +29,24 @@
 /* XXX TODO: ath10k wants a bit more state here for TX and a little more for RX .. */
 
 struct ath10k_skb_cb {
-	uint8_t eid;
+	u8 eid;
+	u8 vdev_id;
+	enum ath10k_hw_txrx_mode txmode;
+	bool is_protected;
+
+	struct {
+		u8 tid;
+		u16 freq;
+		bool is_offchan;
+		bool nohwcrypt;
+		struct ath10k_htt_txbuf *txbuf;
+		u32 txbuf_paddr;
+	} __packed htt;
+
+	struct {
+		bool dtim_zero;
+		bool deliver_cab;
+	} bcn;
 };
 
 struct athp_buf {
