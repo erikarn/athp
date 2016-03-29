@@ -388,6 +388,8 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), "athp ce",
 	    MTX_DEF);
+	mtx_init(&ar->sc_data_mtx, device_get_nameunit(dev), "athp data",
+	    MTX_DEF);
 	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
 	    NULL, psc);
 	(void) taskqueue_start_threads(&psc->pipe_taskq, 1, PI_NET, "%s pipe taskq",
@@ -599,6 +601,7 @@ bad:
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
+	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_mtx);
 	if (psc->pipe_taskq) {
 		taskqueue_drain_all(psc->pipe_taskq);
@@ -656,6 +659,7 @@ athp_pci_detach(device_t dev)
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
+	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_mtx);
 
 	/* Tear down the pipe taskqueue */
