@@ -111,7 +111,7 @@ struct ath10k_vif {
 	enum wmi_vdev_subtype vdev_subtype;
 	u32 beacon_interval;
 	u32 dtim_period;
-//	struct sk_buff *beacon;
+	struct athp_buf *beacon;
 	/* protected by data_lock */
 	enum ath10k_beacon_state beacon_state;
 //	void *beacon_buf;
