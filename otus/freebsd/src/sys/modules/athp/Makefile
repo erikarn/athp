@@ -59,7 +59,12 @@ SRCS    += if_athp_core.c
 SRCS    += if_athp_htc.c
 
 # This is the command structure format to speak to the firmware (WMI).
-# SRCS    += if_athp_wmi_tlv.c
-# SRCS    += if_athp_wmi.c
+SRCS    += if_athp_wmi_tlv.c
+SRCS    += if_athp_wmi.c
+
+# This is the MAC layer - in FreeBSD, this is the MAC/VIF abstraction
+# layer and I'll break out the command handling and net80211 bits
+# into separate source files
+SRCS    += if_athp_mac.c
 
 .include <bsd.kmod.mk>
