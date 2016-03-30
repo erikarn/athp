@@ -166,6 +166,8 @@ struct ath10k {
 	int				sc_invalid;
 	uint64_t			sc_debug;
 
+	void (*sc_node_free)(struct ieee80211_node *);
+
 	int				sc_running:1,
 					sc_calibrating:1,
 					sc_scanning:1;
