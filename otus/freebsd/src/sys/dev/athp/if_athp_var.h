@@ -139,10 +139,13 @@ struct ath10k_htt {
 	int max_num_ampdu;
 	int max_num_amsdu;
 	int max_num_pending_tx;
+
+	wait_queue_head_t empty_tx_wq;
 };
 
 struct ath10k_wow {
 	int max_num_patterns;
+	struct completion wakeup_completed;
 };
 
 /*
@@ -223,6 +226,8 @@ struct ath10k {
 	/* Methods used to speak to the register space */
 	struct athp_regio_methods	sc_regio;
 
+	struct completion target_suspend;
+
 	/* HIF */
 	struct {
 		enum ath10k_bus bus;
@@ -238,13 +243,29 @@ struct ath10k {
 	struct ath10k_htc htc;
 
 	/* HTT */
+	struct ath10k_htt htt;
 
 	/* WMI */
 	struct ath10k_wmi wmi;
-	struct ath10k_htt htt;
 	struct ath10k_wow wow;
 
-	struct cv target_suspend;
+	struct {
+		struct completion started;
+		struct completion completed;
+		struct completion on_channel;
+		struct task timeout;
+		enum ath10k_scan_state state;
+		bool is_roc;
+		int vdev_id;
+		int roc_freq;
+		bool roc_notify;
+	} scan;
+
+	/* should never be NULL; needed for regular htt rx */
+	struct ieee80211_channel *rx_channel;
+
+	/* valid during scan; needed for mgmt rx during scan */
+	struct ieee80211_channel *scan_channel;
 
 	struct ath10k_hw_params hw_params;
 
@@ -278,6 +299,15 @@ struct ath10k {
 	 *  XXX TODO: reorder/rename/etc ot make this match the ath10k struct
 	 * as much as possible.
 	 */
+
+	struct completion install_key_done;
+	struct completion vdev_setup_done;
+	struct completion offchan_tx_completed;
+	wait_queue_head_t peer_mapping_wq;
+
+	struct {
+		struct completion wmi_sync;
+	} thermal;
 
 	struct {
 	/* protected by conf_mutex */

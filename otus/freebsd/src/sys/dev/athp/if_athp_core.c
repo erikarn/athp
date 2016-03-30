@@ -242,11 +242,11 @@ ath10k_core_get_fw_features_str(struct ath10k *ar, char *buf,
 	}
 }
 
-static void
-ath10k_send_suspend_complete(struct ath10k *ar)
+static void ath10k_send_suspend_complete(struct ath10k *ar)
 {
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot suspend complete\n");
-	cv_signal(&ar->target_suspend);
+
+	complete(&ar->target_suspend);
 }
 
 static int
@@ -1128,6 +1128,8 @@ ath10k_core_restart(void *arg, int npending)
 
 	ieee80211_stop_queues(ar->hw);
 	ath10k_drain_tx(ar);
+#endif
+
 	complete_all(&ar->scan.started);
 	complete_all(&ar->scan.completed);
 	complete_all(&ar->scan.on_channel);
@@ -1139,6 +1141,7 @@ ath10k_core_restart(void *arg, int npending)
 	wake_up(&ar->wmi.tx_credits_wq);
 	wake_up(&ar->peer_mapping_wq);
 
+#if 0
 	mutex_lock(&ar->conf_mutex);
 
 	switch (ar->state) {

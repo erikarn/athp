@@ -379,6 +379,20 @@ athp_pci_attach(device_t dev)
 
 	/* XXX TODO: initialize sc_debug from TUNABLE */
 
+	/*
+	 * XXX TODO: should this all be done as part of the ath10k core register
+	 * function?
+	 */
+	init_completion(&ar->scan.started);
+	init_completion(&ar->scan.completed);
+	init_completion(&ar->scan.on_channel);
+	init_completion(&ar->target_suspend);
+	init_completion(&ar->wow.wakeup_completed);
+
+	init_completion(&ar->install_key_done);
+	init_completion(&ar->vdev_setup_done);
+	init_completion(&ar->thermal.wmi_sync);
+
 	/* XXX TODO: unique names */
 	mtx_init(&ar->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
@@ -627,6 +641,18 @@ athp_pci_detach(device_t dev)
 	 * Do a config read to clear pre-existing pci error status.
 	 */
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
+
+	/* clean up anything waiting */
+	complete_all(&ar->scan.started);
+	complete_all(&ar->scan.completed);
+	complete_all(&ar->scan.on_channel);
+	complete_all(&ar->offchan_tx_completed);
+	complete_all(&ar->install_key_done);
+	complete_all(&ar->vdev_setup_done);
+	complete_all(&ar->thermal.wmi_sync);
+	wake_up(&ar->htt.empty_tx_wq);
+	wake_up(&ar->wmi.tx_credits_wq);
+	wake_up(&ar->peer_mapping_wq);
 
 	/* detach main driver */
 	(void) athp_detach(ar);

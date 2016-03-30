@@ -57,4 +57,26 @@ static inline struct ath10k_vif *ath10k_vif_to_arvif(struct ieee80211vap *vap)
 	return (struct ath10k_vif *) vap;
 }
 
+static inline void ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf *pbuf)
+{
+#if 0
+	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+
+	if (info->flags  & IEEE80211_TX_CTL_ASSIGN_SEQ) {
+		if (arvif->tx_seq_no == 0)
+			arvif->tx_seq_no = 0x1000;
+
+		if (info->flags & IEEE80211_TX_CTL_FIRST_FRAGMENT)
+			arvif->tx_seq_no += 0x10;
+		hdr->seq_ctrl &= cpu_to_le16(IEEE80211_SCTL_FRAG);
+		hdr->seq_ctrl |= cpu_to_le16(arvif->tx_seq_no);
+	}
+#endif
+	printf("%s: TODO\n", __func__);
+}
+
+
+
 #endif /* _MAC_H_ */
