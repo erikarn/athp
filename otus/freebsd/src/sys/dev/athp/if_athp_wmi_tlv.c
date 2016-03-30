@@ -94,7 +94,7 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_main.h"
 
-MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp driver dma buffers");
+MALLOC_DECLARE(M_ATHPDEV);
 
 /***************/
 /* TLV helpers */
