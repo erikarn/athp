@@ -98,4 +98,35 @@ IS_ALIGNED(unsigned long ptr, int a)
 	return (ptr % a == 0);
 }
 
+/*
+ * This isn't strictly speaking "linux compat"; it's bits that are
+ * missing from net80211 that we should really port.
+ */
+/* XXX TODO: implement! */
+#define	IEEE80211_IS_ACTION(a)		0
+#define	IEEE80211_IS_DEAUTH(a)		0
+#define	IEEE80211_IS_DISASSOC(a)	0
+#define	IEEE80211_HAS_PROT(a)		0
+#define	IEEE80211_IS_MGMT(a)		0
+
+/* XXX temp uAPSD */
+/* U-APSD queue for WMM IEs sent by AP */
+#define IEEE80211_WMM_IE_AP_QOSINFO_UAPSD       (1<<7)
+#define IEEE80211_WMM_IE_AP_QOSINFO_PARAM_SET_CNT_MASK  0x0f
+
+/* U-APSD queues for WMM IEs sent by STA */
+#define IEEE80211_WMM_IE_STA_QOSINFO_AC_VO      (1<<0)
+#define IEEE80211_WMM_IE_STA_QOSINFO_AC_VI      (1<<1)
+#define IEEE80211_WMM_IE_STA_QOSINFO_AC_BK      (1<<2)
+#define IEEE80211_WMM_IE_STA_QOSINFO_AC_BE      (1<<3)
+#define IEEE80211_WMM_IE_STA_QOSINFO_AC_MASK    0x0f
+
+/* U-APSD max SP length for WMM IEs sent by STA */
+#define IEEE80211_WMM_IE_STA_QOSINFO_SP_ALL     0x00
+#define IEEE80211_WMM_IE_STA_QOSINFO_SP_2       0x01
+#define IEEE80211_WMM_IE_STA_QOSINFO_SP_4       0x02
+#define IEEE80211_WMM_IE_STA_QOSINFO_SP_6       0x03
+#define IEEE80211_WMM_IE_STA_QOSINFO_SP_MASK    0x03
+#define IEEE80211_WMM_IE_STA_QOSINFO_SP_SHIFT   5
+
 #endif	/* __LINUX_COMPAT_H__ */
