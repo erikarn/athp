@@ -8,6 +8,7 @@
 #include <linux/if_ether.h>
 #include <linux/err.h>
 #include <linux/etherdevice.h>
+#include <linux/workqueue.h>
 
 #if 0
 #include <sys/libkern.h>
@@ -128,5 +129,46 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define IEEE80211_WMM_IE_STA_QOSINFO_SP_6       0x03
 #define IEEE80211_WMM_IE_STA_QOSINFO_SP_MASK    0x03
 #define IEEE80211_WMM_IE_STA_QOSINFO_SP_SHIFT   5
+
+/* Crpyto length definitions we don't have? Hm */
+#define IEEE80211_WEP_IV_LEN            4
+#define IEEE80211_WEP_ICV_LEN           4
+#define IEEE80211_CCMP_HDR_LEN          8
+#define IEEE80211_CCMP_MIC_LEN          8
+#define IEEE80211_CCMP_PN_LEN           6
+#define IEEE80211_CCMP_256_HDR_LEN      8
+#define IEEE80211_CCMP_256_MIC_LEN      16
+#define IEEE80211_CCMP_256_PN_LEN       6
+#define IEEE80211_TKIP_IV_LEN           8
+#define IEEE80211_TKIP_ICV_LEN          4
+#define IEEE80211_CMAC_PN_LEN           6
+#define IEEE80211_GMAC_PN_LEN           6
+#define IEEE80211_GCMP_HDR_LEN          8
+#define IEEE80211_GCMP_MIC_LEN          16
+#define IEEE80211_GCMP_PN_LEN           6
+
+/* They store it as 16 bit value, not two 8 bit values.. */
+#define IEEE80211_FCTL_VERS             0x0003
+#define IEEE80211_FCTL_FTYPE            0x000c
+#define IEEE80211_FCTL_STYPE            0x00f0
+#define IEEE80211_FCTL_TODS             0x0100
+#define IEEE80211_FCTL_FROMDS           0x0200
+#define IEEE80211_FCTL_MOREFRAGS        0x0400
+#define IEEE80211_FCTL_RETRY            0x0800
+#define IEEE80211_FCTL_PM               0x1000
+#define IEEE80211_FCTL_MOREDATA         0x2000
+#define IEEE80211_FCTL_PROTECTED        0x4000
+#define IEEE80211_FCTL_ORDER            0x8000
+#define IEEE80211_FCTL_CTL_EXT          0x0f00
+
+#define IEEE80211_SCTL_FRAG             0x000F
+#define IEEE80211_SCTL_SEQ              0xFFF0
+
+#define IEEE80211_FTYPE_MGMT            0x0000
+#define IEEE80211_FTYPE_CTL             0x0004
+#define IEEE80211_FTYPE_DATA            0x0008
+#define IEEE80211_FTYPE_EXT             0x000c
+
+
 
 #endif	/* __LINUX_COMPAT_H__ */
