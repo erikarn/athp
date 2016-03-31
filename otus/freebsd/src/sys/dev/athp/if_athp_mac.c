@@ -71,15 +71,23 @@ __FBSDID("$FreeBSD$");
 #include "hal/linux_compat.h"
 #include "hal/targaddrs.h"
 #include "hal/hw.h"
+#include "hal/htc.h"
+#include "hal/wmi.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
+#include "if_athp_stats.h"
 #include "if_athp_core.h"
+#include "if_athp_desc.h"
+#include "if_athp_htc.h"
+#include "if_athp_buf.h"
+#include "if_athp_wmi.h"
+#include "if_athp_wmi_tlv.h"
 #include "if_athp_var.h"
+#include "if_athp_wmi_ops.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
-
-#include "if_athp_main.h"
+#include "if_athp_mac.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -124,7 +132,7 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 }
 
 void
-ath10k_mac_handle_beacon(struct ath10k *ar, struct sk_buff *skb)
+ath10k_mac_handle_beacon(struct ath10k *ar, struct athp_buf *pbuf)
 {
 
 	printf("%s: called\n", __func__);
