@@ -1112,10 +1112,9 @@ ath10k_init_hw_params(struct ath10k *ar)
 	return 0;
 }
 
-static void
-ath10k_core_restart(void *arg, int npending)
+static void ath10k_core_restart(struct work_struct *work)
 {
-	struct ath10k *ar = arg;
+	struct ath10k *ar = container_of(work, struct ath10k, restart_work);
 
 	/* XXX lock? */
 	set_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags);
@@ -1783,6 +1782,11 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 		ret = -ENOTSUPP;
 		goto err_free_mac;
 	}
+#endif
+
+int
+ath10k_core_init(struct ath10k *ar)
+{
 
 	init_completion(&ar->scan.started);
 	init_completion(&ar->scan.completed);
@@ -1794,7 +1798,9 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 	init_completion(&ar->vdev_setup_done);
 	init_completion(&ar->thermal.wmi_sync);
 
+#if 0
 	INIT_DELAYED_WORK(&ar->scan.timeout, ath10k_scan_timeout_work);
+#endif
 
 	ar->workqueue = create_singlethread_workqueue("ath10k_wq");
 	if (!ar->workqueue)
@@ -1804,8 +1810,10 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 	if (!ar->workqueue_aux)
 		goto err_free_wq;
 
+#if 0
 	mutex_init(&ar->conf_mutex);
 	spin_lock_init(&ar->data_lock);
+#endif
 
 	INIT_LIST_HEAD(&ar->peers);
 	init_waitqueue_head(&ar->peer_mapping_wq);
@@ -1813,34 +1821,38 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 	init_waitqueue_head(&ar->wmi.tx_credits_wq);
 
 	init_completion(&ar->offchan_tx_completed);
+#if 0
 	INIT_WORK(&ar->offchan_tx_work, ath10k_offchan_tx_work);
-	skb_queue_head_init(&ar->offchan_tx_queue);
+#endif
+	TAILQ_INIT(&ar->offchan_tx_queue);
 
+#if 0
 	INIT_WORK(&ar->wmi_mgmt_tx_work, ath10k_mgmt_over_wmi_tx_work);
-	skb_queue_head_init(&ar->wmi_mgmt_tx_queue);
+#endif
+	TAILQ_INIT(&ar->wmi_mgmt_tx_queue);
 
+#if 0
 	INIT_WORK(&ar->register_work, ath10k_core_register_work);
+#endif
 	INIT_WORK(&ar->restart_work, ath10k_core_restart);
 
+#if 0
 	ret = ath10k_debug_create(ar);
 	if (ret)
 		goto err_free_aux_wq;
+#endif
+	device_printf(ar->sc_dev, "%s: TODO: scan/offchan/mgmt/etc add init!\n", __func__);
 
-	return ar;
+	return 0;
 
-err_free_aux_wq:
-	destroy_workqueue(ar->workqueue_aux);
+//err_free_aux_wq:
+//	destroy_workqueue(ar->workqueue_aux);
 err_free_wq:
 	destroy_workqueue(ar->workqueue);
-
 err_free_mac:
-	ath10k_mac_destroy(ar);
-
-	return NULL;
+	return -1;
 }
-#endif
 
-#if 0
 void
 ath10k_core_destroy(struct ath10k *ar)
 {
@@ -1851,7 +1863,8 @@ ath10k_core_destroy(struct ath10k *ar)
 	flush_workqueue(ar->workqueue_aux);
 	destroy_workqueue(ar->workqueue_aux);
 
+#if 0
 	ath10k_debug_destroy(ar);
 	ath10k_mac_destroy(ar);
-}
 #endif
+}

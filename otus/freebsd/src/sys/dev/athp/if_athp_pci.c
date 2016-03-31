@@ -380,20 +380,14 @@ athp_pci_attach(device_t dev)
 	/* XXX TODO: initialize sc_debug from TUNABLE */
 
 	/*
-	 * XXX TODO: should this all be done as part of the ath10k core register
-	 * function?
+	 * Initialise ath10k core bits.
 	 */
-	init_completion(&ar->scan.started);
-	init_completion(&ar->scan.completed);
-	init_completion(&ar->scan.on_channel);
-	init_completion(&ar->target_suspend);
-	init_completion(&ar->wow.wakeup_completed);
+	if (ath10k_core_init(ar) < 0)
+		goto bad0;
 
-	init_completion(&ar->install_key_done);
-	init_completion(&ar->vdev_setup_done);
-	init_completion(&ar->thermal.wmi_sync);
-
-	/* XXX TODO: unique names */
+	/*
+	 * Initialise ath10k freebsd bits.
+	 */
 	mtx_init(&ar->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 	mtx_init(&ar->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
@@ -599,7 +593,6 @@ athp_pci_attach(device_t dev)
 		return (0);
 
 	/* Fallthrough for setup failure */
-
 bad4:
 	athp_pci_free_bufs(psc);
 	bus_dma_tag_destroy(ar->sc_dmat);
@@ -621,6 +614,8 @@ bad:
 		taskqueue_drain_all(psc->pipe_taskq);
 		taskqueue_free(psc->pipe_taskq);
 	}
+	ath10k_core_destroy(ar);
+bad0:
 	return (err);
 }
 
@@ -642,18 +637,6 @@ athp_pci_detach(device_t dev)
 	 */
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
-	/* clean up anything waiting */
-	complete_all(&ar->scan.started);
-	complete_all(&ar->scan.completed);
-	complete_all(&ar->scan.on_channel);
-	complete_all(&ar->offchan_tx_completed);
-	complete_all(&ar->install_key_done);
-	complete_all(&ar->vdev_setup_done);
-	complete_all(&ar->thermal.wmi_sync);
-	wake_up(&ar->htt.empty_tx_wq);
-	wake_up(&ar->wmi.tx_credits_wq);
-	wake_up(&ar->peer_mapping_wq);
-
 	/* detach main driver */
 	(void) athp_detach(ar);
 
@@ -672,6 +655,9 @@ athp_pci_detach(device_t dev)
 
 	/* buffers */
 	athp_pci_free_bufs(psc);
+
+	/* clean up anything waiting */
+	ath10k_core_destroy(ar);
 
 	/* Free bus resources */
 	bus_generic_detach(dev);

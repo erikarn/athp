@@ -399,4 +399,7 @@ extern	int ath10k_core_probe_fw(struct ath10k *ar);
 extern	int ath10k_core_register(struct ath10k *ar);
 extern	void ath10k_core_unregister(struct ath10k *ar);
 
+extern	int ath10k_core_init(struct ath10k *ar);
+extern	void ath10k_core_destroy(struct ath10k *ar);
+
 #endif /* __IF_ATHP_CORE_H__ */

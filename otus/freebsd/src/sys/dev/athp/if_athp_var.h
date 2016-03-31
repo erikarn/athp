@@ -258,8 +258,11 @@ struct ath10k {
 
 	struct completion target_suspend;
 
+#if 0
+	/* XXX TODO: duplicated above; fix it */
 	const struct ath10k_hw_regs *regs;
 	const struct ath10k_hw_values *hw_values;
+#endif
 	struct ath10k_bmi bmi;
 	struct ath10k_wmi wmi;
 	struct ath10k_htc htc;
