@@ -2126,6 +2126,7 @@ int ath10k_wmi_event_scan(struct ath10k *ar, struct athp_buf *pbuf)
 	return 0;
 }
 
+#if 0
 static inline enum ieee80211_band phy_mode_to_band(u32 phy_mode)
 {
 	enum ieee80211_band band;
@@ -2153,6 +2154,7 @@ static inline enum ieee80211_band phy_mode_to_band(u32 phy_mode)
 
 	return band;
 }
+#endif
 
 #if 0
 /* If keys are configured, HW decrypts all frames
@@ -4056,7 +4058,6 @@ void ath10k_wmi_event_vdev_resume_req(struct ath10k *ar, struct athp_buf *pbuf)
 static int ath10k_wmi_alloc_host_mem(struct ath10k *ar, u32 req_id,
 				     u32 num_units, u32 unit_len)
 {
-	dma_addr_t paddr;
 	u32 pool_size;
 	int idx = ar->wmi.num_mem_chunks;
 
@@ -4065,10 +4066,15 @@ static int ath10k_wmi_alloc_host_mem(struct ath10k *ar, u32 req_id,
 	if (!pool_size)
 		return -EINVAL;
 
-	ar->wmi.mem_chunks[idx].vaddr = dma_alloc_coherent(ar->dev,
-							   pool_size,
-							   &paddr,
-							   GFP_KERNEL);
+	/* I'm cheating here and using contigmalloc/vtophys */
+	ar->wmi.mem_chunks[idx].vaddr = contigmalloc(
+	    pool_size,
+	    M_ATHPDEV,
+	    M_NOWAIT | M_ZERO,
+	    0x1000000,		/* paddr low */
+	    0xffffffff,		/* paddr high */
+	    PAGE_SIZE,		/* alignment */
+	    0ul);		/* boundary */
 	if (!ar->wmi.mem_chunks[idx].vaddr) {
 		ath10k_warn(ar, "failed to allocate memory chunk\n");
 		return -ENOMEM;
@@ -4076,7 +4082,7 @@ static int ath10k_wmi_alloc_host_mem(struct ath10k *ar, u32 req_id,
 
 	memset(ar->wmi.mem_chunks[idx].vaddr, 0, pool_size);
 
-	ar->wmi.mem_chunks[idx].paddr = paddr;
+	ar->wmi.mem_chunks[idx].paddr = vtophys(ar->wmi.mem_chunks[idx].vaddr);
 	ar->wmi.mem_chunks[idx].len = pool_size;
 	ar->wmi.mem_chunks[idx].req_id = req_id;
 	ar->wmi.num_mem_chunks++;
@@ -4165,7 +4171,7 @@ static void ath10k_wmi_event_service_ready_work(struct work_struct *work)
 	u32 num_units, req_id, unit_size, num_mem_reqs, num_unit_info, i;
 	int ret;
 
-	if (!skb) {
+	if (!pbuf) {
 		ath10k_warn(ar, "invalid service ready event skb\n");
 		return;
 	}
@@ -6847,10 +6853,9 @@ void ath10k_wmi_detach(struct ath10k *ar)
 
 	/* free the host memory chunks requested by firmware */
 	for (i = 0; i < ar->wmi.num_mem_chunks; i++) {
-		dma_free_coherent(ar->dev,
-				  ar->wmi.mem_chunks[i].len,
-				  ar->wmi.mem_chunks[i].vaddr,
-				  ar->wmi.mem_chunks[i].paddr);
+		contigfree(ar->wmi.mem_chunks[i].vaddr,
+		    ar->wmi.mem_chunks[i].len,
+		    M_ATHPDEV);
 	}
 
 	ar->wmi.num_mem_chunks = 0;

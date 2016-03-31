@@ -108,7 +108,9 @@ struct athp_vap {
 #define	ATHP_DATA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_data_mtx, MA_NOTOWNED)
 
 struct ath10k_mem_chunk {
-	struct athp_descdma dd;
+	void *vaddr;
+	vm_paddr_t paddr;
+	int len;
 	u32 req_id;
 };
 
@@ -207,6 +209,7 @@ struct ath10k {
 	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
 	bool p2p;
 	unsigned long dev_flags;
+
 	enum ath10k_state state;
 
 	int max_num_stations;
@@ -215,6 +218,9 @@ struct ath10k {
 	int max_num_tdls_vdevs;
 	int num_active_peers;
 	int num_tids;
+
+	struct work_struct svc_rdy_work;
+	struct athp_buf *svc_rdy_skb;
 
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;
