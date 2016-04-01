@@ -373,7 +373,10 @@ struct ath10k {
 	spinlock_t data_lock;
 #endif
 
+	/* We use FreeBSD's vif list here */
+#if 0
 	struct list_head arvifs;
+#endif
 	struct list_head peers;
 	wait_queue_head_t peer_mapping_wq;
 
