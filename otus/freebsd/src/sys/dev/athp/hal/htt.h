@@ -628,13 +628,13 @@ struct htt_rx_indication {
 static inline struct htt_rx_indication_mpdu_range *
 		htt_rx_ind_get_mpdu_ranges(struct htt_rx_indication *rx_ind)
 {
-	void *ptr = rx_ind;
+	char *ptr = (void *) rx_ind;
 
 	ptr += sizeof(rx_ind->hdr)
 	     + sizeof(rx_ind->ppdu)
 	     + sizeof(rx_ind->prefix)
 	     + roundup(__le16_to_cpu(rx_ind->prefix.fw_rx_desc_bytes), 4);
-	return ptr;
+	return (void *) ptr;
 }
 
 enum htt_rx_flush_mpdu_status {
@@ -1226,10 +1226,10 @@ struct htt_stats_conf {
 	struct htt_stats_conf_item items[0];
 } __packed;
 
-static inline struct htt_stats_conf_item *htt_stats_conf_next_item(
+static inline const struct htt_stats_conf_item *htt_stats_conf_next_item(
 					const struct htt_stats_conf_item *item)
 {
-	return (void *)item + sizeof(*item) + roundup(item->length, 4);
+	return (const void *) ((const char *)item + sizeof(*item) + roundup(item->length, 4));
 }
 
 /*
