@@ -11,6 +11,7 @@
 #include <linux/err.h>
 #include <linux/etherdevice.h>
 #include <linux/workqueue.h>
+#include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
 
 #if 0

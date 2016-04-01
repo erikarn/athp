@@ -41,6 +41,7 @@
 #define	ATH10K_DBG_MGMT		0x00200000
 #define	ATH10K_DBG_REGULATORY	0x00400000
 #define	ATH10K_DBG_WMI_PRINT	0x00800000
+#define	ATH10K_DBG_HTT		0x01000000
 #define	ATH10K_DBG_ANY		0xffffffff
 
 enum ath10k_pktlog_filter {
