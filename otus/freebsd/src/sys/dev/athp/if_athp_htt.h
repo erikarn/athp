@@ -154,9 +154,7 @@ struct ath10k_htt {
 	struct mtx tx_lock;
 	int max_num_pending_tx;
 	int num_pending_tx;
-#if 0
 	struct idr pending_tx;
-#endif
 	wait_queue_head_t empty_tx_wq;
 	struct dma_pool *tx_pool;
 

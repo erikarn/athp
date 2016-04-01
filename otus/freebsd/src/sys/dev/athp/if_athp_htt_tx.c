@@ -126,7 +126,6 @@ exit:
 	return ret;
 }
 
-#if 0
 int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct athp_buf *skb)
 {
 	struct ath10k *ar = htt->ar;
@@ -152,7 +151,6 @@ void ath10k_htt_tx_free_msdu_id(struct ath10k_htt *htt, u16 msdu_id)
 
 	idr_remove(&htt->pending_tx, msdu_id);
 }
-#endif
 
 int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 {
@@ -164,10 +162,7 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 
 	mtx_init(&htt->tx_lock, device_get_nameunit(ar->sc_dev),
 	    "athp htt tx", MTX_DEF);
-	device_printf(htt->ar->sc_dev, "%s: TODO: implement idr*\n", __func__);
-#if 0
 	idr_init(&htt->pending_tx);
-#endif
 
 	htt->tx_pool = dma_pool_create("ath10k htt tx pool", htt->ar->sc_dev,
 				       sizeof(struct ath10k_htt_txbuf), 4, 0);
@@ -196,9 +191,7 @@ free_tx_pool:
 	dma_pool_destroy(htt->tx_pool);
 free_idr_pending_tx:
 	mtx_destroy(&htt->tx_lock);
-#if 0
 	idr_destroy(&htt->pending_tx);
-#endif
 	return ret;
 }
 
@@ -224,11 +217,13 @@ void ath10k_htt_tx_free(struct ath10k_htt *htt)
 {
 	int size;
 
-	device_printf(htt->ar->sc_dev, "%s: TODO: implement idr bits\n", __func__);
 #if 0
 	idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
-	idr_destroy(&htt->pending_tx);
+#else
+	device_printf(htt->ar->sc_dev, "%s: TODO: implement idr_for_each!\n",
+	    __func__);
 #endif
+	idr_destroy(&htt->pending_tx);
 	dma_pool_destroy(htt->tx_pool);
 
 	if (htt->frag_desc.vaddr) {

@@ -13,6 +13,7 @@
 #include <linux/workqueue.h>
 #include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
+#include <linux/idr.h>
 
 #if 0
 #include <sys/libkern.h>
