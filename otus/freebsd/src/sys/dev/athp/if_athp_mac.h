@@ -52,6 +52,11 @@ void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 				     enum wmi_tlv_tx_pause_id pause_id,
 				     enum wmi_tlv_tx_pause_action action);
 
+void ath10k_mac_tx_lock(struct ath10k *ar, int reason);
+void ath10k_mac_tx_unlock(struct ath10k *ar, int reason);
+void ath10k_mac_vif_tx_lock(struct ath10k_vif *arvif, int reason);
+void ath10k_mac_vif_tx_unlock(struct ath10k_vif *arvif, int reason);
+
 static inline struct ath10k_vif *ath10k_vif_to_arvif(struct ieee80211vap *vap)
 {
 	return (struct ath10k_vif *) vap;

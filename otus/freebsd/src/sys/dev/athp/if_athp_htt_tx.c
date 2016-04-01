@@ -69,10 +69,14 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include "hal/linux_compat.h"
+#include "hal/linux_skb.h"
 #include "hal/targaddrs.h"
+#include "hal/core.h"
 #include "hal/htc.h"
 #include "hal/wmi.h"
 #include "hal/hw.h"
+#include "hal/rx_desc.h"
+#include "hal/htt.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
@@ -80,12 +84,12 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_wmi.h"
 #include "if_athp_core.h"
 #include "if_athp_desc.h"
+#include "if_athp_buf.h"
 #include "if_athp_htc.h"
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
-
-#include "if_athp_main.h"
+#include "if_athp_mac.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 void __ath10k_htt_tx_dec_pending(struct ath10k_htt *htt)
@@ -97,16 +101,16 @@ void __ath10k_htt_tx_dec_pending(struct ath10k_htt *htt)
 
 static void ath10k_htt_tx_dec_pending(struct ath10k_htt *htt)
 {
-	spin_lock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK(htt);
 	__ath10k_htt_tx_dec_pending(htt);
-	spin_unlock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_UNLOCK(htt);
 }
 
 static int ath10k_htt_tx_inc_pending(struct ath10k_htt *htt)
 {
 	int ret = 0;
 
-	spin_lock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK(htt);
 
 	if (htt->num_pending_tx >= htt->max_num_pending_tx) {
 		ret = -EBUSY;
@@ -118,16 +122,17 @@ static int ath10k_htt_tx_inc_pending(struct ath10k_htt *htt)
 		ath10k_mac_tx_lock(htt->ar, ATH10K_TX_PAUSE_Q_FULL);
 
 exit:
-	spin_unlock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_UNLOCK(htt);
 	return ret;
 }
 
-int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct sk_buff *skb)
+#if 0
+int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct athp_buf *skb)
 {
 	struct ath10k *ar = htt->ar;
 	int ret;
 
-	lockdep_assert_held(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK_ASSERT(htt);
 
 	ret = idr_alloc(&htt->pending_tx, skb, 0,
 			htt->max_num_pending_tx, GFP_ATOMIC);
@@ -141,12 +146,13 @@ void ath10k_htt_tx_free_msdu_id(struct ath10k_htt *htt, u16 msdu_id)
 {
 	struct ath10k *ar = htt->ar;
 
-	lockdep_assert_held(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK_ASSERT(htt);
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx free msdu_id %hu\n", msdu_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx free msdu_id %u\n", (unsigned int) msdu_id);
 
 	idr_remove(&htt->pending_tx, msdu_id);
 }
+#endif
 
 int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 {
@@ -156,10 +162,14 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "htt tx max num pending tx %d\n",
 		   htt->max_num_pending_tx);
 
-	spin_lock_init(&htt->tx_lock);
+	mtx_init(&htt->tx_lock, device_get_nameunit(ar->sc_dev),
+	    "athp htt tx", MTX_DEF);
+	device_printf(htt->ar->sc_dev, "%s: TODO: implement idr*\n", __func__);
+#if 0
 	idr_init(&htt->pending_tx);
+#endif
 
-	htt->tx_pool = dma_pool_create("ath10k htt tx pool", htt->ar->dev,
+	htt->tx_pool = dma_pool_create("ath10k htt tx pool", htt->ar->sc_dev,
 				       sizeof(struct ath10k_htt_txbuf), 4, 0);
 	if (!htt->tx_pool) {
 		ret = -ENOMEM;
@@ -170,7 +180,7 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 		goto skip_frag_desc_alloc;
 
 	size = htt->max_num_pending_tx * sizeof(struct htt_msdu_ext_desc);
-	htt->frag_desc.vaddr = dma_alloc_coherent(ar->dev, size,
+	htt->frag_desc.vaddr = dma_alloc_coherent(ar->sc_dev, size,
 						  &htt->frag_desc.paddr,
 						  GFP_DMA);
 	if (!htt->frag_desc.vaddr) {
@@ -185,17 +195,21 @@ skip_frag_desc_alloc:
 free_tx_pool:
 	dma_pool_destroy(htt->tx_pool);
 free_idr_pending_tx:
+	mtx_destroy(&htt->tx_lock);
+#if 0
 	idr_destroy(&htt->pending_tx);
+#endif
 	return ret;
 }
 
+#if 0
 static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *skb, void *ctx)
 {
 	struct ath10k *ar = ctx;
 	struct ath10k_htt *htt = &ar->htt;
 	struct htt_tx_done tx_done = {0};
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "force cleanup msdu_id %hu\n", msdu_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "force cleanup msdu_id %u\n", (unsigned int) msdu_id);
 
 	tx_done.discard = 1;
 	tx_done.msdu_id = msdu_id;
@@ -204,32 +218,38 @@ static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *skb, void *ctx)
 
 	return 0;
 }
+#endif
 
 void ath10k_htt_tx_free(struct ath10k_htt *htt)
 {
 	int size;
 
+	device_printf(htt->ar->sc_dev, "%s: TODO: implement idr bits\n", __func__);
+#if 0
 	idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
 	idr_destroy(&htt->pending_tx);
+#endif
 	dma_pool_destroy(htt->tx_pool);
 
 	if (htt->frag_desc.vaddr) {
 		size = htt->max_num_pending_tx *
 				  sizeof(struct htt_msdu_ext_desc);
-		dma_free_coherent(htt->ar->dev, size, htt->frag_desc.vaddr,
+		dma_free_coherent(htt->ar->sc_dev, size, htt->frag_desc.vaddr,
 				  htt->frag_desc.paddr);
 	}
+	mtx_destroy(&htt->tx_lock);
 }
 
-void ath10k_htt_htc_tx_complete(struct ath10k *ar, struct sk_buff *skb)
+void ath10k_htt_htc_tx_complete(struct ath10k *ar, struct athp_buf *pbuf)
 {
-	dev_kfree_skb_any(skb);
+
+	athp_freebuf(ar, &ar->buf_tx, pbuf);
 }
 
 int ath10k_htt_h2t_ver_req_msg(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
-	struct sk_buff *skb;
+	struct athp_buf *skb;
 	struct htt_cmd *cmd;
 	int len = 0;
 	int ret;
@@ -241,13 +261,13 @@ int ath10k_htt_h2t_ver_req_msg(struct ath10k_htt *htt)
 	if (!skb)
 		return -ENOMEM;
 
-	skb_put(skb, len);
-	cmd = (struct htt_cmd *)skb->data;
+	mbuf_skb_put(skb->m, len);
+	cmd = (struct htt_cmd *)mbuf_skb_data(skb->m);
 	cmd->hdr.msg_type = HTT_H2T_MSG_TYPE_VERSION_REQ;
 
 	ret = ath10k_htc_send(&htt->ar->htc, htt->eid, skb);
 	if (ret) {
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_tx, skb);
 		return ret;
 	}
 
@@ -258,7 +278,7 @@ int ath10k_htt_h2t_stats_req(struct ath10k_htt *htt, u8 mask, u64 cookie)
 {
 	struct ath10k *ar = htt->ar;
 	struct htt_stats_req *req;
-	struct sk_buff *skb;
+	struct athp_buf *skb;
 	struct htt_cmd *cmd;
 	int len = 0, ret;
 
@@ -269,8 +289,8 @@ int ath10k_htt_h2t_stats_req(struct ath10k_htt *htt, u8 mask, u64 cookie)
 	if (!skb)
 		return -ENOMEM;
 
-	skb_put(skb, len);
-	cmd = (struct htt_cmd *)skb->data;
+	mbuf_skb_put(skb->m, len);
+	cmd = (struct htt_cmd *)mbuf_skb_data(skb->m);
 	cmd->hdr.msg_type = HTT_H2T_MSG_TYPE_STATS_REQ;
 
 	req = &cmd->stats_req;
@@ -289,7 +309,7 @@ int ath10k_htt_h2t_stats_req(struct ath10k_htt *htt, u8 mask, u64 cookie)
 	if (ret) {
 		ath10k_warn(ar, "failed to send htt type stats request: %d",
 			    ret);
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_tx, skb);
 		return ret;
 	}
 
@@ -299,7 +319,7 @@ int ath10k_htt_h2t_stats_req(struct ath10k_htt *htt, u8 mask, u64 cookie)
 int ath10k_htt_send_frag_desc_bank_cfg(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
-	struct sk_buff *skb;
+	struct athp_buf *skb;
 	struct htt_cmd *cmd;
 	int ret, size;
 
@@ -316,8 +336,8 @@ int ath10k_htt_send_frag_desc_bank_cfg(struct ath10k_htt *htt)
 	if (!skb)
 		return -ENOMEM;
 
-	skb_put(skb, size);
-	cmd = (struct htt_cmd *)skb->data;
+	mbuf_skb_put(skb->m, size);
+	cmd = (struct htt_cmd *)mbuf_skb_data(skb->m);
 	cmd->hdr.msg_type = HTT_H2T_MSG_TYPE_FRAG_DESC_BANK_CFG;
 	cmd->frag_desc_bank_cfg.info = 0;
 	cmd->frag_desc_bank_cfg.num_banks = 1;
@@ -332,7 +352,7 @@ int ath10k_htt_send_frag_desc_bank_cfg(struct ath10k_htt *htt)
 	if (ret) {
 		ath10k_warn(ar, "failed to send frag desc bank cfg request: %d\n",
 			    ret);
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_tx, skb);
 		return ret;
 	}
 
@@ -342,7 +362,7 @@ int ath10k_htt_send_frag_desc_bank_cfg(struct ath10k_htt *htt)
 int ath10k_htt_send_rx_ring_cfg_ll(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
-	struct sk_buff *skb;
+	struct athp_buf *skb;
 	struct htt_cmd *cmd;
 	struct htt_rx_ring_setup_ring *ring;
 	const int num_rx_ring = 1;
@@ -355,8 +375,11 @@ int ath10k_htt_send_rx_ring_cfg_ll(struct ath10k_htt *htt)
 	 * the HW expects the buffer to be an integral number of 4-byte
 	 * "words"
 	 */
+#if 0
 	BUILD_BUG_ON(!IS_ALIGNED(HTT_RX_BUF_SIZE, 4));
 	BUILD_BUG_ON((HTT_RX_BUF_SIZE & HTT_MAX_CACHE_LINE_SIZE_MASK) != 0);
+#endif
+	device_printf(ar->sc_dev, "%s: TODO: BUILD_BUG_ON!\n", __func__);
 
 	len = sizeof(cmd->hdr) + sizeof(cmd->rx_setup.hdr)
 	    + (sizeof(*ring) * num_rx_ring);
@@ -364,9 +387,9 @@ int ath10k_htt_send_rx_ring_cfg_ll(struct ath10k_htt *htt)
 	if (!skb)
 		return -ENOMEM;
 
-	skb_put(skb, len);
+	mbuf_skb_put(skb->m, len);
 
-	cmd = (struct htt_cmd *)skb->data;
+	cmd = (struct htt_cmd *)mbuf_skb_data(skb->m);
 	ring = &cmd->rx_setup.rings[0];
 
 	cmd->hdr.msg_type = HTT_H2T_MSG_TYPE_RX_RING_CFG;
@@ -418,7 +441,7 @@ int ath10k_htt_send_rx_ring_cfg_ll(struct ath10k_htt *htt)
 
 	ret = ath10k_htc_send(&htt->ar->htc, htt->eid, skb);
 	if (ret) {
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_tx, skb);
 		return ret;
 	}
 
@@ -431,7 +454,7 @@ int ath10k_htt_h2t_aggr_cfg_msg(struct ath10k_htt *htt,
 {
 	struct ath10k *ar = htt->ar;
 	struct htt_aggr_conf *aggr_conf;
-	struct sk_buff *skb;
+	struct athp_buf *skb;
 	struct htt_cmd *cmd;
 	int len;
 	int ret;
@@ -451,8 +474,8 @@ int ath10k_htt_h2t_aggr_cfg_msg(struct ath10k_htt *htt,
 	if (!skb)
 		return -ENOMEM;
 
-	skb_put(skb, len);
-	cmd = (struct htt_cmd *)skb->data;
+	mbuf_skb_put(skb->m, len);
+	cmd = (struct htt_cmd *)mbuf_skb_data(skb->m);
 	cmd->hdr.msg_type = HTT_H2T_MSG_TYPE_AGGR_CFG;
 
 	aggr_conf = &cmd->aggr_conf;
@@ -465,18 +488,19 @@ int ath10k_htt_h2t_aggr_cfg_msg(struct ath10k_htt *htt,
 
 	ret = ath10k_htc_send(&htt->ar->htc, htt->eid, skb);
 	if (ret) {
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_tx, skb);
 		return ret;
 	}
 
 	return 0;
 }
 
-int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
+int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
+#if 0
 	struct ath10k *ar = htt->ar;
-	struct device *dev = ar->dev;
-	struct sk_buff *txdesc = NULL;
+//	struct device *dev = ar->sc_dev;
+	struct athp_buf *txdesc = NULL;
 	struct htt_cmd *cmd;
 	struct ath10k_skb_cb *skb_cb = ATH10K_SKB_CB(msdu);
 	u8 vdev_id = skb_cb->vdev_id;
@@ -491,9 +515,9 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 	len += sizeof(cmd->hdr);
 	len += sizeof(cmd->mgmt_tx);
 
-	spin_lock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK(htt);
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
-	spin_unlock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_UNLOCK(htt);
 	if (res < 0) {
 		goto err_tx_dec;
 	}
@@ -505,25 +529,32 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 		goto err_free_msdu_id;
 	}
 
-	skb_cb->paddr = dma_map_single(dev, msdu->data, msdu->len,
-				       DMA_TO_DEVICE);
-	res = dma_mapping_error(dev, skb_cb->paddr);
+	/*
+	 * load/sync happens here for the msdu contents.
+	 * Then, the command that's allocated below will get
+	 * load/sync in the HTC layer.
+	 */
+	/* XXX TODO: ADRIAN: figure out what I'm missing! */
+	res = athp_dma_mbuf_load(ar, &ar->buf_tx.dh, &msdu->mb, msdu->m);
 	if (res) {
 		res = -EIO;
 		goto err_free_txdesc;
 	}
+	/* Ok, we're not modifying the msdu further, so sync here */
+	athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx.dh, &msdu->mb);
 
-	skb_put(txdesc, len);
-	cmd = (struct htt_cmd *)txdesc->data;
+	mbuf_skb_put(txdesc->m, len);
+	cmd = (struct htt_cmd *)mbuf_skb_data(txdesc->m);
 	memset(cmd, 0, len);
 
 	cmd->hdr.msg_type         = HTT_H2T_MSG_TYPE_MGMT_TX;
-	cmd->mgmt_tx.msdu_paddr = __cpu_to_le32(ATH10K_SKB_CB(msdu)->paddr);
-	cmd->mgmt_tx.len        = __cpu_to_le32(msdu->len);
+	cmd->mgmt_tx.msdu_paddr = __cpu_to_le32(msdu->mb.paddr);
+	cmd->mgmt_tx.len        = __cpu_to_le32(mbuf_skb_len(msdu->m));
 	cmd->mgmt_tx.desc_id    = __cpu_to_le32(msdu_id);
 	cmd->mgmt_tx.vdev_id    = __cpu_to_le32(vdev_id);
-	memcpy(cmd->mgmt_tx.hdr, msdu->data,
-	       min_t(int, msdu->len, HTT_MGMT_FRM_HDR_DOWNLOAD_LEN));
+	memcpy(cmd->mgmt_tx.hdr, mbuf_skb_data(msdu->m),
+	       min_t(int, mbuf_skb_len(msdu->m),
+	       HTT_MGMT_FRM_HDR_DOWNLOAD_LEN));
 
 	skb_cb->htt.txbuf = NULL;
 
@@ -534,24 +565,29 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 	return 0;
 
 err_unmap_msdu:
-	dma_unmap_single(dev, skb_cb->paddr, msdu->len, DMA_TO_DEVICE);
+	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 err_free_txdesc:
-	dev_kfree_skb_any(txdesc);
+	athp_freebuf(ar, &ar->buf_tx, txdesc);
 err_free_msdu_id:
-	spin_lock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK(htt);
 	ath10k_htt_tx_free_msdu_id(htt, msdu_id);
-	spin_unlock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_UNLOCK(htt);
 err_tx_dec:
 	ath10k_htt_tx_dec_pending(htt);
 err:
 	return res;
+#else
+	device_printf(htt->ar->sc_dev, "%s; TODO implement!\n", __func__);
+	return (-EINVAL);
+#endif
 }
 
-int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
+int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
+#if 0
 	struct ath10k *ar = htt->ar;
-	struct device *dev = ar->dev;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)msdu->data;
+	//struct device *dev = ar->sc_dev;
+	//struct ieee80211_frame *hdr = (struct ieee80211_frame *)mbuf_skb_data(msdu->m);
 	struct ath10k_skb_cb *skb_cb = ATH10K_SKB_CB(msdu);
 	struct ath10k_hif_sg_item sg_items[2];
 	struct htt_data_tx_desc_frag *frags;
@@ -569,15 +605,15 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 	if (res)
 		goto err;
 
-	spin_lock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK(htt);
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
-	spin_unlock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_UNLOCK(htt);
 	if (res < 0) {
 		goto err_tx_dec;
 	}
 	msdu_id = res;
 
-	prefetch_len = min(htt->prefetch_len, msdu->len);
+	prefetch_len = min(htt->prefetch_len, mbuf_skb_len(msdu->m));
 	prefetch_len = roundup(prefetch_len, 4);
 
 	skb_cb->htt.txbuf = dma_pool_alloc(htt->tx_pool, GFP_ATOMIC,
@@ -588,23 +624,26 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 	}
 	skb_cb->htt.txbuf_paddr = paddr;
 
-	if ((ieee80211_is_action(hdr->frame_control) ||
-	     ieee80211_is_deauth(hdr->frame_control) ||
-	     ieee80211_is_disassoc(hdr->frame_control)) &&
-	     ieee80211_has_protected(hdr->frame_control)) {
-		skb_put(msdu, IEEE80211_CCMP_MIC_LEN);
+	if ((IEEE80211_IS_ACTION(hdr) ||
+	     IEEE80211_IS_DEAUTH(hdr) ||
+	     IEEE80211_IS_DISASSOC(hdr)) &&
+	     IEEE80211_HAS_PROT(hdr)) {
+		mbuf_skb_put(msdu->m, IEEE80211_CCMP_MIC_LEN);
 	} else if (!skb_cb->htt.nohwcrypt &&
 		   skb_cb->txmode == ATH10K_HW_TXRX_RAW) {
-		skb_put(msdu, IEEE80211_CCMP_MIC_LEN);
+		mbuf_skb_put(msdu->m, IEEE80211_CCMP_MIC_LEN);
 	}
 
-	skb_cb->paddr = dma_map_single(dev, msdu->data, msdu->len,
-				       DMA_TO_DEVICE);
-	res = dma_mapping_error(dev, skb_cb->paddr);
+	/* Do the initial load/sync */
+
+	/* XXX TODO: ADRIAN: figure out what I'm missing! */
+	res = athp_dma_mbuf_load(ar, &ar->buf_tx.dh, &msdu->mb, msdu->m);
 	if (res) {
 		res = -EIO;
 		goto err_free_txbuf;
 	}
+	/* Ok, we're not modifying the msdu further, so sync here */
+	athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx.dh, &msdu->mb);
 
 	switch (skb_cb->txmode) {
 	case ATH10K_HW_TXRX_RAW:
@@ -619,17 +658,17 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 				&htt->frag_desc.vaddr[msdu_id].frags;
 			ext_desc = &htt->frag_desc.vaddr[msdu_id];
 			frags[0].tword_addr.paddr_lo =
-				__cpu_to_le32(skb_cb->paddr);
+				__cpu_to_le32(msdu->mb.paddr);
 			frags[0].tword_addr.paddr_hi = 0;
-			frags[0].tword_addr.len_16 = __cpu_to_le16(msdu->len);
+			frags[0].tword_addr.len_16 = __cpu_to_le16(mbuf_skb_len(msdu->m));
 
 			frags_paddr =  htt->frag_desc.paddr +
 				(sizeof(struct htt_msdu_ext_desc) * msdu_id);
 		} else {
 			frags = skb_cb->htt.txbuf->frags;
 			frags[0].dword_addr.paddr =
-				__cpu_to_le32(skb_cb->paddr);
-			frags[0].dword_addr.len = __cpu_to_le32(msdu->len);
+				__cpu_to_le32(msdu->mb.paddr);
+			frags[0].dword_addr.len = __cpu_to_le32(mbuf_skb_len(msdu->m));
 			frags[1].dword_addr.paddr = 0;
 			frags[1].dword_addr.len = 0;
 
@@ -642,7 +681,7 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 			     HTT_DATA_TX_DESC_FLAGS0_PKT_TYPE);
 		flags0 |= HTT_DATA_TX_DESC_FLAGS0_MAC_HDR_PRESENT;
 
-		frags_paddr = skb_cb->paddr;
+		frags_paddr = msdu->mb.paddr;
 		break;
 	}
 
@@ -677,6 +716,9 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 
 	flags1 |= SM((u16)vdev_id, HTT_DATA_TX_DESC_FLAGS1_VDEV_ID);
 	flags1 |= SM((u16)tid, HTT_DATA_TX_DESC_FLAGS1_EXT_TID);
+
+	/* XXX TODO: ADRIAN: L3/L4 offload */
+#if 0
 	if (msdu->ip_summed == CHECKSUM_PARTIAL &&
 	    !test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
 		flags1 |= HTT_DATA_TX_DESC_FLAGS1_CKSUM_L3_OFFLOAD;
@@ -684,6 +726,7 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 		if (ar->hw_params.continuous_frag_desc)
 			ext_desc->flags |= HTT_MSDU_CHECKSUM_ENABLE;
 	}
+#endif
 
 	/* Prevent firmware from sending up tx inspection requests. There's
 	 * nothing ath10k can do with frames requested for inspection so force
@@ -694,22 +737,25 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 	skb_cb->htt.txbuf->cmd_hdr.msg_type = HTT_H2T_MSG_TYPE_TX_FRM;
 	skb_cb->htt.txbuf->cmd_tx.flags0 = flags0;
 	skb_cb->htt.txbuf->cmd_tx.flags1 = __cpu_to_le16(flags1);
-	skb_cb->htt.txbuf->cmd_tx.len = __cpu_to_le16(msdu->len);
+	skb_cb->htt.txbuf->cmd_tx.len = __cpu_to_le16(mbuf_skb_len(msdu->m));
 	skb_cb->htt.txbuf->cmd_tx.id = __cpu_to_le16(msdu_id);
 	skb_cb->htt.txbuf->cmd_tx.frags_paddr = __cpu_to_le32(frags_paddr);
 	skb_cb->htt.txbuf->cmd_tx.peerid = __cpu_to_le16(HTT_INVALID_PEERID);
 	skb_cb->htt.txbuf->cmd_tx.freq = __cpu_to_le16(skb_cb->htt.freq);
 
+#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_htt_tx(ar, msdu_id, msdu->len, vdev_id, tid);
+#endif
 	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		   "htt tx flags0 %hhu flags1 %hu len %d id %hu frags_paddr %08x, msdu_paddr %08x vdev %hhu tid %hhu freq %hu\n",
-		   flags0, flags1, msdu->len, msdu_id, frags_paddr,
-		   (u32)skb_cb->paddr, vdev_id, tid, skb_cb->htt.freq);
-	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt tx msdu: ",
-			msdu->data, msdu->len);
+		   "htt tx flags0 %u flags1 %u len %d id %hu frags_paddr %08x, msdu_paddr %08x vdev %hhu tid %hhu freq %hu\n",
+		   (unsigned) flags0, (unsigned) flags1, mbuf_skb_len(msdu->m), msdu_id, frags_paddr,
+		   (u32)msdu->mb.paddr, vdev_id, tid, skb_cb->htt.freq);
+	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt tx msdu: ",
+			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
+#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_tx_hdr(ar, msdu->data, msdu->len);
 	trace_ath10k_tx_payload(ar, msdu->data, msdu->len);
-
+#endif
 	sg_items[0].transfer_id = 0;
 	sg_items[0].transfer_context = NULL;
 	sg_items[0].vaddr = &skb_cb->htt.txbuf->htc_hdr;
@@ -721,8 +767,8 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 
 	sg_items[1].transfer_id = 0;
 	sg_items[1].transfer_context = NULL;
-	sg_items[1].vaddr = msdu->data;
-	sg_items[1].paddr = skb_cb->paddr;
+	sg_items[1].vaddr = mbuf_skb_data(msdu->m);
+	sg_items[1].paddr = msdu->mb.paddr;
 	sg_items[1].len = prefetch_len;
 
 	res = ath10k_hif_tx_sg(htt->ar,
@@ -734,17 +780,21 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *msdu)
 	return 0;
 
 err_unmap_msdu:
-	dma_unmap_single(dev, skb_cb->paddr, msdu->len, DMA_TO_DEVICE);
+	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 err_free_txbuf:
 	dma_pool_free(htt->tx_pool,
 		      skb_cb->htt.txbuf,
 		      skb_cb->htt.txbuf_paddr);
 err_free_msdu_id:
-	spin_lock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_LOCK(htt);
 	ath10k_htt_tx_free_msdu_id(htt, msdu_id);
-	spin_unlock_bh(&htt->tx_lock);
+	ATHP_HTT_TX_UNLOCK(htt);
 err_tx_dec:
 	ath10k_htt_tx_dec_pending(htt);
 err:
 	return res;
+#else
+	device_printf(htt->ar->sc_dev, "%s; TODO implement!\n", __func__);
+	return (-EINVAL);
+#endif
 }

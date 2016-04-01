@@ -153,3 +153,59 @@ ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 	printf("%s: called\n", __func__);
 }
 
+
+/***************/
+/* TX handlers */
+/***************/
+
+void ath10k_mac_tx_lock(struct ath10k *ar, int reason)
+{
+	ATHP_HTT_TX_LOCK_ASSERT(&ar->htt);
+
+	WARN_ON(reason >= ATH10K_TX_PAUSE_MAX);
+	ar->tx_paused |= BIT(reason);
+#if 0
+	ieee80211_stop_queues(ar->hw);
+#else
+	device_printf(ar->sc_dev, "%s: TODO: called!\n", __func__);
+#endif
+}
+
+#if 0
+static void ath10k_mac_tx_unlock_iter(void *data, u8 *mac,
+				      struct ieee80211_vif *vif)
+{
+	struct ath10k *ar = data;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+
+	if (arvif->tx_paused)
+		return;
+
+#if 0
+	ieee80211_wake_queue(ar->hw, arvif->vdev_id);
+#else
+	device_printf(ar->sc_dev, "%s: TODO: called!\n", __func__);
+#endif
+}
+#endif
+
+void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
+{
+	ATHP_HTT_TX_LOCK_ASSERT(&ar->htt);
+
+	WARN_ON(reason >= ATH10K_TX_PAUSE_MAX);
+	ar->tx_paused &= ~BIT(reason);
+
+	if (ar->tx_paused)
+		return;
+#if 0
+	ieee80211_iterate_active_interfaces_atomic(ar->hw,
+						   IEEE80211_IFACE_ITER_RESUME_ALL,
+						   ath10k_mac_tx_unlock_iter,
+						   ar);
+
+	ieee80211_wake_queue(ar->hw, ar->hw->offchannel_tx_hw_queue);
+#else
+	device_printf(ar->sc_dev, "%s: TODO: called!\n", __func__);
+#endif
+}

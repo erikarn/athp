@@ -44,6 +44,17 @@ struct ath10k_htt_txbuf {
 	struct htt_data_tx_desc cmd_tx;
 } __packed;
 
+
+#define	ATHP_HTT_TX_LOCK(htt)		mtx_lock(&(htt)->tx_lock)
+#define	ATHP_HTT_TX_UNLOCK(htt)		mtx_unlock(&(htt)->tx_lock)
+#define	ATHP_HTT_TX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_lock, MA_OWNED)
+#define	ATHP_HTT_TX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_lock, MA_NOTOWNED)
+
+#define	ATHP_HTT_RX_LOCK(htt)		mtx_lock(&(htt)->rx_ring.lock)
+#define	ATHP_HTT_RX_UNLOCK(htt)		mtx_unlock(&(htt)->rx_ring.lock)
+#define	ATHP_HTT_RX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_OWNED)
+#define	ATHP_HTT_RX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_NOTOWNED)
+
 struct ath10k_htt {
 	struct ath10k *ar;
 	enum ath10k_htc_ep_id eid;
@@ -68,7 +79,7 @@ struct ath10k_htt {
 		 * buffer objects whose data buffers the HW has
 		 * filled.
 		 */
-		struct sk_buff **netbufs_ring;
+		struct athp_buf **netbufs_ring;
 
 		/* This is used only with firmware supporting IN_ORD_IND.
 		 *
@@ -134,13 +145,13 @@ struct ath10k_htt {
 		struct timer_list refill_retry_timer;
 
 		/* Protects access to all rx ring buffer state variables */
-		spinlock_t lock;
+		struct mtx lock;
 	} rx_ring;
 
 	unsigned int prefetch_len;
 
 	/* Protects access to pending_tx, num_pending_tx */
-	spinlock_t tx_lock;
+	struct mtx tx_lock;
 	int max_num_pending_tx;
 	int num_pending_tx;
 #if 0
@@ -255,9 +266,9 @@ int ath10k_htt_h2t_aggr_cfg_msg(struct ath10k_htt *htt,
 				u8 max_subfrms_amsdu);
 
 void __ath10k_htt_tx_dec_pending(struct ath10k_htt *htt);
-int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct sk_buff *skb);
+int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct athp_buf *skb);
 void ath10k_htt_tx_free_msdu_id(struct ath10k_htt *htt, u16 msdu_id);
-int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct sk_buff *);
-int ath10k_htt_tx(struct ath10k_htt *htt, struct sk_buff *);
+int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *);
+int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *);
 
 #endif
