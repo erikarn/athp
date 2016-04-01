@@ -1382,7 +1382,6 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err;
 	}
 
-#if 0
 	status = ath10k_htt_init(ar);
 	if (status) {
 		ath10k_err(ar, "failed to init htt: %d\n", status);
@@ -1395,6 +1394,7 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_wmi_detach;
 	}
 
+#if 0
 	status = ath10k_htt_rx_alloc(&ar->htt);
 	if (status) {
 		ath10k_err(ar, "failed to alloc htt rx: %d\n", status);
@@ -1495,9 +1495,9 @@ err_htt_rx_detach:
 	ath10k_htt_rx_free(&ar->htt);
 err_htt_tx_detach:
 	ath10k_htt_tx_free(&ar->htt);
+#endif
 err_wmi_detach:
 	ath10k_wmi_detach(ar);
-#endif
 err:
 	return status;
 }
@@ -1544,8 +1544,8 @@ ath10k_core_stop(struct ath10k *ar)
 		ath10k_wait_for_suspend(ar, WMI_PDEV_SUSPEND_AND_DISABLE_INTR);
 
 	ath10k_hif_stop(ar);
-#if 0
 	ath10k_htt_tx_free(&ar->htt);
+#if 0
 	ath10k_htt_rx_free(&ar->htt);
 #else
 	ath10k_wmi_detach(ar);
