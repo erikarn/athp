@@ -34,7 +34,7 @@ struct ath10k_htc_ops {
 
 struct ath10k_htc_ep_ops {
 	void (*ep_tx_complete)(struct ath10k *, struct athp_buf *);
-	void (*ep_rx_complete)(struct ath10k *, struct mbuf *);
+	void (*ep_rx_complete)(struct ath10k *, struct athp_buf *);
 	void (*ep_tx_credits)(struct ath10k *);
 };
 

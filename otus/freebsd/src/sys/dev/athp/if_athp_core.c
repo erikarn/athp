@@ -1376,13 +1376,13 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 	if (status)
 		goto err;
 
-#if 0
 	status = ath10k_wmi_attach(ar);
 	if (status) {
 		ath10k_err(ar, "WMI attach failed: %d\n", status);
 		goto err;
 	}
 
+#if 0
 	status = ath10k_htt_init(ar);
 	if (status) {
 		ath10k_err(ar, "failed to init htt: %d\n", status);
@@ -1547,9 +1547,9 @@ ath10k_core_stop(struct ath10k *ar)
 #if 0
 	ath10k_htt_tx_free(&ar->htt);
 	ath10k_htt_rx_free(&ar->htt);
-	ath10k_wmi_detach(ar);
 #else
-	device_printf(ar->sc_dev, "%s: TODO: htt free/wmi detach\n", __func__);
+	ath10k_wmi_detach(ar);
+	device_printf(ar->sc_dev, "%s: TODO: htt free detach\n", __func__);
 #endif
 }
 

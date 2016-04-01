@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include "hal/linux_compat.h"
+#include "hal/linux_skb.h"
 #include "hal/targaddrs.h"
 #include "hal/core.h"
 #include "hal/hw.h"
@@ -277,16 +278,14 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 	struct ath10k_pci_pipe *pipe_info =  &psc->pipe_info[ce_state->id];
 	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
 	struct athp_buf *pbuf;
-	struct mbuf *m;
-	struct mbufq mq;
 	void *ctx;
 	uint32_t ce_data;
 	unsigned int nbytes, max_nbytes;
 	unsigned int transfer_id;
 	unsigned int flags;
+	TAILQ_HEAD(, athp_buf) br_list;
 
-	/* XXX sigh, I wish mbufq's could have no limit here */
-	mbufq_init(&mq, 1024);
+	TAILQ_INIT(&br_list);
 
 	while (ath10k_ce_completed_recv_next(ce_state, &ctx,
 		    &ce_data, &nbytes, &transfer_id, &flags) == 0) {
@@ -309,23 +308,17 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		/* Assign actual packet buffer length to pbuf AND mbuf */
 		athp_buf_set_len(pbuf, nbytes);
 
-		/* Grab mbuf */
-		m = pbuf->m;		/* XXX TODO: should be a method */
-		pbuf->m = NULL;
-
-		/* Done; free pbuf */
-		athp_freebuf(ar, &ar->buf_rx, pbuf);
-
-		mbufq_enqueue(&mq, m);	/* XXX TODO: check return value */
+		TAILQ_INSERT_TAIL(&br_list, pbuf, next);
 	}
 
-	while ((m = mbufq_dequeue(&mq))) {
+	while ((pbuf = TAILQ_FIRST(&br_list)) != NULL) {
+		TAILQ_REMOVE(&br_list, pbuf, next);
 		ath10k_dbg(ar, ATH10K_DBG_PCI, "pci rx ce pipe %d len %d\n",
-			   ce_state->id, m->m_len);
+			   ce_state->id, mbuf_skb_len(pbuf->m));
 		athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
-			    m->m_data, m->m_len);
-
-		cb->rx_completion(ar, m);
+			    mbuf_skb_data(pbuf->m),
+			    mbuf_skb_len(pbuf->m));
+		cb->rx_completion(ar, pbuf);
 	}
 
 	ath10k_pci_rx_post_pipe(pipe_info);

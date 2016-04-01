@@ -28,7 +28,7 @@ struct ath10k_hif_sg_item {
 
 struct ath10k_hif_cb {
 	int (*tx_completion)(struct ath10k *ar, struct athp_buf *wbuf);
-	int (*rx_completion)(struct ath10k *ar, struct mbuf *wbuf);
+	int (*rx_completion)(struct ath10k *ar, struct athp_buf *wbuf);
 };
 
 struct ath10k_hif_ops {

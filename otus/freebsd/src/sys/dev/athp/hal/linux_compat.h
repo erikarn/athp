@@ -1,6 +1,8 @@
 #ifndef	__LINUX_COMPAT_H__
 #define	__LINUX_COMPAT_H__
 
+#include <net80211/ieee80211.h>
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/completion.h>
@@ -169,6 +171,12 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define IEEE80211_FTYPE_DATA            0x0008
 #define IEEE80211_FTYPE_EXT             0x000c
 
-
+static inline u8 *ieee80211_get_DA(struct ieee80211_frame *hdr)
+{
+	if (IEEE80211_IS_DSTODS(hdr))
+		return hdr->i_addr3;
+	else
+		return hdr->i_addr1;
+}
 
 #endif	/* __LINUX_COMPAT_H__ */

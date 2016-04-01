@@ -43,6 +43,15 @@
 #define	ATH10K_DBG_WMI_PRINT	0x00800000
 #define	ATH10K_DBG_ANY		0xffffffff
 
+enum ath10k_pktlog_filter {
+	ATH10K_PKTLOG_RX         = 0x000000001,
+	ATH10K_PKTLOG_TX         = 0x000000002,
+	ATH10K_PKTLOG_RCFIND     = 0x000000004,
+	ATH10K_PKTLOG_RCUPDATE   = 0x000000008,
+	ATH10K_PKTLOG_DBG_PRINT  = 0x000000010,
+	ATH10K_PKTLOG_ANY        = 0x00000001f,
+};
+
 #define	ath10k_dbg(sc, dm, ...) \
 	do { \
 		if ((dm == ATH10K_DBG_ANY) || (dm & (sc)->sc_debug)) \

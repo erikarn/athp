@@ -407,7 +407,7 @@ static int ath10k_htc_process_trailer(struct ath10k_htc *htc,
 }
 
 static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
-					    struct mbuf *m)
+					    struct athp_buf *pbuf)
 {
 	int status = 0;
 	struct ath10k_htc *htc = &ar->htc;
@@ -419,8 +419,8 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 	u8 eid;
 	bool trailer_present;
 
-	hdr = (struct ath10k_htc_hdr *)m->m_data;
-	mbuf_skb_pull(m, sizeof(*hdr));
+	hdr = (struct ath10k_htc_hdr *) mbuf_skb_data(pbuf->m);
+	mbuf_skb_pull(pbuf->m, sizeof(*hdr));
 
 	eid = hdr->eid;
 
@@ -454,10 +454,10 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 		goto out;
 	}
 
-	if (m->m_len < payload_len) {
+	if (mbuf_skb_len(pbuf->m) < payload_len) {
 		ath10k_dbg(ar, ATH10K_DBG_HTC,
 			   "HTC Rx: insufficient length, got %d, expected %d\n",
-			   m->m_len, payload_len);
+			   mbuf_skb_len(pbuf->m), payload_len);
 		athp_debug_dump(ar, ATH10K_DBG_HTC, "htc bad rx pkt len",
 				"", hdr, sizeof(*hdr));
 		status = -EINVAL;
@@ -489,7 +489,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 		if (status)
 			goto out;
 
-		mbuf_skb_trim(m, m->m_len - trailer_len);
+		mbuf_skb_trim(pbuf->m, mbuf_skb_len(pbuf->m) - trailer_len);
 	}
 
 	if (((int)payload_len - (int)trailer_len) <= 0)
@@ -497,7 +497,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 		goto out;
 
 	if (eid == ATH10K_HTC_EP_0) {
-		struct ath10k_htc_msg *msg = (struct ath10k_htc_msg *)m->m_data;
+		struct ath10k_htc_msg *msg = (struct ath10k_htc_msg *) mbuf_skb_data(pbuf->m);
 
 		switch (__le16_to_cpu(msg->hdr.message_id)) {
 		case ATH10K_HTC_MSG_READY_ID:
@@ -515,10 +515,10 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 			}
 
 			htc->control_resp_len =
-				min_t(int, m->m_len,
+				min_t(int, mbuf_skb_len(pbuf->m),
 				      ATH10K_HTC_MAX_CTRL_MSG_LEN);
 
-			memcpy(htc->control_resp_buffer, m->m_data,
+			memcpy(htc->control_resp_buffer, mbuf_skb_data(pbuf->m),
 			       htc->control_resp_len);
 
 			complete(&htc->ctl_resp);
@@ -534,25 +534,25 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_HTC, "htc rx completion ep %d m %p\n",
-		   eid, m);
-	ep->ep_ops.ep_rx_complete(ar, m);
+		   eid, pbuf->m);
+	ep->ep_ops.ep_rx_complete(ar, pbuf);
 
 	/* skb is now owned by the rx completion handler */
-	m = NULL;
+	pbuf = NULL;
 out:
-	if (m)
-		m_freem(m);
+	if (pbuf)
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 
 	return status;
 }
 
 static void ath10k_htc_control_rx_complete(struct ath10k *ar,
-					   struct mbuf *m)
+					   struct athp_buf *pbuf)
 {
 	/* This is unexpected. FW is not supposed to send regular rx on this
 	 * endpoint. */
-	ath10k_warn(ar, "unexpected htc rx: m=%p\n", m);
-	m_freem(m);
+	ath10k_warn(ar, "unexpected htc rx: pbuf=%p\n", pbuf);
+	athp_freebuf(ar, &ar->buf_rx, pbuf);
 }
 
 /***************/

@@ -52,10 +52,17 @@ struct ath10k_skb_cb {
 	} bcn;
 };
 
+typedef enum {
+	BUF_TYPE_RX,
+	BUF_TYPE_TX
+} athp_buf_type_t;
+
 struct athp_buf {
 	struct athp_dma_mbuf mb;
 	struct mbuf *m;
 	int m_size;	/* size of initial allocation */
+
+	athp_buf_type_t btype;
 
 	TAILQ_ENTRY(athp_buf) next;
 	uint32_t flags;
@@ -73,6 +80,7 @@ struct athp_buf {
 
 struct athp_buf_ring {
 	struct athp_dma_head dh;
+	athp_buf_type_t btype;
 	int br_count;
 	struct athp_buf *br_list;
 	TAILQ_HEAD(, athp_buf) br_inactive;
@@ -225,7 +233,6 @@ struct ath10k {
 	/* ath10k upstream stuff goes below */
 
 	u8 mac_addr[ETH_ALEN];
-
 #if 0
 	enum ath10k_hw_rev hw_rev;
 	u16 dev_id;
@@ -382,7 +389,7 @@ struct ath10k {
 	int num_tids;
 
 	struct work_struct svc_rdy_work;
-	struct sk_buff *svc_rdy_skb;
+	struct athp_buf *svc_rdy_skb;
 
 	struct work_struct offchan_tx_work;
 	TAILQ_HEAD(, athp_buf) offchan_tx_queue;
