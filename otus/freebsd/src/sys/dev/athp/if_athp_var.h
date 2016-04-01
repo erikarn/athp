@@ -19,7 +19,11 @@
 #define	__IF_ATHP_VAR_H__
 
 /* XXX cheating */
+#include "hal/rx_desc.h"
+#include "hal/htt.h"
+
 #include "if_athp_thermal.h"
+#include "if_athp_htt.h"
 
 #define	ATHP_RXBUF_MAX_SCATTER	1
 #define	ATHP_RBUF_SIZE		2048
@@ -144,20 +148,6 @@ struct ath10k_wmi {
 	u32 num_mem_chunks;
 	u32 rx_decap_mode;
 	struct ath10k_mem_chunk mem_chunks[WMI_MAX_MEM_REQS];
-};
-
-#define	ATH10K_HTT_MAX_NUM_AMSDU_DEFAULT	3
-#define	ATH10K_HTT_MAX_NUM_AMPDU_DEFAULT	64
-
-struct ath10k_htt {
-	int op_version;
-	int target_version_major;
-	int target_version_minor;
-	int max_num_ampdu;
-	int max_num_amsdu;
-	int max_num_pending_tx;
-
-	wait_queue_head_t empty_tx_wq;
 };
 
 struct ath10k_wow {
