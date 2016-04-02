@@ -121,8 +121,8 @@ static void ath10k_htt_rx_ring_free(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
 	struct athp_buf *skb;
-	struct ath10k_skb_rxcb *rxcb;
-	struct hlist_node *n;
+//	struct ath10k_skb_rxcb *rxcb;
+//	struct hlist_node *n;
 	int i;
 
 	if (htt->rx_ring.in_ord_rx) {
@@ -149,7 +149,9 @@ static void ath10k_htt_rx_ring_free(struct ath10k_htt *htt)
 	}
 
 	htt->rx_ring.fill_cnt = 0;
+#if 0
 	hash_init(htt->rx_ring.skb_table);
+#endif
 	memset(htt->rx_ring.netbufs_ring, 0,
 	       htt->rx_ring.size * sizeof(htt->rx_ring.netbufs_ring[0]));
 }
@@ -652,7 +654,9 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 
 	htt->rx_ring.fill_cnt = 0;
 	htt->rx_ring.sw_rd_idx.msdu_payld = 0;
+#if 0
 	hash_init(htt->rx_ring.skb_table);
+#endif
 
 	INIT_WORK(&htt->rx_replenish_task, ath10k_htt_rx_replenish_task);
 
