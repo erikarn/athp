@@ -175,10 +175,8 @@ struct ath10k_htt {
 	TAILQ_HEAD(, athp_buf) rx_compl_q;
 	TAILQ_HEAD(, athp_buf) rx_in_ord_compl_q;
 
-#if 0
 	/* rx_status template */
-	struct ieee80211_rx_status rx_status;
-#endif
+	struct ieee80211_rx_stats rx_status;
 
 	struct {
 		vm_paddr_t paddr;

@@ -79,8 +79,10 @@ struct athp_buf {
 		int placeholder;
 	} rx;
 };
+typedef TAILQ_HEAD(, athp_buf) athp_buf_head;
 
 #define	ATH10K_SKB_CB(pbuf)	(&pbuf->tx)
+//#define	ATH10K_SKB_RXCB(pbuf)	(&pbuf->rx)
 
 struct athp_buf_ring {
 	struct athp_dma_head dh;
