@@ -53,8 +53,7 @@ struct athp_buf {
 	} rx;
 };
 
-typedef TAILQ_HEAD(, athp_buf) athp_buf_head;
-
+typedef TAILQ_HEAD(athp_buf_s, athp_buf) athp_buf_head;
 
 #define	ATH10K_SKB_CB(pbuf)	(&pbuf->tx)
 //#define	ATH10K_SKB_RXCB(pbuf)	(&pbuf->rx)
