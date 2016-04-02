@@ -1071,7 +1071,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 		   !!(status->flag & RX_FLAG_FAILED_FCS_CRC),
 		   !!(status->flag & RX_FLAG_MMIC_ERROR),
 		   !!(status->flag & RX_FLAG_AMSDU_MORE));
-	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "rx skb: ",
+	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "rx skb: ",
 			skb->data, skb->len);
 	trace_ath10k_rx_hdr(ar, skb->data, skb->len);
 	trace_ath10k_rx_payload(ar, skb->data, skb->len);
@@ -1404,12 +1404,14 @@ static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb)
 }
 #endif
 
-#if 0
 static void ath10k_htt_rx_h_csum_offload(struct athp_buf *msdu)
 {
+#if 0
 	msdu->ip_summed = ath10k_htt_rx_get_csum_state(msdu);
-}
+#else
+	printf("%s: TODO\n", __func__);
 #endif
+}
 
 static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 				 athp_buf_head *amsdu,
@@ -1452,7 +1454,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 	 */
 	hdr = (void *)first_hdr;
 	qos = ieee80211_get_qos_ctl(hdr);
-	qos[0] &= ~IEEE80211_QOS_CTL_A_MSDU_PRESENT;
+	qos[0] &= ~IEEE80211_QOS_AMSDU;
 
 	/* Some attention flags are valid only in the last MSDU. */
 	last = TAILQ_LAST(amsdu, athp_buf_s);
@@ -1508,7 +1510,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 			continue;
 
 		hdr = (void *) mbuf_skb_data(msdu->m);
-		hdr->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
+		hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
 	}
 }
 
@@ -1521,17 +1523,24 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 	TAILQ_FOREACH_SAFE(msdu, amsdu, next, m_next) {
 		TAILQ_REMOVE(amsdu, msdu, next);
 		/* Setup per-MSDU flags */
+#if 0
 		if (TAILQ_EMPTY(amsdu))
 			status->flag &= ~RX_FLAG_AMSDU_MORE;
 		else
 			status->flag |= RX_FLAG_AMSDU_MORE;
-
+#else
+		if (TAILQ_EMPTY(amsdu))
+			device_printf(ar->sc_dev, "%s: TODO: clear AMSDU_MORE\n", __func__);
+		else
+			device_printf(ar->sc_dev, "%s: TODO: set AMSDU_MORE\n", __func__);
+#endif
 		ath10k_process_rx(ar, status, msdu);
 	}
 }
 
 static int ath10k_unchain_msdu(athp_buf_head *amsdu)
 {
+#if 0
 	struct athp_buf *skb, *first;
 	int space;
 	int total_len = 0;
@@ -1577,18 +1586,30 @@ static int ath10k_unchain_msdu(athp_buf_head *amsdu)
 
 	TAILQ_INSERT_HEAD(amsdu, first, next);
 	return 0;
+#else
+	/*
+	 * XXX TODO: FreeBSD lets me just return an mbuf chain, but
+	 * right now athp_buf's only represent a single mbuf.
+	 * This is one of those places we can optimise things later.
+	 *
+	 * For now, just return an error.
+	 */
+	printf("%s: TODO!\n", __func__);
+	return -1;
+#endif
 }
 
 static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 				    athp_buf_head *amsdu,
 				    bool chained)
 {
+#if 0
 	struct athp_buf *first;
 	struct htt_rx_desc *rxd;
 	enum rx_msdu_decap_format decap;
 
-	first = skb_peek(amsdu);
-	rxd = (void *)first->data - sizeof(*rxd);
+	first = TAILQ_FIRST(amsdu);
+	rxd = (void *)((char *) mbuf_skb_data(first->m) - sizeof(*rxd));
 	decap = MS(__le32_to_cpu(rxd->msdu_start.common.info1),
 		   RX_MSDU_START_INFO1_DECAP_FORMAT);
 
@@ -1607,6 +1628,9 @@ static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 	}
 
 	ath10k_unchain_msdu(amsdu);
+#else
+	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
+#endif
 }
 
 static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
@@ -1618,18 +1642,21 @@ static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
 	bool is_mgmt;
 	bool has_fcs_err;
 
-	msdu = skb_peek(amsdu);
-	rxd = (void *)msdu->data - sizeof(*rxd);
+	msdu = TAILQ_FIRST(amsdu);
+	rxd = (void *)((char *) mbuf_skb_data(msdu->m) - sizeof(*rxd));
 
 	/* FIXME: It might be a good idea to do some fuzzy-testing to drop
 	 * invalid/dangerous frames.
 	 */
 
+#if 0
 	if (!rx_status->freq) {
 		ath10k_warn(ar, "no channel configured; ignoring frame(s)!\n");
 		return false;
 	}
-
+#else
+	device_printf(ar->sc_dev, "%s: TODO: freq check!\n", __func__);
+#endif
 	is_mgmt = !!(rxd->attention.flags &
 		     __cpu_to_le32(RX_ATTENTION_FLAGS_MGMT_TYPE));
 	has_fcs_err = !!(rxd->attention.flags &
@@ -1692,7 +1719,7 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 			     HTT_RX_INDICATION_INFO1_NUM_MPDU_RANGES);
 	mpdu_ranges = htt_rx_ind_get_mpdu_ranges(rx);
 
-	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx ind: ",
+	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx ind: ",
 			rx, sizeof(*rx) +
 			(sizeof(struct htt_rx_indication_mpdu_range) *
 				num_mpdu_ranges));
@@ -1706,7 +1733,7 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 					      &fw_desc_len, &amsdu);
 		if (ret < 0) {
 			ath10k_warn(ar, "rx ring became corrupted: %d\n", ret);
-			athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
+			athp_buf_list_flush(ar, &ar->buf_rx, &amsdu);
 			/* FIXME: It's probably a good idea to reboot the
 			 * device instead of leaving it inoperable.
 			 */
@@ -1894,7 +1921,7 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 #if 0
 	ieee80211_stop_rx_ba_session_offl(arvif->vif, peer->addr, tid);
 #else
-	device_print(ar->sc_dev, "%s: todo: stop_rx_ba_session_offl\n", __func__);
+	device_printf(ar->sc_dev, "%s: todo: stop_rx_ba_session_offl\n", __func__);
 #endif
 	ATHP_DATA_UNLOCK(ar);
 }
@@ -1908,7 +1935,7 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	if (TAILQ_EMPTY(list))
 		return -ENOBUFS;
 
-	if (WARN_ON(!skb_queue_empty(amsdu)))
+	if (WARN_ON(! TAILQ_EMPTY(amsdu)))
 		return -EINVAL;
 
 	while ((msdu = __skb_dequeue(list))) {
@@ -2178,7 +2205,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_FRAG_IND: {
-		ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
+		athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
 				skb->data, skb->len);
 		ath10k_htt_rx_frag_handler(htt, &resp->rx_frag_ind);
 		break;
@@ -2242,7 +2269,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 	default:
 		ath10k_warn(ar, "htt event (%d) not handled\n",
 			    resp->hdr.msg_type);
-		ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
+		athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
 				skb->data, skb->len);
 		break;
 	};
