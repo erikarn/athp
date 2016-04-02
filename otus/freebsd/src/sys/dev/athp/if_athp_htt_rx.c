@@ -1088,7 +1088,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 static int ath10k_htt_rx_nwifi_hdrlen(struct ath10k *ar,
 				      struct ieee80211_frame *hdr)
 {
-	int len = ieee80211_hdrlen(hdr->frame_control);
+	int len = ieee80211_anyhdrsize(hdr);
 
 	if (!test_bit(ATH10K_FW_FEATURE_NO_NWIFI_DECAP_4ADDR_PADDING,
 		      ar->fw_features))
@@ -1163,7 +1163,7 @@ static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 		mbuf_skb_trim(msdu->m, mbuf_sku_len(msdu->m)- 8);
 
 	/* Head */
-	hdr_len = ieee80211_hdrlen(hdr->frame_control);
+	hdr_len = ieee80211_anyhdrsize(hdr);
 	crypto_len = ath10k_htt_rx_crypto_param_len(ar, enctype);
 
 	memmove((char *)mbuf_skb_data(msdu->m) + crypto_len,
@@ -1205,7 +1205,7 @@ static void ath10k_htt_rx_h_undecap_nwifi(struct ath10k *ar,
 
 	/* push original 802.11 header */
 	hdr = (struct ieee80211_hdr *)first_hdr;
-	hdr_len = ieee80211_hdrlen(hdr->frame_control);
+	hdr_len = ieee80211_anyhdrsize(hdr);
 	memcpy(skb_push(msdu, hdr_len), hdr, hdr_len);
 
 	/* original 802.11 header has a different DA and in
@@ -1242,7 +1242,7 @@ static void *ath10k_htt_rx_h_find_rfc1042(struct ath10k *ar,
 	rfc1042 = hdr;
 
 	if (is_first) {
-		hdr_len = ieee80211_hdrlen(hdr->frame_control);
+		hdr_len = ieee80211_anyhdrsize(hdr);
 		crypto_len = ath10k_htt_rx_crypto_param_len(ar, enctype);
 
 		rfc1042 += round_up(hdr_len, 4) +
@@ -1291,7 +1291,7 @@ static void ath10k_htt_rx_h_undecap_eth(struct ath10k *ar,
 
 	/* push original 802.11 header */
 	hdr = (struct ieee80211_hdr *)first_hdr;
-	hdr_len = ieee80211_hdrlen(hdr->frame_control);
+	hdr_len = ieee80211_anyhdrsize(hdr);
 	memcpy(skb_push(msdu, hdr_len), hdr, hdr_len);
 
 	/* original 802.11 header has a different DA and in
@@ -1323,7 +1323,7 @@ static void ath10k_htt_rx_h_undecap_snap(struct ath10k *ar,
 	skb_pull(msdu, sizeof(struct amsdu_subframe_hdr));
 
 	hdr = (struct ieee80211_hdr *)first_hdr;
-	hdr_len = ieee80211_hdrlen(hdr->frame_control);
+	hdr_len = ieee80211_anyhdrsize(hdr);
 	memcpy(skb_push(msdu, hdr_len), hdr, hdr_len);
 #else
 	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
@@ -1419,7 +1419,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 	struct athp_buf *last;
 	struct athp_buf *msdu;
 	struct htt_rx_desc *rxd;
-	struct ieee80211_hdr *hdr;
+	struct ieee80211_frame *hdr;
 	enum htt_rx_mpdu_encrypt_type enctype;
 	u8 first_hdr[64];
 	u8 *qos;
@@ -1444,7 +1444,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 	 * decapped header. It'll be used for undecapping of each MSDU.
 	 */
 	hdr = (void *)rxd->rx_hdr_status;
-	hdr_len = ieee80211_hdrlen(hdr->frame_control);
+	hdr_len = ieee80211_anyhdrsize(hdr);
 	memcpy(first_hdr, hdr, hdr_len);
 
 	/* Each A-MSDU subframe will use the original header as the base and be
