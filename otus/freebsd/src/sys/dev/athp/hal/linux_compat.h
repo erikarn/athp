@@ -112,6 +112,7 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define	IEEE80211_IS_ACTION(a)		0
 #define	IEEE80211_IS_DEAUTH(a)		0
 #define	IEEE80211_IS_DISASSOC(a)	0
+#define	IEEE80211_IS_QOS(a)		0
 #define	IEEE80211_HAS_PROT(a)		0
 #define	IEEE80211_IS_MGMT(a)		0
 

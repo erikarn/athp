@@ -736,6 +736,7 @@ struct amsdu_subframe_hdr {
 	__be16 len;
 } __packed;
 
+#if 0
 static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 				  struct ieee80211_rx_stats *status,
 				  struct htt_rx_desc *rxd)
@@ -814,7 +815,9 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 		break;
 	}
 }
+#endif
 
+#if 0
 static struct ieee80211_channel *
 ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 {
@@ -852,7 +855,9 @@ ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 
 	return def.chan;
 }
+#endif
 
+#if 0
 static struct ieee80211_channel *
 ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 {
@@ -869,7 +874,9 @@ ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 
 	return NULL;
 }
+#endif
 
+#if 0
 static void
 ath10k_htt_rx_h_any_chan_iter(struct ieee80211_hw *hw,
 			      struct ieee80211_chanctx_conf *conf,
@@ -879,7 +886,9 @@ ath10k_htt_rx_h_any_chan_iter(struct ieee80211_hw *hw,
 
 	*def = conf->def;
 }
+#endif
 
+#if 0
 static struct ieee80211_channel *
 ath10k_htt_rx_h_any_channel(struct ath10k *ar)
 {
@@ -891,7 +900,9 @@ ath10k_htt_rx_h_any_channel(struct ath10k *ar)
 
 	return def.chan;
 }
+#endif
 
+#if 0
 static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 				    struct ieee80211_rx_stats *status,
 				    struct htt_rx_desc *rxd,
@@ -943,6 +954,7 @@ static void ath10k_htt_rx_h_mactime(struct ath10k *ar,
 	status->mactime = __le32_to_cpu(rxd->ppdu_end.common.tsf_timestamp);
 	status->flag |= RX_FLAG_MACTIME_END;
 }
+#endif
 
 static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 				 athp_buf_head *amsdu,
@@ -957,14 +969,15 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 	if (TAILQ_EMPTY(amsdu))
 		return;
 
-	first = skb_peek(amsdu);
-	rxd = (void *)first->data - sizeof(*rxd);
+	first = TAILQ_FIRST(amsdu);
+	rxd = (void *) ((char *)mbuf_skb_data(first->m) - sizeof(*rxd));
 
 	is_first_ppdu = !!(rxd->attention.flags &
 			   __cpu_to_le32(RX_ATTENTION_FLAGS_FIRST_MPDU));
 	is_last_ppdu = !!(rxd->attention.flags &
 			  __cpu_to_le32(RX_ATTENTION_FLAGS_LAST_MPDU));
 
+#if 0
 	if (is_first_ppdu) {
 		/* New PPDU starts so clear out the old per-PPDU status. */
 		status->freq = 0;
@@ -985,6 +998,10 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 
 	if (is_last_ppdu)
 		ath10k_htt_rx_h_mactime(ar, status, rxd);
+#else
+	device_printf(ar->sc_dev, "%s: called; first=%d, last=%d; TODO!\n",
+	    __func__, is_first_ppdu, is_last_ppdu);
+#endif
 }
 
 static const char * const tid_to_ac[] = {
@@ -998,12 +1015,13 @@ static const char * const tid_to_ac[] = {
 	"VO",
 };
 
-static char *ath10k_get_tid(struct ieee80211_hdr *hdr, char *out, size_t size)
+static char *ath10k_get_tid(struct ieee80211_frame *hdr, char *out, size_t size)
 {
+#if 0
 	u8 *qc;
 	int tid;
 
-	if (!ieee80211_is_data_qos(hdr->frame_control))
+	if (! IEEE80211_IS_QOS(hdr))
 		return "";
 
 	qc = ieee80211_get_qos_ctl(hdr);
@@ -1014,6 +1032,9 @@ static char *ath10k_get_tid(struct ieee80211_hdr *hdr, char *out, size_t size)
 		snprintf(out, size, "tid %d", tid);
 
 	return out;
+#else
+	return "ath10k_get_tid: TODO";
+#endif
 }
 
 static void ath10k_process_rx(struct ath10k *ar,
