@@ -171,9 +171,9 @@ struct ath10k_htt {
 	struct tasklet_struct txrx_compl_task;
 #endif
 
-	TAILQ_HEAD(, athp_buf) tx_compl_q;
-	TAILQ_HEAD(, athp_buf) rx_compl_q;
-	TAILQ_HEAD(, athp_buf) rx_in_ord_compl_q;
+	athp_buf_head tx_compl_q;
+	athp_buf_head rx_compl_q;
+	athp_buf_head rx_in_ord_compl_q;
 
 	/* rx_status template */
 	struct ieee80211_rx_stats rx_status;

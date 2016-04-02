@@ -306,13 +306,15 @@ int ath10k_htt_rx_ring_refill(struct ath10k *ar)
 
 void ath10k_htt_rx_free(struct ath10k_htt *htt)
 {
+	struct ath10k *ar = htt->ar;
+
 	del_timer_sync(&htt->rx_ring.refill_retry_timer);
 	tasklet_kill(&htt->rx_replenish_task);
 	tasklet_kill(&htt->txrx_compl_task);
 
-	skb_queue_purge(&htt->tx_compl_q);
-	skb_queue_purge(&htt->rx_compl_q);
-	skb_queue_purge(&htt->rx_in_ord_compl_q);
+	athp_buf_list_flush(ar, &ar->buf_tx, &htt->tx_compl_q);
+	athp_buf_list_flush(ar, &ar->buf_rx, &htt->rx_compl_q);
+	athp_buf_list_flush(ar, &ar->buf_rx, &htt->rx_in_ord_compl_q);
 
 	ath10k_htt_rx_ring_free(htt);
 
@@ -367,7 +369,7 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 				   u8 **fw_desc, int *fw_desc_len,
 				   athp_buf_head *amsdu)
 {
-//	struct ath10k *ar = htt->ar;
+	struct ath10k *ar = htt->ar;
 	int msdu_len, msdu_chaining = 0;
 	struct athp_buf *msdu;
 	struct htt_rx_desc *rx_desc;
@@ -379,7 +381,7 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 
 		msdu = ath10k_htt_rx_netbuf_pop(htt);
 		if (!msdu) {
-			__skb_queue_purge(amsdu);
+			athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 			return -ENOENT;
 		}
 
@@ -402,7 +404,7 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 		 */
 		if (!(__le32_to_cpu(rx_desc->attention.flags)
 				& RX_ATTENTION_FLAGS_MSDU_DONE)) {
-			__skb_queue_purge(amsdu);
+			athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 			return -EIO;
 		}
 
@@ -466,11 +468,11 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 		while (msdu_chained--) {
 			msdu = ath10k_htt_rx_netbuf_pop(htt);
 			if (!msdu) {
-				__skb_queue_purge(amsdu);
+				athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 				return -ENOENT;
 			}
 
-			__skb_queue_tail(amsdu, msdu);
+			TAILQ_INSERT_TAIL(amsdu, msdu, next);
 			mbuf_skb_trim(msdu->m, 0);
 			mbuf_skb_put(msdu->m, min(msdu_len, HTT_RX_BUF_SIZE));
 			msdu_len -= mbuf_skb_len(msdu->m);
@@ -565,7 +567,7 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 
 		msdu = ath10k_htt_rx_pop_paddr(htt, paddr);
 		if (!msdu) {
-			__skb_queue_purge(list);
+			athp_buf_list_flush(ar, &ar->buf_rx, list);
 			return -ENOENT;
 		}
 
@@ -1542,7 +1544,7 @@ static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 	 */
 	if (decap != RX_MSDU_DECAP_RAW ||
 	    skb_queue_len(amsdu) != 1 + rxd->frag_info.ring2_more_count) {
-		__skb_queue_purge(amsdu);
+		athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 		return;
 	}
 
@@ -1605,7 +1607,7 @@ static void ath10k_htt_rx_h_filter(struct ath10k *ar,
 	if (ath10k_htt_rx_amsdu_allowed(ar, amsdu, rx_status))
 		return;
 
-	__skb_queue_purge(amsdu);
+	athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 }
 
 static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
@@ -1646,7 +1648,7 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 					      &fw_desc_len, &amsdu);
 		if (ret < 0) {
 			ath10k_warn(ar, "rx ring became corrupted: %d\n", ret);
-			__skb_queue_purge(&amsdu);
+			athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 			/* FIXME: It's probably a good idea to reboot the
 			 * device instead of leaving it inoperable.
 			 */
@@ -1691,13 +1693,13 @@ static void ath10k_htt_rx_frag_handler(struct ath10k_htt *htt,
 	if (ret) {
 		ath10k_warn(ar, "failed to pop amsdu from httr rx ring for fragmented rx %d\n",
 			    ret);
-		__skb_queue_purge(&amsdu);
+		athp_buf_list_flush(ar, &ar->buf_rx, &amsdu);
 		return;
 	}
 
 	if (skb_queue_len(&amsdu) != 1) {
 		ath10k_warn(ar, "failed to pop frag amsdu: too many msdus\n");
-		__skb_queue_purge(&amsdu);
+		athp_buf_list_flush(ar, &ar->buf_rx, &amsdu);
 		return;
 	}
 
@@ -2019,7 +2021,7 @@ static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 			/* Should not happen. */
 			ath10k_warn(ar, "failed to extract amsdu: %d\n", ret);
 			htt->rx_confused = true;
-			__skb_queue_purge(&list);
+			athp_buf_list_flush(ar, &ar->buf_rx, &list);
 			return;
 		}
 	}

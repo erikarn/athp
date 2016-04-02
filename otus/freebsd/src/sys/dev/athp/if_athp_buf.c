@@ -310,3 +310,15 @@ athp_buf_set_len(struct athp_buf *bf, int len)
 	bf->m->m_len = len;
 	bf->m->m_pkthdr.len = len;
 }
+
+void
+athp_buf_list_flush(struct ath10k *ar, struct athp_buf_ring *br,
+    athp_buf_head *bl)
+{
+	struct athp_buf *pbuf, *pbuf_next;
+
+	TAILQ_FOREACH_SAFE(pbuf, bl, next, pbuf_next) {
+		TAILQ_REMOVE(bl, pbuf, next);
+		athp_freebuf(ar, br, pbuf);
+	}
+}
