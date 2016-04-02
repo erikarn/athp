@@ -162,6 +162,8 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 
 	mtx_init(&htt->tx_lock, device_get_nameunit(ar->sc_dev),
 	    "athp htt tx", MTX_DEF);
+	mtx_init(&htt->tx_comp_lock, device_get_nameunit(ar->sc_dev),
+	    "athp htt comp tx", MTX_DEF);
 	idr_init(&htt->pending_tx);
 
 	htt->tx_pool = dma_pool_create("ath10k htt tx pool", htt->ar->sc_dev,

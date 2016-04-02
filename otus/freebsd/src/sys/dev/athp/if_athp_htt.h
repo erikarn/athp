@@ -50,6 +50,11 @@ struct ath10k_htt_txbuf {
 #define	ATHP_HTT_TX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_lock, MA_OWNED)
 #define	ATHP_HTT_TX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_lock, MA_NOTOWNED)
 
+#define	ATHP_HTT_TX_COMP_LOCK(htt)		mtx_lock(&(htt)->tx_comp_lock)
+#define	ATHP_HTT_TX_COMP_UNLOCK(htt)		mtx_unlock(&(htt)->tx_comp_lock)
+#define	ATHP_HTT_TX_COMP_LOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_comp_lock, MA_OWNED)
+#define	ATHP_HTT_TX_COMP_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_comp_lock, MA_NOTOWNED)
+
 #define	ATHP_HTT_RX_LOCK(htt)		mtx_lock(&(htt)->rx_ring.lock)
 #define	ATHP_HTT_RX_UNLOCK(htt)		mtx_unlock(&(htt)->rx_ring.lock)
 #define	ATHP_HTT_RX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_OWNED)
@@ -158,20 +163,21 @@ struct ath10k_htt {
 	wait_queue_head_t empty_tx_wq;
 	struct dma_pool *tx_pool;
 
+
 	/* set if host-fw communication goes haywire
 	 * used to avoid further failures */
 	bool rx_confused;
-#if 0
-	struct tasklet_struct rx_replenish_task;
-#endif
+	struct work_struct rx_replenish_task;
 
-#if 0
 	/* This is used to group tx/rx completions separately and process them
 	 * in batches to reduce cache stalls */
-	struct tasklet_struct txrx_compl_task;
-#endif
+	struct work_struct txrx_compl_task;
 
+	/* protects access to the tx completion queue */
+	struct mtx tx_comp_lock;
 	athp_buf_head tx_compl_q;
+
+	/* protected by htt rx lock */
 	athp_buf_head rx_compl_q;
 	athp_buf_head rx_in_ord_compl_q;
 

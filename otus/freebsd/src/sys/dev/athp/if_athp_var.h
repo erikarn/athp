@@ -138,8 +138,8 @@ struct ath10k {
 	struct athp_buf_ring buf_rx;
 	struct athp_buf_ring buf_tx;
 
-#if 0
 	/* Taskqueues for work */
+#if 0
 	struct taskqueue		*sc_taskq;
 	struct taskqueue		*sc_aux_taskq;
 #endif
