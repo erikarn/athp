@@ -1804,7 +1804,7 @@ static void ath10k_htt_rx_frm_tx_compl(struct ath10k *ar,
 				       struct athp_buf *skb)
 {
 	struct ath10k_htt *htt = &ar->htt;
-	struct htt_resp *resp = (struct htt_resp *)skb->data;
+	struct htt_resp *resp = (struct htt_resp *) (void *) mbuf_skb_data(skb->m);
 	struct htt_tx_done tx_done = {};
 	int status = MS(resp->data_tx_completion.flags, HTT_DATA_TX_STATUS);
 	__le16 msdu_id;
@@ -1840,6 +1840,7 @@ static void ath10k_htt_rx_frm_tx_compl(struct ath10k *ar,
 
 static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 {
+#if 0
 	struct htt_rx_addba *ev = &resp->rx_addba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
@@ -1880,10 +1881,14 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 	device_printf(ar->sc_dev, "%s: rx_ba_session_offl todo!\n", __func__);
 #endif
 	ATHP_DATA_UNLOCK(ar);
+#else
+	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
+#endif
 }
 
 static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 {
+#if 0
 	struct htt_rx_delba *ev = &resp->rx_delba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
@@ -1924,6 +1929,9 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 	device_printf(ar->sc_dev, "%s: todo: stop_rx_ba_session_offl\n", __func__);
 #endif
 	ATHP_DATA_UNLOCK(ar);
+#else
+	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
+#endif
 }
 
 static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
@@ -1941,14 +1949,14 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	while ((msdu = __skb_dequeue(list))) {
 		TAILQ_INSERT_TAIL(amsdu, msdu, next);
 
-		rxd = (void *)msdu->data - sizeof(*rxd);
+		rxd = (void *)((char *) mbuf_skb_data(msdu->m) - sizeof(*rxd));
 		if (rxd->msdu_end.common.info0 &
 		    __cpu_to_le32(RX_MSDU_END_INFO0_LAST_MSDU))
 			break;
 	}
 
-	msdu = skb_peek_tail(amsdu);
-	rxd = (void *)msdu->data - sizeof(*rxd);
+	msdu = TAILQ_LAST(amsdu, athp_buf_s);
+	rxd = (void *)((char *) mbuf_skb_data(msdu->m) - sizeof(*rxd));
 	if (!(rxd->msdu_end.common.info0 &
 	      __cpu_to_le32(RX_MSDU_END_INFO0_LAST_MSDU))) {
 		skb_queue_splice_init(amsdu, list);
@@ -1961,7 +1969,7 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 					    struct athp_buf *skb)
 {
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ieee80211_frame *hdr = (struct ieee80211_frame *) (void *) mbuf_skb_data(skb->m);
 
 	if (!ieee80211_has_protected(hdr->frame_control))
 		return;
@@ -1986,33 +1994,44 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 	struct athp_buf *msdu;
 	size_t offset;
 
-	while ((msdu = __skb_dequeue(list))) {
+	while (! TAILQ_EMPTY(list)) {
+		msdu = TAILQ_FIRST(list);
+		TAILQ_REMOVE(list, msdu, next);
+
 		/* Offloaded frames don't have Rx descriptor. Instead they have
 		 * a short meta information header.
 		 */
 
-		rx = (void *)msdu->data;
+		rx = (void *) mbuf_skb_data(msdu->m);
 
-		skb_put(msdu, sizeof(*rx));
-		skb_pull(msdu, sizeof(*rx));
+		mbuf_skb_put(msdu->m, sizeof(*rx));
+		mbuf_skb_pull(msdu->m, sizeof(*rx));
 
+		/*
+		 * Do we have enough space in the msdu for the msdu_len?
+		 * If not, then we can't store it in the msdu frame.
+		 *
+		 * Which is .. hm, silly, because in FreeBSD we will
+		 * have enough space, either in the mbuf or creating
+		 * a chain.  But, there's no chains yet, so!
+		 */
 		if (skb_tailroom(msdu) < __le16_to_cpu(rx->msdu_len)) {
 			ath10k_warn(ar, "dropping frame: offloaded rx msdu is too long!\n");
-			dev_kfree_skb_any(msdu);
+			athp_freebuf(ar, &ar->buf_rx, msdu);
 			continue;
 		}
 
-		skb_put(msdu, __le16_to_cpu(rx->msdu_len));
+		mbuf_skb_put(msdu->m, __le16_to_cpu(rx->msdu_len));
 
 		/* Offloaded rx header length isn't multiple of 2 nor 4 so the
 		 * actual payload is unaligned. Align the frame.  Otherwise
 		 * mac80211 complains.  This shouldn't reduce performance much
 		 * because these offloaded frames are rare.
 		 */
-		offset = 4 - ((unsigned long)msdu->data & 3);
-		skb_put(msdu, offset);
-		memmove(msdu->data + offset, msdu->data, msdu->len);
-		skb_pull(msdu, offset);
+		offset = 4 - ((unsigned long) mbuf_skb_data(msdu->m) & 3);
+		mbuf_skb_put(msdu->m, offset);
+		memmove(mbuf_skb_data(msdu->m) + offset, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
+		mbuf_skb_pull(msdu->m, offset);
 
 		/* FIXME: The frame is NWifi. Re-construct QoS Control
 		 * if possible later.
