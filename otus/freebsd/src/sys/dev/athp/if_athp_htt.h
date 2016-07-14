@@ -187,6 +187,7 @@ struct ath10k_htt {
 	struct {
 		vm_paddr_t paddr;
 		struct htt_msdu_ext_desc *vaddr;
+		struct athp_descdma dd;
 	} frag_desc;
 };
 

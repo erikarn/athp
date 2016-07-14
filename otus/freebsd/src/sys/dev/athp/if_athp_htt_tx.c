@@ -177,14 +177,14 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 		goto skip_frag_desc_alloc;
 
 	size = htt->max_num_pending_tx * sizeof(struct htt_msdu_ext_desc);
-	htt->frag_desc.vaddr = dma_alloc_coherent(ar->sc_dev, size,
-						  &htt->frag_desc.paddr,
-						  GFP_DMA);
-	if (!htt->frag_desc.vaddr) {
+	if (athp_descdma_alloc(ar, &htt->frag_desc.dd, "htt frag_desc",
+	    8, size) != 0) {
 		ath10k_warn(ar, "failed to alloc fragment desc memory\n");
 		ret = -ENOMEM;
 		goto free_tx_pool;
 	}
+	htt->frag_desc.vaddr = (void *) htt->frag_desc.dd.dd_desc;
+	htt->frag_desc.paddr = htt->frag_desc.dd.dd_desc_paddr;
 
 skip_frag_desc_alloc:
 	return 0;
@@ -197,11 +197,12 @@ free_idr_pending_tx:
 	return ret;
 }
 
-#if 0
 static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *skb, void *ctx)
 {
 	struct ath10k *ar = ctx;
+#if 0
 	struct ath10k_htt *htt = &ar->htt;
+#endif
 	struct htt_tx_done tx_done = {0};
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "force cleanup msdu_id %u\n", (unsigned int) msdu_id);
@@ -209,30 +210,24 @@ static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *skb, void *ctx)
 	tx_done.discard = 1;
 	tx_done.msdu_id = msdu_id;
 
+#if 0
 	ath10k_txrx_tx_unref(htt, &tx_done);
+#else
+	device_printf(ar->sc_dev, "%s: ath10k_txrx_tx_unref: TODO\n", __func__);
+#endif
 
 	return 0;
 }
-#endif
 
 void ath10k_htt_tx_free(struct ath10k_htt *htt)
 {
-	int size;
 
-#if 0
 	idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
-#else
-	device_printf(htt->ar->sc_dev, "%s: TODO: implement idr_for_each!\n",
-	    __func__);
-#endif
 	idr_destroy(&htt->pending_tx);
 	dma_pool_destroy(htt->tx_pool);
 
 	if (htt->frag_desc.vaddr) {
-		size = htt->max_num_pending_tx *
-				  sizeof(struct htt_msdu_ext_desc);
-		dma_free_coherent(htt->ar->sc_dev, size, htt->frag_desc.vaddr,
-				  htt->frag_desc.paddr);
+		athp_descdma_free(htt->ar, &htt->frag_desc.dd);
 	}
 	mtx_destroy(&htt->tx_lock);
 }
