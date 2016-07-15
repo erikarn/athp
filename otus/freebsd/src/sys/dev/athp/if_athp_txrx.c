@@ -96,9 +96,9 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DECLARE(M_ATHPDEV);
 
-static void ath10k_report_offchan_tx(struct ath10k *ar, struct mbuf *skb)
+static void ath10k_report_offchan_tx(struct ath10k *ar, struct athp_buf *pbuf)
 {
-	if (!ATH10K_SKB_CB(skb)->htt.is_offchan)
+	if (!ATH10K_SKB_CB(pbuf)->htt.is_offchan)
 		return;
 
 	/* If the original wait_for_completion() timed out before
@@ -106,13 +106,13 @@ static void ath10k_report_offchan_tx(struct ath10k *ar, struct mbuf *skb)
 	 * offchan_tx_completed for a different skb. Prevent this by using
 	 * offchan_tx_skb. */
 	spin_lock_bh(&ar->data_lock);
-	if (ar->offchan_tx_skb != skb) {
+	if (ar->offchan_tx_pbuf != pbuf) {
 		ath10k_warn(ar, "completed old offchannel frame\n");
 		goto out;
 	}
 
 	complete(&ar->offchan_tx_completed);
-	ar->offchan_tx_skb = NULL; /* just for sanity */
+	ar->offchan_tx_pbuf = NULL; /* just for sanity */
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "completed offchannel skb %p\n", skb);
 out:
@@ -126,6 +126,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	struct device *dev = ar->dev;
 	struct ieee80211_tx_info *info;
 	struct ath10k_skb_cb *skb_cb;
+	struct athp_buf *pbuf;
 	struct mbuf *msdu;
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT,
@@ -140,13 +141,15 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	}
 
 	spin_lock_bh(&htt->tx_lock);
-	msdu = idr_find(&htt->pending_tx, tx_done->msdu_id);
-	if (!msdu) {
+	pbuf = idr_find(&htt->pending_tx, tx_done->msdu_id);
+	if (! pbuf) {
 		ath10k_warn(ar, "received tx completion for invalid msdu_id: %d\n",
 			    tx_done->msdu_id);
 		spin_unlock_bh(&htt->tx_lock);
 		return;
 	}
+	msdu = pbuf->m;
+
 	ath10k_htt_tx_free_msdu_id(htt, tx_done->msdu_id);
 	__ath10k_htt_tx_dec_pending(htt);
 	if (htt->num_pending_tx == 0)
