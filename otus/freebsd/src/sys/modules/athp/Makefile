@@ -67,4 +67,10 @@ SRCS    += if_athp_wmi.c
 # into separate source files
 SRCS    += if_athp_mac.c
 
+# This is the transport layer for transmit/receive MSDUs.
+SRCS    += if_athp_htt.c
+SRCS    += if_athp_txrx.c
+SRCS    += if_athp_htt_tx.c
+SRCS    += if_athp_htt_rx.c
+
 .include <bsd.kmod.mk>
