@@ -81,3 +81,13 @@ Things to undo:
 
 * dma coherent API - is now there
 * find the conversions to the freebsd list structs - that's now there
+
+NEED TO DO THIS OR THE FIRMWARE CRASHES
+
+* the regulatory code programs in the regdomain in a regdomain callback handler.
+  If we don't call that WMI routine then things fail badly and the firmware
+  panics.
+
+  Go find ath10k_regd_update() and ensure we call it as part of dev/vif up or
+  firmware will panic upon scan!
+
