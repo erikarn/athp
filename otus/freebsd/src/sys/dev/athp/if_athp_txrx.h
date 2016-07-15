@@ -17,8 +17,6 @@
 #ifndef _TXRX_H_
 #define _TXRX_H_
 
-#include "htt.h"
-
 void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 			  const struct htt_tx_done *tx_done);
 
