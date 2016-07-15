@@ -90,6 +90,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_txrx.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 void __ath10k_htt_tx_dec_pending(struct ath10k_htt *htt)
@@ -197,12 +198,10 @@ free_idr_pending_tx:
 	return ret;
 }
 
-static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *skb, void *ctx)
+static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *pbuf, void *ctx)
 {
 	struct ath10k *ar = ctx;
-#if 0
 	struct ath10k_htt *htt = &ar->htt;
-#endif
 	struct htt_tx_done tx_done = {0};
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "force cleanup msdu_id %u\n", (unsigned int) msdu_id);
@@ -210,11 +209,7 @@ static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *skb, void *ctx)
 	tx_done.discard = 1;
 	tx_done.msdu_id = msdu_id;
 
-#if 0
 	ath10k_txrx_tx_unref(htt, &tx_done);
-#else
-	device_printf(ar->sc_dev, "%s: ath10k_txrx_tx_unref: TODO\n", __func__);
-#endif
 
 	return 0;
 }
@@ -508,6 +503,7 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	len += sizeof(cmd->mgmt_tx);
 
 	ATHP_HTT_TX_LOCK(htt);
+	/* XXX note: we're specifically trying to store athp_buf's in the idr */
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
 	ATHP_HTT_TX_UNLOCK(htt);
 	if (res < 0) {
