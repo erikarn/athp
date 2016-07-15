@@ -76,3 +76,8 @@ firmware injection and start stubbing out the HIF layer for implementing.
 The only bits of HIF layer we need are power_on, stop, power_off and the BMI
 HIF wait for message routine.
 
+
+Things to undo:
+
+* dma coherent API - is now there
+* find the conversions to the freebsd list structs - that's now there
