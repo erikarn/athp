@@ -199,7 +199,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	ieee80211_tx_status(htt->ar->hw, msdu);
 	/* we do not own the msdu anymore */
 #else
-	printf("%s: TODO: send the msdu/mbuf up net80211!\n", __func__);
+	device_printf(ar->sc_dev, "%s: TODO: send the msdu/mbuf up net80211!\n", __func__);
 	athp_freebuf(ar, &ar->buf_tx, msdu);
 #endif
 }

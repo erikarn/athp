@@ -90,6 +90,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_txrx.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -520,10 +521,10 @@ static void ath10k_htt_rx_replenish_task(struct work_struct *work)
 	ath10k_htt_rx_msdu_buff_replenish(htt);
 }
 
-#if 0
 static struct athp_buf *ath10k_htt_rx_pop_paddr(struct ath10k_htt *htt,
 					       u32 paddr)
 {
+#if 0
 	struct ath10k *ar = htt->ar;
 //	struct ath10k_skb_rxcb *rxcb;
 	struct athp_buf *msdu;
@@ -544,14 +545,17 @@ static struct athp_buf *ath10k_htt_rx_pop_paddr(struct ath10k_htt *htt,
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 
 	return msdu;
-}
+#else
+	printf("%s: called; TODO!\n", __func__);
+	return NULL;
 #endif
+}
 
-#if 0
 static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 					struct htt_rx_in_ord_ind *ev,
 					athp_buf_head *list)
 {
+#if 0
 	struct ath10k *ar = htt->ar;
 	struct htt_rx_in_ord_msdu_desc *msdu_desc = ev->msdu_descs;
 	struct htt_rx_desc *rxd;
@@ -579,8 +583,9 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 		if (!is_offload) {
 			rxd = (void *)msdu->data;
 
+#ifdef	ATHP_TRACE_DIAG
 			trace_ath10k_htt_rx_desc(ar, rxd, sizeof(*rxd));
-
+#endif
 			skb_put(msdu, sizeof(*rxd));
 			skb_pull(msdu, sizeof(*rxd));
 			skb_put(msdu, __le16_to_cpu(msdu_desc->msdu_len));
@@ -596,8 +601,11 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 	}
 
 	return 0;
-}
+#else
+	printf("%s: TODO!\n", __func__);
+	return -ENOENT;
 #endif
+}
 
 int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 {
@@ -1017,7 +1025,7 @@ static const char * const tid_to_ac[] = {
 
 static char *ath10k_get_tid(struct ieee80211_frame *hdr, char *out, size_t size)
 {
-#if 0
+#if 1
 	u8 *qc;
 	int tid;
 
@@ -1025,7 +1033,7 @@ static char *ath10k_get_tid(struct ieee80211_frame *hdr, char *out, size_t size)
 		return "";
 
 	qc = ieee80211_get_qos_ctl(hdr);
-	tid = *qc & IEEE80211_QOS_CTL_TID_MASK;
+	tid = *qc & IEEE80211_QOS_TID;
 	if (tid < 8)
 		snprintf(out, size, "tid %d (%s)", tid, tid_to_ac[tid]);
 	else
@@ -1073,9 +1081,10 @@ static void ath10k_process_rx(struct ath10k *ar,
 		   !!(status->flag & RX_FLAG_AMSDU_MORE));
 	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "rx skb: ",
 			mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
+#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_rx_hdr(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 	trace_ath10k_rx_payload(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-
+#endif
 	ieee80211_rx(ar->hw, skb);
 #else
 	device_printf(ar->sc_dev, "%s: TODO: HANDLE RX!\n",
@@ -1767,6 +1776,7 @@ static void ath10k_htt_rx_frag_handler(struct ath10k_htt *htt,
 	int ret;
 	u8 *fw_desc;
 	int fw_desc_len;
+	struct athp_buf *pb;
 
 	fw_desc_len = __le16_to_cpu(frag->fw_rx_desc_bytes);
 	fw_desc = (u8 *)frag->fw_msdu_rx_desc;
@@ -1789,7 +1799,10 @@ static void ath10k_htt_rx_frag_handler(struct ath10k_htt *htt,
 		return;
 	}
 
+#if 0
 	if (skb_queue_len(&amsdu) != 1) {
+#endif
+	if ((pb = TAILQ_FIRST(&amsdu)) && TAILQ_NEXT(pb, next)) {
 		ath10k_warn(ar, "failed to pop frag amsdu: too many msdus\n");
 		athp_buf_list_flush(ar, &ar->buf_rx, &amsdu);
 		return;
@@ -1944,7 +1957,7 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 				       athp_buf_head *amsdu)
 {
-	struct athp_buf *msdu;
+	struct athp_buf *msdu, *mm;
 	struct htt_rx_desc *rxd;
 
 	if (TAILQ_EMPTY(list))
@@ -1953,7 +1966,8 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	if (WARN_ON(! TAILQ_EMPTY(amsdu)))
 		return -EINVAL;
 
-	while ((msdu = __skb_dequeue(list))) {
+	while ((msdu = TAILQ_FIRST(list))) {
+		TAILQ_REMOVE(list, msdu, next);
 		TAILQ_INSERT_TAIL(amsdu, msdu, next);
 
 		rxd = (void *)((char *) mbuf_skb_data(msdu->m) - sizeof(*rxd));
@@ -1966,7 +1980,32 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	rxd = (void *)((char *) mbuf_skb_data(msdu->m) - sizeof(*rxd));
 	if (!(rxd->msdu_end.common.info0 &
 	      __cpu_to_le32(RX_MSDU_END_INFO0_LAST_MSDU))) {
+		/* Move the contents of "amsdu" to the head of "list", emptying "amsdu" */
+		/*
+		 * TAILQ_CONCAT(h1, h2, e) moves h2 to the end of h1, but
+		 * we need to prepend it! So, we have to do what I did in
+		 * ath(4) - iterate backwards over the list and then
+		 * prepend each to the destination list.
+		 *
+		 * It's stupid, it's not O(n), but it'll at least work.
+		 */
+#if 0
 		skb_queue_splice_init(amsdu, list);
+#endif
+		athp_buf_head tmp;
+
+		/* Reverse the list */
+		while ((mm = TAILQ_FIRST(amsdu))) {
+			TAILQ_REMOVE(amsdu, mm, next);
+			TAILQ_INSERT_HEAD(&tmp, mm, next);
+		}
+
+		/* Insert into the head of list */
+		while ((mm = TAILQ_FIRST(&tmp))) {
+			TAILQ_REMOVE(&tmp, mm, next);
+			TAILQ_INSERT_HEAD(list, mm, next);
+		}
+
 		return -EAGAIN;
 	}
 
@@ -2024,7 +2063,7 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		 * have enough space, either in the mbuf or creating
 		 * a chain.  But, there's no chains yet, so!
 		 */
-		if (skb_tailroom(msdu) < __le16_to_cpu(rx->msdu_len)) {
+		if (mbuf_skb_tailroom(msdu->m) < __le16_to_cpu(rx->msdu_len)) {
 			ath10k_warn(ar, "dropping frame: offloaded rx msdu is too long!\n");
 			athp_freebuf(ar, &ar->buf_rx, msdu);
 			continue;
@@ -2053,7 +2092,7 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		ath10k_htt_rx_h_rx_offload_prot(status, msdu);
 		ath10k_htt_rx_h_channel(ar, status, NULL, rx->vdev_id);
 #else
-		printf("%s: TODO: offload_prot\n", __func__);
+		device_printf(ar->sc_dev, "%s: TODO: offload_prot\n", __func__);
 #endif
 
 #if 1
@@ -2086,8 +2125,8 @@ static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 	if (htt->rx_confused)
 		return;
 
-	skb_pull(skb, sizeof(resp->hdr));
-	skb_pull(skb, sizeof(resp->rx_in_ord_ind));
+	mbuf_skb_pull(skb->m, sizeof(resp->hdr));
+	mbuf_skb_pull(skb->m, sizeof(resp->rx_in_ord_ind));
 
 	peer_id = __le16_to_cpu(resp->rx_in_ord_ind.peer_id);
 	msdu_count = __le16_to_cpu(resp->rx_in_ord_ind.msdu_count);
@@ -2252,7 +2291,10 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 	case HTT_T2H_MSG_TYPE_TEST:
 		break;
 	case HTT_T2H_MSG_TYPE_STATS_CONF:
+#ifdef	ATHP_TRACE_DIAG
 		trace_ath10k_htt_stats(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
+#endif
+		device_printf(ar->sc_dev, "%s: got HTT_T2H_MSG_TYPE_STATS_CONF\n", __func__);
 		break;
 	case HTT_T2H_MSG_TYPE_TX_INSPECT_IND:
 		/* Firmware can return tx frames if it's unable to fully
@@ -2269,12 +2311,15 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		ath10k_htt_rx_delba(ar, resp);
 		break;
 	case HTT_T2H_MSG_TYPE_PKTLOG: {
+#ifdef	ATHP_TRACE_DIAG
 		struct ath10k_pktlog_hdr *hdr =
 			(struct ath10k_pktlog_hdr *)resp->pktlog_msg.payload;
 
 		trace_ath10k_htt_pktlog(ar, resp->pktlog_msg.payload,
 					sizeof(*hdr) +
 					__le16_to_cpu(hdr->size));
+#endif
+		device_printf(ar->sc_dev, "%s: got HTT_T2H_MSG_TYPE_PKTLOG\n", __func__);
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_FLUSH: {
@@ -2326,22 +2371,25 @@ static void ath10k_htt_txrx_compl_task(struct work_struct *work)
 
 	/* XXX TODO: migrate this to "grab list" under the lock */
 	ATHP_HTT_TX_COMP_LOCK(htt);
-	while ((skb = skb_dequeue(&htt->tx_compl_q))) {
+	while ((skb = TAILQ_FIRST(&htt->tx_compl_q))) {
+		TAILQ_REMOVE(&htt->tx_compl_q, skb, next);
 		ath10k_htt_rx_frm_tx_compl(htt->ar, skb);
 		athp_freebuf(ar, &ar->buf_tx, skb);
 	}
 	ATHP_HTT_TX_COMP_UNLOCK(htt);
 
 	ATHP_HTT_RX_LOCK(htt);
-	while ((skb = __skb_dequeue(&htt->rx_compl_q))) {
+	while ((skb = TAILQ_FIRST(&htt->rx_compl_q))) {
+		TAILQ_REMOVE(&htt->rx_compl_q, skb, next);
 		resp = (struct htt_resp *)mbuf_skb_data(skb->m);
 		ath10k_htt_rx_handler(htt, &resp->rx_ind);
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
 
-	while ((skb = __skb_dequeue(&htt->rx_in_ord_compl_q))) {
+	while ((skb = TAILQ_FIRST(&htt->rx_in_ord_compl_q))) {
+		TAILQ_REMOVE(&htt->rx_in_ord_compl_q, skb, next);
 		ath10k_htt_rx_in_ord_ind(ar, skb);
-		dev_kfree_skb_any(skb);
+		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
 	ATHP_HTT_RX_UNLOCK(htt);
 }
