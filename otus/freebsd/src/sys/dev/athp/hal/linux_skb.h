@@ -1,6 +1,52 @@
 #ifndef	__LINUX_COMPAT_SKB_H__
 #define	__LINUX_COMPAT_SKB_H__
 
+#include <sys/mbuf.h>
+
+/*
+ * Return how much data is left at the end of the mbuf,
+ * between the end of the mbuf data (len) and the end of
+ * the buffer itself.
+ *
+ * This is tricky because we have to take into account
+ * whether m_data has been adjusted..
+ */
+static inline int
+mbuf_skb_tailroom(struct mbuf *m)
+{
+	int len, offset, rl;
+	const char *s;
+
+	/* Get the underlying buffer data/size */
+	s = M_START(m);
+	len = M_SIZE(m);
+
+	/* Calculate how far into the buffer we are */
+	offset = s - m->m_data;
+	if (offset < 0 || offset > len) {
+		printf("%s: mbuf=%p; bad offset?!\n", __func__, m);
+		return 0;
+	}
+
+	/*
+	 * Tailroom is now the difference between len and m_len;
+	 * but we have to also offset it by offset.
+	 */
+	rl = len - m->m_len;
+	rl = rl - offset;
+	if (rl < 0) {
+		printf("%s: mbuf=%p; size=%d, len=%d, offset=%d; rl=%d ?\n",
+		  __func__,
+		  m,
+		  len,
+		  m->m_len,
+		  offset,
+		  rl);
+		return 0;
+	}
+	return rl;
+}
+
 static inline char *
 mbuf_skb_data(struct mbuf *m)
 {
