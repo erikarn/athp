@@ -328,7 +328,7 @@ struct ath10k {
 	struct work_struct offchan_tx_work;
 	TAILQ_HEAD(, athp_buf) offchan_tx_queue;
 	struct completion offchan_tx_completed;
-	struct athp_buf *offchan_tx_skb;
+	struct athp_buf *offchan_tx_pbuf;
 
 	struct work_struct wmi_mgmt_tx_work;
 	TAILQ_HEAD(, athp_buf) wmi_mgmt_tx_queue;
