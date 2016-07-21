@@ -130,6 +130,8 @@ _athp_free_buf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
 
+	ATHP_BUF_LOCK_ASSERT(ar);
+
 	/* If there's an mbuf, then unmap, and free */
 	if (bf->m != NULL) {
 		athp_unmap_buf(ar, br, bf);
@@ -148,6 +150,8 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
 {
 	int i;
 
+	ATHP_BUF_LOCK(ar);
+
 	/* prevent further allocations from RX list(s) */
 	TAILQ_INIT(&br->br_inactive);
 
@@ -155,6 +159,9 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
 		struct athp_buf *dp = &br->br_list[i];
 		_athp_free_buf(ar, br, dp);
 	}
+
+	ATHP_BUF_UNLOCK(ar);
+
 	free(br->br_list, M_ATHPDEV);
 	br->br_list = NULL;
 }
@@ -198,6 +205,8 @@ _athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br)
 {
 	struct athp_buf *bf;
 
+	ATHP_BUF_LOCK_ASSERT(ar);
+
 	/* Allocate a buffer */
 	bf = TAILQ_FIRST(&br->br_inactive);
 	if (bf != NULL)
@@ -212,7 +221,7 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
 
-	ATHP_LOCK_ASSERT(ar);
+	ATHP_BUF_LOCK(ar);
 
 	/* if there's an mbuf - unmap (if needed) and free it */
 	if (bf->m != NULL)
@@ -220,6 +229,8 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 
 	/* Push it into the inactive queue */
 	TAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
+	ATHP_BUF_UNLOCK(ar);
+
 }
 
 /*
@@ -242,8 +253,6 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	struct athp_buf *bf;
 	struct mbuf *m;
 
-	ATHP_LOCK_ASSERT(ar);
-
 	/* Allocate mbuf; fail if we can't allocate one */
 	m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, bufsize);
 	if (m == NULL) {
@@ -252,7 +261,9 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	}
 
 	/* Allocate buffer */
+	ATHP_BUF_LOCK(ar);
 	bf = _athp_getbuf(ar, br);
+	ATHP_BUF_UNLOCK(ar);
 	if (! bf) {
 		m_freem(m);
 		return (NULL);
@@ -269,9 +280,9 @@ athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 {
 	struct athp_buf *bf;
 
-	ATHP_LOCK_ASSERT(ar);
-
+	ATHP_BUF_LOCK(ar);
 	bf = _athp_getbuf(ar, br);
+	ATHP_BUF_UNLOCK(ar);
 	if (bf == NULL)
 		return NULL;
 

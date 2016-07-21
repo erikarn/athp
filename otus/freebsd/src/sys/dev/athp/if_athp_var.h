@@ -63,6 +63,11 @@ struct athp_vap {
 #define	ATHP_DATA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_data_mtx, MA_OWNED)
 #define	ATHP_DATA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_data_mtx, MA_NOTOWNED)
 
+#define	ATHP_BUF_LOCK(sc)		mtx_lock(&(sc)->sc_buf_mtx)
+#define	ATHP_BUF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_buf_mtx)
+#define	ATHP_BUF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_OWNED)
+#define	ATHP_BUF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_NOTOWNED)
+
 struct ath10k_bmi {
 	bool done_sent;
 };
@@ -112,6 +117,7 @@ struct ath10k {
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
+	struct mtx			sc_buf_mtx;
 	struct mtx			sc_conf_mtx;
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
