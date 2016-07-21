@@ -130,7 +130,7 @@ static void ath10k_htt_rx_ring_free(struct ath10k_htt *htt)
 		hash_for_each_safe(htt->rx_ring.skb_table, i, n, rxcb, hlist) {
 			skb = ATH10K_RXCB_SKB(rxcb);
 			dma_unmap_single(htt->ar->dev, rxcb->paddr,
-					 skb->len + skb_tailroom(skb),
+					 mbuf_skb_len(skb->m) + skb_tailroom(skb),
 					 DMA_FROM_DEVICE);
 			hash_del(&rxcb->hlist);
 			athp_freebuf(ar, &ar->buf_rx, skb);
@@ -182,8 +182,8 @@ static int __ath10k_htt_rx_ring_fill_n(struct ath10k_htt *htt, int num)
 		if (!IS_ALIGNED((unsigned long)mbuf_skb_data(skb->m), HTT_RX_DESC_ALIGN)) {
 #if 0
 			mbuf_skb_pull(skb->m,
-				 PTR_ALIGN(skb->data, HTT_RX_DESC_ALIGN) -
-				 skb->data);
+				 PTR_ALIGN(mbuf_skb_data(skb->m), HTT_RX_DESC_ALIGN) -
+				 mbuf_skb_data(skb->m));
 #else
 			device_printf(ar->sc_dev, "%s: unaligned mbuf?\n", __func__);
 			athp_freebuf(ar, &ar->buf_rx, skb);
@@ -1043,7 +1043,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 {
 #if 0
 	struct ieee80211_rx_stats *status;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)mbuf_skb_data(skb->m);
 	char tid[32];
 
 	status = IEEE80211_SKB_RXCB(skb);
@@ -1052,7 +1052,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_DATA,
 		   "rx skb %p len %u peer %pM %s %s sn %u %s%s%s%s%s %srate_idx %u vht_nss %u freq %u band %u flag 0x%x fcs-err %i mic-err %i amsdu-more %i\n",
 		   skb,
-		   skb->len,
+		   mbuf_skb_len(skb->m),
 		   ieee80211_get_SA(hdr),
 		   ath10k_get_tid(hdr, tid, sizeof(tid)),
 		   is_multicast_ether_addr(ieee80211_get_DA(hdr)) ?
@@ -1072,9 +1072,9 @@ static void ath10k_process_rx(struct ath10k *ar,
 		   !!(status->flag & RX_FLAG_MMIC_ERROR),
 		   !!(status->flag & RX_FLAG_AMSDU_MORE));
 	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "rx skb: ",
-			skb->data, skb->len);
-	trace_ath10k_rx_hdr(ar, skb->data, skb->len);
-	trace_ath10k_rx_payload(ar, skb->data, skb->len);
+			mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
+	trace_ath10k_rx_hdr(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
+	trace_ath10k_rx_payload(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 
 	ieee80211_rx(ar->hw, skb);
 #else
@@ -1534,7 +1534,14 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		else
 			device_printf(ar->sc_dev, "%s: TODO: set AMSDU_MORE\n", __func__);
 #endif
+
+#if 1
 		ath10k_process_rx(ar, status, msdu);
+#else
+		device_printf(ar->sc_dev, "%s: TODO: HANDLE RX!\n",
+		    __func__);
+		athp_freebuf(ar, &ar->buf_rx, msdu);
+#endif
 	}
 }
 
@@ -1579,8 +1586,8 @@ static int ath10k_unchain_msdu(athp_buf_head *amsdu)
 	 * msdu_head
 	 */
 	while ((skb = __skb_dequeue(amsdu))) {
-		skb_copy_from_linear_data(skb, skb_put(first, skb->len),
-					  skb->len);
+		skb_copy_from_linear_data(skb, skb_put(first, mbuf_skb_len(skb->m)),
+					  mbuf_skb_len(skb->m));
 		dev_kfree_skb_any(skb);
 	}
 
@@ -1966,12 +1973,13 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	return 0;
 }
 
+#if 0
 static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 					    struct athp_buf *skb)
 {
 	struct ieee80211_frame *hdr = (struct ieee80211_frame *) (void *) mbuf_skb_data(skb->m);
 
-	if (!ieee80211_has_protected(hdr->frame_control))
+	if (!ieee80211_has_protected(hdr))
 		return;
 
 	/* Offloaded frames are already decrypted but firmware insists they are
@@ -1984,6 +1992,7 @@ static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 			RX_FLAG_IV_STRIPPED |
 			RX_FLAG_MMIC_STRIPPED;
 }
+#endif
 
 static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 				       athp_buf_head *list)
@@ -2037,19 +2046,30 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		 * if possible later.
 		 */
 
+#if 0
 		memset(status, 0, sizeof(*status));
 		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 
 		ath10k_htt_rx_h_rx_offload_prot(status, msdu);
 		ath10k_htt_rx_h_channel(ar, status, NULL, rx->vdev_id);
+#else
+		printf("%s: TODO: offload_prot\n", __func__);
+#endif
+
+#if 1
 		ath10k_process_rx(ar, status, msdu);
+#else
+		device_printf(ar->sc_dev, "%s: TODO: HANDLE RX!\n",
+		    __func__);
+		athp_freebuf(ar, &ar->buf_rx, skb);
+#endif
 	}
 }
 
 static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ath10k_htt *htt = &ar->htt;
-	struct htt_resp *resp = (void *)skb->data;
+	struct htt_resp *resp = (void *)mbuf_skb_data(skb->m);
 	struct ieee80211_rx_stats *status = &htt->rx_status;
 	athp_buf_head list;
 	athp_buf_head amsdu;
@@ -2081,7 +2101,7 @@ static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 		   "htt rx in ord vdev %i peer %i tid %i offload %i frag %i msdu count %i\n",
 		   vdev_id, peer_id, tid, offload, frag, msdu_count);
 
-	if (skb->len < msdu_count * sizeof(*resp->rx_in_ord_ind.msdu_descs)) {
+	if (mbuf_skb_len(skb->m) < msdu_count * sizeof(*resp->rx_in_ord_ind.msdu_descs)) {
 		ath10k_warn(ar, "dropping invalid in order rx indication\n");
 		return;
 	}
@@ -2136,11 +2156,11 @@ static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ath10k_htt *htt = &ar->htt;
-	struct htt_resp *resp = (struct htt_resp *)skb->data;
+	struct htt_resp *resp = (struct htt_resp *)mbuf_skb_data(skb->m);
 	enum htt_t2h_msg_type type;
 
 	/* confirm alignment */
-	if (!IS_ALIGNED((unsigned long)skb->data, 4))
+	if (!IS_ALIGNED((unsigned long)mbuf_skb_data(skb->m), 4))
 		ath10k_warn(ar, "unaligned htt message, expect trouble\n");
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt rx, msg_type: 0x%0X\n",
@@ -2225,14 +2245,14 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 	}
 	case HTT_T2H_MSG_TYPE_RX_FRAG_IND: {
 		athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
-				skb->data, skb->len);
+				mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 		ath10k_htt_rx_frag_handler(htt, &resp->rx_frag_ind);
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_TEST:
 		break;
 	case HTT_T2H_MSG_TYPE_STATS_CONF:
-		trace_ath10k_htt_stats(ar, skb->data, skb->len);
+		trace_ath10k_htt_stats(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 		break;
 	case HTT_T2H_MSG_TYPE_TX_INSPECT_IND:
 		/* Firmware can return tx frames if it's unable to fully
@@ -2289,7 +2309,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		ath10k_warn(ar, "htt event (%d) not handled\n",
 			    resp->hdr.msg_type);
 		athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
-				skb->data, skb->len);
+				mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 		break;
 	};
 
@@ -2314,7 +2334,7 @@ static void ath10k_htt_txrx_compl_task(struct work_struct *work)
 
 	ATHP_HTT_RX_LOCK(htt);
 	while ((skb = __skb_dequeue(&htt->rx_compl_q))) {
-		resp = (struct htt_resp *)skb->data;
+		resp = (struct htt_resp *)mbuf_skb_data(skb->m);
 		ath10k_htt_rx_handler(htt, &resp->rx_ind);
 		dev_kfree_skb_any(skb);
 	}
