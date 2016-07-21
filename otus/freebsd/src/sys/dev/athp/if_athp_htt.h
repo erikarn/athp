@@ -114,6 +114,7 @@ struct ath10k_htt {
 		 * rather than a CPU address.
 		 */
 		dma_addr_t base_paddr;
+		struct athp_descdma paddrs_dd;
 
 		/* how many elems in the ring (power of 2) */
 		int size;
@@ -136,6 +137,7 @@ struct ath10k_htt {
 		struct {
 			__le32 *vaddr;
 			dma_addr_t paddr;
+			struct athp_descdma dd;
 		} alloc_idx;
 
 		/* where HTT SW has processed bufs filled by rx MAC DMA */

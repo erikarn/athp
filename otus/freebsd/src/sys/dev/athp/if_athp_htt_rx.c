@@ -322,16 +322,8 @@ void ath10k_htt_rx_free(struct ath10k_htt *htt)
 
 	ath10k_htt_rx_ring_free(htt);
 
-	dma_free_coherent(htt->ar->sc_dev,
-			  (htt->rx_ring.size *
-			   sizeof(htt->rx_ring.paddrs_ring)),
-			  htt->rx_ring.paddrs_ring,
-			  htt->rx_ring.base_paddr);
-
-	dma_free_coherent(htt->ar->sc_dev,
-			  sizeof(*htt->rx_ring.alloc_idx.vaddr),
-			  htt->rx_ring.alloc_idx.vaddr,
-			  htt->rx_ring.alloc_idx.paddr);
+	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
+	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
 
 	kfree(htt->rx_ring.netbufs_ring);
 }
@@ -610,8 +602,6 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
-	dma_addr_t paddr;
-	void *vaddr;
 	size_t size;
 	struct timer_list *timer = &htt->rx_ring.refill_retry_timer;
 
@@ -637,21 +627,25 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 
 	size = htt->rx_ring.size * sizeof(htt->rx_ring.paddrs_ring);
 
-	vaddr = dma_alloc_coherent(htt->ar->sc_dev, size, &paddr, GFP_DMA);
-	if (!vaddr)
+	/* XXX TODO: flush ops */
+	if (athp_descdma_alloc(ar, &htt->rx_ring.paddrs_dd, "rxring", 8, size) != 0) {
+		ath10k_warn(ar, "%s: failed to alloc htt rx ring\n", __func__);
 		goto err_dma_ring;
+	}
 
-	htt->rx_ring.paddrs_ring = vaddr;
-	htt->rx_ring.base_paddr = paddr;
+	htt->rx_ring.paddrs_ring = htt->rx_ring.paddrs_dd.dd_desc;
+	htt->rx_ring.base_paddr = htt->rx_ring.paddrs_dd.dd_desc_paddr;
 
-	vaddr = dma_alloc_coherent(htt->ar->sc_dev,
-				   sizeof(*htt->rx_ring.alloc_idx.vaddr),
-				   &paddr, GFP_DMA);
-	if (!vaddr)
+	/* XXX TODO: flush ops */
+	if (athp_descdma_alloc(ar, &htt->rx_ring.alloc_idx.dd,
+	    "rx_alloc_idx", 8,
+	    sizeof(*htt->rx_ring.alloc_idx.vaddr)) != 0) {
+		ath10k_warn(ar, "%s: failed to alloc htt rx_ring alloc_idx ring\n", __func__);
 		goto err_dma_idx;
+	}
 
-	htt->rx_ring.alloc_idx.vaddr = vaddr;
-	htt->rx_ring.alloc_idx.paddr = paddr;
+	htt->rx_ring.alloc_idx.vaddr = htt->rx_ring.alloc_idx.dd.dd_desc;
+	htt->rx_ring.alloc_idx.paddr = htt->rx_ring.alloc_idx.dd.dd_desc_paddr;
 	htt->rx_ring.sw_rd_idx.msdu_payld = htt->rx_ring.size_mask;
 	*htt->rx_ring.alloc_idx.vaddr = 0;
 
@@ -679,11 +673,9 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	return 0;
 
 err_dma_idx:
-	dma_free_coherent(htt->ar->sc_dev,
-			  (htt->rx_ring.size *
-			   sizeof(htt->rx_ring.paddrs_ring)),
-			  htt->rx_ring.paddrs_ring,
-			  htt->rx_ring.base_paddr);
+	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
+	/* XXX TODO: does ath10k leak this? */
+	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
 err_dma_ring:
 	kfree(htt->rx_ring.netbufs_ring);
 err_netbuf:
