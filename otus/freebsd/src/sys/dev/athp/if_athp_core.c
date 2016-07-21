@@ -94,6 +94,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_main.h"
 #include "if_athp_pci_chip.h"
 #include "if_athp_swap.h"
+#include "if_athp_wmi_ops.h"
 
 /*
  * This is the "core" interface part of ath10k (core.c.)
@@ -1394,7 +1395,6 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_wmi_detach;
 	}
 
-#if 0
 	status = ath10k_htt_rx_alloc(&ar->htt);
 	if (status) {
 		ath10k_err(ar, "failed to alloc htt rx: %d\n", status);
@@ -1442,7 +1442,7 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "firmware %s booted\n",
-		   ar->hw->wiphy->fw_version);
+		   ar->fw_version_str);
 
 	status = ath10k_wmi_cmd_init(ar);
 	if (status) {
@@ -1478,24 +1478,29 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		}
 	}
 
+#if 0
 	status = ath10k_debug_start(ar);
 	if (status)
 		goto err_hif_stop;
+#else
+	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_start\n", __func__);
+#endif
 
 	ar->free_vdev_map = (1LL << ar->max_num_vdevs) - 1;
 
+#if 0
 	INIT_LIST_HEAD(&ar->arvifs);
+#else
+	device_printf(ar->sc_dev, "%s: TODO: arvifs init\n", __func__);
 #endif
 
 	return 0;
-#if 0
 err_hif_stop:
 	ath10k_hif_stop(ar);
 err_htt_rx_detach:
 	ath10k_htt_rx_free(&ar->htt);
 err_htt_tx_detach:
 	ath10k_htt_tx_free(&ar->htt);
-#endif
 err_wmi_detach:
 	ath10k_wmi_detach(ar);
 err:
