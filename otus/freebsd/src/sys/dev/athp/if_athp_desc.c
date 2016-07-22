@@ -251,7 +251,6 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	int ret;
 	int nsegs;
 
-	bzero(dm, sizeof(*dm));
 	nsegs = 0;
 	ret = bus_dmamap_load_mbuf_sg(dh->tag, dm->map, m, segs,
 	    &nsegs, BUS_DMA_NOWAIT);
@@ -276,7 +275,25 @@ athp_dma_mbuf_unload(struct ath10k *ar, struct athp_dma_head *dh,
 {
 
 	bus_dmamap_unload(dh->tag, dm->map);
-	bzero(dm, sizeof(*dm));
+	dm->paddr = 0;
+}
+
+void
+athp_dma_mbuf_setup(struct ath10k *ar, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	bus_dmamap_create(dh->tag, 0, &dm->map);
+}
+
+void
+athp_dma_mbuf_destroy(struct ath10k *ar, struct athp_dma_head *dh,
+    struct athp_dma_mbuf *dm)
+{
+
+	if (dm->map != NULL)
+		bus_dmamap_destroy(dh->tag, dm->map);
+	dm->map = NULL;
 }
 
 /*

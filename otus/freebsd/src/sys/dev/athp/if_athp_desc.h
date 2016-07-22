@@ -71,6 +71,12 @@ extern	int athp_dma_mbuf_load(struct ath10k *ar,
 extern	void athp_dma_mbuf_unload(struct ath10k *ar,
 	    struct athp_dma_head *dh,
 	    struct athp_dma_mbuf *dm);
+extern	void athp_dma_mbuf_setup(struct ath10k *ar,
+	    struct athp_dma_head *dh,
+	    struct athp_dma_mbuf *dm);
+extern	void athp_dma_mbuf_destroy(struct ath10k *ar,
+	    struct athp_dma_head *dh,
+	    struct athp_dma_mbuf *dm);
 /* Call before an mbuf is handed to the hardware for transmit. */
 extern	void athp_dma_mbuf_pre_xmit(struct ath10k *ar,
 	    struct athp_dma_head *dh,

@@ -158,6 +158,7 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
 	for (i = 0; i < br->br_count; i++) {
 		struct athp_buf *dp = &br->br_list[i];
 		_athp_free_buf(ar, br, dp);
+		athp_dma_mbuf_destroy(ar, &br->dh, &dp->mb);
 	}
 
 	ATHP_BUF_UNLOCK(ar);
@@ -184,7 +185,9 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
 	}
 
 	/* Setup initial state for each entry */
-	/* XXX it's all zero, so we're okay for now */
+	for (i = 0; i < count; i++) {
+		athp_dma_mbuf_setup(ar, &br->dh, &br->br_list[i].mb);
+	}
 
 	/* Lists */
 	TAILQ_INIT(&br->br_inactive);
