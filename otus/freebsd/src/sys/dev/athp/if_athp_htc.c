@@ -120,7 +120,7 @@ ath10k_htc_build_tx_ctrl_skb(struct ath10k *ar)
 {
 	struct athp_buf *pbuf;
 
-	pbuf = athp_getbuf(ar, &ar->buf_rx, ATH10K_HTC_CONTROL_BUFFER_SIZE);
+	pbuf = athp_getbuf(ar, &ar->buf_tx, ATH10K_HTC_CONTROL_BUFFER_SIZE);
 	if (! pbuf) {
 		device_printf(ar->sc_dev, "%s: athp_getbuf failed!\n",
 		    __func__);
