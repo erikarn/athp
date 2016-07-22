@@ -298,14 +298,26 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	bus_addr_t paddr;
 	int ret;
 
-	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *), M_SIZE(m),
+	/* Sanity check - once this is fixed, the above may work */
+	if (m->m_pkthdr.len == 0) {
+		device_printf(ar->sc_dev, "%s: ERROR: mbuf pkthdr.len=0!\n",
+		    __func__);
+		return ENOMEM;
+	}
+
+	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *), m->m_pkthdr.len,
 	    athp_load_cb, &paddr, BUS_DMA_NOWAIT);
 	if (ret != 0) {
 		device_printf(ar->sc_dev, "%s: failed; ret=%d\n", __func__, ret);
 		return (ENOMEM);
 	}
 	if (paddr == 0) {
-		device_printf(ar->sc_dev, "%s: callback returned paddr=0\n", __func__);
+		device_printf(ar->sc_dev, "%s: callback returned paddr=0; bufsize=%d, ml=%d, len=%d, pkthdr.len=%d\n",
+		    __func__,
+		    dh->buf_size,
+		    M_SIZE(m),
+		    m->m_len,
+		    m->m_pkthdr.len);
 		return (ENOMEM);
 	}
 	dm->paddr = paddr;
