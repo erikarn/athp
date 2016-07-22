@@ -170,7 +170,9 @@ athp_pci_intr(void *arg)
 	struct athp_pci_softc *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
+#if 0
 	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
+#endif
 
 	if (ar->sc_invalid)
 		return;
