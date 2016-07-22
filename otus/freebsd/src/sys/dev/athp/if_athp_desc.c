@@ -263,9 +263,9 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	    &nsegs, BUS_DMA_NOWAIT);
 	if (ret != 0)
 		return (ret);
-	if (nsegs > 1) {
-		device_printf(ar->sc_dev, "%s: nsegs > 1 (%d)\n",
-		    __func__, nsegs);
+	if (nsegs != 1) {
+		device_printf(ar->sc_dev, "%s: nsegs > 1 (%d), tag=%p, map=%p, m=%p\n",
+		    __func__, nsegs, dh->tag, dm->map, m);
 		bus_dmamap_unload(dh->tag, dm->map);
 		return (ENOMEM);
 	}
@@ -289,8 +289,14 @@ void
 athp_dma_mbuf_setup(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
+	int error;
 
-	bus_dmamap_create(dh->tag, 0, &dm->map);
+	error = bus_dmamap_create(dh->tag, BUS_DMA_NOWAIT, &dm->map);
+	if (error != 0) {
+		device_printf(ar->sc_dev,
+		    "%s: bus_dmamap_create failed; error=%d\n",
+		    __func__, error);
+	}
 }
 
 void
