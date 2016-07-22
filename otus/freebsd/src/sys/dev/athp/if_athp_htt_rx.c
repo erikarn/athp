@@ -325,7 +325,7 @@ void ath10k_htt_rx_free(struct ath10k_htt *htt)
 	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
 	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
 
-	kfree(htt->rx_ring.netbufs_ring);
+	free(htt->rx_ring.netbufs_ring, M_ATHPDEV);
 }
 
 static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
@@ -620,8 +620,9 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	}
 
 	htt->rx_ring.netbufs_ring =
-		kzalloc(htt->rx_ring.size * sizeof(struct athp_buf *),
-			GFP_KERNEL);
+		malloc(htt->rx_ring.size * sizeof(struct athp_buf *),
+		    M_ATHPDEV,
+		    M_NOWAIT | M_ZERO);
 	if (!htt->rx_ring.netbufs_ring)
 		goto err_netbuf;
 
@@ -677,7 +678,7 @@ err_dma_idx:
 	/* XXX TODO: does ath10k leak this? */
 	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
 err_dma_ring:
-	kfree(htt->rx_ring.netbufs_ring);
+	free(htt->rx_ring.netbufs_ring, M_ATHPDEV);
 err_netbuf:
 	return -ENOMEM;
 }

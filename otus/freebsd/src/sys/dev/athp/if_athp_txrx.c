@@ -277,7 +277,7 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, ev->vdev_id, ev->addr);
 	if (!peer) {
-		peer = kzalloc(sizeof(*peer), GFP_ATOMIC);
+		peer = malloc(sizeof(*peer), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!peer)
 			goto exit;
 
@@ -316,7 +316,7 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 
 	if (bitmap_empty(peer->peer_ids, ATH10K_MAX_NUM_PEER_IDS)) {
 		list_del(&peer->list);
-		kfree(peer);
+		free(peer, M_ATHPDEV);
 		wake_up(&ar->peer_mapping_wq);
 	}
 

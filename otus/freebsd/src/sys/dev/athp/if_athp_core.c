@@ -478,7 +478,7 @@ ath10k_download_cal_dt(struct ath10k *ar)
 		goto out;
 	}
 
-	data = kmalloc(data_len, GFP_KERNEL);
+	data = malloc(data_len, M_ATHPDEV, M_NOWAIT | M_ZERO);
 	if (!data) {
 		ret = -ENOMEM;
 		goto out;
@@ -502,7 +502,7 @@ ath10k_download_cal_dt(struct ath10k *ar)
 	ret = 0;
 
 out_free:
-	kfree(data);
+	free(data, M_ATHPDEV);
 
 out:
 	return ret;
