@@ -211,7 +211,7 @@ athp_dma_head_alloc(struct ath10k *ar, struct athp_dma_head *dh,
 	 */
 	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev), 8, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    buf_size, 1, buf_size, BUS_DMA_NOWAIT, NULL, NULL,
+	    buf_size, 1, buf_size, BUS_DMA_ALLOCNOW, NULL, NULL,
 	    &dh->tag);
 	if (error != 0) {
 		ath10k_err(ar, "%s: bus_dma_tag_create failed: %d\n",
