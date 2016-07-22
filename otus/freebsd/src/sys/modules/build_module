@@ -11,7 +11,7 @@ make \
 	MODULES_OVERRIDE="" \
 	DEBUG_FLAGS="-g" \
 	DEBUG_FLAGS="-g" \
-	KMODDIR="/home/adrian/git/github/erikarn/otus/otus/freebsd/modules/" \
+	KMODDIR="/home/adrian/git/github/erikarn/athp/otus/freebsd/modules/" \
 	KMODOWN="${X_KMODOWN}" \
 	KMODGRP="${X_KMODGRP}" \
 	MAKESYSPATH="${X_SRCDIR}/share/mk" \
