@@ -94,7 +94,23 @@ static void
 athp_load_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 {
 	bus_addr_t *paddr = (bus_addr_t*) arg;
-	KASSERT(error == 0, ("error %u on bus_dma callback", error));
+	if (error != 0) {
+		printf("%s: error=%d!\n", __func__, error);
+		*paddr = 0;
+		return;
+	}
+
+	/* Only handle one segment for now */
+	if (nsegs != 1) {
+		/*
+		 * XXX TODO: how do we even free the segment list
+		 * if we have too many? Ideally we'd just pass this
+		 * into the arg so the caller can free the map.
+		 */
+		printf("%s: TODO: error: nseg != 1 (%d); FIX ME NOW OR LEAKING WILL HAPPEN\n", __func__, nsegs);
+		*paddr = 0;
+		return;
+	}
 	*paddr = segs->ds_addr;
 }
 
@@ -118,6 +134,8 @@ athp_descdma_alloc(struct ath10k *ar, struct athp_descdma *dd,
 	 *
 	 * BUS_DMA_ALLOCNOW is not used; we never use bounce
 	 * buffers for the descriptors themselves.
+	 *
+	 * XXX TODO: create a single tag for these allocations!
 	 */
 	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev),	/* parent */
 		       PAGE_SIZE, 0,		/* alignment, bounds */
@@ -254,6 +272,7 @@ int
 athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm, struct mbuf *m)
 {
+#if 0
 	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
 	int ret;
 	int nsegs;
@@ -264,8 +283,8 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	if (ret != 0)
 		return (ret);
 	if (nsegs != 1) {
-		device_printf(ar->sc_dev, "%s: nsegs > 1 (%d), tag=%p, map=%p, m=%p\n",
-		    __func__, nsegs, dh->tag, dm->map, m);
+		device_printf(ar->sc_dev, "%s: nsegs > 1 (%d), tag=%p, map=%p, m=%p, len=%d, dmasize=%d\n",
+		    __func__, nsegs, dh->tag, dm->map, m, M_SIZE(m), dh->buf_size);
 		bus_dmamap_unload(dh->tag, dm->map);
 		return (ENOMEM);
 	}
@@ -274,6 +293,20 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	dm->paddr = segs[0].ds_addr;
 
 	return (0);
+#else
+	/* XXX until I figure out why load_mbuf_sg doesn't work.. */
+	bus_addr_t paddr;
+	int ret;
+
+	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *), M_SIZE(m),
+	    athp_load_cb, &paddr, BUS_DMA_NOWAIT);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: failed; ret=%d\n", __func__, ret);
+		return (ENOMEM);
+	}
+	dm->paddr = paddr;
+	return (0);
+#endif
 }
 
 void
