@@ -97,8 +97,10 @@ __FBSDID("$FreeBSD$");
 void
 athp_debug_dump(struct ath10k *ar, uint64_t mask,
     const char *msg, const char *prefix,
-    const void *buf, size_t len)
+    const void *b, size_t len)
 {
+	const char *buf = b;
+	int i;
 
 	if ((ar->sc_debug & mask) == 0)
 		return;
@@ -106,9 +108,14 @@ athp_debug_dump(struct ath10k *ar, uint64_t mask,
 	if (msg)
 		ath10k_dbg(ar, mask, "%s\n", msg);
 
-	/* XXX TODO: dump data */
-	device_printf(ar->sc_dev, "%s: TODO: implement debug_dump\n",
-	    __func__);
+	for (i = 0; i < len; i++) {
+		if (i % 16 == 0)
+			printf("%s: ", prefix);
+		printf("%.02x ", buf[i] & 0xff);
+		if (i % 16 == 15)
+			printf("\n");
+	}
+	printf("\n");
 }
 
 void
