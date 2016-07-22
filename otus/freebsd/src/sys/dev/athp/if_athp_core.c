@@ -1638,9 +1638,10 @@ err_power_down:
 	return ret;
 }
 
-int
-ath10k_core_register(struct ath10k *ar)
+static void
+ath10k_core_register_work(struct work_struct *work)
 {
+	struct ath10k *ar = container_of(work, struct ath10k, register_work);
 	int status;
 
 	status = ath10k_core_probe_fw(ar);
@@ -1680,7 +1681,7 @@ ath10k_core_register(struct ath10k *ar)
 	    __func__);
 #endif
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags);
-	return (0);
+	return;
 
 #if 0
 err_spectral_destroy:
@@ -1696,7 +1697,7 @@ err:
 	/* TODO: It's probably a good idea to release device from the driver
 	 * but calling device_release_driver() here will cause a deadlock.
 	 */
-	return (-1);
+	(void) 0;
 }
 
 /*
@@ -1704,26 +1705,21 @@ err:
  * and fleshed out.
  */
 
-#if 0
 int
-ath10k_core_register(struct ath10k *ar, u32 chip_id)
+ath10k_core_register(struct ath10k *ar)
 {
-	ar->chip_id = chip_id;
+
 	queue_work(ar->workqueue, &ar->register_work);
 
 	return 0;
 }
-EXPORT_SYMBOL(ath10k_core_register);
-#endif
 
 void
 ath10k_core_unregister(struct ath10k *ar)
 {
 
 	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-#if 0
 	cancel_work_sync(&ar->register_work);
-#endif
 
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags))
 		return;
@@ -1836,9 +1832,7 @@ ath10k_core_init(struct ath10k *ar)
 #endif
 	TAILQ_INIT(&ar->wmi_mgmt_tx_queue);
 
-#if 0
 	INIT_WORK(&ar->register_work, ath10k_core_register_work);
-#endif
 	INIT_WORK(&ar->restart_work, ath10k_core_restart);
 
 #if 0
