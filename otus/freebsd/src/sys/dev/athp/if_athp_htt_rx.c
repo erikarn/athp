@@ -176,9 +176,13 @@ static int __ath10k_htt_rx_ring_fill_n(struct ath10k_htt *htt, int num)
 	while (num > 0) {
 		skb = athp_getbuf(ar, &ar->buf_rx, HTT_RX_BUF_SIZE + HTT_RX_DESC_ALIGN);
 		if (!skb) {
+			device_printf(ar->sc_dev, "%s: getbuf call failed\n", __func__);
 			ret = -ENOMEM;
 			goto fail;
 		}
+
+		/* Set length appropriately */
+		athp_buf_set_len(skb, HTT_RX_BUF_SIZE + HTT_RX_DESC_ALIGN);
 
 		if (!IS_ALIGNED((unsigned long)mbuf_skb_data(skb->m), HTT_RX_DESC_ALIGN)) {
 #if 0
@@ -200,6 +204,7 @@ static int __ath10k_htt_rx_ring_fill_n(struct ath10k_htt *htt, int num)
 
 		/* map */
 		if (athp_dma_mbuf_load(ar, &ar->buf_rx.dh, &skb->mb, skb->m) != 0) {
+			device_printf(ar->sc_dev, "%s: athp_dma_mbuf_load call failed\n", __func__);
 			athp_freebuf(ar, &ar->buf_rx, skb);
 			skb = NULL;
 			ret = -ENOMEM;
