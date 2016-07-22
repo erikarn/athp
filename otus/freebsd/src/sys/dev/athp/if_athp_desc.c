@@ -304,6 +304,10 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 		device_printf(ar->sc_dev, "%s: failed; ret=%d\n", __func__, ret);
 		return (ENOMEM);
 	}
+	if (paddr == 0) {
+		device_printf(ar->sc_dev, "%s: callback returned paddr=0\n", __func__);
+		return (ENOMEM);
+	}
 	dm->paddr = paddr;
 	return (0);
 #endif
