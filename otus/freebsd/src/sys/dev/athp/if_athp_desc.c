@@ -209,9 +209,16 @@ athp_dma_head_alloc(struct ath10k *ar, struct athp_dma_head *dh,
 	 * NB: we require 8-byte alignment for at least RX descriptors;
 	 * I'm not sure yet about the transmit side.
 	 */
-	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev), 8, 0,
-	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    buf_size, 1, buf_size, BUS_DMA_ALLOCNOW, NULL, NULL,
+	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev),
+	    8, 0, /* alignment, bounds */
+	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
+	    BUS_SPACE_MAXADDR, /* highaddr */
+	    NULL, NULL, /* filter, filterarg */
+	    buf_size, /* maxsize */
+	    ATHP_RXBUF_MAX_SCATTER,
+	    buf_size, /* maxsegsize */
+	    BUS_DMA_ALLOCNOW, /* flags */
+	    NULL, NULL, /* lock func, lock arg */
 	    &dh->tag);
 	if (error != 0) {
 		ath10k_err(ar, "%s: bus_dma_tag_create failed: %d\n",
