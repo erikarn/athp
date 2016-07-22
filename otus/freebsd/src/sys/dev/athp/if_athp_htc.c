@@ -424,6 +424,8 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 
 	eid = hdr->eid;
 
+	ath10k_dbg(ar, ATH10K_DBG_HTC, "%s: called!; eid=%d\n", __func__, eid);
+
 	if (eid >= ATH10K_HTC_EP_COUNT) {
 		ath10k_warn(ar, "HTC Rx: invalid eid %d\n", eid);
 		athp_debug_dump(ar, ATH10K_DBG_HTC, "htc bad header", "",
