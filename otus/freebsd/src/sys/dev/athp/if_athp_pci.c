@@ -197,7 +197,6 @@ athp_pci_intr(void *arg)
 #define	BS_BAR	0x10
 
 /* XXX */
-#define	ATHP_MAX_SCATTER	8
 #define MSI_NUM_REQUEST_LOG2	3
 #define MSI_NUM_REQUEST		(1<<MSI_NUM_REQUEST_LOG2)
 
@@ -380,7 +379,6 @@ athp_attach_preinit(void *arg)
 
 	/* XXX TODO: refactor this stuff out */
 	athp_pci_free_bufs(psc);
-	bus_dma_tag_destroy(ar->sc_dmat);
 	bus_teardown_intr(ar->sc_dev, psc->sc_irq, psc->sc_ih);
 	bus_release_resource(ar->sc_dev, SYS_RES_IRQ, 0, psc->sc_irq);
 	bus_release_resource(ar->sc_dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
@@ -523,30 +521,6 @@ athp_pci_attach(device_t dev)
 	ar->sc_regio.reg_arg = psc;
 
 	/*
-	 * Setup DMA descriptor area.
-	 *
-	 * XXX TODO: should we enforce > 1 byte alignment anywhere?
-	 * The descriptor rings are all 8 bytes. But, the TX/RX requirements
-	 * may be different; I need to check.
-	 */
-	if (bus_dma_tag_create(bus_get_dma_tag(dev),    /* parent */
-	    8, 0,		    /* alignment, bounds */
-	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
-	    BUS_SPACE_MAXADDR,       /* highaddr */
-	    NULL, NULL,	      /* filter, filterarg */
-	    0x3ffff,		 /* maxsize XXX */
-	    ATHP_MAX_SCATTER,	 /* nsegments */
-	    0x3ffff,		 /* maxsegsize XXX */
-	    BUS_DMA_ALLOCNOW,	/* flags */
-	    NULL,		    /* lockfunc */
-	    NULL,		    /* lockarg */
-	    &ar->sc_dmat)) {
-		device_printf(dev, "cannot allocate DMA tag\n");
-		err = ENXIO;
-		goto bad3;
-	}
-
-	/*
 	 * TODO: abstract this out to be a bus/hif specific
 	 * attach path.
 	 *
@@ -638,14 +612,12 @@ athp_pci_attach(device_t dev)
 	/* Fallthrough for setup failure */
 bad4:
 	athp_pci_free_bufs(psc);
-	bus_dma_tag_destroy(ar->sc_dmat);
 bad3:
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 bad2:
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
 bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
-
 bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
@@ -707,7 +679,6 @@ athp_pci_detach(device_t dev)
 	bus_generic_detach(dev);
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
-	bus_dma_tag_destroy(ar->sc_dmat);
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmastering? */

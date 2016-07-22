@@ -27,6 +27,7 @@
 #include "if_athp_htt.h"
 
 #define	ATHP_RXBUF_MAX_SCATTER	1
+#define	ATHP_TXBUF_MAX_SCATTER	1
 #define	ATHP_RBUF_SIZE		2048
 #define	ATHP_RX_LIST_COUNT	1024
 #define	ATHP_TX_LIST_COUNT	1024
@@ -135,7 +136,6 @@ struct ath10k {
 	const struct ath10k_hw_values	*sc_regvals;
 
 	/* Bus facing state; we should abstract this out a bit */
-	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */
 	bus_space_tag_t		sc_st;		/* bus space tag */
 	bus_space_handle_t	sc_sh;		/* bus handle tag */
 
