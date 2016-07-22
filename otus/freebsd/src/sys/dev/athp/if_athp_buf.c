@@ -270,6 +270,7 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	}
 
 	/* Setup initial mbuf tracking state */
+	bf->m = m;
 	bf->m_size = bufsize;
 
 	return (bf);
