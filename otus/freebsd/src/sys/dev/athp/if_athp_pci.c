@@ -575,6 +575,9 @@ athp_pci_attach(device_t dev)
 
 	/* (here's where ath10k requests IRQs */
 
+	/* Ok, gate open the interrupt handler */
+	ar->sc_invalid = 0;
+
 	/* pci_chip_reset */
 	ret = ath10k_pci_chip_reset(psc);
 	if (ret) {
