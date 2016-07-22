@@ -249,6 +249,11 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
  *
  * Note: this doesn't load anything; that's done by the caller
  * before it passes it into the hardware.
+ *
+ * Note: it sets the maxsize to the requested buffer size;
+ * it isn't setting it up to the actual mbuf storage size.
+ * Again, the caller should (!) request more space if it
+ * wants to grow.
  */
 struct athp_buf *
 athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
@@ -276,6 +281,10 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	/* Setup initial mbuf tracking state */
 	bf->m = m;
 	bf->m_size = bufsize;
+
+	/* and initial mbuf size */
+	bf->m->m_len = 0;
+	bf->m->m_pkthdr.len = 0;
 
 	return (bf);
 }
