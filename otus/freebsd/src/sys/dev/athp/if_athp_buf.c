@@ -257,7 +257,8 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	struct mbuf *m;
 
 	/* Allocate mbuf; fail if we can't allocate one */
-	m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, bufsize);
+	//m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, bufsize);
+	m = m_getm2(NULL, bufsize, M_NOWAIT, MT_DATA, M_PKTHDR);
 	if (m == NULL) {
 		device_printf(ar->sc_dev, "%s: failed to allocate mbuf\n", __func__);
 		return (NULL);
