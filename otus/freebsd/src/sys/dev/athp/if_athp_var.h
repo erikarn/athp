@@ -123,6 +123,8 @@ struct ath10k {
 	int				sc_invalid;
 	uint64_t			sc_debug;
 
+	struct intr_config_hook		sc_preinit_hook;
+
 	void (*sc_node_free)(struct ieee80211_node *);
 
 	/* XXX TODO: Cheating, until all the layering is fixed */

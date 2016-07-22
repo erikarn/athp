@@ -249,6 +249,13 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
 	return (0);
 }
 
+/*
+ * Attach time setup.
+ *
+ * This needs to be deferred until interrupts are enabled;
+ * we can't run this code during probe as it does firmware messages
+ * to set things up and that requires interrupts + sleeping.
+ */
 int
 athp_attach(struct ath10k *ar)
 {

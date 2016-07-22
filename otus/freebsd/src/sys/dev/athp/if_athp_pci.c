@@ -363,6 +363,40 @@ athp_pci_free_bufs(struct athp_pci_softc *psc)
 	athp_dma_head_free(ar, &ar->buf_tx.dh);
 }
 
+static void
+athp_attach_preinit(void *arg)
+{
+	struct ath10k *ar = arg;
+	struct athp_pci_softc *psc = ar->sc_psc;
+	int ret;
+
+	ret = athp_attach(ar);
+	config_intrhook_disestablish(&ar->sc_preinit_hook);
+
+	if (ret == 0)
+		return;
+
+	/* XXX TODO: refactor this stuff out */
+	athp_pci_free_bufs(psc);
+	bus_dma_tag_destroy(ar->sc_dmat);
+	bus_teardown_intr(ar->sc_dev, psc->sc_irq, psc->sc_ih);
+	bus_release_resource(ar->sc_dev, SYS_RES_IRQ, 0, psc->sc_irq);
+	bus_release_resource(ar->sc_dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
+
+	/* XXX disable busmaster? */
+	mtx_destroy(&psc->ps_mtx);
+	mtx_destroy(&psc->ce_mtx);
+	mtx_destroy(&ar->sc_conf_mtx);
+	mtx_destroy(&ar->sc_data_mtx);
+	mtx_destroy(&ar->sc_buf_mtx);
+	mtx_destroy(&ar->sc_mtx);
+	if (psc->pipe_taskq) {
+		taskqueue_drain_all(psc->pipe_taskq);
+		taskqueue_free(psc->pipe_taskq);
+	}
+	ath10k_core_destroy(ar);
+}
+
 static int
 athp_pci_attach(device_t dev)
 {
@@ -587,12 +621,16 @@ athp_pci_attach(device_t dev)
 		goto bad3;
 	}
 
-	/* call core_register */
-
 	/* Call main attach method with given info */
-	err = athp_attach(ar);
-	if (err == 0)
-		return (0);
+	ar->sc_preinit_hook.ich_func = athp_attach_preinit;
+	ar->sc_preinit_hook.ich_arg = ar;
+	if (config_intrhook_establish(&ar->sc_preinit_hook) != 0) {
+		device_printf(ar->sc_dev,
+		    "%s: couldn't establish preinit hook\n", __func__);
+		goto bad4;
+	}
+
+	return (0);
 
 	/* Fallthrough for setup failure */
 bad4:
