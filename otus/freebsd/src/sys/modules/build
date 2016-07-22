@@ -1,0 +1,11 @@
+#!/bin/sh
+
+#X_SRCDIR="/usr/src" ; export X_SRCDIR
+#X_KERNDIR="i386/compile/MARILYN" ; export X_KERNDIR
+
+#X_SRCDIR="/home/adrian/work/freebsd/stable/9/" ; export X_SRCDIR
+#X_KERNDIR="i386/compile/MARILYN-9-STABLE" ; export X_KERNDIR
+
+X_SRCDIR="/home/adrian/work/freebsd/stable/9/" ; export X_SRCDIR
+X_KERNDIR="/usr/obj/usr/home/adrian/work/freebsd/stable/9/sys/MARILYN-9-STABLE/" ; export X_KERNDIR
+./build_modules $*

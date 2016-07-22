@@ -1,0 +1,21 @@
+#!/bin/sh
+
+X_SRCDIR=${X_SRCDIR:="/home/adrian/work/freebsd/head/src/"}
+X_KERNDIR=${X_KERNDIR:="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/sys/GERTRUDE/"}
+X_KMODOWN=${X_KMODOWN:="adrian"}
+X_KMODGRP=${X_KMODGRP:="adrian"}
+
+# This allows for -HEAD includes for net80211 ..
+env CFLAGS="-I../../../sys/" \
+make \
+	MODULES_OVERRIDE="" \
+	DEBUG_FLAGS="-g" \
+	DEBUG_FLAGS="-g" \
+	KMODDIR="/home/adrian/git/github/erikarn/otus/otus/freebsd/modules/" \
+	KMODOWN="${X_KMODOWN}" \
+	KMODGRP="${X_KMODGRP}" \
+	MAKESYSPATH="${X_SRCDIR}/share/mk" \
+	SYSDIR="${X_SRCDIR}/sys/" \
+	KERNBUILDDIR="${X_KERNDIR}" \
+	KERN_DEBUGDIR="" \
+	$@

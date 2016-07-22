@@ -1,0 +1,12 @@
+#!/bin/sh
+
+MODULES_LIST="athp athpfw"
+
+for i in ${MODULES_LIST}; do
+	echo "entering ${i}"
+	PPWD="`pwd`"
+	cd ${i} || exit 1
+	../build_module $@ || exit 1
+	echo ".. back to ${PPWD}"
+	cd ${PPWD}
+done
