@@ -547,7 +547,7 @@ athp_pci_attach(device_t dev)
 		    ret);
 		/* XXX cleanup */
 		err = ENXIO;
-		goto bad3;
+		goto bad4;
 	}
 
 	/* deinit ce */
@@ -560,7 +560,7 @@ athp_pci_attach(device_t dev)
 		    __func__,
 		    ret);
 		err = ENXIO;
-		goto bad3;
+		goto bad4;
 	}
 
 	/* init IRQ */
@@ -570,7 +570,7 @@ athp_pci_attach(device_t dev)
 		    __func__,
 		    ret);
 		err = ENXIO;
-		goto bad3;
+		goto bad4;
 	}
 
 	/* (here's where ath10k requests IRQs */
@@ -585,7 +585,7 @@ athp_pci_attach(device_t dev)
 		    __func__,
 		    ret);
 		err = ENXIO;
-		goto bad3;
+		goto bad4;
 	}
 
 	/* read SoC/chip version */
@@ -598,7 +598,7 @@ athp_pci_attach(device_t dev)
 		    "%s: unsupported chip; chipid: 0x%08x\n", __func__,
 		    ar->sc_chipid);
 		err = ENXIO;
-		goto bad3;
+		goto bad4;
 	}
 
 	/* Call main attach method with given info */
@@ -615,7 +615,7 @@ athp_pci_attach(device_t dev)
 	/* Fallthrough for setup failure */
 bad4:
 	athp_pci_free_bufs(psc);
-bad3:
+//bad3:
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 bad2:
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
