@@ -138,10 +138,6 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	if (pbuf == NULL)
 		return (-ENOMEM);
 
-	if (pbuf->mb.paddr & 3) {
-		ath10k_warn(ar, "%s: unaligned mbuf\n", __func__);
-	}
-
 	/* DMA Load */
 	ret = athp_dma_mbuf_load(ar, &ar->buf_rx.dh, &pbuf->mb, pbuf->m);
 	if (ret != 0) {
@@ -155,12 +151,22 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	/* Pre-recv sync */
 	athp_dma_mbuf_pre_recv(ar, &ar->buf_rx.dh, &pbuf->mb);
 
+	if (pbuf->mb.paddr & 3) {
+		ath10k_warn(ar, "%s: unaligned mbuf\n", __func__);
+	}
+
 	/*
 	 * Once the mapping is done and we've verified there's only
 	 * a single physical segment, we can hand it to the copy engine
 	 * to queue for receive.
 	 */
 	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->mb.paddr);
+#if 0
+	device_printf(ar->sc_dev, "%s: m=%p, paddr=%08x\n",
+	    __func__,
+	    pbuf->m,
+	    (uint32_t) pbuf->mb.paddr);
+#endif
 	if (ret) {
 		ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
 		athp_freebuf(ar, &ar->buf_rx, pbuf);
@@ -294,6 +300,10 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 
 		/* Post-RX sync */
 		athp_dma_mbuf_post_recv(ar, &ar->buf_rx.dh, &pbuf->mb);
+
+		ath10k_dbg(ar, ATH10K_DBG_PCI, "rx ce pipe %d, m=%p, paddr=%08x, len %d, tid %d flags 0x%08x\n",
+		    ce_state->id, pbuf->m,
+		    (uint32_t) pbuf->mb.paddr, nbytes, transfer_id, flags);
 
 		/* Finish mapping; don't need it anymore */
 		athp_dma_mbuf_unload(ar, &ar->buf_rx.dh, &pbuf->mb);
