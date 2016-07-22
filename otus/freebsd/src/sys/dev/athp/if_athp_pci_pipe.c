@@ -138,6 +138,9 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	if (pbuf == NULL)
 		return (-ENOMEM);
 
+	/* Set the length appropriately */
+	athp_buf_set_len(pbuf, pipe->buf_sz);
+
 	/* DMA Load */
 	ret = athp_dma_mbuf_load(ar, &ar->buf_rx.dh, &pbuf->mb, pbuf->m);
 	if (ret != 0) {
