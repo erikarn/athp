@@ -1510,11 +1510,10 @@ err:
 int
 ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 {
-#if 0
 	int ret;
 	unsigned long time_left;
 
-//	reinit_completion(&ar->target_suspend);
+	reinit_completion(&ar->target_suspend);
 
 	ret = ath10k_wmi_pdev_suspend_target(ar, suspend_opt);
 	if (ret) {
@@ -1530,10 +1529,6 @@ ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 	}
 
 	return 0;
-#else
-	device_printf(ar->sc_dev, "%s: TODO: called\n", __func__);
-	return (-1);
-#endif
 }
 
 void
