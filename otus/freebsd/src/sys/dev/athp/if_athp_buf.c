@@ -275,6 +275,7 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	ATHP_BUF_UNLOCK(ar);
 	if (! bf) {
 		m_freem(m);
+		device_printf(ar->sc_dev, "%s: out of buffers? btype=%d\n", __func__, br->btype);
 		return (NULL);
 	}
 
