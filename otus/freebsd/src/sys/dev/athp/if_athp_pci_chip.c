@@ -380,7 +380,7 @@ ath10k_pci_disable_and_clear_legacy_irq(struct athp_pci_softc *psc)
 				PCIE_INTR_ENABLE_ADDRESS);
 }
 
-static void
+void
 ath10k_pci_enable_legacy_irq(struct athp_pci_softc *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;

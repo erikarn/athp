@@ -170,10 +170,6 @@ athp_pci_intr(void *arg)
 	struct athp_pci_softc *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
-#if 0
-	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
-#endif
-
 	if (ar->sc_invalid)
 		return;
 
@@ -192,6 +188,8 @@ athp_pci_intr(void *arg)
 	 * predictable locking tricky.
 	 */
 	ath10k_ce_per_engine_service_any(ar);
+	if (psc->num_msi_intrs == 0)
+		ath10k_pci_enable_legacy_irq(psc);
 }
 
 #define	BS_BAR	0x10

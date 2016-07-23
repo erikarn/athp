@@ -24,4 +24,6 @@ extern	void ath10k_pci_fw_crashed_clear(struct athp_pci_softc *psc);
 extern	int ath10k_pci_wake_target_cpu(struct athp_pci_softc *psc);
 extern	void ath10k_pci_sleep_sync(struct athp_pci_softc *psc);
 
+extern void ath10k_pci_enable_legacy_irq(struct athp_pci_softc *psc);
+
 #endif	/* __IF_ATHP_PCI_CHIP_H__ */
