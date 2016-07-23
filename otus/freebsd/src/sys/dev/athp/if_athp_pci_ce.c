@@ -863,6 +863,10 @@ void ath10k_ce_per_engine_service_any(struct ath10k *ar)
 	int ce_id;
 	uint32_t intr_summary;
 
+	/*
+	 * This reads the interrupt status registers to figure
+	 * out which CEs are ready.
+	 */
 	intr_summary = CE_INTERRUPT_SUMMARY(ar);
 
 	for (ce_id = 0; intr_summary && (ce_id < CE_COUNT(ar)); ce_id++) {
@@ -871,7 +875,6 @@ void ath10k_ce_per_engine_service_any(struct ath10k *ar)
 		else
 			/* no intr pending on this CE */
 			continue;
-
 		ath10k_ce_per_engine_service(ar, ce_id);
 	}
 }
