@@ -330,6 +330,8 @@ athp_attach(struct ath10k *ar)
 	// if (bootverbose)
 		ieee80211_announce(ic);
 
+	device_printf(ar->sc_dev, "%s: completed! we're ready!\n", __func__);
+
 	return (0);
 err:
 	return (ret);
