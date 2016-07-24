@@ -106,7 +106,7 @@ struct ath10k_vif {
 	/* This must always be at the top */
 	struct ieee80211vap av_vap;
 
-	TAILQ_ENTRY(ath10k_vif) list;
+	TAILQ_ENTRY(ath10k_vif) next;
 
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;

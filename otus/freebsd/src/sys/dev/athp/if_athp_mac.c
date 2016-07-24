@@ -98,6 +98,7 @@ struct ath10k *
 ath10k_mac_create(size_t priv_size)
 {
 	printf("%s: called\n", __func__);
+
 	return NULL;
 }
 
@@ -112,8 +113,12 @@ int
 ath10k_mac_register(struct ath10k *ar)
 {
 
-	printf("%s: called\n", __func__);
-	return (-EINVAL);
+	printf("%s: TODO\n", __func__);
+
+	/* for now .. */
+	TAILQ_INIT(&ar->arvifs);
+
+	return (0);
 }
 
 void
@@ -123,11 +128,26 @@ ath10k_mac_unregister(struct ath10k *ar)
 	printf("%s: called\n", __func__);
 }
 
+/*
+ * There's no refcounting on ath10k_vif's, beware!
+ */
 struct ath10k_vif *
 ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 {
+	struct ath10k_vif *vif;
 
-	printf("%s: called\n", __func__);
+	/* XXX for now; may need to use another lock, or create a new one */
+	ATHP_LOCK(ar);
+	TAILQ_FOREACH(vif, &ar->arvifs, next) {
+		if (vif->vdev_id == vdev_id) {
+			ATHP_UNLOCK(ar);
+			return vif;
+		}
+	}
+	ATHP_UNLOCK(ar);
+
+	device_printf(ar->sc_dev, "%s: couldn't find vdev id %d\n",
+	    __func__, vdev_id);
 	return (NULL);
 }
 

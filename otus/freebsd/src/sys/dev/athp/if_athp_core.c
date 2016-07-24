@@ -95,6 +95,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_chip.h"
 #include "if_athp_swap.h"
 #include "if_athp_wmi_ops.h"
+#include "if_athp_mac.h"
 
 /*
  * This is the "core" interface part of ath10k (core.c.)
@@ -1645,13 +1646,13 @@ ath10k_core_register_work(struct work_struct *work)
 		goto err;
 	}
 
-#if 0
 	status = ath10k_mac_register(ar);
 	if (status) {
 		ath10k_err(ar, "could not register to mac80211 (%d)\n", status);
 		goto err_release_fw;
 	}
 
+#if 0
 	status = ath10k_debug_register(ar);
 	if (status) {
 		ath10k_err(ar, "unable to initialize debugfs\n");
@@ -1685,9 +1686,9 @@ err_debug_destroy:
 	ath10k_debug_destroy(ar);
 err_unregister_mac:
 	ath10k_mac_unregister(ar);
+#endif
 err_release_fw:
 	ath10k_core_free_firmware_files(ar);
-#endif
 err:
 	/* TODO: It's probably a good idea to release device from the driver
 	 * but calling device_release_driver() here will cause a deadlock.
@@ -1726,12 +1727,14 @@ ath10k_core_unregister(struct ath10k *ar)
 	 * would be already be free'd recursively, leading to a double free.
 	 */
 	ath10k_spectral_destroy(ar);
+#endif
 
 	/* We must unregister from mac80211 before we stop HTC and HIF.
 	 * Otherwise we will fail to submit commands to FW and mac80211 will be
 	 * unhappy about callback failures. */
 	ath10k_mac_unregister(ar);
 
+#if 0
 	ath10k_testmode_destroy(ar);
 #endif
 	ath10k_core_free_firmware_files(ar);
