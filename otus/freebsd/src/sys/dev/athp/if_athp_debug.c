@@ -126,7 +126,8 @@ ath10k_print_driver_info(struct ath10k *ar)
 	ath10k_core_get_fw_features_str(ar, fw_features, sizeof(fw_features));
 
 	device_printf(ar->sc_dev,
-	    "%s (0x%08x, 0x%08x%s%s%s) fw %s api %d htt-ver %d.%d wmi-op %d htt-op %d cal %s max-sta %d raw %d hwcrypto %d features %s\n",
+	    "%s (0x%08x, 0x%08x%s%s%s) fw %s api %d htt-ver %d.%d wmi-op %d "
+	    "htt-op %d cal %s max-sta %d raw %d hwcrypto %d features %s\n",
 		    ar->hw_params.name,
 		    ar->target_version,
 		    ar->sc_chipid,
