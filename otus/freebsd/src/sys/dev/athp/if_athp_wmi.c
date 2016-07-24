@@ -1808,7 +1808,6 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		return ret;
 	}
 
-#if 0
 	wait_event_timeout(ar->wmi.tx_credits_wq, ({
 		/* try to send pending beacons first. they take priority */
 		ath10k_wmi_tx_beacons_nowait(ar);
@@ -1820,21 +1819,6 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 
 		(ret != -EAGAIN);
 	}), 3*HZ);
-#endif
-
-	/* XXX TODO: need to do this in a loop with sleepwait, etc! */
-	device_printf(ar->sc_dev, "%s: called; cmd_id=%d, need to implement wait!\n", __func__, cmd_id);
-
-	/* try to send pending beacons first. they take priority */
-	ath10k_wmi_tx_beacons_nowait(ar);
-
-	ret = ath10k_wmi_cmd_send_nowait(ar, pbuf, cmd_id);
-
-	if (ret && test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
-		ret = -ESHUTDOWN;
-
-	if (ret)
-		device_printf(ar->sc_dev, "%s: error; cmd_id=%d, ret=%d\n", __func__, cmd_id, ret);
 
 	if (ret)
 		athp_freebuf(ar, &ar->buf_tx, pbuf);
