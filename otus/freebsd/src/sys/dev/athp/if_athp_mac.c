@@ -88,12 +88,14 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_main.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
 /* Placeholders for the MAC routines; the port of these will come later */
 
 
+#if 0
 struct ath10k *
 ath10k_mac_create(size_t priv_size)
 {
@@ -108,15 +110,21 @@ ath10k_mac_destroy(struct ath10k *ar)
 
 	printf("%s: called\n", __func__);
 }
+#endif
 
 int
 ath10k_mac_register(struct ath10k *ar)
 {
+	int ret;
 
-	printf("%s: TODO\n", __func__);
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* for now .. */
 	TAILQ_INIT(&ar->arvifs);
+
+	ret = athp_attach_net80211(ar);
+	if (ret != 0)
+		return (ret);
 
 	return (0);
 }
@@ -125,7 +133,8 @@ void
 ath10k_mac_unregister(struct ath10k *ar)
 {
 
-	printf("%s: called\n", __func__);
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
+	athp_detach_net80211(ar);
 }
 
 /*
@@ -228,4 +237,10 @@ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
 #else
 	device_printf(ar->sc_dev, "%s: TODO: called!\n", __func__);
 #endif
+}
+
+void
+ath10k_drain_tx(struct ath10k *ar)
+{
+	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
 }

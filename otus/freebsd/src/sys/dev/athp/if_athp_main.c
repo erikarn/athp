@@ -88,6 +88,10 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
+/*
+ * These are the net80211 facing implementation pieces.
+ */
+
 static int
 athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
     const struct ieee80211_bpf_params *params)
@@ -257,18 +261,12 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
  * to set things up and that requires interrupts + sleeping.
  */
 int
-athp_attach(struct ath10k *ar)
+athp_attach_net80211(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
 	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
-	int ret;
 
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
-
-	/* Initial: probe firmware/target info */
-	ret = ath10k_core_register(ar);
-	if (ret != 0)
-		goto err;
 
 	/* Setup net80211 state */
 	ic->ic_softc = ar;
@@ -333,12 +331,10 @@ athp_attach(struct ath10k *ar)
 	device_printf(ar->sc_dev, "%s: completed! we're ready!\n", __func__);
 
 	return (0);
-err:
-	return (ret);
 }
 
 int
-athp_detach(struct ath10k *ar)
+athp_detach_net80211(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
 

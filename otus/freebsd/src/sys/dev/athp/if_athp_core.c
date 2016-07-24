@@ -1128,8 +1128,8 @@ static void ath10k_core_restart(struct work_struct *work)
 	barrier();
 
 	ieee80211_stop_queues(ar->hw);
-	ath10k_drain_tx(ar);
 #endif
+	ath10k_drain_tx(ar);
 
 	complete_all(&ar->scan.started);
 	complete_all(&ar->scan.completed);
@@ -1546,12 +1546,8 @@ ath10k_core_stop(struct ath10k *ar)
 
 	ath10k_hif_stop(ar);
 	ath10k_htt_tx_free(&ar->htt);
-#if 0
 	ath10k_htt_rx_free(&ar->htt);
-#else
 	ath10k_wmi_detach(ar);
-	device_printf(ar->sc_dev, "%s: TODO: htt free detach\n", __func__);
-#endif
 }
 
 /* mac80211 manages fw/hw initialization through start/stop hooks. However in
@@ -1673,7 +1669,7 @@ ath10k_core_register_work(struct work_struct *work)
 	}
 #else
 	device_printf(ar->sc_dev,
-	    "%s: TODO: mac/debug/spectral/thermal register\n",
+	    "%s: TODO: debug/spectral/thermal register\n",
 	    __func__);
 #endif
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags);

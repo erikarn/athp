@@ -57,6 +57,8 @@ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason);
 void ath10k_mac_vif_tx_lock(struct ath10k_vif *arvif, int reason);
 void ath10k_mac_vif_tx_unlock(struct ath10k_vif *arvif, int reason);
 
+void ath10k_drain_tx(struct ath10k *ar);
+
 static inline struct ath10k_vif *ath10k_vif_to_arvif(struct ieee80211vap *vap)
 {
 	return (struct ath10k_vif *) vap;
@@ -81,7 +83,5 @@ static inline void ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf 
 #endif
 	printf("%s: TODO\n", __func__);
 }
-
-
 
 #endif /* _MAC_H_ */

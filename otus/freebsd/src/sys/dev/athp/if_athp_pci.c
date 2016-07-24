@@ -369,9 +369,9 @@ athp_attach_preinit(void *arg)
 	struct athp_pci_softc *psc = ar->sc_psc;
 	int ret;
 
-	ret = athp_attach(ar);
 	config_intrhook_disestablish(&ar->sc_preinit_hook);
 
+	ret = ath10k_core_register(ar);
 	if (ret == 0)
 		return;
 
@@ -653,8 +653,8 @@ athp_pci_detach(device_t dev)
 	 */
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
-	/* detach main driver */
-	(void) athp_detach(ar);
+	/* stop/free the core */
+	ath10k_core_destroy(ar);
 
 	/* kill tasklet(s) */
 
@@ -671,9 +671,6 @@ athp_pci_detach(device_t dev)
 
 	/* buffers */
 	athp_pci_free_bufs(psc);
-
-	/* clean up anything waiting */
-	ath10k_core_destroy(ar);
 
 	/* Free bus resources */
 	bus_generic_detach(dev);
