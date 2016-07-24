@@ -41,7 +41,7 @@ struct ath10k_pci_pipe {
 	struct mtx pipe_lock;
 
 	/* Interrupt task - scheduled to do transmit/receive work */
-	struct task intr;
+//	struct task intr;
 };
 
 extern	void ath10k_pci_ce_deinit(struct ath10k *ar);
