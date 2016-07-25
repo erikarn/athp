@@ -345,8 +345,5 @@ athp_detach_net80211(struct ath10k *ar)
 	if (ic->ic_softc == ar)
 		ieee80211_ifdetach(ic);
 
-	/* XXX TODO: look at ath10k_pci_remove */
-	ath10k_core_unregister(ar);
-
 	return (0);
 }

@@ -654,11 +654,12 @@ athp_pci_detach(device_t dev)
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
 	/* stop/free the core */
-	ath10k_core_destroy(ar);
+	ath10k_core_unregister(ar);
 
 	/* kill tasklet(s) */
 
 	/* deinit irq */
+	ath10k_pci_deinit_irq(psc);
 
 	/* ce deinit */
 	ath10k_pci_ce_deinit(ar);

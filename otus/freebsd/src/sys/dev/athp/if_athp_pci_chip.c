@@ -155,8 +155,6 @@ static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 static void ath10k_pci_buffer_cleanup(struct athp_pci_softc *ar);
 static int ath10k_pci_cold_reset(struct athp_pci_softc *ar);
 static int ath10k_pci_wait_for_target_init(struct athp_pci_softc *ar);
-int ath10k_pci_init_irq(struct athp_pci_softc *ar);
-static int ath10k_pci_deinit_irq(struct athp_pci_softc *ar);
 static int ath10k_pci_request_irq(struct athp_pci_softc *ar);
 static void ath10k_pci_free_irq(struct athp_pci_softc *ar);
 static int ath10k_pci_qca99x0_chip_reset(struct athp_pci_softc *ar);
@@ -926,6 +924,24 @@ ath10k_pci_deinit_irq_legacy(struct athp_pci_softc *psc)
 
 	athp_pci_write32(ar, SOC_CORE_BASE_ADDRESS(ar->sc_regofs) + PCIE_INTR_ENABLE_ADDRESS,
 			   0);
+}
+
+int
+ath10k_pci_deinit_irq(struct athp_pci_softc *psc)
+{
+	struct ath10k *ar = &psc->sc_sc;
+
+	switch(psc->num_msi_intrs) {
+	case 0:
+		ath10k_pci_deinit_irq_legacy(psc);
+		return 0;
+	case 1:
+	case MSI_NUM_REQUEST:
+	default:
+		device_printf(ar->sc_dev, "%s: TODO: MSI deinit_irq\n",
+		    __func__);
+	}
+	return -EINVAL;
 }
 
 static int
