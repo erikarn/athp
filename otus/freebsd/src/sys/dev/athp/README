@@ -25,7 +25,6 @@ Notes:
 * .. so don't cheat by hard-coding 10.1 or 10.2 APIs; we have to do this somewhat
   clean early on.
 
-
 Bring-up order; more detail
 
 * probe/attach
@@ -76,11 +75,42 @@ firmware injection and start stubbing out the HIF layer for implementing.
 The only bits of HIF layer we need are power_on, stop, power_off and the BMI
 HIF wait for message routine.
 
+net80211 bringup:
 
-Things to undo:
+* mac.c - has the commands to send, the tx/rx path into mac80211, and the
+  command path
+* thermal.c - thermal control
+* p2p.c - p2p support
+* debug*.c - debugfs support (yes, for debugging)
 
-* dma coherent API - is now there
-* find the conversions to the freebsd list structs - that's now there
+rough order for net80211 bringup:
+
+* add ath10k/mac.c into if_athp_mac.c, and stub out almost everything
+* make peer create/destroy work
+* make vif create/destroy work
+* leave the chanctx bits stubbed out, but at least eyeball them to see
+  how they're supposed to work (eg when they're doing channel switches, etc)
+* write scan stubs so we don't change channel for scans
+* stub out the net80211 management frame sending for now, leave it up to the
+  driver (so scans are done by the driver!) - same as if_rsu.c, I hope!
+* program in a regulatory domain into the firmware, so it doesn't panic!
+* add in initial scan support, see if we can get scan results!
+
+Then checkpoint, and fix up the dirty pieces before we continue.
+
+Things to finish doing:
+
+* dma coherent API - remove it entirely; use the freebsd calls
+  (otherwise device_t versus struct device (linux) gets unhappy;
+  the linux layer really expects struct device)
+* convert everything to freebsd list iteration
+* convert everything to freebsd tasks, task_timeouts, callout as appropriate
+  (the linux lock model and callout/tasklet model doens't seem to be implemented
+  completely 'right' with what freebsd needs.)
+
+MSI:
+
+* TODO: figure out all of the MSI bits that I missed!
 
 NEED TO DO THIS OR THE FIRMWARE CRASHES
 
