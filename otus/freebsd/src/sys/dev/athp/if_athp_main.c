@@ -297,6 +297,8 @@ athp_attach_net80211(struct ath10k *ar)
 	setbit(bands, IEEE80211_MODE_11G);
 	ieee80211_init_channels(ic, NULL, bands);
 
+	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
+
 	ieee80211_ifattach(ic);
 
 	/* required 802.11 methods */
