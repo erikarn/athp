@@ -1114,9 +1114,9 @@ ath10k_init_hw_params(struct ath10k *ar)
 	return 0;
 }
 
-static void ath10k_core_restart(struct work_struct *work)
+static void ath10k_core_restart(void *arg, int npending)
 {
-	struct ath10k *ar = container_of(work, struct ath10k, restart_work);
+	struct ath10k *ar = arg;
 
 	/* XXX lock? */
 	set_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags);
@@ -1631,9 +1631,9 @@ err_power_down:
 }
 
 static void
-ath10k_core_register_work(struct work_struct *work)
+ath10k_core_register_work(void *arg, int npending)
 {
-	struct ath10k *ar = container_of(work, struct ath10k, register_work);
+	struct ath10k *ar = arg;
 	int status;
 
 	status = ath10k_core_probe_fw(ar);
@@ -1701,7 +1701,7 @@ int
 ath10k_core_register(struct ath10k *ar)
 {
 
-	queue_work(ar->workqueue, &ar->register_work);
+	taskqueue_enqueue(ar->workqueue, &ar->register_work);
 
 	return 0;
 }
@@ -1711,7 +1711,7 @@ ath10k_core_unregister(struct ath10k *ar)
 {
 
 	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-	cancel_work_sync(&ar->register_work);
+	taskqueue_drain(ar->workqueue, &ar->register_work);
 
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags))
 		return;
@@ -1797,13 +1797,20 @@ ath10k_core_init(struct ath10k *ar)
 	INIT_DELAYED_WORK(&ar->scan.timeout, ath10k_scan_timeout_work);
 #endif
 
-	ar->workqueue = create_singlethread_workqueue("ath10k_wq");
+	ar->workqueue = taskqueue_create("ath10k_wq",
+	    M_NOWAIT, taskqueue_thread_enqueue, &ar->workqueue);
 	if (!ar->workqueue)
 		goto err_free_mac;
 
-	ar->workqueue_aux = create_singlethread_workqueue("ath10k_aux_wq");
+	ar->workqueue_aux = taskqueue_create("ath10k_aux_wq",
+	    M_NOWAIT, taskqueue_thread_enqueue, &ar->workqueue_aux);
 	if (!ar->workqueue_aux)
 		goto err_free_wq;
+
+	taskqueue_start_threads(&ar->workqueue, 1, PI_NET, "%s ath10k_wq",
+	    device_get_nameunit(ar->sc_dev));
+	taskqueue_start_threads(&ar->workqueue_aux, 1, PI_NET,
+	    "%s ath10k_aux_wq", device_get_nameunit(ar->sc_dev));
 
 #if 0
 	mutex_init(&ar->conf_mutex);
@@ -1826,8 +1833,8 @@ ath10k_core_init(struct ath10k *ar)
 #endif
 	TAILQ_INIT(&ar->wmi_mgmt_tx_queue);
 
-	INIT_WORK(&ar->register_work, ath10k_core_register_work);
-	INIT_WORK(&ar->restart_work, ath10k_core_restart);
+	TASK_INIT(&ar->register_work, 0, ath10k_core_register_work, ar);
+	TASK_INIT(&ar->restart_work, 0, ath10k_core_restart, ar);
 
 #if 0
 	ret = ath10k_debug_create(ar);
@@ -1839,9 +1846,9 @@ ath10k_core_init(struct ath10k *ar)
 	return 0;
 
 //err_free_aux_wq:
-//	destroy_workqueue(ar->workqueue_aux);
+//	taskqueue_free(ar->workqueue_aux);
 err_free_wq:
-	destroy_workqueue(ar->workqueue);
+	taskqueue_free(ar->workqueue);
 err_free_mac:
 	return -1;
 }
@@ -1850,11 +1857,11 @@ void
 ath10k_core_destroy(struct ath10k *ar)
 {
 
-	flush_workqueue(ar->workqueue);
-	destroy_workqueue(ar->workqueue);
+	taskqueue_drain_all(ar->workqueue);
+	taskqueue_free(ar->workqueue);
 
-	flush_workqueue(ar->workqueue_aux);
-	destroy_workqueue(ar->workqueue_aux);
+	taskqueue_drain_all(ar->workqueue_aux);
+	taskqueue_free(ar->workqueue_aux);
 
 #if 0
 	ath10k_debug_destroy(ar);

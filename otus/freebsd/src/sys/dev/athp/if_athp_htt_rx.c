@@ -101,7 +101,7 @@ MALLOC_DECLARE(M_ATHPDEV);
 #define HTT_RX_RING_REFILL_RETRY_MS 50
 
 static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb);
-static void ath10k_htt_txrx_compl_task(struct work_struct *work);
+static void ath10k_htt_txrx_compl_task(void *arg, int npending);
 
 #if 0
 static struct athp_buf *
@@ -285,7 +285,7 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 		mod_timer(&htt->rx_ring.refill_retry_timer, jiffies +
 			  msecs_to_jiffies(HTT_RX_RING_REFILL_RETRY_MS));
 	} else if (num_deficit > 0) {
-		queue_work(ar->workqueue, &htt->rx_replenish_task);
+		taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 	}
 	ATHP_HTT_RX_UNLOCK(htt);
 }
@@ -318,8 +318,8 @@ void ath10k_htt_rx_free(struct ath10k_htt *htt)
 	struct ath10k *ar = htt->ar;
 
 	del_timer_sync(&htt->rx_ring.refill_retry_timer);
-	cancel_work_sync(&htt->rx_replenish_task);
-	cancel_work_sync(&htt->txrx_compl_task);
+	taskqueue_drain(ar->workqueue, &htt->rx_replenish_task);
+	taskqueue_drain(ar->workqueue, &htt->txrx_compl_task);
 
 	athp_buf_list_flush(ar, &ar->buf_tx, &htt->tx_compl_q);
 	athp_buf_list_flush(ar, &ar->buf_rx, &htt->rx_compl_q);
@@ -511,9 +511,9 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 	return msdu_chaining;
 }
 
-static void ath10k_htt_rx_replenish_task(struct work_struct *work)
+static void ath10k_htt_rx_replenish_task(void *arg, int npending)
 {
-	struct ath10k_htt *htt = (void *) container_of(work, struct ath10k_htt, rx_replenish_task);
+	struct ath10k_htt *htt = arg;
 
 	ath10k_htt_rx_msdu_buff_replenish(htt);
 }
@@ -666,13 +666,13 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	hash_init(htt->rx_ring.skb_table);
 #endif
 
-	INIT_WORK(&htt->rx_replenish_task, ath10k_htt_rx_replenish_task);
+	TASK_INIT(&htt->rx_replenish_task, 0, ath10k_htt_rx_replenish_task, htt);
 
 	TAILQ_INIT(&htt->tx_compl_q);
 	TAILQ_INIT(&htt->rx_compl_q);
 	TAILQ_INIT(&htt->rx_in_ord_compl_q);
 
-	INIT_WORK(&htt->txrx_compl_task, ath10k_htt_txrx_compl_task);
+	TASK_INIT(&htt->txrx_compl_task, 0, ath10k_htt_txrx_compl_task, htt);
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "htt rx ring size %d fill_level %d\n",
 		   htt->rx_ring.size, htt->rx_ring.fill_level);
@@ -1762,7 +1762,7 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 		ath10k_htt_rx_h_deliver(ar, &amsdu, rx_status);
 	}
 
-	queue_work(ar->workqueue, &htt->rx_replenish_task);
+	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 }
 
 static void ath10k_htt_rx_frag_handler(struct ath10k_htt *htt,
@@ -1786,7 +1786,7 @@ static void ath10k_htt_rx_frag_handler(struct ath10k_htt *htt,
 				      &amsdu);
 	ATHP_HTT_RX_UNLOCK(htt);
 
-	queue_work(ar->workqueue, &htt->rx_replenish_task);
+	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT_DUMP, "htt rx frag ahead\n");
 
@@ -2187,7 +2187,7 @@ static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 		}
 	}
 
-	queue_work(ar->workqueue, &htt->rx_replenish_task);
+	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 }
 
 void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
@@ -2222,7 +2222,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		ATHP_HTT_RX_LOCK(htt);
 		TAILQ_INSERT_TAIL(&htt->rx_compl_q, skb, next);
 		ATHP_HTT_RX_UNLOCK(htt);
-		queue_work(ar->workqueue, &htt->txrx_compl_task);
+		taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
 		return;
 	case HTT_T2H_MSG_TYPE_PEER_MAP: {
 		struct htt_peer_map_event ev = {
@@ -2266,7 +2266,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		ATHP_HTT_TX_COMP_LOCK(htt);
 		TAILQ_INSERT_TAIL(&htt->tx_compl_q, skb, next);
 		ATHP_HTT_TX_COMP_UNLOCK(htt);
-		queue_work(ar->workqueue, &htt->txrx_compl_task);
+		taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
 		return;
 	case HTT_T2H_MSG_TYPE_SEC_IND: {
 		struct ath10k *ar = htt->ar;
@@ -2331,7 +2331,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		ATHP_HTT_RX_LOCK(htt);
 		TAILQ_INSERT_TAIL(&htt->rx_in_ord_compl_q, skb, next);
 		ATHP_HTT_RX_UNLOCK(htt);
-		queue_work(ar->workqueue, &htt->txrx_compl_task);
+		taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
 #else
 		device_printf(ar->sc_dev, "%s: TODO: IN_ORD_PADDR_IND: unsupported!\n",
 		    __func__);
@@ -2360,9 +2360,9 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 	athp_freebuf(ar, &ar->buf_rx, skb);
 }
 
-static void ath10k_htt_txrx_compl_task(struct work_struct *work)
+static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 {
-	struct ath10k_htt *htt = container_of(work, struct ath10k_htt, txrx_compl_task);
+	struct ath10k_htt *htt = arg;
 	struct ath10k *ar = htt->ar;
 	struct htt_resp *resp;
 	struct athp_buf *skb;

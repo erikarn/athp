@@ -169,11 +169,11 @@ struct ath10k_htt {
 	/* set if host-fw communication goes haywire
 	 * used to avoid further failures */
 	bool rx_confused;
-	struct work_struct rx_replenish_task;
+	struct task rx_replenish_task;
 
 	/* This is used to group tx/rx completions separately and process them
 	 * in batches to reduce cache stalls */
-	struct work_struct txrx_compl_task;
+	struct task txrx_compl_task;
 
 	/* protects access to the tx completion queue */
 	struct mtx tx_comp_lock;

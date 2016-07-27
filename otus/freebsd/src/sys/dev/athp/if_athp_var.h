@@ -295,11 +295,9 @@ struct ath10k {
 
 	struct completion vdev_setup_done;
 
-#if 1
-	struct workqueue_struct *workqueue;
+	struct taskqueue *workqueue;
 	/* Auxiliary workqueue */
-	struct workqueue_struct *workqueue_aux;
-#endif
+	struct taskqueue *workqueue_aux;
 
 	/* prevents concurrent FW reconfiguration */
 #if 0
@@ -328,21 +326,21 @@ struct ath10k {
 	int num_active_peers;
 	int num_tids;
 
-	struct work_struct svc_rdy_work;
+	struct task svc_rdy_work;
 	struct athp_buf *svc_rdy_skb;
 
-	struct work_struct offchan_tx_work;
+	struct task offchan_tx_work;
 	TAILQ_HEAD(, athp_buf) offchan_tx_queue;
 	struct completion offchan_tx_completed;
 	struct athp_buf *offchan_tx_pbuf;
 
-	struct work_struct wmi_mgmt_tx_work;
+	struct task wmi_mgmt_tx_work;
 	TAILQ_HEAD(, athp_buf) wmi_mgmt_tx_queue;
 
 	enum ath10k_state state;
 
-	struct work_struct register_work;
-	struct work_struct restart_work;
+	struct task register_work;
+	struct task restart_work;
 
 #if 0
 	/* cycle count is reported twice for each visited channel during scan.

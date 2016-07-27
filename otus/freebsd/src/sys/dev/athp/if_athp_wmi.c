@@ -4160,9 +4160,9 @@ ath10k_wmi_10x_op_pull_svc_rdy_ev(struct ath10k *ar, struct athp_buf *pbuf,
 	return 0;
 }
 
-static void ath10k_wmi_event_service_ready_work(struct work_struct *work)
+static void ath10k_wmi_event_service_ready_work(void *targ, int npending)
 {
-	struct ath10k *ar = container_of(work, struct ath10k, svc_rdy_work);
+	struct ath10k *ar = targ;
 	struct athp_buf *pbuf = ar->svc_rdy_skb;
 	struct wmi_svc_rdy_ev_arg arg = {};
 	u32 num_units, req_id, unit_size, num_mem_reqs, num_unit_info, i;
@@ -4308,7 +4308,7 @@ static void ath10k_wmi_event_service_ready_work(struct work_struct *work)
 void ath10k_wmi_event_service_ready(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	ar->svc_rdy_skb = pbuf;
-	queue_work(ar->workqueue_aux, &ar->svc_rdy_work);
+	taskqueue_enqueue(ar->workqueue_aux, &ar->svc_rdy_work);
 }
 
 static int ath10k_wmi_op_pull_rdy_ev(struct ath10k *ar, struct athp_buf *pbuf,
@@ -6848,7 +6848,7 @@ int ath10k_wmi_attach(struct ath10k *ar)
 	init_completion(&ar->wmi.service_ready);
 	init_completion(&ar->wmi.unified_ready);
 
-	INIT_WORK(&ar->svc_rdy_work, ath10k_wmi_event_service_ready_work);
+	TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
 
 	return 0;
 }
@@ -6857,7 +6857,7 @@ void ath10k_wmi_detach(struct ath10k *ar)
 {
 	int i;
 
-	cancel_work_sync(&ar->svc_rdy_work);
+	taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
 
 	if (ar->svc_rdy_skb)
 		athp_freebuf(ar, &ar->buf_rx, ar->svc_rdy_skb);
