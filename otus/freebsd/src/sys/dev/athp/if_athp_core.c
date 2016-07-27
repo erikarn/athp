@@ -604,6 +604,8 @@ ath10k_download_fw(struct ath10k *ar, enum ath10k_firmware_mode mode)
 			   mode_name, ret);
 		return ret;
 	}
+	ath10k_dbg(ar, ATH10K_DBG_BOOT,
+		   "boot uploading done\n");
 
 	return ret;
 }
