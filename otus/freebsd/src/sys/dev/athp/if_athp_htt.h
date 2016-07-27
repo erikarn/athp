@@ -149,7 +149,7 @@ struct ath10k_htt {
 		 * refill_retry_timer - timer triggered when the ring is
 		 * not refilled to the level expected
 		 */
-		struct timer_list refill_retry_timer;
+		struct callout refill_retry_timer;
 
 		/* Protects access to all rx ring buffer state variables */
 		struct mtx lock;

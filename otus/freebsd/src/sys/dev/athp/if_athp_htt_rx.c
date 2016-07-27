@@ -102,6 +102,7 @@ MALLOC_DECLARE(M_ATHPDEV);
 
 static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb);
 static void ath10k_htt_txrx_compl_task(void *arg, int npending);
+static void ath10k_htt_rx_ring_refill_retry(void *arg);
 
 #if 0
 static struct athp_buf *
@@ -282,15 +283,17 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 		 * As long as enough buffers are left in the ring for
 		 * another A-MPDU rx, no special recovery is needed.
 		 */
-		mod_timer(&htt->rx_ring.refill_retry_timer, jiffies +
-			  msecs_to_jiffies(HTT_RX_RING_REFILL_RETRY_MS));
+		callout_reset(&htt->rx_ring.refill_retry_timer,
+		    HTT_RX_RING_REFILL_RETRY_MS * hz,
+		    ath10k_htt_rx_ring_refill_retry,
+		    htt);
 	} else if (num_deficit > 0) {
 		taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 	}
 	ATHP_HTT_RX_UNLOCK(htt);
 }
 
-static void ath10k_htt_rx_ring_refill_retry(unsigned long arg)
+static void ath10k_htt_rx_ring_refill_retry(void *arg)
 {
 	struct ath10k_htt *htt = (struct ath10k_htt *)arg;
 
@@ -317,7 +320,10 @@ void ath10k_htt_rx_free(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
 
-	del_timer_sync(&htt->rx_ring.refill_retry_timer);
+	/* XXX TODO: if this returns 0, then we're still running the callout routine .. */
+	ATHP_HTT_RX_LOCK(htt);
+	callout_stop(&htt->rx_ring.refill_retry_timer);
+	ATHP_HTT_RX_UNLOCK(htt);
 	taskqueue_drain(ar->workqueue, &htt->rx_replenish_task);
 	taskqueue_drain(ar->workqueue, &htt->txrx_compl_task);
 
@@ -608,7 +614,7 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
 	size_t size;
-	struct timer_list *timer = &htt->rx_ring.refill_retry_timer;
+	struct callout *timer = &htt->rx_ring.refill_retry_timer;
 
 	htt->rx_confused = false;
 
@@ -655,10 +661,10 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	htt->rx_ring.sw_rd_idx.msdu_payld = htt->rx_ring.size_mask;
 	*htt->rx_ring.alloc_idx.vaddr = 0;
 
-	/* Initialize the Rx refill retry timer */
-	setup_timer(timer, ath10k_htt_rx_ring_refill_retry, (unsigned long)htt);
-
 	mtx_init(&htt->rx_ring.lock, device_get_nameunit(ar->sc_dev), "athp rx htt", MTX_DEF);
+
+	/* Initialize the Rx refill retry timer */
+	callout_init_mtx(timer, &htt->rx_ring.lock, 0);
 
 	htt->rx_ring.fill_cnt = 0;
 	htt->rx_ring.sw_rd_idx.msdu_payld = 0;

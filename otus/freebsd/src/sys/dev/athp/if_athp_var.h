@@ -247,7 +247,7 @@ struct ath10k {
 		struct completion started;
 		struct completion completed;
 		struct completion on_channel;
-		struct delayed_work timeout;
+		struct timeout_task timeout;
 		enum ath10k_scan_state state;
 		bool is_roc;
 		int vdev_id;

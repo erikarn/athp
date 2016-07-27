@@ -10,7 +10,7 @@
 #include <linux/if_ether.h>
 #include <linux/err.h>
 #include <linux/etherdevice.h>
-#include <linux/workqueue.h>
+//#include <linux/workqueue.h>
 //#include <linux/dmapool.h>
 //#include <linux/dma-mapping.h>
 #include <linux/idr.h>
