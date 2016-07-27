@@ -5,16 +5,20 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/completion.h>
-#include <linux/wait.h>
-#include <linux/if_ether.h>
+//#include <linux/completion.h>
+//#include <linux/wait.h>
+//#include <linux/if_ether.h>
 #include <linux/err.h>
-#include <linux/etherdevice.h>
+//#include <linux/etherdevice.h>
 //#include <linux/workqueue.h>
 //#include <linux/dmapool.h>
 //#include <linux/dma-mapping.h>
 #include <linux/idr.h>
 //#include <linux/dma-mapping.h>
+
+/* Minimal set of bits needed for compilation */
+#define	ETH_ALEN		ETHER_ADDR_LEN
+#define	ether_addr_copy(d, s)	memcpy((d), (s), ETHER_ADDR_LEN)
 
 #if 0
 #include <sys/libkern.h>
@@ -68,7 +72,6 @@ roundup_pow_of_two(unsigned long n)
 
 #define	BIT(x)			(1 << (x))
 
-#define	ETH_ALEN		ETHER_ADDR_LEN
 
 /* XXX TODO: only for 32 bit values */
 static inline int
