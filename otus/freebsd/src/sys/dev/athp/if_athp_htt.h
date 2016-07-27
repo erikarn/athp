@@ -163,8 +163,8 @@ struct ath10k_htt {
 	int num_pending_tx;
 	struct idr pending_tx;
 	wait_queue_head_t empty_tx_wq;
-	struct dma_pool *tx_pool;
 
+//	struct dma_pool *tx_pool;
 
 	/* set if host-fw communication goes haywire
 	 * used to avoid further failures */
