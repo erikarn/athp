@@ -985,18 +985,19 @@ static int ath10k_pci_bmi_wait(struct ath10k_ce_pipe *tx_pipe,
 			       struct ath10k_ce_pipe *rx_pipe,
 			       struct bmi_xfer *xfer)
 {
-	int i;
+	int interval;
+
+	interval = ticks + ((2000 * hz) / 1000);
 
 	/* Wait up to 2 seconds for each transfer */
-	for (i = 0; i < (2 * 100 * 1000); i++) {
+	while (! ieee80211_time_after(ticks, interval)) {
 		ath10k_pci_bmi_send_done(tx_pipe);
 		ath10k_pci_bmi_recv_data(rx_pipe);
 
 		if (xfer->tx_done && (xfer->rx_done == xfer->wait_for_resp))
 			return 0;
 
-		/* Wait 10uS each time */
-		DELAY(10);
+		kern_yield(PRI_USER);
 	}
 
 	printf("%s: timed out\n", __func__);
