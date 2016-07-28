@@ -407,7 +407,8 @@ athp_pci_attach(device_t dev)
 	ar->sc_dev = dev;
 	ar->sc_invalid = 1;
 	/* XXX TODO: initialize sc_debug from TUNABLE */
-	ar->sc_debug = ATH10K_DBG_BOOT | ATH10K_DBG_PCI | ATH10K_DBG_HTC | ATH10K_DBG_PCI_DUMP | ATH10K_DBG_WMI;
+	ar->sc_debug = ATH10K_DBG_BOOT | ATH10K_DBG_PCI | ATH10K_DBG_HTC |
+	    ATH10K_DBG_PCI_DUMP | ATH10K_DBG_WMI | ATH10K_DBG_BMI;
 	ar->sc_psc = psc;
 
 	/*
