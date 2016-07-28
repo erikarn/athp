@@ -248,7 +248,7 @@ static void ath10k_send_suspend_complete(struct ath10k *ar)
 {
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot suspend complete\n");
 
-	ath10k_wakeup_one(&ar->target_suspend);
+	ath10k_compl_wakeup_one(&ar->target_suspend);
 }
 
 static int
@@ -1133,13 +1133,13 @@ static void ath10k_core_restart(void *arg, int npending)
 #endif
 	ath10k_drain_tx(ar);
 
-	ath10k_wakeup_all(&ar->scan.started);
-	ath10k_wakeup_all(&ar->scan.completed);
-	ath10k_wakeup_all(&ar->scan.on_channel);
-	ath10k_wakeup_all(&ar->offchan_tx_completed);
-	ath10k_wakeup_all(&ar->install_key_done);
-	ath10k_wakeup_all(&ar->vdev_setup_done);
-	ath10k_wakeup_all(&ar->thermal.wmi_sync);
+	ath10k_compl_wakeup_all(&ar->scan.started);
+	ath10k_compl_wakeup_all(&ar->scan.completed);
+	ath10k_compl_wakeup_all(&ar->scan.on_channel);
+	ath10k_compl_wakeup_all(&ar->offchan_tx_completed);
+	ath10k_compl_wakeup_all(&ar->install_key_done);
+	ath10k_compl_wakeup_all(&ar->vdev_setup_done);
+	ath10k_compl_wakeup_all(&ar->thermal.wmi_sync);
 	wake_up(&ar->htt.empty_tx_wq);
 	wake_up(&ar->wmi.tx_credits_wq);
 	wake_up(&ar->peer_mapping_wq);

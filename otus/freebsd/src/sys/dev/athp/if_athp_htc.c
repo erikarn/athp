@@ -512,7 +512,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 				 */
 				ath10k_warn(ar, "HTC rx ctrl still processing\n");
 				status = -EINVAL;
-				ath10k_wakeup_one(&htc->ctl_resp);
+				ath10k_compl_wakeup_one(&htc->ctl_resp);
 				goto out;
 			}
 
@@ -523,7 +523,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 			memcpy(htc->control_resp_buffer, mbuf_skb_data(pbuf->m),
 			       htc->control_resp_len);
 
-			ath10k_wakeup_one(&htc->ctl_resp);
+			ath10k_compl_wakeup_one(&htc->ctl_resp);
 			break;
 		case ATH10K_HTC_MSG_SEND_SUSPEND_COMPLETE:
 			htc->htc_ops.target_send_suspend_complete(ar);

@@ -32,14 +32,14 @@ struct ath10k_compl {
 	int done;
 };
 static inline int
-ath10k_wakeup_all(struct ath10k_compl *p)
+ath10k_compl_wakeup_all(struct ath10k_compl *p)
 {
 	wakeup(p);
 	return 0;
 }
 
 static inline int
-ath10k_wakeup_one(struct ath10k_compl *p)
+ath10k_compl_wakeup_one(struct ath10k_compl *p)
 {
 	wakeup_one(p);
 	return 0;
