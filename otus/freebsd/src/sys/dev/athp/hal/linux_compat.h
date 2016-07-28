@@ -31,6 +31,7 @@
 struct ath10k_compl {
 	int done;
 };
+
 static inline int
 ath10k_compl_wakeup_all(struct ath10k_compl *p)
 {
@@ -91,6 +92,58 @@ ath10k_compl_isdone(struct ath10k_compl *p)
 {
 
 	return (p->done != 0);
+}
+
+
+/*
+ * A simple wake/sleep wrapper.
+ */
+struct ath10k_wait {
+	int placeholder;
+};
+
+static inline void
+ath10k_wait_init(struct ath10k_wait *p)
+{
+	p->placeholder = 0;
+}
+
+static inline void
+ath10k_wait_wakeup_one(struct ath10k_wait *p)
+{
+
+	wakeup_one(p);
+}
+
+static inline void
+ath10k_wait_wakeup_all(struct ath10k_wait *p)
+{
+
+	wakeup(p);
+}
+
+static inline int
+ath10k_wait_wait(struct ath10k_wait *p, const char *str, int timo)
+{
+	int ret;
+
+	/* Ensure timeout isn't 0; we don't have a mutex here */
+	/* XXX TODO: convert these to mutexes! */
+	if (timo == 0) {
+		printf("%s: (%s): TODO: timo=0, bad timeout!\n",
+		    __func__, str);
+		timo = hz;	/* 1 second */
+	} else {
+		timo = (timo * hz) / 1000;
+	}
+
+	ret = tsleep(p, 0, str, timo);
+
+	/* Linux compat hack - return 0 if we timed out; else the 'time left' */
+	if (ret == EWOULDBLOCK) {
+		return 0;
+	}
+	return 1;
 }
 
 #if 0

@@ -86,7 +86,7 @@ struct ath10k_wmi {
 	enum ath10k_htc_ep_id eid;
 	struct ath10k_compl service_ready;
 	struct ath10k_compl unified_ready;
-	wait_queue_head_t tx_credits_wq;
+	struct ath10k_wait tx_credits_wq;
 	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
 	struct wmi_cmd_map *cmd;
 	struct wmi_vdev_param_map *vdev_param;
@@ -313,7 +313,7 @@ struct ath10k {
 
 	TAILQ_HEAD(, ath10k_vif) arvifs;
 	struct list_head peers;
-	wait_queue_head_t peer_mapping_wq;
+	struct ath10k_wait peer_mapping_wq;
 
 	/* protected by conf_mutex */
 	int num_peers;

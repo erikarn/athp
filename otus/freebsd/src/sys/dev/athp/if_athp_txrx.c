@@ -153,7 +153,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	ath10k_htt_tx_free_msdu_id(htt, tx_done->msdu_id);
 	__ath10k_htt_tx_dec_pending(htt);
 	if (htt->num_pending_tx == 0)
-		wake_up(&htt->empty_tx_wq);
+		ath10k_wait_wakeup_one(&htt->empty_tx_wq);
 	ATHP_HTT_TX_UNLOCK(htt);
 
 	skb_cb = ATH10K_SKB_CB(msdu);
@@ -244,20 +244,33 @@ struct ath10k_peer *ath10k_peer_find_by_id(struct ath10k *ar, int peer_id)
 static int ath10k_wait_for_peer_common(struct ath10k *ar, int vdev_id,
 				       const u8 *addr, bool expect_mapped)
 {
-	long time_left;
+	int interval, ret;
 
-	time_left = wait_event_timeout(ar->peer_mapping_wq, ({
+	interval = ticks + ((3 * hz) / 1000);
+
+	ret = 0;
+	while (! ieee80211_time_after(ticks, interval)) {
 			bool mapped;
 
+			ath10k_wait_wait(&ar->peer_mapping_wq, "peer_mapping_wq", 1);
+
+			/* Check to see if the peer exists */
 			ATHP_DATA_LOCK(ar);
 			mapped = !!ath10k_peer_find(ar, vdev_id, addr);
 			ATHP_DATA_UNLOCK(ar);
 
-			(mapped == expect_mapped ||
-			 test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags));
-		}), 3*HZ);
+			/*
+			 * Break out of the loop if we got the peer or we
+			 * crashed
+			 */
+			if (mapped == expect_mapped ||
+			    test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags)) {
+				ret = 1;
+				break;
+			}
+	}
 
-	if (time_left == 0)
+	if (ret == 0)
 		return -ETIMEDOUT;
 
 	return 0;
@@ -289,7 +302,7 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 		peer->vdev_id = ev->vdev_id;
 		ether_addr_copy(peer->addr, ev->addr);
 		list_add(&peer->list, &ar->peers);
-		wake_up(&ar->peer_mapping_wq);
+		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer map vdev %d peer %pM id %d\n",
@@ -322,7 +335,7 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 	if (bitmap_empty(peer->peer_ids, ATH10K_MAX_NUM_PEER_IDS)) {
 		list_del(&peer->list);
 		free(peer, M_ATHPDEV);
-		wake_up(&ar->peer_mapping_wq);
+		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
 
 exit:

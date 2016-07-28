@@ -1793,12 +1793,13 @@ static void ath10k_wmi_op_ep_tx_credits(struct ath10k *ar)
 	/* try to send pending beacons first. they take priority */
 	ath10k_wmi_tx_beacons_nowait(ar);
 
-	wake_up(&ar->wmi.tx_credits_wq);
+	ath10k_wait_wakeup_one(&ar->wmi.tx_credits_wq);
 }
 
 int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 {
 	int ret = -EOPNOTSUPP;
+	int interval;
 
 	might_sleep();
 
@@ -1808,17 +1809,27 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		return ret;
 	}
 
-	wait_event_timeout(ar->wmi.tx_credits_wq, ({
+	interval = ticks + ((3 * hz) / 1000);
+
+	/*
+	 * XXX TODO: this is in milliseconds, which likely needs to be more
+	 * frequent for this kind of thing.
+	 */
+	while (! ieee80211_time_after(ticks, interval)) {
+		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
+
 		/* try to send pending beacons first. they take priority */
 		ath10k_wmi_tx_beacons_nowait(ar);
 
+		/* Try to send something */
 		ret = ath10k_wmi_cmd_send_nowait(ar, pbuf, cmd_id);
 
 		if (ret && test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 			ret = -ESHUTDOWN;
 
-		(ret != -EAGAIN);
-	}), 3*HZ);
+		if (ret != -EAGAIN)
+			break;
+	}
 
 	if (ret)
 		athp_freebuf(ar, &ar->buf_tx, pbuf);

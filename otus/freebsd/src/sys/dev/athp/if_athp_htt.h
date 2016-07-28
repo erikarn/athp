@@ -162,7 +162,7 @@ struct ath10k_htt {
 	int max_num_pending_tx;
 	int num_pending_tx;
 	struct idr pending_tx;
-	wait_queue_head_t empty_tx_wq;
+	struct ath10k_wait empty_tx_wq;
 
 //	struct dma_pool *tx_pool;
 

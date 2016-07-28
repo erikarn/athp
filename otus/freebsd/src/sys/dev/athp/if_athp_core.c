@@ -1140,9 +1140,10 @@ static void ath10k_core_restart(void *arg, int npending)
 	ath10k_compl_wakeup_all(&ar->install_key_done);
 	ath10k_compl_wakeup_all(&ar->vdev_setup_done);
 	ath10k_compl_wakeup_all(&ar->thermal.wmi_sync);
-	wake_up(&ar->htt.empty_tx_wq);
-	wake_up(&ar->wmi.tx_credits_wq);
-	wake_up(&ar->peer_mapping_wq);
+	/* XXX why's the driver waking up one? */
+	ath10k_wait_wakeup_one(&ar->htt.empty_tx_wq);
+	ath10k_wait_wakeup_one(&ar->wmi.tx_credits_wq);
+	ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 
 #if 0
 	mutex_lock(&ar->conf_mutex);
@@ -1821,9 +1822,9 @@ ath10k_core_init(struct ath10k *ar)
 #endif
 
 	INIT_LIST_HEAD(&ar->peers);
-	init_waitqueue_head(&ar->peer_mapping_wq);
-	init_waitqueue_head(&ar->htt.empty_tx_wq);
-	init_waitqueue_head(&ar->wmi.tx_credits_wq);
+	ath10k_wait_init(&ar->peer_mapping_wq);
+	ath10k_wait_init(&ar->htt.empty_tx_wq);
+	ath10k_wait_init(&ar->wmi.tx_credits_wq);
 
 	ath10k_compl_init(&ar->offchan_tx_completed);
 #if 0
