@@ -84,8 +84,8 @@ struct ath10k_mem_chunk {
 struct ath10k_wmi {
 	enum ath10k_fw_wmi_op_version op_version;
 	enum ath10k_htc_ep_id eid;
-	struct completion service_ready;
-	struct completion unified_ready;
+	struct ath10k_compl service_ready;
+	struct ath10k_compl unified_ready;
 	wait_queue_head_t tx_credits_wq;
 	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
 	struct wmi_cmd_map *cmd;
@@ -100,7 +100,7 @@ struct ath10k_wmi {
 
 struct ath10k_wow {
 	int max_num_patterns;
-	struct completion wakeup_completed;
+	struct ath10k_compl wakeup_completed;
 };
 
 /*
@@ -203,7 +203,7 @@ struct ath10k {
 		const struct ath10k_hif_ops *ops;
 	} hif;
 
-	struct completion target_suspend;
+	struct ath10k_compl target_suspend;
 
 #if 0
 	/* XXX TODO: duplicated above; fix it */
@@ -244,9 +244,9 @@ struct ath10k {
 	enum ath10k_cal_mode cal_mode;
 
 	struct {
-		struct completion started;
-		struct completion completed;
-		struct completion on_channel;
+		struct ath10k_compl started;
+		struct ath10k_compl completed;
+		struct ath10k_compl on_channel;
 		struct timeout_task timeout;
 		enum ath10k_scan_state state;
 		bool is_roc;
@@ -291,9 +291,9 @@ struct ath10k {
 	u8 cfg_tx_chainmask;
 	u8 cfg_rx_chainmask;
 
-	struct completion install_key_done;
+	struct ath10k_compl install_key_done;
 
-	struct completion vdev_setup_done;
+	struct ath10k_compl vdev_setup_done;
 
 	struct taskqueue *workqueue;
 	/* Auxiliary workqueue */
@@ -331,7 +331,7 @@ struct ath10k {
 
 	struct task offchan_tx_work;
 	TAILQ_HEAD(, athp_buf) offchan_tx_queue;
-	struct completion offchan_tx_completed;
+	struct ath10k_compl offchan_tx_completed;
 	struct athp_buf *offchan_tx_pbuf;
 
 	struct task wmi_mgmt_tx_work;

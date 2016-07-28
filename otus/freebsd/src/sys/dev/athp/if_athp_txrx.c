@@ -111,7 +111,7 @@ static void ath10k_report_offchan_tx(struct ath10k *ar, struct athp_buf *pbuf)
 		goto out;
 	}
 
-	complete(&ar->offchan_tx_completed);
+	ath10k_wakeup_one(&ar->offchan_tx_completed);
 	ar->offchan_tx_pbuf = NULL; /* just for sanity */
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "completed offchannel skb %p\n", pbuf);

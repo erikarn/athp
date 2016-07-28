@@ -248,7 +248,7 @@ static void ath10k_send_suspend_complete(struct ath10k *ar)
 {
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot suspend complete\n");
 
-	complete(&ar->target_suspend);
+	ath10k_wakeup_one(&ar->target_suspend);
 }
 
 static int
@@ -1133,13 +1133,13 @@ static void ath10k_core_restart(void *arg, int npending)
 #endif
 	ath10k_drain_tx(ar);
 
-	complete_all(&ar->scan.started);
-	complete_all(&ar->scan.completed);
-	complete_all(&ar->scan.on_channel);
-	complete_all(&ar->offchan_tx_completed);
-	complete_all(&ar->install_key_done);
-	complete_all(&ar->vdev_setup_done);
-	complete_all(&ar->thermal.wmi_sync);
+	ath10k_wakeup_all(&ar->scan.started);
+	ath10k_wakeup_all(&ar->scan.completed);
+	ath10k_wakeup_all(&ar->scan.on_channel);
+	ath10k_wakeup_all(&ar->offchan_tx_completed);
+	ath10k_wakeup_all(&ar->install_key_done);
+	ath10k_wakeup_all(&ar->vdev_setup_done);
+	ath10k_wakeup_all(&ar->thermal.wmi_sync);
 	wake_up(&ar->htt.empty_tx_wq);
 	wake_up(&ar->wmi.tx_credits_wq);
 	wake_up(&ar->peer_mapping_wq);
@@ -1516,7 +1516,7 @@ ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 	int ret;
 	unsigned long time_left;
 
-	reinit_completion(&ar->target_suspend);
+	ath10k_compl_reinit(&ar->target_suspend);
 
 	ret = ath10k_wmi_pdev_suspend_target(ar, suspend_opt);
 	if (ret) {
@@ -1524,7 +1524,8 @@ ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 		return ret;
 	}
 
-	time_left = wait_for_completion_timeout(&ar->target_suspend, 1 * HZ);
+	time_left = ath10k_compl_wait(&ar->target_suspend, "target_suspend",
+	    1000);
 
 	if (!time_left) {
 		ath10k_warn(ar, "suspend timed out - target pause event never came\n");
@@ -1785,15 +1786,15 @@ int
 ath10k_core_init(struct ath10k *ar)
 {
 
-	init_completion(&ar->scan.started);
-	init_completion(&ar->scan.completed);
-	init_completion(&ar->scan.on_channel);
-	init_completion(&ar->target_suspend);
-	init_completion(&ar->wow.wakeup_completed);
+	ath10k_compl_init(&ar->scan.started);
+	ath10k_compl_init(&ar->scan.completed);
+	ath10k_compl_init(&ar->scan.on_channel);
+	ath10k_compl_init(&ar->target_suspend);
+	ath10k_compl_init(&ar->wow.wakeup_completed);
 
-	init_completion(&ar->install_key_done);
-	init_completion(&ar->vdev_setup_done);
-	init_completion(&ar->thermal.wmi_sync);
+	ath10k_compl_init(&ar->install_key_done);
+	ath10k_compl_init(&ar->vdev_setup_done);
+	ath10k_compl_init(&ar->thermal.wmi_sync);
 
 #if 0
 	INIT_DELAYED_WORK(&ar->scan.timeout, ath10k_scan_timeout_work);
@@ -1824,7 +1825,7 @@ ath10k_core_init(struct ath10k *ar)
 	init_waitqueue_head(&ar->htt.empty_tx_wq);
 	init_waitqueue_head(&ar->wmi.tx_credits_wq);
 
-	init_completion(&ar->offchan_tx_completed);
+	ath10k_compl_init(&ar->offchan_tx_completed);
 #if 0
 	INIT_WORK(&ar->offchan_tx_work, ath10k_offchan_tx_work);
 #endif

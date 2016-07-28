@@ -18,7 +18,7 @@
 #ifndef	__IF_ATHP_CORE_H__
 #define	__IF_ATHP_CORE_H__
 
-#include <linux/completion.h>
+//#include <linux/completion.h>
 
 #define ATH10K_SCAN_ID 0
 #define WMI_READY_TIMEOUT (5 * HZ)
@@ -180,7 +180,7 @@ struct ath10k_debug {
 	struct dentry *debugfs_phy;
 
 	struct ath10k_fw_stats fw_stats;
-	struct completion fw_stats_complete;
+	struct ath10k_compl fw_stats_complete;
 	bool fw_stats_done;
 
 	unsigned long htt_stats_mask;

@@ -505,14 +505,14 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 		case ATH10K_HTC_MSG_READY_ID:
 		case ATH10K_HTC_MSG_CONNECT_SERVICE_RESP_ID:
 			/* handle HTC control message */
-			if (completion_done(&htc->ctl_resp)) {
+			if (ath10k_compl_isdone(&htc->ctl_resp)) {
 				/*
 				 * this is a fatal error, target should not be
 				 * sending unsolicited messages on the ep 0
 				 */
 				ath10k_warn(ar, "HTC rx ctrl still processing\n");
 				status = -EINVAL;
-				complete(&htc->ctl_resp);
+				ath10k_wakeup_one(&htc->ctl_resp);
 				goto out;
 			}
 
@@ -523,7 +523,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 			memcpy(htc->control_resp_buffer, mbuf_skb_data(pbuf->m),
 			       htc->control_resp_len);
 
-			complete(&htc->ctl_resp);
+			ath10k_wakeup_one(&htc->ctl_resp);
 			break;
 		case ATH10K_HTC_MSG_SEND_SUSPEND_COMPLETE:
 			htc->htc_ops.target_send_suspend_complete(ar);
@@ -650,8 +650,8 @@ int ath10k_htc_wait_target(struct ath10k_htc *htc)
 	u16 credit_count;
 	u16 credit_size;
 
-	time_left = wait_for_completion_timeout(&htc->ctl_resp,
-						ATH10K_HTC_WAIT_TIMEOUT_HZ);
+	time_left = ath10k_compl_wait(&htc->ctl_resp, "ctl_resp",
+						ATH10K_HTC_WAIT_TIMEOUT_MSEC);
 	if (!time_left) {
 		/* Workaround: In some cases the PCI HIF doesn't
 		 * receive interrupt for the control response message
@@ -665,8 +665,8 @@ int ath10k_htc_wait_target(struct ath10k_htc *htc)
 			ath10k_hif_send_complete_check(htc->ar, i, 1);
 
 		time_left =
-		wait_for_completion_timeout(&htc->ctl_resp,
-					    ATH10K_HTC_WAIT_TIMEOUT_HZ);
+		ath10k_compl_wait(&htc->ctl_resp, "ctl_resp",
+					    ATH10K_HTC_WAIT_TIMEOUT_MSEC);
 
 		if (!time_left)
 			status = -ETIMEDOUT;
@@ -789,7 +789,7 @@ int ath10k_htc_connect_service(struct ath10k_htc *htc,
 	req_msg->flags = __cpu_to_le16(flags);
 	req_msg->service_id = __cpu_to_le16(conn_req->service_id);
 
-	reinit_completion(&htc->ctl_resp);
+	ath10k_compl_reinit(&htc->ctl_resp);
 
 	status = ath10k_htc_send(htc, ATH10K_HTC_EP_0, pbuf);
 	if (status) {
@@ -798,8 +798,8 @@ int ath10k_htc_connect_service(struct ath10k_htc *htc,
 	}
 
 	/* wait for response */
-	time_left = wait_for_completion_timeout(&htc->ctl_resp,
-						ATH10K_HTC_CONN_SVC_TIMEOUT_HZ);
+	time_left = ath10k_compl_wait(&htc->ctl_resp, "ctl_resp",
+	    ATH10K_HTC_CONN_SVC_TIMEOUT_MSEC);
 	if (!time_left) {
 		ath10k_err(ar, "Service connect timeout\n");
 		return -ETIMEDOUT;
@@ -967,7 +967,7 @@ int ath10k_htc_init(struct ath10k *ar)
 	ath10k_hif_set_callbacks(ar, &htc_callbacks);
 	ath10k_hif_get_default_pipe(ar, &ep->ul_pipe_id, &ep->dl_pipe_id);
 
-	init_completion(&htc->ctl_resp);
+	ath10k_compl_init(&htc->ctl_resp);
 
 	return 0;
 }
