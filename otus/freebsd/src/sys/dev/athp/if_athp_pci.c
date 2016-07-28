@@ -384,7 +384,7 @@ athp_attach_preinit(void *arg)
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	mtx_destroy(&ar->sc_conf_mtx);
+	sx_destroy(&ar->sc_conf_sx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_mtx);
@@ -424,8 +424,7 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 	mtx_init(&ar->sc_buf_mtx, device_get_nameunit(dev), "athp buf",
 	    MTX_DEF);
-	mtx_init(&ar->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
-	    MTX_DEF);
+	sx_init(&ar->sc_conf_sx, "athp conf");
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
 	    MTX_DEF);
 	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), "athp ce",
@@ -623,7 +622,7 @@ bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	mtx_destroy(&ar->sc_conf_mtx);
+	sx_destroy(&ar->sc_conf_sx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_mtx);
@@ -684,7 +683,7 @@ athp_pci_detach(device_t dev)
 
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	mtx_destroy(&ar->sc_conf_mtx);
+	sx_destroy(&ar->sc_conf_sx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_mtx);

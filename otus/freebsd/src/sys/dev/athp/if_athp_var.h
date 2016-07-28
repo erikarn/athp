@@ -55,10 +55,10 @@ struct athp_vap {
 
 #define	ATHP_FW_VER_STR		128
 
-#define	ATHP_CONF_LOCK(sc)		mtx_lock(&(sc)->sc_conf_mtx)
-#define	ATHP_CONF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_conf_mtx)
-#define	ATHP_CONF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
-#define	ATHP_CONF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
+#define	ATHP_CONF_LOCK(sc)		sx_xlock(&(sc)->sc_conf_sx)
+#define	ATHP_CONF_UNLOCK(sc)		sx_unlock(&(sc)->sc_conf_sx)
+#define	ATHP_CONF_LOCK_ASSERT(sc)	0
+#define	ATHP_CONF_UNLOCK_ASSERT(sc)	0
 
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
@@ -120,7 +120,7 @@ struct ath10k {
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
 	struct mtx			sc_buf_mtx;
-	struct mtx			sc_conf_mtx;
+	struct sx			sc_conf_sx;
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
 	uint64_t			sc_debug;
