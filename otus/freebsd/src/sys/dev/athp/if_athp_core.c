@@ -1821,7 +1821,7 @@ ath10k_core_init(struct ath10k *ar)
 	spin_lock_init(&ar->data_lock);
 #endif
 
-	INIT_LIST_HEAD(&ar->peers);
+	TAILQ_INIT(&ar->peers);
 	ath10k_wait_init(&ar->peer_mapping_wq);
 	ath10k_wait_init(&ar->htt.empty_tx_wq);
 	ath10k_wait_init(&ar->wmi.tx_credits_wq);

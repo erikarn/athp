@@ -61,9 +61,7 @@ ath10k_bus_str(enum ath10k_bus bus)
 #define ATH10K_MAX_NUM_PEER_IDS (1 << 11) /* htt rx_desc limit */
 
 struct ath10k_peer {
-	/* XXX TODO: convert */
-//	TAILQ_ENTRY(ath10k_peer) list;
-	struct list_head list;
+	TAILQ_ENTRY(ath10k_peer) list;
 	int vdev_id;
 	u8 addr[ETH_ALEN];
 	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);

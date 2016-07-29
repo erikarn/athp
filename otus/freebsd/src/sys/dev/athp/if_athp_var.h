@@ -312,7 +312,7 @@ struct ath10k {
 #endif
 
 	TAILQ_HEAD(, ath10k_vif) arvifs;
-	struct list_head peers;
+	TAILQ_HEAD(, ath10k_peer) peers;
 	struct ath10k_wait peer_mapping_wq;
 
 	/* protected by conf_mutex */

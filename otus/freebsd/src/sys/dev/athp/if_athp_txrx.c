@@ -216,7 +216,7 @@ struct ath10k_peer *ath10k_peer_find(struct ath10k *ar, int vdev_id,
 
 	ATHP_DATA_LOCK_ASSERT(ar);
 
-	list_for_each_entry(peer, &ar->peers, list) {
+	TAILQ_FOREACH(peer, &ar->peers, list) {
 		if (peer->vdev_id != vdev_id)
 			continue;
 		if (memcmp(peer->addr, addr, ETH_ALEN))
@@ -234,7 +234,7 @@ struct ath10k_peer *ath10k_peer_find_by_id(struct ath10k *ar, int peer_id)
 
 	ATHP_DATA_LOCK_ASSERT(ar);
 
-	list_for_each_entry(peer, &ar->peers, list)
+	TAILQ_FOREACH(peer, &ar->peers, list)
 		if (test_bit(peer_id, peer->peer_ids))
 			return peer;
 
@@ -301,7 +301,7 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 
 		peer->vdev_id = ev->vdev_id;
 		ether_addr_copy(peer->addr, ev->addr);
-		list_add(&peer->list, &ar->peers);
+		TAILQ_INSERT_TAIL(&ar->peers, peer, list);
 		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
 
@@ -333,7 +333,7 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 	clear_bit(ev->peer_id, peer->peer_ids);
 
 	if (bitmap_empty(peer->peer_ids, ATH10K_MAX_NUM_PEER_IDS)) {
-		list_del(&peer->list);
+		TAILQ_REMOVE(&ar->peers, peer, list);
 		free(peer, M_ATHPDEV);
 		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
