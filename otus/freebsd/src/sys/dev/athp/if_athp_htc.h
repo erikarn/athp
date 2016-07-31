@@ -24,6 +24,9 @@ struct ath10k;
 /* HTC protocol */
 /****************/
 
+/* XXX cheating */
+#include "if_athp_hal_compl.h"
+
 struct athp_buf;
 
 struct ath10k_htc_ops {

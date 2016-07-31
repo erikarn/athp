@@ -25,6 +25,7 @@
 #include "if_athp_buf.h"
 #include "if_athp_thermal.h"
 #include "if_athp_htt.h"
+#include "if_athp_hal_compl.h"
 
 #define	ATHP_RXBUF_MAX_SCATTER	1
 #define	ATHP_TXBUF_MAX_SCATTER	1

@@ -18,6 +18,9 @@
 #ifndef	__IF_ATHP_CORE_H__
 #define	__IF_ATHP_CORE_H__
 
+/* XXX cheating */
+#include "if_athp_hal_compl.h"
+
 #define ATH10K_SCAN_ID 0
 #define WMI_READY_TIMEOUT (5 * HZ)
 #define ATH10K_FLUSH_TIMEOUT_HZ (5*HZ)
