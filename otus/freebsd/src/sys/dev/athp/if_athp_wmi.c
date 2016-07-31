@@ -39,6 +39,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/condvar.h>
 #include <sys/ctype.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <machine/pmap.h>	/* for vtophys() */
+
 #include <machine/bus.h>
 #include <machine/resource.h>
 
