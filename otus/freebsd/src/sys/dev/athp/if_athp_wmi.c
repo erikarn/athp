@@ -2659,7 +2659,7 @@ static int ath10k_wmi_main_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2680,7 +2680,7 @@ static int ath10k_wmi_main_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2718,7 +2718,7 @@ static int ath10k_wmi_10x_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2740,7 +2740,7 @@ static int ath10k_wmi_10x_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2785,7 +2785,7 @@ static int ath10k_wmi_10_2_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2822,7 +2822,7 @@ static int ath10k_wmi_10_2_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2868,7 +2868,7 @@ static int ath10k_wmi_10_2_4_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2905,7 +2905,7 @@ static int ath10k_wmi_10_2_4_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
