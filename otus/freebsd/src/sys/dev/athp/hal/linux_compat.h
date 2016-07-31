@@ -32,6 +32,13 @@ roundup_pow_of_two(unsigned long n)
 	return 1UL << flsl(n - 1);
 }
 
+/* XXX TODO: only for 32 bit values */
+static inline int
+ilog2(uint32_t val)
+{
+	return fls(val);
+}
+
 /* bit string */
 #include <sys/bitstring.h>
 #define	test_bit(i, n)		bit_test(n, i)
@@ -41,6 +48,59 @@ roundup_pow_of_two(unsigned long n)
 #define	BIT(x)			(1 << (x))
 // This clashes with the linux/types.h declaration
 //#define	DECLARE_BITMAP(n, s)	bitstr_t bit_decl(n, s)
+static inline int bitmap_empty(bitstr_t *bs, int size)
+{
+	int i;
+	for (i = 0; i < size; i++) {
+		if (bit_test(bs, i))
+			return 0;
+	}
+	return 1;
+}
+
+/* other stuff */
+#define	ARRAY_SIZE(n)	nitems(n)
+#define	min_t(t, a, b)		MIN(a, b)
+#define	DIV_ROUND_UP(x, n)	howmany(x, n)
+
+#define __round_mask(x, y) ((__typeof__(x))((y)-1))
+#define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
+#define round_down(x, y) ((x) & ~__round_mask(x, y))
+
+/* for linuxkpi, this is M_NOWAIT | M_USE_RESERVE */
+#define	GFP_ATOMIC		(M_NOWAIT)
+
+/* compile/runtime warnings */
+#define	__ath10k_stringify(x)		# x
+
+#define	WARN_ON(c) ({			\
+		bool __ret = c;	\
+		if (__ret) {						\
+			printf("WARNING: %s failed at %s:%d\n",		\
+			    __ath10k_stringify(c), __FILE__, __LINE__);	\
+		}							\
+		__ret;							\
+	})
+
+#define	WARN_ON_ONCE(c)		WARN_ON(c)
+
+#define	BUILD_BUG_ON(c)		CTASSERT(!(c))
+
+/* le/be accessor macros */
+#define	__cpu_to_le32(a)	htole32(a)
+#define	__cpu_to_le16(a)	htole16(a)
+#define	__le32_to_cpu(a)	le32toh(a)
+#define	__le16_to_cpu(a)	le16toh(a)
+#undef	le32_to_cpup
+#define	le32_to_cpup(v)		le32toh(*(v))
+
+#define	le32_to_cpu(a)		__le32_to_cpu(a)
+#define	le16_to_cpu(a)		__le16_to_cpu(a)
+#define	cpu_to_le32(a)		__cpu_to_le32(a)
+
+/* Errorcodes */
+#define	ECOMM			ESTALE
+#define	ENOTSUPP		EOPNOTSUPP
 
 #endif
 
@@ -102,7 +162,6 @@ ilog2(uint32_t val)
 {
 	return fls(val);
 }
-
 
 #define	ECOMM		ESTALE
 
