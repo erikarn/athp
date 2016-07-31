@@ -31,6 +31,9 @@ SRCS    += if_athp_desc.c
 # This is the athp buffer layer.
 SRCS    += if_athp_buf.c
 
+# This the sleep/wait completion layer
+SRCS    += if_athp_hal_compl.c
+
 # This is the Copy Engine interface - the DMA ring hardware access.
 SRCS    += if_athp_pci_ce.c
 
