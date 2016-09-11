@@ -4,28 +4,22 @@
 #include <net80211/ieee80211.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/types.h>
+#include <sys/libkern.h>
 
-/* Linux includes */
+#define	unlikely(x)	(x)
+#define	likely(x)	(x)
 
-#include <linux/types.h>
-#include <linux/kernel.h>
-//#include <linux/completion.h>
-//#include <linux/wait.h>
-//#include <linux/if_ether.h>
-#include <linux/err.h>
-//#include <linux/etherdevice.h>
-//#include <linux/workqueue.h>
-//#include <linux/dmapool.h>
-//#include <linux/dma-mapping.h>
-//#include <linux/idr.h>
-//#include <linux/dma-mapping.h>
+/* XXX Linux-style IS_ERR/PTR_ERR hijinx, sigh */
+#include "athp_err.h"
 
 /* Minimal set of bits needed for compilation */
+
 /* Ethernet */
 #define	ETH_ALEN		ETHER_ADDR_LEN
 #define	ether_addr_copy(d, s)	memcpy((d), (s), ETHER_ADDR_LEN)
 
-#if 0
+#if 1
 /* math */
 static inline unsigned long
 roundup_pow_of_two(unsigned long n)
@@ -41,6 +35,12 @@ ilog2(uint32_t val)
 	return fls(val);
 }
 
+static inline int
+is_power_of_2(unsigned long n)
+{
+	return (n == roundup_pow_of_two(n));
+}
+
 /* bit string */
 #include <sys/bitstring.h>
 #define	test_bit(i, n)		bit_test(n, i)
@@ -49,7 +49,7 @@ ilog2(uint32_t val)
 #define	__set_bit(i, n)		bit_set(n, i)
 #define	BIT(x)			(1 << (x))
 // This clashes with the linux/types.h declaration
-//#define	DECLARE_BITMAP(n, s)	bitstr_t bit_decl(n, s)
+#define	DECLARE_BITMAP(n, s)	bitstr_t bit_decl(n, s)
 static inline int bitmap_empty(bitstr_t *bs, int size)
 {
 	int i;
@@ -59,6 +59,26 @@ static inline int bitmap_empty(bitstr_t *bs, int size)
 	}
 	return 1;
 }
+
+/* Types */
+typedef uint8_t		u8;
+typedef uint16_t	u16;
+typedef uint32_t	u32;
+typedef uint64_t	u64;
+
+typedef int8_t		s8;
+typedef int16_t		s16;
+typedef int32_t		s32;
+typedef int64_t		s64;
+
+typedef uint16_t	__le16;
+typedef uint32_t	__le32;
+typedef uint64_t	__le64;
+
+typedef uint16_t	__be16;
+typedef uint32_t	__be32;
+typedef uint64_t	__be64;
+
 
 /* other stuff */
 #define	ARRAY_SIZE(n)	nitems(n)
@@ -104,72 +124,6 @@ static inline int bitmap_empty(bitstr_t *bs, int size)
 #define	ECOMM			ESTALE
 #define	ENOTSUPP		EOPNOTSUPP
 
-#endif
-
-#if 0
-#include <sys/libkern.h>
-
-typedef uint8_t		u8;
-typedef uint16_t	u16;
-typedef uint32_t	u32;
-typedef uint64_t	u64;
-
-typedef int8_t		s8;
-typedef int16_t		s16;
-typedef int32_t		s32;
-typedef int64_t		s64;
-
-typedef uint16_t	__le16;
-typedef uint32_t	__le32;
-typedef uint64_t	__le64;
-
-typedef uint16_t	__be16;
-typedef uint32_t	__be32;
-typedef uint64_t	__be64;
-
-//#define	PTR_ALIGN(ptr, a)
-
-static inline unsigned long
-roundup_pow_of_two(unsigned long n)
-{
-
-	return 1UL << flsl(n - 1);
-}
-
-#define BUILD_BUG_ON(x) CTASSERT(!(x))
-
-#define	unlikely(x)	(x)
-
-
-
-#define	ARRAY_SIZE(n)	nitems(n)
-
-/* Bitfield things; include sys/bitstring.h */
-#include <sys/bitstring.h>
-
-#define	DECLARE_BITMAP(n, s)	bitstr_t bit_decl(n, s)
-#define	test_bit(i, n)		bit_test(n, i)
-#define	set_bit(i, n)		__set_bit(i, n)
-#define	clear_bit(i, n)		bit_clear(n, i)
-#define	__set_bit(i, n)		bit_set(n, i)
-
-#define	min_t(t, a, b)		MIN(a, b)
-
-#define	BIT(x)			(1 << (x))
-
-
-/* XXX TODO: only for 32 bit values */
-static inline int
-ilog2(uint32_t val)
-{
-	return fls(val);
-}
-
-#define	ECOMM		ESTALE
-
-#define	HZ		hz
-
-#define	DIV_ROUND_UP(x, n)	howmany(x, n)
 #endif
 
 /* Bits not implemented by our linuxkpi layer so far */
