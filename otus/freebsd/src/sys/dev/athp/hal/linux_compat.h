@@ -5,6 +5,8 @@
 #include <sys/param.h>
 #include <sys/kernel.h>
 
+/* Linux includes */
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 //#include <linux/completion.h>
@@ -15,7 +17,7 @@
 //#include <linux/workqueue.h>
 //#include <linux/dmapool.h>
 //#include <linux/dma-mapping.h>
-#include <linux/idr.h>
+//#include <linux/idr.h>
 //#include <linux/dma-mapping.h>
 
 /* Minimal set of bits needed for compilation */

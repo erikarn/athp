@@ -22,6 +22,8 @@
 #include "hal/rx_desc.h"
 #include "hal/htt.h"
 
+#include "athp_idr.h"
+
 #include "if_athp_buf.h"
 #include "if_athp_thermal.h"
 #include "if_athp_htt.h"
