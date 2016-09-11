@@ -40,14 +40,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/stdarg.h>
 
-#if 0
-#include <linux/bitops.h>
-#include <linux/kobject.h>
-#include <linux/slab.h>
-#include <linux/idr.h>
-#include <linux/err.h>
-#endif
-
 #include "athp_bitops.h"
 #include "athp_idr.h"
 

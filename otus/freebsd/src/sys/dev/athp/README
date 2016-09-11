@@ -128,3 +128,6 @@ NEED TO DO THIS OR THE FIRMWARE CRASHES
 * Revisit the timeouts (ath10k_wait, ath10k_compl) and anywhere that sleep/wakeup
   times are calculated (grep for ticks, time_after, etc).
   The sleep time is 1ms per loop check, which is too long?
+
+* Fix up the bitops/idr code to have its own namespace for everything so it
+  doesn't trip up the linux compat layer symbols.
