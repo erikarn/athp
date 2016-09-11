@@ -113,7 +113,7 @@ struct ath10k_htt {
 		 * Base address of ring, as a "physical" device address
 		 * rather than a CPU address.
 		 */
-		dma_addr_t base_paddr;
+		vm_paddr_t base_paddr;
 		struct athp_descdma paddrs_dd;
 
 		/* how many elems in the ring (power of 2) */
@@ -136,7 +136,7 @@ struct ath10k_htt {
 		 */
 		struct {
 			__le32 *vaddr;
-			dma_addr_t paddr;
+			vm_paddr_t paddr;
 			struct athp_descdma dd;
 		} alloc_idx;
 
