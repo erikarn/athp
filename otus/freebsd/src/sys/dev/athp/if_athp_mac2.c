@@ -105,6 +105,7 @@ MALLOC_DECLARE(M_ATHPDEV);
  * hand-porting no matter what) to the platform-agnostic pieces.
  */
 
+#if 0
 /*********/
 /* Rates */
 /*********/
@@ -4173,7 +4174,9 @@ static int ath10k_mac_set_txbf_conf(struct ath10k_vif *arvif)
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
 					 ar->wmi.vdev_param->txbf, value);
 }
+#endif
 
+#if 1
 /*
  * TODO:
  * Figure out how to handle WMI_VDEV_SUBTYPE_P2P_DEVICE,
@@ -4465,6 +4468,9 @@ err:
 
 	return ret;
 }
+#endif
+
+#if 0
 
 static void ath10k_mac_vif_tx_unlock_all(struct ath10k_vif *arvif)
 {
@@ -4473,6 +4479,9 @@ static void ath10k_mac_vif_tx_unlock_all(struct ath10k_vif *arvif)
 	for (i = 0; i < BITS_PER_LONG; i++)
 		ath10k_mac_vif_tx_unlock(arvif, i);
 }
+#endif
+
+#if 1
 
 static void ath10k_remove_interface(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif)
@@ -4548,6 +4557,10 @@ static void ath10k_remove_interface(struct ieee80211_hw *hw,
 
 	mutex_unlock(&ar->conf_mutex);
 }
+
+#endif
+
+#if 0
 
 /*
  * FIXME: Has to be verified.
@@ -7261,3 +7274,4 @@ void ath10k_mac_unregister(struct ath10k *ar)
 
 	SET_IEEE80211_DEV(ar->hw, NULL);
 }
+#endif
