@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
+#include "if_athp_mac.h"
 
 #include "if_athp_main.h"
 
@@ -139,7 +140,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 	struct ath10k *ar = ic->ic_softc;
-	struct athp_vap *uvp;
+	struct ath10k_vif *uvp;
 	struct ieee80211vap *vap;
 
 	/* XXX for now, one vap */
@@ -149,7 +150,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* XXX TODO: figure out what we need to implement! */
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
-	uvp = malloc(sizeof(struct athp_vap), M_80211_VAP, M_WAITOK | M_ZERO);
+	uvp = malloc(sizeof(struct ath10k_vif), M_80211_VAP, M_WAITOK | M_ZERO);
 	if (uvp == NULL)
 		return (NULL);
 	vap = (void *) uvp;
@@ -161,6 +162,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	}
 
 	/* XXX TODO: override methods */
+
+	/* XXX TODO: call into driver; setup state */
 
 	/* Complete setup */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -176,10 +179,13 @@ athp_vap_delete(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	struct athp_vap *uvp = (void *) vap;
+	struct ath10k_vif *uvp = ath10k_vif_to_arvif(vap);
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	ieee80211_vap_detach(vap);
+
+	/* XXX TODO: call into driver state; detach things */
+
 	free(uvp, M_80211_VAP);
 }
 

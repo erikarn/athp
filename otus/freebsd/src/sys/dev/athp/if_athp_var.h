@@ -43,12 +43,6 @@ struct athp_node {
 	uint64_t		tx_retries;
 };
 
-struct athp_vap {
-	struct ieee80211vap	vap;
-	int			(*newstate)(struct ieee80211vap *,
-				    enum ieee80211_state, int);
-};
-#define	ATHP_VAP(vap)		((struct athp_vap *)(vap))
 #define	ATHP_NODE(ni)		((struct athp_node *)(ni))
 
 #define	ATHP_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
