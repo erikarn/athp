@@ -18,7 +18,8 @@
 #ifndef	__IF_ATHP_CORE_H__
 #define	__IF_ATHP_CORE_H__
 
-#include <linux/completion.h>
+/* XXX cheating */
+#include "if_athp_hal_compl.h"
 
 #define ATH10K_SCAN_ID 0
 #define WMI_READY_TIMEOUT (5 * HZ)
@@ -63,9 +64,7 @@ ath10k_bus_str(enum ath10k_bus bus)
 #define ATH10K_MAX_NUM_PEER_IDS (1 << 11) /* htt rx_desc limit */
 
 struct ath10k_peer {
-	/* XXX TODO: convert */
-//	TAILQ_ENTRY(ath10k_peer) list;
-	struct list_head list;
+	TAILQ_ENTRY(ath10k_peer) list;
 	int vdev_id;
 	u8 addr[ETH_ALEN];
 	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);
@@ -180,7 +179,7 @@ struct ath10k_debug {
 	struct dentry *debugfs_phy;
 
 	struct ath10k_fw_stats fw_stats;
-	struct completion fw_stats_complete;
+	struct ath10k_compl fw_stats_complete;
 	bool fw_stats_done;
 
 	unsigned long htt_stats_mask;

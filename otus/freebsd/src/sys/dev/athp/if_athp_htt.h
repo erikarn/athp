@@ -66,7 +66,7 @@ struct ath10k_htt {
 
 	u8 target_version_major;
 	u8 target_version_minor;
-	struct completion target_version_received;
+	struct ath10k_compl target_version_received;
 	enum ath10k_fw_htt_op_version op_version;
 	u8 max_num_amsdu;
 	u8 max_num_ampdu;
@@ -113,7 +113,7 @@ struct ath10k_htt {
 		 * Base address of ring, as a "physical" device address
 		 * rather than a CPU address.
 		 */
-		dma_addr_t base_paddr;
+		vm_paddr_t base_paddr;
 		struct athp_descdma paddrs_dd;
 
 		/* how many elems in the ring (power of 2) */
@@ -136,7 +136,7 @@ struct ath10k_htt {
 		 */
 		struct {
 			__le32 *vaddr;
-			dma_addr_t paddr;
+			vm_paddr_t paddr;
 			struct athp_descdma dd;
 		} alloc_idx;
 
@@ -149,7 +149,7 @@ struct ath10k_htt {
 		 * refill_retry_timer - timer triggered when the ring is
 		 * not refilled to the level expected
 		 */
-		struct timer_list refill_retry_timer;
+		struct callout refill_retry_timer;
 
 		/* Protects access to all rx ring buffer state variables */
 		struct mtx lock;
@@ -162,18 +162,18 @@ struct ath10k_htt {
 	int max_num_pending_tx;
 	int num_pending_tx;
 	struct idr pending_tx;
-	wait_queue_head_t empty_tx_wq;
-	struct dma_pool *tx_pool;
+	struct ath10k_wait empty_tx_wq;
 
+//	struct dma_pool *tx_pool;
 
 	/* set if host-fw communication goes haywire
 	 * used to avoid further failures */
 	bool rx_confused;
-	struct work_struct rx_replenish_task;
+	struct task rx_replenish_task;
 
 	/* This is used to group tx/rx completions separately and process them
 	 * in batches to reduce cache stalls */
-	struct work_struct txrx_compl_task;
+	struct task txrx_compl_task;
 
 	/* protects access to the tx completion queue */
 	struct mtx tx_comp_lock;

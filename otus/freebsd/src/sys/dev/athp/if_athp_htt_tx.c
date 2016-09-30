@@ -167,12 +167,14 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 	    "athp htt comp tx", MTX_DEF);
 	idr_init(&htt->pending_tx);
 
+#if 0
 	htt->tx_pool = dma_pool_create("ath10k htt tx pool", htt->ar->sc_dev,
 				       sizeof(struct ath10k_htt_txbuf), 4, 0);
 	if (!htt->tx_pool) {
 		ret = -ENOMEM;
 		goto free_idr_pending_tx;
 	}
+#endif
 
 	if (!ar->hw_params.continuous_frag_desc)
 		goto skip_frag_desc_alloc;
@@ -191,8 +193,10 @@ skip_frag_desc_alloc:
 	return 0;
 
 free_tx_pool:
+#if 0
 	dma_pool_destroy(htt->tx_pool);
 free_idr_pending_tx:
+#endif
 	mtx_destroy(&htt->tx_lock);
 	idr_destroy(&htt->pending_tx);
 	return ret;
@@ -219,7 +223,9 @@ void ath10k_htt_tx_free(struct ath10k_htt *htt)
 
 	idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
 	idr_destroy(&htt->pending_tx);
+#if 0
 	dma_pool_destroy(htt->tx_pool);
+#endif
 
 	if (htt->frag_desc.vaddr) {
 		athp_descdma_free(htt->ar, &htt->frag_desc.dd);

@@ -22,9 +22,12 @@
 #include "hal/rx_desc.h"
 #include "hal/htt.h"
 
+#include "athp_idr.h"
+
 #include "if_athp_buf.h"
 #include "if_athp_thermal.h"
 #include "if_athp_htt.h"
+#include "if_athp_hal_compl.h"
 
 #define	ATHP_RXBUF_MAX_SCATTER	1
 #define	ATHP_TXBUF_MAX_SCATTER	1
@@ -55,10 +58,10 @@ struct athp_vap {
 
 #define	ATHP_FW_VER_STR		128
 
-#define	ATHP_CONF_LOCK(sc)		mtx_lock(&(sc)->sc_conf_mtx)
-#define	ATHP_CONF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_conf_mtx)
-#define	ATHP_CONF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
-#define	ATHP_CONF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
+#define	ATHP_CONF_LOCK(sc)		sx_xlock(&(sc)->sc_conf_sx)
+#define	ATHP_CONF_UNLOCK(sc)		sx_unlock(&(sc)->sc_conf_sx)
+#define	ATHP_CONF_LOCK_ASSERT(sc)	0
+#define	ATHP_CONF_UNLOCK_ASSERT(sc)	0
 
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
@@ -84,9 +87,9 @@ struct ath10k_mem_chunk {
 struct ath10k_wmi {
 	enum ath10k_fw_wmi_op_version op_version;
 	enum ath10k_htc_ep_id eid;
-	struct completion service_ready;
-	struct completion unified_ready;
-	wait_queue_head_t tx_credits_wq;
+	struct ath10k_compl service_ready;
+	struct ath10k_compl unified_ready;
+	struct ath10k_wait tx_credits_wq;
 	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
 	struct wmi_cmd_map *cmd;
 	struct wmi_vdev_param_map *vdev_param;
@@ -100,7 +103,7 @@ struct ath10k_wmi {
 
 struct ath10k_wow {
 	int max_num_patterns;
-	struct completion wakeup_completed;
+	struct ath10k_compl wakeup_completed;
 };
 
 /*
@@ -120,7 +123,7 @@ struct ath10k {
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
 	struct mtx			sc_buf_mtx;
-	struct mtx			sc_conf_mtx;
+	struct sx			sc_conf_sx;
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
 	uint64_t			sc_debug;
@@ -203,7 +206,7 @@ struct ath10k {
 		const struct ath10k_hif_ops *ops;
 	} hif;
 
-	struct completion target_suspend;
+	struct ath10k_compl target_suspend;
 
 #if 0
 	/* XXX TODO: duplicated above; fix it */
@@ -244,10 +247,10 @@ struct ath10k {
 	enum ath10k_cal_mode cal_mode;
 
 	struct {
-		struct completion started;
-		struct completion completed;
-		struct completion on_channel;
-		struct delayed_work timeout;
+		struct ath10k_compl started;
+		struct ath10k_compl completed;
+		struct ath10k_compl on_channel;
+		struct timeout_task timeout;
 		enum ath10k_scan_state state;
 		bool is_roc;
 		int vdev_id;
@@ -291,15 +294,13 @@ struct ath10k {
 	u8 cfg_tx_chainmask;
 	u8 cfg_rx_chainmask;
 
-	struct completion install_key_done;
+	struct ath10k_compl install_key_done;
 
-	struct completion vdev_setup_done;
+	struct ath10k_compl vdev_setup_done;
 
-#if 1
-	struct workqueue_struct *workqueue;
+	struct taskqueue *workqueue;
 	/* Auxiliary workqueue */
-	struct workqueue_struct *workqueue_aux;
-#endif
+	struct taskqueue *workqueue_aux;
 
 	/* prevents concurrent FW reconfiguration */
 #if 0
@@ -314,8 +315,8 @@ struct ath10k {
 #endif
 
 	TAILQ_HEAD(, ath10k_vif) arvifs;
-	struct list_head peers;
-	wait_queue_head_t peer_mapping_wq;
+	TAILQ_HEAD(, ath10k_peer) peers;
+	struct ath10k_wait peer_mapping_wq;
 
 	/* protected by conf_mutex */
 	int num_peers;
@@ -328,21 +329,21 @@ struct ath10k {
 	int num_active_peers;
 	int num_tids;
 
-	struct work_struct svc_rdy_work;
+	struct task svc_rdy_work;
 	struct athp_buf *svc_rdy_skb;
 
-	struct work_struct offchan_tx_work;
+	struct task offchan_tx_work;
 	TAILQ_HEAD(, athp_buf) offchan_tx_queue;
-	struct completion offchan_tx_completed;
+	struct ath10k_compl offchan_tx_completed;
 	struct athp_buf *offchan_tx_pbuf;
 
-	struct work_struct wmi_mgmt_tx_work;
+	struct task wmi_mgmt_tx_work;
 	TAILQ_HEAD(, athp_buf) wmi_mgmt_tx_queue;
 
 	enum ath10k_state state;
 
-	struct work_struct register_work;
-	struct work_struct restart_work;
+	struct task register_work;
+	struct task restart_work;
 
 #if 0
 	/* cycle count is reported twice for each visited channel during scan.

@@ -29,7 +29,7 @@ struct ath10k_thermal {
 #if 0
 	struct thermal_cooling_device *cdev;
 #endif
-	struct completion wmi_sync;
+	struct ath10k_compl wmi_sync;
 
 	/* protected by conf_mutex */
 	u32 throttle_state;

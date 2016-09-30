@@ -23,7 +23,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_wlan.h"
 
-
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/sockio.h>
@@ -39,6 +38,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/taskqueue.h>
 #include <sys/condvar.h>
 #include <sys/ctype.h>
+
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <machine/pmap.h>	/* for vtophys() */
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -1649,8 +1652,8 @@ int ath10k_wmi_wait_for_service_ready(struct ath10k *ar)
 {
 	unsigned long time_left;
 
-	time_left = wait_for_completion_timeout(&ar->wmi.service_ready,
-						WMI_SERVICE_READY_TIMEOUT_HZ);
+	time_left = ath10k_compl_wait(&ar->wmi.service_ready,
+	    "wmi_service_ready", WMI_SERVICE_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
 	return 0;
@@ -1660,8 +1663,8 @@ int ath10k_wmi_wait_for_unified_ready(struct ath10k *ar)
 {
 	unsigned long time_left;
 
-	time_left = wait_for_completion_timeout(&ar->wmi.unified_ready,
-						WMI_UNIFIED_READY_TIMEOUT_HZ);
+	time_left = ath10k_compl_wait(&ar->wmi.unified_ready,
+	    "wmi_unified_ready", WMI_UNIFIED_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
 	return 0;
@@ -1793,12 +1796,13 @@ static void ath10k_wmi_op_ep_tx_credits(struct ath10k *ar)
 	/* try to send pending beacons first. they take priority */
 	ath10k_wmi_tx_beacons_nowait(ar);
 
-	wake_up(&ar->wmi.tx_credits_wq);
+	ath10k_wait_wakeup_one(&ar->wmi.tx_credits_wq);
 }
 
 int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 {
 	int ret = -EOPNOTSUPP;
+	int interval;
 
 	might_sleep();
 
@@ -1808,17 +1812,27 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		return ret;
 	}
 
-	wait_event_timeout(ar->wmi.tx_credits_wq, ({
+	interval = ticks + ((3 * hz) / 1000);
+
+	/*
+	 * XXX TODO: this is in milliseconds, which likely needs to be more
+	 * frequent for this kind of thing.
+	 */
+	while (! ieee80211_time_after(ticks, interval)) {
+		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
+
 		/* try to send pending beacons first. they take priority */
 		ath10k_wmi_tx_beacons_nowait(ar);
 
+		/* Try to send something */
 		ret = ath10k_wmi_cmd_send_nowait(ar, pbuf, cmd_id);
 
 		if (ret && test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 			ret = -ESHUTDOWN;
 
-		(ret != -EAGAIN);
-	}), 3*HZ);
+		if (ret != -EAGAIN)
+			break;
+	}
 
 	if (ret)
 		athp_freebuf(ar, &ar->buf_tx, pbuf);
@@ -1899,7 +1913,7 @@ static void ath10k_wmi_event_scan_started(struct ath10k *ar)
 			ieee80211_ready_on_channel(ar->hw);
 #endif
 
-		complete(&ar->scan.started);
+		ath10k_compl_wakeup_one(&ar->scan.started);
 		break;
 	}
 }
@@ -1917,7 +1931,7 @@ static void ath10k_wmi_event_scan_start_failed(struct ath10k *ar)
 			    ar->scan.state);
 		break;
 	case ATH10K_SCAN_STARTING:
-		complete(&ar->scan.started);
+		ath10k_compl_wakeup_one(&ar->scan.started);
 #if 0
 		__ath10k_scan_finish(ar);
 #else
@@ -1992,7 +2006,7 @@ static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 #if 0
 		ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
 		if (ar->scan.is_roc && ar->scan.roc_freq == freq)
-			complete(&ar->scan.on_channel);
+			ath10k_compl_wakeup_one(&ar->scan.on_channel);
 #endif
 		break;
 	}
@@ -2649,7 +2663,7 @@ static int ath10k_wmi_main_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2670,7 +2684,7 @@ static int ath10k_wmi_main_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2708,7 +2722,7 @@ static int ath10k_wmi_10x_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2730,7 +2744,7 @@ static int ath10k_wmi_10x_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2775,7 +2789,7 @@ static int ath10k_wmi_10_2_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2812,7 +2826,7 @@ static int ath10k_wmi_10_2_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2858,7 +2872,7 @@ static int ath10k_wmi_10_2_4_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2895,7 +2909,7 @@ static int ath10k_wmi_10_2_4_op_pull_fw_stats(struct ath10k *ar,
 		if (!mbuf_skb_pull(pbuf->m, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
+		dst = malloc(sizeof(*dst), M_ATHPDEV, M_NOWAIT | M_ZERO);
 		if (!dst)
 			continue;
 
@@ -2953,13 +2967,13 @@ void ath10k_wmi_event_vdev_start_resp(struct ath10k *ar, struct athp_buf *pbuf)
 	if (WARN_ON(__le32_to_cpu(arg.status)))
 		return;
 
-	complete(&ar->vdev_setup_done);
+	ath10k_compl_wakeup_one(&ar->vdev_setup_done);
 }
 
 void ath10k_wmi_event_vdev_stopped(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "WMI_VDEV_STOPPED_EVENTID\n");
-	complete(&ar->vdev_setup_done);
+	ath10k_compl_wakeup_one(&ar->vdev_setup_done);
 }
 
 static int
@@ -3984,7 +3998,7 @@ void ath10k_wmi_event_wow_wakeup_host(struct ath10k *ar, struct athp_buf *pbuf)
 	struct wmi_wow_ev_arg ev = {};
 	int ret;
 
-	complete(&ar->wow.wakeup_completed);
+	ath10k_compl_wakeup_one(&ar->wow.wakeup_completed);
 
 	ret = ath10k_wmi_pull_wow_event(ar, pbuf, &ev);
 	if (ret) {
@@ -4160,9 +4174,9 @@ ath10k_wmi_10x_op_pull_svc_rdy_ev(struct ath10k *ar, struct athp_buf *pbuf,
 	return 0;
 }
 
-static void ath10k_wmi_event_service_ready_work(struct work_struct *work)
+static void ath10k_wmi_event_service_ready_work(void *targ, int npending)
 {
-	struct ath10k *ar = container_of(work, struct ath10k, svc_rdy_work);
+	struct ath10k *ar = targ;
 	struct athp_buf *pbuf = ar->svc_rdy_skb;
 	struct wmi_svc_rdy_ev_arg arg = {};
 	u32 num_units, req_id, unit_size, num_mem_reqs, num_unit_info, i;
@@ -4302,13 +4316,13 @@ static void ath10k_wmi_event_service_ready_work(struct work_struct *work)
 
 	athp_freebuf(ar, &ar->buf_rx, pbuf);
 	ar->svc_rdy_skb = NULL;
-	complete(&ar->wmi.service_ready);
+	ath10k_compl_wakeup_one(&ar->wmi.service_ready);
 }
 
 void ath10k_wmi_event_service_ready(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	ar->svc_rdy_skb = pbuf;
-	queue_work(ar->workqueue_aux, &ar->svc_rdy_work);
+	taskqueue_enqueue(ar->workqueue_aux, &ar->svc_rdy_work);
 }
 
 static int ath10k_wmi_op_pull_rdy_ev(struct ath10k *ar, struct athp_buf *pbuf,
@@ -4362,7 +4376,7 @@ int ath10k_wmi_event_ready(struct ath10k *ar, struct athp_buf *pbuf)
 		   __le32_to_cpu(arg.status));
 
 	ether_addr_copy(ar->mac_addr, arg.mac_addr);
-	complete(&ar->wmi.unified_ready);
+	ath10k_compl_wakeup_one(&ar->wmi.unified_ready);
 	return 0;
 }
 
@@ -6845,10 +6859,10 @@ int ath10k_wmi_attach(struct ath10k *ar)
 		return -EINVAL;
 	}
 
-	init_completion(&ar->wmi.service_ready);
-	init_completion(&ar->wmi.unified_ready);
+	ath10k_compl_init(&ar->wmi.service_ready);
+	ath10k_compl_init(&ar->wmi.unified_ready);
 
-	INIT_WORK(&ar->svc_rdy_work, ath10k_wmi_event_service_ready_work);
+	TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
 
 	return 0;
 }
@@ -6857,7 +6871,7 @@ void ath10k_wmi_detach(struct ath10k *ar)
 {
 	int i;
 
-	cancel_work_sync(&ar->svc_rdy_work);
+	taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
 
 	if (ar->svc_rdy_skb)
 		athp_freebuf(ar, &ar->buf_rx, ar->svc_rdy_skb);

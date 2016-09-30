@@ -24,7 +24,8 @@ struct ath10k;
 /* HTC protocol */
 /****************/
 
-#include <linux/completion.h>
+/* XXX cheating */
+#include "if_athp_hal_compl.h"
 
 struct athp_buf;
 
@@ -82,7 +83,7 @@ struct ath10k_htc {
 	u8 control_resp_buffer[ATH10K_HTC_MAX_CTRL_MSG_LEN];
 	int control_resp_len;
 
-	struct completion ctl_resp;
+	struct ath10k_compl ctl_resp;
 
 	int total_transmit_credits;
 	struct ath10k_htc_svc_tx_credits service_tx_alloc[ATH10K_HTC_EP_COUNT];
