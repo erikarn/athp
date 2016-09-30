@@ -115,6 +115,7 @@ struct ath10k_vif {
 	struct athp_buf *beacon;
 	/* protected by data_lock */
 	enum ath10k_beacon_state beacon_state;
+	struct athp_descdma beacon_buf;
 //	void *beacon_buf;
 //	dma_addr_t beacon_paddr;
 	unsigned long tx_paused; /* arbitrary values defined by target */
