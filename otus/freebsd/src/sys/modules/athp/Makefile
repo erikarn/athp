@@ -14,6 +14,9 @@ SRCS    = if_athp_pci.c if_athp_main.c			\
 	  bus_if.h device_if.h				\
 	  opt_wlan.h
 
+# IDR from Linux
+SRCS	+= athp_idr.c
+
 # This is the chip specific register offsets used for MMIO access.
 #
 # XXX TODO: it should just folded into if_athp_pci_chip.c as I bet
