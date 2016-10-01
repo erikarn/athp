@@ -4291,8 +4291,6 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 
 	ATHP_CONF_LOCK(ar);
 
-	memset(arvif, 0, sizeof(*arvif));
-
 	arvif->ar = ar;
 	arvif->vif = vif;
 
