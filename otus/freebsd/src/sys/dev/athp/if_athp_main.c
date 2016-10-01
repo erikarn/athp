@@ -84,6 +84,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_mac2.h"
 
 #include "if_athp_main.h"
 
@@ -142,6 +143,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *uvp;
 	struct ieee80211vap *vap;
+	int ret;
 
 	/* XXX for now, one vap */
 	if (! TAILQ_EMPTY(&ic->ic_vaps))
@@ -163,7 +165,12 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 
 	/* XXX TODO: override methods */
 
-	/* XXX TODO: call into driver; setup state */
+	/* call into driver; setup state */
+	ret = ath10k_add_interface(ar, vap, opmode, flags, bssid, mac);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: ath10k_add_interface failed; ret=%d\n", __func__, ret);
+		goto error;
+	}
 
 	/* Complete setup */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -172,6 +179,12 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	ic->ic_opmode = opmode;
 
 	return (vap);
+error:
+	device_printf(ar->sc_dev, "%s: freeing and returning failure\n", __func__);
+	ath10k_remove_interface(ar, vap);
+	ieee80211_vap_detach(vap);
+	free(uvp, M_80211_VAP);
+	return (NULL);
 }
 
 static void
@@ -182,10 +195,8 @@ athp_vap_delete(struct ieee80211vap *vap)
 	struct ath10k_vif *uvp = ath10k_vif_to_arvif(vap);
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
+	ath10k_remove_interface(ar, vap);
 	ieee80211_vap_detach(vap);
-
-	/* XXX TODO: call into driver state; detach things */
-
 	free(uvp, M_80211_VAP);
 }
 
