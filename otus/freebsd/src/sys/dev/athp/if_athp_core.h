@@ -107,6 +107,8 @@ struct ath10k_vif {
 
 	TAILQ_ENTRY(ath10k_vif) next;
 
+	int is_setup;	/* set if the hardware state vif is setup */
+
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
 	enum wmi_vdev_subtype vdev_subtype;

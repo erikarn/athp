@@ -165,25 +165,28 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 
 	/* XXX TODO: override methods */
 
-	/* call into driver; setup state */
-	ret = ath10k_add_interface(ar, vap, opmode, flags, bssid, mac);
-	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: ath10k_add_interface failed; ret=%d\n", __func__, ret);
-		goto error;
-	}
-
-	/* Complete setup */
+	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
 	    ieee80211_media_status, mac);
 	/* XXX ew */
 	ic->ic_opmode = opmode;
 
+	/* call into driver; setup state */
+	ret = ath10k_add_interface(ar, vap, opmode, flags, bssid, mac);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: ath10k_add_interface failed; ret=%d\n", __func__, ret);
+		/*
+		 * For now, we can't abort here - too much state needs
+		 * to be setup before we call the linux ath10k mac.c
+		 * routine.
+		 */
+		return (vap);
+	}
+
+	/* Get here - we're okay */
+	uvp->is_setup = 1;
+
 	return (vap);
-error:
-	device_printf(ar->sc_dev, "%s: freeing and returning failure\n", __func__);
-	ieee80211_vap_detach(vap);
-	free(uvp, M_80211_VAP);
-	return (NULL);
 }
 
 static void
@@ -194,7 +197,13 @@ athp_vap_delete(struct ieee80211vap *vap)
 	struct ath10k_vif *uvp = ath10k_vif_to_arvif(vap);
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
-	ath10k_remove_interface(ar, vap);
+	/*
+	 * Only deinit the hardware/driver state if we did successfully
+	 * set it up earlier.
+	 */
+	if (uvp->is_setup)
+		ath10k_remove_interface(ar, vap);
+
 	ieee80211_vap_detach(vap);
 	free(uvp, M_80211_VAP);
 }
