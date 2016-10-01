@@ -181,7 +181,6 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	return (vap);
 error:
 	device_printf(ar->sc_dev, "%s: freeing and returning failure\n", __func__);
-	ath10k_remove_interface(ar, vap);
 	ieee80211_vap_detach(vap);
 	free(uvp, M_80211_VAP);
 	return (NULL);
