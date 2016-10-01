@@ -72,6 +72,7 @@ SRCS    += if_athp_wmi.c
 # layer and I'll break out the command handling and net80211 bits
 # into separate source files
 SRCS    += if_athp_mac.c
+SRCS    += if_athp_mac2.c
 
 # This is the transport layer for transmit/receive MSDUs.
 SRCS    += if_athp_htt.c
