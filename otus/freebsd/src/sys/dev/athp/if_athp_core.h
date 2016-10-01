@@ -22,9 +22,9 @@
 #include "if_athp_hal_compl.h"
 
 #define ATH10K_SCAN_ID 0
-#define WMI_READY_TIMEOUT (5 * HZ)
-#define ATH10K_FLUSH_TIMEOUT_HZ (5*HZ)
-#define ATH10K_CONNECTION_LOSS_HZ (3*HZ)
+#define WMI_READY_TIMEOUT (5)
+#define ATH10K_FLUSH_TIMEOUT_HZ (5)
+#define ATH10K_CONNECTION_LOSS_HZ (3)
 #define ATH10K_NUM_CHANS 39
 
 /* Antenna noise floor */
@@ -93,7 +93,7 @@ struct ath10k_sta {
 #endif
 };
 
-#define ATH10K_VDEV_SETUP_TIMEOUT_HZ (5*HZ)
+#define ATH10K_VDEV_SETUP_TIMEOUT_HZ (5)
 
 enum ath10k_beacon_state {
 	ATH10K_BEACON_SCHEDULED = 0,
@@ -121,7 +121,7 @@ struct ath10k_vif {
 	unsigned long tx_paused; /* arbitrary values defined by target */
 
 	struct ath10k *ar;
-	struct ieee80211vap *vap;
+	struct ieee80211vap *vif;
 
 	bool is_started;
 	bool is_up;
