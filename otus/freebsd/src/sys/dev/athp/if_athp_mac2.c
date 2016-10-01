@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_mac2.h"
 #include "if_athp_main.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
@@ -4184,7 +4185,8 @@ static int ath10k_mac_set_txbf_conf(struct ath10k_vif *arvif)
  * for P2P_FIND/GO_NEG should be handled by checking CCK flag
  * in the TX packet.
  */
-int ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
+int
+ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
     enum ieee80211_opmode opmode, int flags,
     const uint8_t bssid[IEEE80211_ADDR_LEN],
     const uint8_t mac[IEEE80211_ADDR_LEN])
@@ -4512,34 +4514,41 @@ err:
 }
 #endif
 
-#if 0
+#if 1
 
 static void ath10k_mac_vif_tx_unlock_all(struct ath10k_vif *arvif)
 {
+#if 0
 	int i;
 
 	for (i = 0; i < BITS_PER_LONG; i++)
 		ath10k_mac_vif_tx_unlock(arvif, i);
+#else
+	printf("%s: TODO: implement!\n", __func__);
+#endif
 }
 #endif
 
 #if 1
 
-static void ath10k_remove_interface(struct ieee80211_hw *hw,
-				    struct ieee80211_vif *vif)
+void
+ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
+#if 0
 	cancel_work_sync(&arvif->ap_csa_work);
 	cancel_delayed_work_sync(&arvif->connection_loss_work);
+#else
+	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
+#endif
 
 	ATHP_CONF_LOCK(ar);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	ath10k_mac_vif_beacon_cleanup(arvif);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	ret = ath10k_spectral_vif_stop(arvif);
 	if (ret)
@@ -4547,17 +4556,16 @@ static void ath10k_remove_interface(struct ieee80211_hw *hw,
 			    arvif->vdev_id, ret);
 
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
-	list_del(&arvif->list);
+	TAILQ_REMOVE(&ar->arvifs, arvif, next);
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP ||
 	    arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
 		ret = ath10k_wmi_peer_delete(arvif->ar, arvif->vdev_id,
-					     vif->addr);
+					     vif->iv_myaddr);
 		if (ret)
 			ath10k_warn(ar, "failed to submit AP/IBSS self-peer removal on vdev %i: %d\n",
 				    arvif->vdev_id, ret);
-
-		kfree(arvif->u.ap.noa_data);
+		free(arvif->u.ap.noa_data, M_ATHPDEV);
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i delete (remove interface)\n",
@@ -4574,28 +4582,28 @@ static void ath10k_remove_interface(struct ieee80211_hw *hw,
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP ||
 	    arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
 		ret = ath10k_wait_for_peer_deleted(ar, arvif->vdev_id,
-						   vif->addr);
+						   vif->iv_myaddr);
 		if (ret)
 			ath10k_warn(ar, "failed to remove AP self-peer on vdev %i: %d\n",
 				    arvif->vdev_id, ret);
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		ar->num_peers--;
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 	}
 
 	ath10k_peer_cleanup(ar, arvif->vdev_id);
 
-	if (vif->type == NL80211_IFTYPE_MONITOR) {
+	if (vif->iv_opmode == IEEE80211_M_MONITOR) {
 		ar->monitor_arvif = NULL;
 		ret = ath10k_monitor_recalc(ar);
 		if (ret)
 			ath10k_warn(ar, "failed to recalc monitor: %d\n", ret);
 	}
 
-	spin_lock_bh(&ar->htt.tx_lock);
+	ATHP_HTT_TX_LOCK(&ar->htt);
 	ath10k_mac_vif_tx_unlock_all(arvif);
-	spin_unlock_bh(&ar->htt.tx_lock);
+	ATHP_HTT_TX_UNLOCK(&ar->htt);
 
 	ATHP_CONF_UNLOCK(ar);
 }
