@@ -1818,7 +1818,9 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: setup: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
 	while (! ieee80211_time_after(ticks, interval)) {
+		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: loop: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
 
 		/* try to send pending beacons first. they take priority */
@@ -6818,6 +6820,9 @@ static const struct wmi_ops wmi_10_4_ops = {
 
 int ath10k_wmi_attach(struct ath10k *ar)
 {
+
+	ath10k_warn(ar, "%s: wmi.op_version=%d\n", __func__, ar->wmi.op_version);
+
 	switch (ar->wmi.op_version) {
 	case ATH10K_FW_WMI_OP_VERSION_10_4:
 		ar->wmi.ops = &wmi_10_4_ops;
