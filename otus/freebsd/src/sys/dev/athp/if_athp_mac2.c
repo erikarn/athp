@@ -305,7 +305,7 @@ static int ath10k_install_key(struct ath10k_vif *arvif,
 	if (ret)
 		return ret;
 
-	time_left = wait_for_completion_timeout(&ar->install_key_done, 3 * HZ);
+	time_left = ath10k_compl_wait(&ar->install_key_done, "install_key", 3);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -3048,7 +3048,74 @@ static int ath10k_update_channel_list(struct ath10k *ar)
 
 	return ret;
 }
+#endif
 
+#if 1
+
+/*
+ * Note: this is a very mac80211 specific routine;
+ * let's copy/paste it into a BSD specific one to make
+ * future merging and re-implementation easier.
+ */
+
+/*
+ * For now, just hard-code channel 1-11.
+ */
+
+static int freq_2ghz[] = { 2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462 };
+
+static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
+{
+#if 0
+	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211_supported_band **bands;
+	enum ieee80211_band band;
+	struct ieee80211_channel *channel;
+#endif
+	struct wmi_scan_chan_list_arg arg = {0};
+	struct wmi_channel_arg *ch;
+//	bool passive;
+	int len;
+	int ret;
+	int i;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* For now, channel 1..11 */
+	arg.n_channels = 11;
+	len = sizeof(struct wmi_channel_arg) * arg.n_channels;
+	arg.channels = malloc(len, M_ATHPDEV, M_ZERO | M_NOWAIT);
+	if (!arg.channels)
+		return -ENOMEM;
+
+	ch = arg.channels;
+	for (i = 0; i < 11; i++) {
+		ch->allow_ht = true;
+		ch->allow_vht = true;
+		ch->allow_ibss = 1;
+		ch->ht40plus = 0;
+		ch->chan_radar = 0;
+		ch->passive = 0;
+
+		ch->freq = freq_2ghz[i];
+		ch->band_center_freq1 = freq_2ghz[i];
+		ch->min_power = 0;
+		ch->max_power = 30;	/* 15dBm */
+		ch->max_reg_power = 30;	/* 15dBm */
+		ch->max_antenna_gain = 3;	/* XXX */
+		ch->reg_class_id = 0;
+		ch->mode = MODE_11G;
+		ch++;
+	}
+
+	ret = ath10k_wmi_scan_chan_list(ar, &arg);
+	free(arg.channels, M_ATHPDEV);
+
+	return ret;
+}
+#endif
+
+#if 0
 static enum wmi_dfs_region
 ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
 {
@@ -3064,20 +3131,27 @@ ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
 	}
 	return WMI_UNINIT_DFS_DOMAIN;
 }
+#endif
 
+#if 1
 static void ath10k_regd_update(struct ath10k *ar)
 {
+#if 0
 	struct reg_dmn_pair_mapping *regpair;
+#endif
 	int ret;
 	enum wmi_dfs_region wmi_dfs_reg;
+#if 0
 	enum nl80211_dfs_regions nl_dfs_reg;
+#endif
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ret = ath10k_update_channel_list(ar);
+	ret = ath10k_update_channel_list_freebsd(ar);
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
 
+#if 0
 	regpair = ar->ath_common.regulatory.regpair;
 
 	if (config_enabled(CONFIG_ATH10K_DFS_CERTIFIED) && ar->dfs_detector) {
@@ -3086,9 +3160,14 @@ static void ath10k_regd_update(struct ath10k *ar)
 	} else {
 		wmi_dfs_reg = WMI_UNINIT_DFS_DOMAIN;
 	}
+#else
+	ath10k_warn(ar, "%s: TODO: finish setup/chanlist!\n", __func__);
+	wmi_dfs_reg = WMI_UNINIT_DFS_DOMAIN;
+#endif
 
 	/* Target allows setting up per-band regdomain but ath_common provides
 	 * a combined one only */
+#if 0
 	ret = ath10k_wmi_pdev_set_regdomain(ar,
 					    regpair->reg_domain,
 					    regpair->reg_domain, /* 2ghz */
@@ -3096,10 +3175,17 @@ static void ath10k_regd_update(struct ath10k *ar)
 					    regpair->reg_2ghz_ctl,
 					    regpair->reg_5ghz_ctl,
 					    wmi_dfs_reg);
+#else
+	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x60, 0x60, 0x60, /* world regdomain - 0x60 */
+	    0x10, 0x10,		/* FCC_CTL */
+	    wmi_dfs_reg);
+#endif
 	if (ret)
 		ath10k_warn(ar, "failed to set pdev regdomain: %d\n", ret);
 }
+#endif
 
+#if 0
 static void ath10k_reg_notifier(struct wiphy *wiphy,
 				struct regulatory_request *request)
 {
@@ -3486,9 +3572,12 @@ static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
 		ieee80211_free_txskb(ar->hw, skb);
 	}
 }
+#endif
 
+#if 1
 void ath10k_offchan_tx_purge(struct ath10k *ar)
 {
+#if 0
 	struct sk_buff *skb;
 
 	for (;;) {
@@ -3498,8 +3587,13 @@ void ath10k_offchan_tx_purge(struct ath10k *ar)
 
 		ieee80211_free_txskb(ar->hw, skb);
 	}
+#else
+	ath10k_warn(ar, "%s: TODO\n", __func__);
+#endif
 }
+#endif
 
+#if 0
 void ath10k_offchan_tx_work(struct work_struct *work)
 {
 	struct ath10k *ar = container_of(work, struct ath10k, offchan_tx_work);
@@ -3559,7 +3653,7 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 		ath10k_mac_tx(ar, skb);
 
 		time_left =
-		wait_for_completion_timeout(&ar->offchan_tx_completed, 3 * HZ);
+		ath10k_compl_wait(&ar->offchan_tx_completed, "ofchn_tx", 3 * HZ);
 		if (time_left == 0)
 			ath10k_warn(ar, "timed out waiting for offchannel skb %p\n",
 				    skb);
@@ -3607,11 +3701,13 @@ void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 		}
 	}
 }
+#endif
 
 /************/
 /* Scanning */
 /************/
 
+#if 1
 void __ath10k_scan_finish(struct ath10k *ar)
 {
 	ATHP_DATA_LOCK_ASSERT(ar);
@@ -3622,29 +3718,42 @@ void __ath10k_scan_finish(struct ath10k *ar)
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
 		if (!ar->scan.is_roc)
+#if 0
 			ieee80211_scan_completed(ar->hw,
 						 (ar->scan.state ==
 						  ATH10K_SCAN_ABORTING));
-		else if (ar->scan.roc_notify)
+#else
+			ath10k_warn(ar, "%s: TODO: scan completed; notify net80211\n", __func__);
+#endif
+		else if (ar->scan.roc_notify) {
+#if 0
 			ieee80211_remain_on_channel_expired(ar->hw);
+#else
+			ath10k_warn(ar, "%s: TODO: scan remain-on-channel expired\n", __func__);
+#endif
+		}
 		/* fall through */
 	case ATH10K_SCAN_STARTING:
 		ar->scan.state = ATH10K_SCAN_IDLE;
 		ar->scan_channel = NULL;
 		ath10k_offchan_tx_purge(ar);
-		cancel_delayed_work(&ar->scan.timeout);
-		complete_all(&ar->scan.completed);
+		callout_drain(&ar->scan.timeout);	/* XXX holding lock? Can't block and wait by calling callout_stop? */
+		ath10k_compl_wakeup_all(&ar->scan.completed);
 		break;
 	}
 }
+#endif
 
+#if 1
 void ath10k_scan_finish(struct ath10k *ar)
 {
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	__ath10k_scan_finish(ar);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 }
+#endif
 
+#if 1
 static int ath10k_scan_stop(struct ath10k *ar)
 {
 	struct wmi_stop_scan_arg arg = {
@@ -3662,7 +3771,7 @@ static int ath10k_scan_stop(struct ath10k *ar)
 		goto out;
 	}
 
-	ret = wait_for_completion_timeout(&ar->scan.completed, 3*HZ);
+	ret = ath10k_compl_wait(&ar->scan.completed, "scan_stop", 3);
 	if (ret == 0) {
 		ath10k_warn(ar, "failed to receive scan abortion completion: timed out\n");
 		ret = -ETIMEDOUT;
@@ -3678,21 +3787,23 @@ out:
 	 * being overflown with data and/or it can recover on its own before
 	 * next scan request is submitted.
 	 */
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	if (ar->scan.state != ATH10K_SCAN_IDLE)
 		__ath10k_scan_finish(ar);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	return ret;
 }
+#endif
 
+#if 1
 static void ath10k_scan_abort(struct ath10k *ar)
 {
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 
 	switch (ar->scan.state) {
 	case ATH10K_SCAN_IDLE:
@@ -3708,19 +3819,22 @@ static void ath10k_scan_abort(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 		ar->scan.state = ATH10K_SCAN_ABORTING;
-		spin_unlock_bh(&ar->data_lock);
+		/* XXX TODO: EWW unlock;relock! */
+		ATHP_DATA_UNLOCK(ar);
 
 		ret = ath10k_scan_stop(ar);
 		if (ret)
 			ath10k_warn(ar, "failed to abort scan: %d\n", ret);
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		break;
 	}
 
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 }
+#endif
 
+#if 0
 void ath10k_scan_timeout_work(struct work_struct *work)
 {
 	struct ath10k *ar = container_of(work, struct ath10k,
@@ -3730,7 +3844,20 @@ void ath10k_scan_timeout_work(struct work_struct *work)
 	ath10k_scan_abort(ar);
 	ATHP_CONF_UNLOCK(ar);
 }
+#endif
 
+#if 1
+static void ath10k_scan_timeout_cb(void *arg)
+{
+	struct ath10k *ar = arg;
+
+	ATHP_CONF_LOCK(ar);
+	ath10k_scan_abort(ar);
+	ATHP_CONF_UNLOCK(ar);
+}
+#endif
+
+#if 1
 static int ath10k_start_scan(struct ath10k *ar,
 			     const struct wmi_start_scan_arg *arg)
 {
@@ -3742,7 +3869,7 @@ static int ath10k_start_scan(struct ath10k *ar,
 	if (ret)
 		return ret;
 
-	ret = wait_for_completion_timeout(&ar->scan.started, 1*HZ);
+	ret = ath10k_compl_wait(&ar->scan.started, "scan_start", 1);
 	if (ret == 0) {
 		ret = ath10k_scan_stop(ar);
 		if (ret)
@@ -3755,23 +3882,29 @@ static int ath10k_start_scan(struct ath10k *ar,
 	 * this point.  This is probably due to some issue in the
 	 * firmware, but no need to wedge the driver due to that...
 	 */
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	if (ar->scan.state == ATH10K_SCAN_IDLE) {
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 		return -EINVAL;
 	}
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	/* Add a 200ms margin to account for event/command processing */
+#if 0
 	ieee80211_queue_delayed_work(ar->hw, &ar->scan.timeout,
 				     msecs_to_jiffies(arg->max_scan_time+200));
+#else
+	callout_reset(&ar->scan.timeout, hz * 200, ath10k_scan_timeout_cb, ar);
+#endif
 	return 0;
 }
+#endif
 
 /**********************/
 /* mac80211 callbacks */
 /**********************/
 
+#if 0
 static void ath10k_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control,
 		      struct sk_buff *skb)
@@ -3847,7 +3980,9 @@ void ath10k_drain_tx(struct ath10k *ar)
 	cancel_work_sync(&ar->offchan_tx_work);
 	cancel_work_sync(&ar->wmi_mgmt_tx_work);
 }
+#endif
 
+#if 1
 void ath10k_halt(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -3870,12 +4005,14 @@ void ath10k_halt(struct ath10k *ar)
 	ath10k_core_stop(ar);
 	ath10k_hif_power_down(ar);
 
-	spin_lock_bh(&ar->data_lock);
-	list_for_each_entry(arvif, &ar->arvifs, list)
+	ATHP_DATA_LOCK(ar);
+	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		ath10k_mac_vif_beacon_cleanup(arvif);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 }
+#endif
 
+#if 0
 static int ath10k_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
 {
 	struct ath10k *ar = hw->priv;
@@ -3894,7 +4031,9 @@ static int ath10k_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
 
 	return 0;
 }
+#endif
 
+#if 1
 static void ath10k_check_chain_mask(struct ath10k *ar, u32 cm, const char *dbg)
 {
 	/* It is not clear that allowing gaps in chainmask
@@ -3907,7 +4046,9 @@ static void ath10k_check_chain_mask(struct ath10k *ar, u32 cm, const char *dbg)
 	ath10k_warn(ar, "mac %s antenna chainmask may be invalid: 0x%x.  Suggested values: 15, 7, 3, 1 or 0.\n",
 		    dbg, cm);
 }
+#endif
 
+#if 1
 static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 {
 	int ret;
@@ -3942,7 +4083,9 @@ static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 
 	return 0;
 }
+#endif
 
+#if 0
 static int ath10k_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
 {
 	struct ath10k *ar = hw->priv;
@@ -3953,10 +4096,11 @@ static int ath10k_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static int ath10k_start(struct ieee80211_hw *hw)
+#if 1
+int ath10k_start(struct ath10k *ar)
 {
-	struct ath10k *ar = hw->priv;
 	u32 burst_enable;
 	int ret = 0;
 
@@ -4064,8 +4208,12 @@ static int ath10k_start(struct ieee80211_hw *hw)
 	ar->num_started_vdevs = 0;
 	ath10k_regd_update(ar);
 
+#if 0
 	ath10k_spectral_start(ar);
 	ath10k_thermal_set_throttling(ar);
+#else
+	ath10k_warn(ar, "%s: TODO: call spectral_start / set_throttling\n", __func__);
+#endif
 
 	ATHP_CONF_UNLOCK(ar);
 	return 0;
@@ -4083,10 +4231,11 @@ err:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static void ath10k_stop(struct ieee80211_hw *hw)
+#if 1
+void ath10k_stop(struct ath10k *ar)
 {
-	struct ath10k *ar = hw->priv;
 
 	ath10k_drain_tx(ar);
 
@@ -4097,10 +4246,12 @@ static void ath10k_stop(struct ieee80211_hw *hw)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
-	cancel_delayed_work_sync(&ar->scan.timeout);
-	cancel_work_sync(&ar->restart_work);
+	callout_drain(&ar->scan.timeout); /* XXX make sync? */
+	taskqueue_drain(ar->workqueue, &ar->restart_work);
 }
+#endif
 
+#if 0
 static int ath10k_config_ps(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -4987,7 +5138,7 @@ static void ath10k_cancel_hw_scan(struct ieee80211_hw *hw,
 	ath10k_scan_abort(ar);
 	ATHP_CONF_UNLOCK(ar);
 
-	cancel_delayed_work_sync(&ar->scan.timeout);
+	callout_drain(&ar->scan.timeout); /* XXX make sync? */
 }
 
 static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
@@ -5743,7 +5894,7 @@ exit:
 	return ret;
 }
 
-#define ATH10K_ROC_TIMEOUT_HZ (2*HZ)
+#define ATH10K_ROC_TIMEOUT_HZ (2)
 
 static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif,
@@ -5807,7 +5958,7 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-	ret = wait_for_completion_timeout(&ar->scan.on_channel, 3*HZ);
+	ret = ath10k_compl_wait(&ar->scan.on_channel, 3);
 	if (ret == 0) {
 		ath10k_warn(ar, "failed to switch to channel for roc scan\n");
 
@@ -5819,9 +5970,12 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
+#if 0
 	ieee80211_queue_delayed_work(ar->hw, &ar->scan.timeout,
 				     msecs_to_jiffies(duration));
-
+#else
+	callout_reset(&ar->scan.timeout, hz * duration, ath10k_scan_timeout_cb, ar);
+#endif
 	ret = 0;
 exit:
 	ATHP_CONF_UNLOCK(ar);
@@ -5842,7 +5996,7 @@ static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw)
 
 	ATHP_CONF_UNLOCK(ar);
 
-	cancel_delayed_work_sync(&ar->scan.timeout);
+	callout_drain(&ar->scan.timeout);	/* XXX TODO: make sync? */
 
 	return 0;
 }

@@ -152,6 +152,15 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* XXX TODO: figure out what we need to implement! */
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
+	/* We have to bring up the hardware if it isn't yet */
+	if (TAILQ_EMPTY(&ic->ic_vaps)) {
+		ret = ath10k_start(ar);
+		if (ret != 0) {
+			device_printf(ar->sc_dev, "%s: ath10k_start failed; ret=%d\n", __func__, ret);
+			return (NULL);
+		}
+	}
+
 	uvp = malloc(sizeof(struct ath10k_vif), M_80211_VAP, M_WAITOK | M_ZERO);
 	if (uvp == NULL)
 		return (NULL);
@@ -203,6 +212,13 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	if (uvp->is_setup)
 		ath10k_remove_interface(ar, vap);
+
+	/*
+	 * XXX for now, we only support a single VAP.
+	 * Later on, we need to check if any other VAPs are left and if
+	 * not, we can power down.
+	 */
+	ath10k_stop(ar);
 
 	ieee80211_vap_detach(vap);
 	free(uvp, M_80211_VAP);

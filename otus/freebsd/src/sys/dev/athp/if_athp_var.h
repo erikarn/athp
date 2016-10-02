@@ -244,7 +244,7 @@ struct ath10k {
 		struct ath10k_compl started;
 		struct ath10k_compl completed;
 		struct ath10k_compl on_channel;
-		struct timeout_task timeout;
+		struct callout timeout; /* XXX TODO: use net80211 taskqueue + timeout? */
 		enum ath10k_scan_state state;
 		bool is_roc;
 		int vdev_id;
