@@ -87,6 +87,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_var.h"
 #include "if_athp_hif.h"
 #include "if_athp_pci_ce.h"
+#include "if_athp_pci_hif.h"
 #include "if_athp_pci_pipe.h"
 #include "if_athp_pci.h"
 
@@ -195,7 +196,7 @@ const struct service_to_pipe target_service_to_ce_map_wlan[] = {
 };
 
 
-static void
+void
 ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
 {
 
