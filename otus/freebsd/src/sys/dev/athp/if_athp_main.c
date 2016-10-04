@@ -211,6 +211,15 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* Get here - we're okay */
 	uvp->is_setup = 1;
 
+	/*
+	 * Bring up the interface for now; it's not "right" though.
+	 */
+	ret = ath10k_vdev_start(uvp, ic->ic_curchan);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
+		return (vap);
+	}
+
 	return (vap);
 }
 
@@ -226,8 +235,10 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * Only deinit the hardware/driver state if we did successfully
 	 * set it up earlier.
 	 */
-	if (uvp->is_setup)
+	if (uvp->is_setup) {
+		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
+	}
 
 	/*
 	 * XXX for now, we only support a single VAP.
