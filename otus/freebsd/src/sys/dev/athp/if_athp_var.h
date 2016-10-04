@@ -84,6 +84,7 @@ struct ath10k_wmi {
 	struct ath10k_compl service_ready;
 	struct ath10k_compl unified_ready;
 	struct ath10k_wait tx_credits_wq;
+	int is_init;
 	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
 	struct wmi_cmd_map *cmd;
 	struct wmi_vdev_param_map *vdev_param;

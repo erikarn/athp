@@ -953,7 +953,8 @@ int ath10k_htc_init(struct ath10k *ar)
 	/* need for lock initialisation */
 	htc->ar = ar;
 
-	ATHP_HTC_TX_LOCK_INIT(htc);
+	if (! htc->is_init)
+		ATHP_HTC_TX_LOCK_INIT(htc);
 
 	ath10k_htc_reset_endpoint_states(htc);
 
@@ -967,7 +968,10 @@ int ath10k_htc_init(struct ath10k *ar)
 	ath10k_hif_set_callbacks(ar, &htc_callbacks);
 	ath10k_hif_get_default_pipe(ar, &ep->ul_pipe_id, &ep->dl_pipe_id);
 
-	ath10k_compl_init(&htc->ctl_resp);
+	if (! htc->is_init)
+		ath10k_compl_init(&htc->ctl_resp);
+
+	htc->is_init = 1;
 
 	return 0;
 }

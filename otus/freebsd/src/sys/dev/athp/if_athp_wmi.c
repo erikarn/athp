@@ -6864,10 +6864,13 @@ int ath10k_wmi_attach(struct ath10k *ar)
 		return -EINVAL;
 	}
 
-	ath10k_compl_init(&ar->wmi.service_ready);
-	ath10k_compl_init(&ar->wmi.unified_ready);
+	if (! ar->wmi.is_init) {
+		ath10k_compl_init(&ar->wmi.service_ready);
+		ath10k_compl_init(&ar->wmi.unified_ready);
 
-	TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
+		TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
+	}
+	ar->wmi.is_init = 1;
 
 	return 0;
 }

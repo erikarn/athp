@@ -161,11 +161,15 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "htt tx max num pending tx %d\n",
 		   htt->max_num_pending_tx);
 
-	mtx_init(&htt->tx_lock, device_get_nameunit(ar->sc_dev),
-	    "athp htt tx", MTX_DEF);
-	mtx_init(&htt->tx_comp_lock, device_get_nameunit(ar->sc_dev),
-	    "athp htt comp tx", MTX_DEF);
-	idr_init(&htt->pending_tx);
+	if (! htt->tx_is_init) {
+		mtx_init(&htt->tx_lock, device_get_nameunit(ar->sc_dev),
+		    "athp htt tx", MTX_DEF);
+		mtx_init(&htt->tx_comp_lock, device_get_nameunit(ar->sc_dev),
+		    "athp htt comp tx", MTX_DEF);
+
+		idr_init(&htt->pending_tx);
+	}
+	htt->tx_is_init = 1;
 
 #if 0
 	htt->tx_pool = dma_pool_create("ath10k htt tx pool", htt->ar->sc_dev,
@@ -198,7 +202,9 @@ free_tx_pool:
 free_idr_pending_tx:
 #endif
 	mtx_destroy(&htt->tx_lock);
+	mtx_destroy(&htt->tx_comp_lock);
 	idr_destroy(&htt->pending_tx);
+	htt->tx_is_init = 0;
 	return ret;
 }
 
@@ -221,8 +227,10 @@ static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *pbuf, void *ctx)
 void ath10k_htt_tx_free(struct ath10k_htt *htt)
 {
 
-	idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
-	idr_destroy(&htt->pending_tx);
+	if (htt->tx_is_init) {
+		idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
+		idr_destroy(&htt->pending_tx);
+	}
 #if 0
 	dma_pool_destroy(htt->tx_pool);
 #endif
@@ -230,7 +238,11 @@ void ath10k_htt_tx_free(struct ath10k_htt *htt)
 	if (htt->frag_desc.vaddr) {
 		athp_descdma_free(htt->ar, &htt->frag_desc.dd);
 	}
-	mtx_destroy(&htt->tx_lock);
+	if (htt->tx_is_init) {
+		mtx_destroy(&htt->tx_lock);
+		mtx_destroy(&htt->tx_comp_lock);
+	}
+	htt->tx_is_init = 0;
 }
 
 void ath10k_htt_htc_tx_complete(struct ath10k *ar, struct athp_buf *pbuf)

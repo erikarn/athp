@@ -661,10 +661,12 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	htt->rx_ring.sw_rd_idx.msdu_payld = htt->rx_ring.size_mask;
 	*htt->rx_ring.alloc_idx.vaddr = 0;
 
-	mtx_init(&htt->rx_ring.lock, device_get_nameunit(ar->sc_dev), "athp rx htt", MTX_DEF);
+	if (! htt->rx_is_init) {
+		mtx_init(&htt->rx_ring.lock, device_get_nameunit(ar->sc_dev), "athp rx htt", MTX_DEF);
 
-	/* Initialize the Rx refill retry timer */
-	callout_init_mtx(timer, &htt->rx_ring.lock, 0);
+		/* Initialize the Rx refill retry timer */
+		callout_init_mtx(timer, &htt->rx_ring.lock, 0);
+	}
 
 	htt->rx_ring.fill_cnt = 0;
 	htt->rx_ring.sw_rd_idx.msdu_payld = 0;
@@ -672,13 +674,16 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	hash_init(htt->rx_ring.skb_table);
 #endif
 
-	TASK_INIT(&htt->rx_replenish_task, 0, ath10k_htt_rx_replenish_task, htt);
+	if (! htt->rx_is_init) {
+		TASK_INIT(&htt->rx_replenish_task, 0, ath10k_htt_rx_replenish_task, htt);
 
-	TAILQ_INIT(&htt->tx_compl_q);
-	TAILQ_INIT(&htt->rx_compl_q);
-	TAILQ_INIT(&htt->rx_in_ord_compl_q);
+		TAILQ_INIT(&htt->tx_compl_q);
+		TAILQ_INIT(&htt->rx_compl_q);
+		TAILQ_INIT(&htt->rx_in_ord_compl_q);
 
-	TASK_INIT(&htt->txrx_compl_task, 0, ath10k_htt_txrx_compl_task, htt);
+		TASK_INIT(&htt->txrx_compl_task, 0, ath10k_htt_txrx_compl_task, htt);
+	}
+	htt->rx_is_init = 1;
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "htt rx ring size %d fill_level %d\n",
 		   htt->rx_ring.size, htt->rx_ring.fill_level);
