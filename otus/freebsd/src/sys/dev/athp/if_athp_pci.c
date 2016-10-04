@@ -173,6 +173,14 @@ athp_pci_intr(void *arg)
 	if (ar->sc_invalid)
 		return;
 
+	if (ath10k_pci_has_fw_crashed(psc)) {
+		ath10k_err(ar, "%s: FIRMWARE CRASH\n", __func__);
+		ath10k_pci_irq_disable(psc);
+		ath10k_pci_fw_crashed_clear(psc);
+		ath10k_pci_fw_crashed_dump(psc);
+		return;
+	}
+
 	/*
 	 * XXX for now, this is purely for non-MSI interrupts.
 	 */
@@ -408,7 +416,7 @@ athp_pci_attach(device_t dev)
 	ar->sc_invalid = 1;
 	/* XXX TODO: initialize sc_debug from TUNABLE */
 	ar->sc_debug = ATH10K_DBG_BOOT | ATH10K_DBG_PCI | ATH10K_DBG_HTC |
-	    ATH10K_DBG_PCI_DUMP | ATH10K_DBG_WMI | ATH10K_DBG_BMI;
+	    ATH10K_DBG_PCI_DUMP | ATH10K_DBG_WMI | ATH10K_DBG_BMI | ATH10K_DBG_MAC;
 	ar->sc_psc = psc;
 
 	/*
