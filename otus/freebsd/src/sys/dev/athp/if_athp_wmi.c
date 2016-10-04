@@ -1812,7 +1812,8 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		return ret;
 	}
 
-	interval = ticks + ((3 * hz) / 1000);
+	/* Wait 3 milliseconds */
+	interval = ticks + ((3000 * hz) / 1000);
 
 	/*
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
@@ -4651,6 +4652,8 @@ static void ath10k_wmi_10_2_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	cmd_hdr = (struct wmi_cmd_hdr *)mbuf_skb_data(pbuf->m);
 	id = MS(__le32_to_cpu(cmd_hdr->cmd_id), WMI_CMD_HDR_CMD_ID);
 
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event id 0x%08x\n", __func__, id);
+
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
 
@@ -6867,7 +6870,10 @@ int ath10k_wmi_attach(struct ath10k *ar)
 	ath10k_compl_init(&ar->wmi.service_ready);
 	ath10k_compl_init(&ar->wmi.unified_ready);
 
-	TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
+	if (! ar->wmi.is_init) {
+		TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
+	}
+	ar->wmi.is_init = 1;
 
 	return 0;
 }

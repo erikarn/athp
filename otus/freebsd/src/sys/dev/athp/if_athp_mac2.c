@@ -544,11 +544,13 @@ static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
 
 	return 0;
 }
+#endif
 
 /*********************/
 /* General utilities */
 /*********************/
 
+#if 0
 static inline enum wmi_phy_mode
 chan_to_phymode(const struct cfg80211_chan_def *chandef)
 {
@@ -607,7 +609,9 @@ chan_to_phymode(const struct cfg80211_chan_def *chandef)
 	WARN_ON(phymode == MODE_UNKNOWN);
 	return phymode;
 }
+#endif
 
+#if 0
 static u8 ath10k_parse_mpdudensity(u8 mpdudensity)
 {
 /*
@@ -944,7 +948,7 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 		return -ESHUTDOWN;
 
-	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__, ATH10K_VDEV_SETUP_TIMEOUT_HZ);
+	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__, 1000);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -952,10 +956,18 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 }
 #endif
 
-#if 1
+/*
+ * XXX TODO: implement the vdev start/restart/stop routines, and
+ * tie them to the ioctl up/down/reinit paths.
+ *
+ * For a monitor VAP, we don't call monitor_vdev_start - I think
+ * that is for enabling monitor mode on a non-monitor VAP.
+ * Instead, we start it normally.
+ */
+
+#if 0
 static int ath10k_monitor_vdev_start(struct ath10k *ar, int vdev_id)
 {
-#if 0
 	struct cfg80211_chan_def *chandef = NULL;
 	struct ieee80211_channel *channel = NULL;
 	struct wmi_vdev_start_request_arg arg = {};
@@ -1022,10 +1034,84 @@ vdev_stop:
 			    ar->monitor_vdev_id, ret);
 
 	return ret;
-#else
-	ath10k_warn(ar, "%s: TODO: flesh out monitor setup!\n", __func__);
-	return (0);
+}
 #endif
+
+/*
+ * FreeBSD monitor vdev - for now, only "work" if we are a monitor
+ * vdev.  If we're a normal vap in monitor mode, don't do anything.
+ *
+ * This simplifies bring-up for now.
+ */
+#if 1
+static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
+{
+	struct ieee80211_channel *channel = NULL;
+	struct wmi_vdev_start_request_arg arg = {};
+	int ret = 0;
+
+	ath10k_warn(ar, "%s: called; vdev_id=%d\n",__func__, vdev_id);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (ar->monitor_arvif == NULL) {
+		ath10k_warn(ar, "%s: no monitor_arvif; bailing\n", __func__);
+		return (-ENOENT);
+	}
+
+	/* No channel context; use the global one for now */
+	channel = ar->sc_ic.ic_curchan;
+
+	arg.vdev_id = vdev_id;
+	arg.channel.freq = channel->ic_freq;
+	arg.channel.band_center_freq1 = channel->ic_freq;
+
+	/*
+	 * XXX hard-coded for now, just for bring-up!
+	 */
+	arg.channel.mode = MODE_11G;
+	arg.channel.chan_radar = 0;	/* XXX TODO: CHAN_RADAR check */
+	arg.channel.min_power = 0;
+	arg.channel.max_power = 30;
+	arg.channel.max_reg_power = 30;
+	arg.channel.max_antenna_gain = 3;
+
+	ath10k_compl_reinit(&ar->vdev_setup_done);
+
+	ret = ath10k_wmi_vdev_start(ar, &arg);
+	if (ret) {
+		ath10k_warn(ar, "failed to request monitor vdev %i start: %d\n",
+			    vdev_id, ret);
+		return ret;
+	}
+
+	ret = ath10k_vdev_setup_sync(ar);
+	if (ret) {
+		ath10k_warn(ar, "failed to synchronize setup for monitor vdev %i start: %d\n",
+			    vdev_id, ret);
+		return ret;
+	}
+
+	ret = ath10k_wmi_vdev_up(ar, vdev_id, 0, ar->mac_addr);
+	if (ret) {
+		ath10k_warn(ar, "failed to put up monitor vdev %i: %d\n",
+			    vdev_id, ret);
+		goto vdev_stop;
+	}
+
+	ar->monitor_vdev_id = vdev_id;
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac monitor vdev %i started\n",
+		   ar->monitor_vdev_id);
+	return 0;
+
+vdev_stop:
+	ret = ath10k_wmi_vdev_stop(ar, ar->monitor_vdev_id);
+	if (ret)
+		ath10k_warn(ar, "failed to stop monitor vdev %i after start failure: %d\n",
+			    ar->monitor_vdev_id, ret);
+
+	return ret;
 }
 #endif
 
@@ -1071,7 +1157,7 @@ static int ath10k_monitor_vdev_create(struct ath10k *ar)
 		return -ENOMEM;
 	}
 
-	bit = flsll(ar->free_vdev_map);
+	bit = ffsll(ar->free_vdev_map);
 
 	ar->monitor_vdev_id = bit;
 
@@ -1099,6 +1185,8 @@ static int ath10k_monitor_vdev_delete(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	ret = ath10k_wmi_vdev_delete(ar, ar->monitor_vdev_id);
 	if (ret) {
 		ath10k_warn(ar, "failed to request wmi monitor vdev %i removal: %d\n",
@@ -1121,13 +1209,15 @@ static int ath10k_monitor_start(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	ret = ath10k_monitor_vdev_create(ar);
 	if (ret) {
 		ath10k_warn(ar, "failed to create monitor vdev: %d\n", ret);
 		return ret;
 	}
 
-	ret = ath10k_monitor_vdev_start(ar, ar->monitor_vdev_id);
+	ret = ath10k_monitor_vdev_start_freebsd(ar, ar->monitor_vdev_id);
 	if (ret) {
 		ath10k_warn(ar, "failed to start monitor vdev: %d\n", ret);
 		ath10k_monitor_vdev_delete(ar);
@@ -1147,6 +1237,8 @@ static int ath10k_monitor_stop(struct ath10k *ar)
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	ret = ath10k_monitor_vdev_stop(ar);
 	if (ret) {
@@ -1220,6 +1312,8 @@ static int ath10k_monitor_recalc(struct ath10k *ar)
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	needed = ath10k_mac_monitor_vdev_is_needed(ar);
 	allowed = ath10k_mac_monitor_vdev_is_allowed(ar);
@@ -1331,9 +1425,12 @@ static bool ath10k_mac_has_radar_enabled(struct ath10k *ar)
 
 	return has_radar;
 }
+#endif
 
+#if 1
 static void ath10k_recalc_radar_detection(struct ath10k *ar)
 {
+#if 0
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
@@ -1356,9 +1453,15 @@ static void ath10k_recalc_radar_detection(struct ath10k *ar)
 		ath10k_warn(ar, "failed to start CAC: %d\n", ret);
 		ieee80211_radar_detected(ar->hw);
 	}
+#else
+	ath10k_warn(ar, "%s: TODO\n", __func__);
+#endif
 }
+#endif
 
-static int ath10k_vdev_stop(struct ath10k_vif *arvif)
+#if 1
+int
+ath10k_vdev_stop(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
 	int ret;
@@ -1390,14 +1493,22 @@ static int ath10k_vdev_stop(struct ath10k_vif *arvif)
 
 	return ret;
 }
+#endif
 
-static int ath10k_vdev_start_restart(struct ath10k_vif *arvif,
-				     const struct cfg80211_chan_def *chandef,
-				     bool restart)
+#if 1
+/*
+ * XXX TODO: this has been heavily customised for freebsd!
+ */
+static int
+ath10k_vdev_start_restart(struct ath10k_vif *arvif,
+    struct ieee80211_channel *channel,
+    bool restart)
 {
 	struct ath10k *ar = arvif->ar;
 	struct wmi_vdev_start_request_arg arg = {};
 	int ret = 0;
+
+	ath10k_warn(ar, "%s: TODO: make it check channel flags; etc!\n", __func__);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -1407,14 +1518,15 @@ static int ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.dtim_period = arvif->dtim_period;
 	arg.bcn_intval = arvif->beacon_interval;
 
-	arg.channel.freq = chandef->chan->center_freq;
-	arg.channel.band_center_freq1 = chandef->center_freq1;
-	arg.channel.mode = chan_to_phymode(chandef);
+	arg.channel.freq = channel->ic_freq;
+	/* XXX NOTE: need this for vht40/vht80/etc operation */
+	arg.channel.band_center_freq1 = channel->ic_freq;
+	arg.channel.mode = MODE_11G; // chan_to_phymode(chandef);
 
 	arg.channel.min_power = 0;
-	arg.channel.max_power = chandef->chan->max_power * 2;
-	arg.channel.max_reg_power = chandef->chan->max_reg_power * 2;
-	arg.channel.max_antenna_gain = chandef->chan->max_antenna_gain * 2;
+	arg.channel.max_power = 30; //chandef->chan->max_power * 2;
+	arg.channel.max_reg_power = 30; //chandef->chan->max_reg_power * 2;
+	arg.channel.max_antenna_gain = 3; // chandef->chan->max_antenna_gain * 2;
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP) {
 		arg.ssid = arvif->u.ap.ssid;
@@ -1423,10 +1535,14 @@ static int ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 
 		/* For now allow DFS for AP mode */
 		arg.channel.chan_radar =
-			!!(chandef->chan->flags & IEEE80211_CHAN_RADAR);
+			!!(IEEE80211_IS_CHAN_RADAR(channel));
 	} else if (arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
+#if 0
 		arg.ssid = arvif->vif->bss_conf.ssid;
 		arg.ssid_len = arvif->vif->bss_conf.ssid_len;
+#else
+		ath10k_warn(ar, "%s: TODO: IBSS setup\n", __func__);
+#endif
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
@@ -1458,19 +1574,25 @@ static int ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 
 	return ret;
 }
+#endif
 
-static int ath10k_vdev_start(struct ath10k_vif *arvif,
-			     const struct cfg80211_chan_def *def)
+#if 1
+int
+ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
-	return ath10k_vdev_start_restart(arvif, def, false);
+	return ath10k_vdev_start_restart(arvif, c, false);
 }
+#endif
 
-static int ath10k_vdev_restart(struct ath10k_vif *arvif,
-			       const struct cfg80211_chan_def *def)
+#if 1
+int
+ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
-	return ath10k_vdev_start_restart(arvif, def, true);
+	return ath10k_vdev_start_restart(arvif, c, true);
 }
+#endif
 
+#if 0
 static int ath10k_mac_setup_bcn_p2p_ie(struct ath10k_vif *arvif,
 				       struct sk_buff *bcn)
 {
@@ -3176,7 +3298,7 @@ static void ath10k_regd_update(struct ath10k *ar)
 					    regpair->reg_5ghz_ctl,
 					    wmi_dfs_reg);
 #else
-	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x60, 0x60, 0x60, /* world regdomain - 0x60 */
+	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x0, 0x0, 0x0, /* CUS223E bringup code, regdomain 0 */
 	    0x10, 0x10,		/* FCC_CTL */
 	    wmi_dfs_reg);
 #endif
@@ -4833,6 +4955,7 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 
 	if (vif->iv_opmode == IEEE80211_M_MONITOR) {
 		ar->monitor_arvif = NULL;
+		ar->monitor = false;
 		ret = ath10k_monitor_recalc(ar);
 		if (ret)
 			ath10k_warn(ar, "failed to recalc monitor: %d\n", ret);

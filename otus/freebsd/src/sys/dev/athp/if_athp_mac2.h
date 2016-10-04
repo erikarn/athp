@@ -20,4 +20,8 @@ extern	int ath10k_start(struct ath10k *ar);
 extern	void ath10k_stop(struct ath10k *ar);
 extern	void ath10k_halt(struct ath10k *ar);
 
+extern	int ath10k_vdev_stop(struct ath10k_vif *arvif);
+extern	int ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c);
+extern	int ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c);
+
 #endif

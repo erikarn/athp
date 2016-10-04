@@ -154,6 +154,22 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 
 	/* We have to bring up the hardware if it isn't yet */
 	if (TAILQ_EMPTY(&ic->ic_vaps)) {
+		/*
+		 * XXX TODO: sigh, this path actually goes and re-re-re-re
+		 * re-inits everything; which includes the memory allocations,
+		 * and the /mutexes/, and the /tasks/, and the /callouts/.
+		 *
+		 * This .. can't happen, as it completely breaks how
+		 * FreeBSD expects things to work.
+		 *
+		 * Trouble is, sigh, a whole bunch of WMI setup really seems
+		 * to assume that we've completely powered off/reset the
+		 * target CPU before its reinit'ed.  So, I may have to
+		 * review each and every one of those pieces and fix
+		 * the whole thing up.
+		 *
+		 * Ugh.
+		 */
 		ret = ath10k_start(ar);
 		if (ret != 0) {
 			device_printf(ar->sc_dev, "%s: ath10k_start failed; ret=%d\n", __func__, ret);
@@ -195,6 +211,15 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* Get here - we're okay */
 	uvp->is_setup = 1;
 
+	/*
+	 * Bring up the interface for now; it's not "right" though.
+	 */
+	ret = ath10k_vdev_start(uvp, ic->ic_curchan);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
+		return (vap);
+	}
+
 	return (vap);
 }
 
@@ -210,8 +235,10 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * Only deinit the hardware/driver state if we did successfully
 	 * set it up earlier.
 	 */
-	if (uvp->is_setup)
+	if (uvp->is_setup) {
+		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
+	}
 
 	/*
 	 * XXX for now, we only support a single VAP.

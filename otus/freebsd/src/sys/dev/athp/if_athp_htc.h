@@ -77,6 +77,7 @@ struct ath10k_htc {
 
 	/* protects endpoints */
 	struct mtx tx_lock;
+	int is_init;
 
 	struct ath10k_htc_ops htc_ops;
 

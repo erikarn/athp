@@ -64,6 +64,9 @@ struct ath10k_htt {
 	struct ath10k *ar;
 	enum ath10k_htc_ep_id eid;
 
+	int rx_is_init;
+	int tx_is_init;
+
 	u8 target_version_major;
 	u8 target_version_minor;
 	struct ath10k_compl target_version_received;
