@@ -298,9 +298,7 @@ int ath10k_htt_setup(struct ath10k_htt *htt)
 	struct ath10k *ar = htt->ar;
 	int status;
 
-	if (! htt->is_init)
-		ath10k_compl_init(&htt->target_version_received);
-	htt->is_init = 1;
+	ath10k_compl_init(&htt->target_version_received);
 
 	status = ath10k_htt_h2t_ver_req_msg(htt);
 	if (status)
