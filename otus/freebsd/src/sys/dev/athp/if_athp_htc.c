@@ -968,8 +968,7 @@ int ath10k_htc_init(struct ath10k *ar)
 	ath10k_hif_set_callbacks(ar, &htc_callbacks);
 	ath10k_hif_get_default_pipe(ar, &ep->ul_pipe_id, &ep->dl_pipe_id);
 
-	if (! htc->is_init)
-		ath10k_compl_init(&htc->ctl_resp);
+	ath10k_compl_init(&htc->ctl_resp);
 
 	htc->is_init = 1;
 
