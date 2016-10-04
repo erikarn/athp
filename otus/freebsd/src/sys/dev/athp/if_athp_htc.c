@@ -488,8 +488,10 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 		trailer -= trailer_len;
 		status = ath10k_htc_process_trailer(htc, trailer,
 						    trailer_len, hdr->eid);
-		if (status)
+		if (status) {
+			ath10k_err(ar, "%s: ath10k_htc_process_trailer failed; status=%d\n", __func__, status);
 			goto out;
+		}
 
 		mbuf_skb_trim(pbuf->m, mbuf_skb_len(pbuf->m) - trailer_len);
 	}
@@ -500,6 +502,9 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 
 	if (eid == ATH10K_HTC_EP_0) {
 		struct ath10k_htc_msg *msg = (struct ath10k_htc_msg *) mbuf_skb_data(pbuf->m);
+
+		ath10k_dbg(ar, ATH10K_DBG_HTC, "htc rx completion ep %d m %p, message_id=%d\n",
+			   eid, pbuf->m, __le16_to_cpu(msg->hdr.message_id));
 
 		switch (__le16_to_cpu(msg->hdr.message_id)) {
 		case ATH10K_HTC_MSG_READY_ID:
