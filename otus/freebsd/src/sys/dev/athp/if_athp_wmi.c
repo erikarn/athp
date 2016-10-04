@@ -1812,7 +1812,8 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		return ret;
 	}
 
-	interval = ticks + ((3 * hz) / 1000);
+	/* Wait 3 milliseconds */
+	interval = ticks + ((3000 * hz) / 1000);
 
 	/*
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
@@ -6864,10 +6865,10 @@ int ath10k_wmi_attach(struct ath10k *ar)
 		return -EINVAL;
 	}
 
-	if (! ar->wmi.is_init) {
-		ath10k_compl_init(&ar->wmi.service_ready);
-		ath10k_compl_init(&ar->wmi.unified_ready);
+	ath10k_compl_init(&ar->wmi.service_ready);
+	ath10k_compl_init(&ar->wmi.unified_ready);
 
+	if (! ar->wmi.is_init) {
 		TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
 	}
 	ar->wmi.is_init = 1;
