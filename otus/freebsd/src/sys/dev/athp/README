@@ -137,3 +137,9 @@ NEED TO DO THIS OR THE FIRMWARE CRASHES
 * Extend net80211 rx_stats struct to include MAC timestamp, PHY timestamp,
   RX duration, RX phy/rate, etc, etc.  Then, teach the htt_r routines
   (eg things referenced in htt_rx_h_ppdu())
+* AMSDU more flag too; the upper layer should be told about AMSDU-more so
+  it knows not to do some checks (eg all decaped AMSDU frames will
+  share the same faked seqno, crypto, IV, etc.)
+
+* RX checksum offloading - htt_rx_h_csum_offload()
+
