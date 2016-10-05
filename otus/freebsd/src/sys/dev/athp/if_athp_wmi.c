@@ -1772,6 +1772,7 @@ unlock:
 	ATHP_DATA_UNLOCK(ar);
 }
 
+#if 0
 static void ath10k_wmi_tx_beacons_iter(void *data, u8 *mac,
 				       struct ieee80211vap *vif)
 {
@@ -1779,10 +1780,24 @@ static void ath10k_wmi_tx_beacons_iter(void *data, u8 *mac,
 
 	ath10k_wmi_tx_beacon_nowait(arvif);
 }
+#endif
 
 static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 {
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
+#if 0
+	struct ath10k_vif *vif;
+
+	/*
+	 * XXX TODO: this needs conf_lock held, but unfortunately
+	 * it may already be held.  Maybe see if we can iterate
+	 * the VAPs?
+	 */
+	TAILQ_FOREACH(vif, &ar->arvifs, next) {
+		ath10k_wmi_tx_beacon_nowait(vif);
+	}
+#else
+	ath10k_warn(ar, "%s: TODO\n", __func__);
+#endif
 #if 0
 	ieee80211_iterate_active_interfaces_atomic(ar->hw,
 						   IEEE80211_IFACE_ITER_NORMAL,
@@ -1819,9 +1834,9 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: setup: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
+//	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: setup: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
 	while (! ieee80211_time_after(ticks, interval)) {
-		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: loop: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
+//		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: loop: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
 
 		/* try to send pending beacons first. they take priority */
@@ -5580,8 +5595,8 @@ ath10k_wmi_op_gen_vdev_create(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->vdev_macaddr.addr, macaddr);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "WMI vdev create: id %d type %d subtype %d macaddr %pM\n",
-		   vdev_id, type, subtype, macaddr);
+		   "WMI vdev create: id %d type %d subtype %d macaddr %6D\n",
+		   vdev_id, type, subtype, macaddr, ":");
 	return pbuf;
 }
 
@@ -5691,8 +5706,8 @@ ath10k_wmi_op_gen_vdev_up(struct ath10k *ar, u32 vdev_id, u32 aid,
 	ether_addr_copy(cmd->vdev_bssid.addr, bssid);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi mgmt vdev up id 0x%x assoc id %d bssid %pM\n",
-		   vdev_id, aid, bssid);
+		   "wmi mgmt vdev up id 0x%x assoc id %d bssid %6D\n",
+		   vdev_id, aid, bssid, ":");
 	return pbuf;
 }
 
@@ -5850,8 +5865,8 @@ ath10k_wmi_op_gen_peer_create(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->peer_macaddr.addr, peer_addr);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer create vdev_id %d peer_addr %pM\n",
-		   vdev_id, peer_addr);
+		   "wmi peer create vdev_id %d peer_addr %6D\n",
+		   vdev_id, peer_addr, ":");
 	return pbuf;
 }
 
@@ -5871,8 +5886,8 @@ ath10k_wmi_op_gen_peer_delete(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->peer_macaddr.addr, peer_addr);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer delete vdev_id %d peer_addr %pM\n",
-		   vdev_id, peer_addr);
+		   "wmi peer delete vdev_id %d peer_addr %6D\n",
+		   vdev_id, peer_addr, ":");
 	return pbuf;
 }
 
@@ -5893,8 +5908,8 @@ ath10k_wmi_op_gen_peer_flush(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->peer_macaddr.addr, peer_addr);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer flush vdev_id %d peer_addr %pM tids %08x\n",
-		   vdev_id, peer_addr, tid_bitmap);
+		   "wmi peer flush vdev_id %d peer_addr %6D tids %08x\n",
+		   vdev_id, peer_addr, ":", tid_bitmap);
 	return pbuf;
 }
 
@@ -5918,8 +5933,8 @@ ath10k_wmi_op_gen_peer_set_param(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->peer_macaddr.addr, peer_addr);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi vdev %d peer 0x%pM set param %d value %d\n",
-		   vdev_id, peer_addr, param_id, param_value);
+		   "wmi vdev %d peer %6D set param %d value %d\n",
+		   vdev_id, peer_addr, ":", param_id, param_value);
 	return pbuf;
 }
 
@@ -5988,8 +6003,8 @@ ath10k_wmi_op_gen_set_ap_ps(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	ether_addr_copy(cmd->peer_macaddr.addr, mac);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi ap ps param vdev_id 0x%X param %d value %d mac_addr %pM\n",
-		   vdev_id, param_id, value, mac);
+		   "wmi ap ps param vdev_id 0x%X param %d value %d mac_addr %6D\n",
+		   vdev_id, param_id, value, mac, ":");
 	return pbuf;
 }
 
@@ -6133,8 +6148,8 @@ ath10k_wmi_op_gen_peer_assoc(struct ath10k *ar,
 	ath10k_wmi_peer_assoc_fill_main(ar, mbuf_skb_data(pbuf->m), arg);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer assoc vdev %d addr %pM (%s)\n",
-		   arg->vdev_id, arg->addr,
+		   "wmi peer assoc vdev %d addr %6D (%s)\n",
+		   arg->vdev_id, arg->addr, ":",
 		   arg->peer_reassoc ? "reassociate" : "new");
 	return pbuf;
 }
