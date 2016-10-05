@@ -445,6 +445,17 @@ athp_setup_channels(struct ath10k *ar)
 	}
 }
 
+static void
+athp_attach_sysctl(struct ath10k *ar)
+{
+	struct sysctl_oid *tree = device_get_sysctl_tree(ar->sc_dev);
+	struct sysctl_ctx_list *ctx = device_get_sysctl_ctx(ar->sc_dev);
+	struct sysctl_oid_list *child = SYSCTL_CHILDREN(tree);
+
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "debug", CTLFLAG_RW,
+	    &ar->sc_debug, "debug control");
+}
+
 /*
  * Attach time setup.
  *
@@ -515,7 +526,8 @@ athp_attach_net80211(struct ath10k *ar)
 	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu), ATH10K_TX_RADIOTAP_PRESENT,
 	    &ar->sc_rxtapu.th.wr_ihdr, sizeof(ar->sc_rxtapu), ATH10K_RX_RADIOTAP_PRESENT);
 
-	/* XXX TODO: sysctl attach */
+	/* sysctl attach */
+	athp_attach_sysctl(ar);
 
 	// if (bootverbose)
 		ieee80211_announce(ic);
