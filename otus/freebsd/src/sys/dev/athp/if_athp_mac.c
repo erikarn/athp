@@ -120,7 +120,7 @@ ath10k_mac_register(struct ath10k *ar)
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* for now .. */
-	TAILQ_INIT(&ar->arvifs);
+//	TAILQ_INIT(&ar->arvifs);
 
 	ret = athp_attach_net80211(ar);
 	if (ret != 0)

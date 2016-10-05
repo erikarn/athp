@@ -1328,6 +1328,7 @@ int
 ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 {
 	int status;
+	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -1488,6 +1489,16 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_hif_stop;
 #else
 	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_start\n", __func__);
+#if 0
+	ret = ath10k_wmi_dbglog_cfg(ar, 0xffffffff, ATH10K_DBGLOG_LEVEL_VERBOSE);
+	if (ret != 0) {
+		ath10k_err(ar, "%s: failed dbglog_cfg; ret=%d\n", __func__, ret);
+	}
+#endif
+	ret = ath10k_wmi_pdev_pktlog_disable(ar);
+	if (ret != 0) {
+		ath10k_err(ar, "%s: failed pktlog_disable; ret=%d\n", __func__, ret);
+	}
 #endif
 
 	ar->free_vdev_map = (1LL << ar->max_num_vdevs) - 1;
@@ -1495,7 +1506,7 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 #if 0
 	INIT_LIST_HEAD(&ar->arvifs);
 #else
-	device_printf(ar->sc_dev, "%s: TODO: arvifs init\n", __func__);
+	TAILQ_INIT(&ar->arvifs);
 #endif
 
 	return 0;
