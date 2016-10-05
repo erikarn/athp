@@ -84,7 +84,11 @@ extern	void athp_free_list(struct ath10k *ar, struct athp_buf_ring *br);
 
 extern	void athp_buf_set_len(struct athp_buf *bf, int len);
 
+/*
+ * athp_buf routines.
+ */
 extern	void athp_buf_list_flush(struct ath10k *ar, struct athp_buf_ring *br,
 	    athp_buf_head *bl);
+extern	int athp_buf_list_count(athp_buf_head *bl);
 
 #endif	/* __IF_ATHP_BUF_H__ */

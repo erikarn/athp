@@ -349,6 +349,22 @@ athp_buf_list_flush(struct ath10k *ar, struct athp_buf_ring *br,
 	}
 }
 
+/*
+ * XXX TODO: O(n), yes, it should be replaced with more athp_buf_list
+ * methods to manage lists, and then keep the count inline.
+ */
+int
+athp_buf_list_count(athp_buf_head *bl)
+{
+	struct athp_buf *pbuf;
+	int n = 0;
+
+	TAILQ_FOREACH(pbuf, bl, next) {
+		n++;
+	}
+	return (n);
+}
+
 struct mbuf *
 athp_buf_take_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
