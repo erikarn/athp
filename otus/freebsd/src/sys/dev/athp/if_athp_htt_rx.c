@@ -1132,9 +1132,33 @@ static void ath10k_process_rx(struct ath10k *ar,
 #endif
 	ieee80211_rx(ar->hw, skb);
 #else
-	device_printf(ar->sc_dev, "%s: TODO: HANDLE RX!\n",
-	    __func__);
+	struct ieee80211com *ic = &ar->sc_ic;
+	struct mbuf *m;
+	struct ieee80211_node *ni;
+
+	/* Grab mbuf */
+	m = athp_buf_take_mbuf(ar, &ar->buf_rx, skb);
+
+	/* Free pbuf; no longer needed */
 	athp_freebuf(ar, &ar->buf_rx, skb);
+
+	ath10k_dbg(ar, ATH10K_DBG_DATA,
+	    "%s: frame; m=%p, len=%d\n", __func__, m, m->m_len);
+
+	/* Radiotap */
+	if (ieee80211_radiotap_active(ic))
+		ieee80211_radiotap_rx_all(ic, m);
+
+	/* RX path to net80211 */
+	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
+	if (ni != NULL) {
+		ieee80211_input_mimo(ni, m, rx_status);
+		ieee80211_free_node(ni);
+	} else {
+		ieee80211_input_mimo_all(ic, m, rx_status);
+	}
+
+	/* skb/pbuf is done by here */
 #endif
 }
 
@@ -1158,15 +1182,15 @@ static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 					enum htt_rx_mpdu_encrypt_type enctype,
 					bool is_decrypted)
 {
-#if 0
-	struct ieee80211_hdr *hdr;
+#if 1
+	struct ieee80211_frame *hdr;
 	struct htt_rx_desc *rxd;
 	size_t hdr_len;
 	size_t crypto_len;
 	bool is_first;
 	bool is_last;
 
-	rxd = (void *)msdu->data - sizeof(*rxd);
+	rxd = (void *)((char *)mbuf_skb_data(msdu->m) - sizeof(*rxd));
 	is_first = !!(rxd->msdu_end.common.info0 &
 		      __cpu_to_le32(RX_MSDU_END_INFO0_FIRST_MSDU));
 	is_last = !!(rxd->msdu_end.common.info0 &
@@ -1190,7 +1214,10 @@ static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 	if (unlikely(WARN_ON_ONCE(!(is_first && is_last))))
 		return;
 
-	skb_trim(msdu, msdu->len - FCS_LEN);
+/*XXX*/
+#define	FCS_LEN	4
+	mbuf_skb_trim(msdu->m, mbuf_skb_len(msdu->m) - FCS_LEN);
+#undef	FCS_LEN
 
 	/* In most cases this will be true for sniffed frames. It makes sense
 	 * to deliver them as-is without stripping the crypto param. This is
@@ -1206,15 +1233,15 @@ static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 	 * since hdr is used to compute some stuff.
 	 */
 
-	hdr = (void *)msdu->data;
+	hdr = (void *) mbuf_skb_data(msdu->m);
 
 	/* Tail */
-	skb_trim(msdu, msdu->len - ath10k_htt_rx_crypto_tail_len(ar, enctype));
+	mbuf_skb_trim(msdu->m, mbuf_skb_len(msdu->m) - ath10k_htt_rx_crypto_tail_len(ar, enctype));
 
 	/* MMIC */
-	if (!ieee80211_has_morefrags(hdr->frame_control) &&
+	if (!(hdr->i_fc[1] & IEEE80211_FC1_MORE_FRAG) &&
 	    enctype == HTT_RX_MPDU_ENCRYPT_TKIP_WPA)
-		mbuf_skb_trim(msdu->m, mbuf_sku_len(msdu->m)- 8);
+		mbuf_skb_trim(msdu->m, mbuf_skb_len(msdu->m)- 8);
 
 	/* Head */
 	hdr_len = ieee80211_anyhdrsize(hdr);
@@ -1458,12 +1485,13 @@ static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb)
 }
 #endif
 
+/*
+ * XXX TODO: need to enable setting checksum flags if needed.
+ */
 static void ath10k_htt_rx_h_csum_offload(struct athp_buf *msdu)
 {
 #if 0
 	msdu->ip_summed = ath10k_htt_rx_get_csum_state(msdu);
-#else
-	printf("%s: TODO\n", __func__);
 #endif
 }
 
@@ -1548,8 +1576,8 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 				RX_FLAG_IV_STRIPPED |
 				RX_FLAG_MMIC_STRIPPED;
 #else
-	device_printf(ar->sc_dev, "%s: TODO: fcs_err=%d, tkip_err=%d, is_decrypted=%d\n",
-	    __func__, has_fcs_err, has_tkip_err, is_decrypted);
+//	device_printf(ar->sc_dev, "%s: TODO: fcs_err=%d, tkip_err=%d, is_decrypted=%d\n",
+//	    __func__, has_fcs_err, has_tkip_err, is_decrypted);
 #endif
 	TAILQ_FOREACH(msdu, amsdu, next) {
 		ath10k_htt_rx_h_csum_offload(msdu);
@@ -1582,20 +1610,8 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 			status->flag &= ~RX_FLAG_AMSDU_MORE;
 		else
 			status->flag |= RX_FLAG_AMSDU_MORE;
-#else
-		if (TAILQ_EMPTY(amsdu))
-			device_printf(ar->sc_dev, "%s: TODO: clear AMSDU_MORE\n", __func__);
-		else
-			device_printf(ar->sc_dev, "%s: TODO: set AMSDU_MORE\n", __func__);
 #endif
-
-#if 1
 		ath10k_process_rx(ar, status, msdu);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: HANDLE RX!\n",
-		    __func__);
-		athp_freebuf(ar, &ar->buf_rx, msdu);
-#endif
 	}
 }
 
@@ -1664,7 +1680,6 @@ static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 				    athp_buf_head *amsdu,
 				    bool chained)
 {
-#if 0
 	struct athp_buf *first;
 	struct htt_rx_desc *rxd;
 	enum rx_msdu_decap_format decap;
@@ -1683,15 +1698,12 @@ static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 	 * try re-constructing such frames - it'll be pretty much garbage.
 	 */
 	if (decap != RX_MSDU_DECAP_RAW ||
-	    skb_queue_len(amsdu) != 1 + rxd->frag_info.ring2_more_count) {
+	    athp_buf_list_count(amsdu) != 1 + rxd->frag_info.ring2_more_count) {
 		athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 		return;
 	}
 
 	ath10k_unchain_msdu(amsdu);
-#else
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-#endif
 }
 
 static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
@@ -1710,14 +1722,11 @@ static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
 	 * invalid/dangerous frames.
 	 */
 
-#if 0
-	if (!rx_status->freq) {
+	if (!rx_status->c_freq) {
 		ath10k_warn(ar, "no channel configured; ignoring frame(s)!\n");
 		return false;
 	}
-#else
-	device_printf(ar->sc_dev, "%s: TODO: freq check!\n", __func__);
-#endif
+
 	is_mgmt = !!(rxd->attention.flags &
 		     __cpu_to_le32(RX_ATTENTION_FLAGS_MGMT_TYPE));
 	has_fcs_err = !!(rxd->attention.flags &
@@ -2140,13 +2149,7 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		device_printf(ar->sc_dev, "%s: TODO: offload_prot\n", __func__);
 #endif
 
-#if 1
 		ath10k_process_rx(ar, status, msdu);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: HANDLE RX!\n",
-		    __func__);
-		athp_freebuf(ar, &ar->buf_rx, skb);
-#endif
 	}
 }
 
