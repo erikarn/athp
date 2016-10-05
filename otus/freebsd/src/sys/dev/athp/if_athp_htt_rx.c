@@ -764,11 +764,17 @@ struct amsdu_subframe_hdr {
 	__be16 len;
 } __packed;
 
-#if 0
+/*
+ * XXX TODO: the net80211 rx_stats struct doesn't currently include
+ * the RX rate/phy type information.
+ *
+ * XXX TODO: maybe at least just log what we decode here for now?
+ */
 static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 				  struct ieee80211_rx_stats *status,
 				  struct htt_rx_desc *rxd)
 {
+#if 0
 	struct ieee80211_supported_band *sband;
 	u8 cck, rate, bw, sgi, mcs, nss;
 	u8 preamble = 0;
@@ -842,19 +848,19 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 	default:
 		break;
 	}
-}
 #endif
+}
 
-#if 0
 static struct ieee80211_channel *
 ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
-	struct cfg80211_chan_def def;
+//	struct cfg80211_chan_def def;
 	u16 peer_id;
 
-	ATHP_HTT_RX_LOCK_ASSERT(htt);
+//	ATHP_HTT_RX_LOCK_ASSERT(htt);
 
 	if (!rxd)
 		return NULL;
@@ -878,17 +884,24 @@ ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 	if (WARN_ON_ONCE(!arvif))
 		return NULL;
 
+#if 0
 	if (WARN_ON(ath10k_mac_vif_chan(arvif->vif, &def)))
 		return NULL;
-
 	return def.chan;
-}
+#else
+	/* XXX TODO: is this valid? */
+	return ic->ic_curchan;
 #endif
+}
 
-#if 0
+/*
+ * XXX TODO: we don't yet have a per-vif channel context;
+ * so don't implement this just yet.
+ */
 static struct ieee80211_channel *
 ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 {
+#if 0
 	struct ath10k_vif *arvif;
 	struct cfg80211_chan_def def;
 
@@ -899,10 +912,10 @@ ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 		    ath10k_mac_vif_chan(arvif->vif, &def) == 0)
 			return def.chan;
 	}
-
+#else
 	return NULL;
-}
 #endif
+}
 
 #if 0
 static void
@@ -916,10 +929,11 @@ ath10k_htt_rx_h_any_chan_iter(struct ieee80211_hw *hw,
 }
 #endif
 
-#if 0
 static struct ieee80211_channel *
 ath10k_htt_rx_h_any_channel(struct ath10k *ar)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
+#if 0
 	struct cfg80211_chan_def def = {};
 
 	ieee80211_iter_chan_contexts_atomic(ar->hw,
@@ -927,10 +941,15 @@ ath10k_htt_rx_h_any_channel(struct ath10k *ar)
 					    &def);
 
 	return def.chan;
-}
+#else
+	return (ic->ic_curchan);
 #endif
+}
 
-#if 0
+/*
+ * XXX TODO: I'm not sure if this is "right" for say, off channel
+ * traffic for scans.
+ */
 static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 				    struct ieee80211_rx_stats *status,
 				    struct htt_rx_desc *rxd,
@@ -953,8 +972,9 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 	if (!ch)
 		return false;
 
-	status->band = ch->band;
-	status->freq = ch->center_freq;
+	status->c_freq = ch->ic_freq;
+	status->c_ieee = ch->ic_ieee;
+	status->r_flags |= IEEE80211_R_FREQ | IEEE80211_R_IEEE;
 
 	return true;
 }
@@ -964,15 +984,22 @@ static void ath10k_htt_rx_h_signal(struct ath10k *ar,
 				   struct htt_rx_desc *rxd)
 {
 	/* FIXME: Get real NF */
-	status->signal = ATH10K_DEFAULT_NOISE_FLOOR +
+	status->rssi = ATH10K_DEFAULT_NOISE_FLOOR +
 			 rxd->ppdu_start.rssi_comb;
-	status->flag &= ~RX_FLAG_NO_SIGNAL_VAL;
+	status->nf = ATH10K_DEFAULT_NOISE_FLOOR;
+	status->r_flags |= IEEE80211_R_NF | IEEE80211_R_RSSI;
 }
 
+/*
+ * XXX TODO: it would be nice to push an RX TSF into the net80211
+ * rx_stats structure.  That way the TSF field can be populated
+ * for packets where it's supplied.
+ */
 static void ath10k_htt_rx_h_mactime(struct ath10k *ar,
 				    struct ieee80211_rx_stats *status,
 				    struct htt_rx_desc *rxd)
 {
+#if 0
 	/* FIXME: TSF is known only at the end of PPDU, in the last MPDU. This
 	 * means all prior MSDUs in a PPDU are reported to mac80211 without the
 	 * TSF. Is it worth holding frames until end of PPDU is known?
@@ -981,8 +1008,8 @@ static void ath10k_htt_rx_h_mactime(struct ath10k *ar,
 	 */
 	status->mactime = __le32_to_cpu(rxd->ppdu_end.common.tsf_timestamp);
 	status->flag |= RX_FLAG_MACTIME_END;
-}
 #endif
+}
 
 static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 				 athp_buf_head *amsdu,
@@ -1005,8 +1032,8 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 	is_last_ppdu = !!(rxd->attention.flags &
 			  __cpu_to_le32(RX_ATTENTION_FLAGS_LAST_MPDU));
 
-#if 0
 	if (is_first_ppdu) {
+#if 0
 		/* New PPDU starts so clear out the old per-PPDU status. */
 		status->freq = 0;
 		status->rate_idx = 0;
@@ -1018,6 +1045,8 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 				  RX_FLAG_40MHZ |
 				  RX_FLAG_MACTIME_END);
 		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
+#endif
+		bzero(status, sizeof(*status));
 
 		ath10k_htt_rx_h_signal(ar, status, rxd);
 		ath10k_htt_rx_h_channel(ar, status, rxd, vdev_id);
@@ -1026,10 +1055,6 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 
 	if (is_last_ppdu)
 		ath10k_htt_rx_h_mactime(ar, status, rxd);
-#else
-	device_printf(ar->sc_dev, "%s: called; first=%d, last=%d; TODO!\n",
-	    __func__, is_first_ppdu, is_last_ppdu);
-#endif
 }
 
 static const char * const tid_to_ac[] = {
