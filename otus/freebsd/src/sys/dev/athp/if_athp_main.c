@@ -158,11 +158,41 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m)
 	return (ENXIO);
 }
 
+/*
+ * Handle initial notifications about starting the interface here.
+ */
 static void
 athp_parent(struct ieee80211com *ic)
 {
+	struct ath10k *ar = ic->ic_softc;
+
+	if (ic->ic_nrunning > 0) {
+		/* Track if we're running already */
+		if (ar->sc_isrunning == 0) {
+			ieee80211_start_all(ic);
+			ar->sc_isrunning = 1;
+		}
+	}
+
+	if (ic->ic_nrunning == 0) {
+		ar->sc_isrunning = 0;
+	}
 }
 
+static int
+athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
+{
+//	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	enum ieee80211_state ostate = vap->iv_state;
+
+	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
+	    ieee80211_state_name[ostate],
+	    ieee80211_state_name[nstate]);
+
+	return (0);
+}
 
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
@@ -219,6 +249,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	}
 
 	/* XXX TODO: override methods */
+	uvp->av_newstate = vap->iv_newstate;
+	vap->iv_newstate = athp_vap_newstate;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,

@@ -161,7 +161,9 @@ struct ath10k_vif {
 	struct wmi_wmm_params_all_arg wmm_params;
 	struct task ap_csa_work;
 	struct task connection_loss_work;
-//	struct cfg80211_bitrate_mask bitrate_mask;
+
+	/* net80211 state */
+	int (*av_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
 };
 
 struct ath10k_vif_iter {

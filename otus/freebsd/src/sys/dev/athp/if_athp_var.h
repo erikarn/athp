@@ -122,6 +122,7 @@ struct ath10k {
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
 	uint64_t			sc_debug;
+	int				sc_isrunning;
 
 	struct intr_config_hook		sc_preinit_hook;
 
