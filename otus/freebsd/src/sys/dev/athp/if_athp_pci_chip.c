@@ -355,7 +355,7 @@ ath10k_pci_irq_pending(struct athp_pci_softc *psc)
 	return false;
 }
 
-static void
+void
 ath10k_pci_disable_and_clear_legacy_irq(struct athp_pci_softc *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
