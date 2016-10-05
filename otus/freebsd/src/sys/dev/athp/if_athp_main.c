@@ -131,6 +131,7 @@ athp_set_channel(struct ieee80211com *ic)
 {
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *arvif;
+	struct ieee80211vap *vap;
 	int ret;
 
 	/* If we have a monitor vap then set that channel */
@@ -140,15 +141,18 @@ athp_set_channel(struct ieee80211com *ic)
 	}
 
 	arvif = ar->monitor_arvif;
-	ret = ath10k_vdev_restart(arvif, ic->ic_curchan);
+	vap = (void *) arvif;
+	ath10k_vif_bring_down(vap);
+	ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 	if (ret != 0) {
-		ath10k_err(ar, "%s: error calling vdev_restart; ret=%d\n",
+		ath10k_err(ar, "%s: error calling vif_up; ret=%d\n",
 		    __func__,
 		    ret);
 	}
+
 finish:
 	ATHP_CONF_UNLOCK(ar);
-
+	return;
 }
 
 static int
@@ -166,6 +170,7 @@ athp_parent(struct ieee80211com *ic)
 {
 	struct ath10k *ar = ic->ic_softc;
 
+	/* XXX TODO: add conf lock */
 	if (ic->ic_nrunning > 0) {
 		/* Track if we're running already */
 		if (ar->sc_isrunning == 0) {
@@ -182,16 +187,53 @@ athp_parent(struct ieee80211com *ic)
 static int
 athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
-//	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
+	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	enum ieee80211_state ostate = vap->iv_state;
+	int ret;
+	int error = 0;
 
 	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
 	    ieee80211_state_name[ostate],
 	    ieee80211_state_name[nstate]);
 
-	return (0);
+	IEEE80211_UNLOCK(ic);
+
+	switch (nstate) {
+	case IEEE80211_S_RUN:
+		/* RUN->RUN; ignore for now */
+		if (ostate == IEEE80211_S_RUN)
+			break;
+
+		/* For now, only start vdev on INIT->RUN */
+		/* This should be ok for monitor, but not for station */
+		if (ostate == IEEE80211_S_INIT) {
+			ATHP_CONF_LOCK(ar);
+			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
+			ATHP_CONF_UNLOCK(ar);
+			if (ret != 0) {
+				device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
+				break;
+			}
+		}
+		break;
+
+	case IEEE80211_S_INIT:
+		ATHP_CONF_LOCK(ar);
+		ath10k_vif_bring_down(vap);
+		ATHP_CONF_UNLOCK(ar);
+		break;
+	default:
+		ath10k_warn(ar, "%s: state %s not handled\n",
+		    __func__,
+		    ieee80211_state_name[nstate]);
+		break;
+	}
+	IEEE80211_LOCK(ic);
+
+	error = vif->av_newstate(vap, nstate, arg);
+	return (error);
 }
 
 static struct ieee80211vap *
@@ -272,15 +314,6 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 
 	/* Get here - we're okay */
 	uvp->is_setup = 1;
-
-	/*
-	 * Bring up the interface for now; it's not "right" though.
-	 */
-	ret = ath10k_vdev_start(uvp, ic->ic_curchan);
-	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
-		return (vap);
-	}
 
 	return (vap);
 }

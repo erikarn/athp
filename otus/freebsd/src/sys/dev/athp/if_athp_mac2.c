@@ -989,7 +989,8 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 		return -ESHUTDOWN;
 
-	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__, 1000);
+	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
+	    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -6872,7 +6873,110 @@ ath10k_mac_op_change_chanctx(struct ieee80211_hw *hw,
 unlock:
 	ATHP_CONF_UNLOCK(ar);
 }
+#endif
 
+
+/*
+ * Note: vdevs need to be start/stop'ed, AND up/down'ed as appropriate.
+ * starting a vdev just tells the firmware to take it into account when
+ * it's doing internal accounting (I think p2p channel change is a good
+ * example), but it needs to be brought up in order to receive traffic.
+ */
+#if 1
+int
+ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c)
+{
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = arvif->ar;
+	int ret;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac chanctx assign channel %d vdev_id %i\n",
+		   c->ic_ieee, arvif->vdev_id);
+
+	if (WARN_ON(arvif->is_started)) {
+		return -EBUSY;
+	}
+
+	ret = ath10k_vdev_start(arvif, c);
+	if (ret) {
+		ath10k_warn(ar, "failed to start vdev %i addr %6D on freq %d: %d\n",
+			    arvif->vdev_id, vap->iv_myaddr, ":",
+			    c->ic_freq, ret);
+		goto err;
+	}
+
+	arvif->is_started = true;
+
+	ret = ath10k_mac_vif_setup_ps(arvif);
+	if (ret) {
+		ath10k_warn(ar, "failed to update vdev %i ps: %d\n",
+			    arvif->vdev_id, ret);
+		goto err_stop;
+	}
+
+	if (arvif->vdev_type == WMI_VDEV_TYPE_MONITOR) {
+		ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, 0, vap->iv_myaddr);
+		if (ret) {
+			ath10k_warn(ar, "failed to up monitor vdev %i: %d\n",
+				    arvif->vdev_id, ret);
+			goto err_stop;
+		}
+
+		arvif->is_up = true;
+	}
+
+	return 0;
+
+err_stop:
+	ath10k_vdev_stop(arvif);
+	arvif->is_started = false;
+	ath10k_mac_vif_setup_ps(arvif);
+
+err:
+	return ret;
+}
+#endif
+
+#if 1
+void
+ath10k_vif_bring_down(struct ieee80211vap *vap)
+{
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = arvif->ar;
+	int ret;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac chanctx unassign vdev_id %i\n",
+		   arvif->vdev_id);
+
+	WARN_ON(!arvif->is_started);
+
+	if (arvif->vdev_type == WMI_VDEV_TYPE_MONITOR) {
+		WARN_ON(!arvif->is_up);
+
+		ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
+		if (ret)
+			ath10k_warn(ar, "failed to down monitor vdev %i: %d\n",
+				    arvif->vdev_id, ret);
+
+		arvif->is_up = false;
+	}
+
+	ret = ath10k_vdev_stop(arvif);
+	if (ret)
+		ath10k_warn(ar, "failed to stop vdev %i: %d\n",
+			    arvif->vdev_id, ret);
+
+	arvif->is_started = false;
+}
+#endif
+
+#if 0
 static int
 ath10k_mac_op_assign_vif_chanctx(struct ieee80211_hw *hw,
 				 struct ieee80211_vif *vif,
