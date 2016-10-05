@@ -550,6 +550,44 @@ static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
 /* General utilities */
 /*********************/
 
+#if 1
+static inline enum wmi_phy_mode
+chan_to_phymode(struct ieee80211_channel *c)
+{
+	enum wmi_phy_mode phymode = MODE_UNKNOWN;
+
+	if (IEEE80211_IS_CHAN_2GHZ(c)) {
+		if (IEEE80211_IS_CHAN_HT20(c))
+			phymode = MODE_11NG_HT20;
+		else if (IEEE80211_IS_CHAN_HT40(c))
+			phymode = MODE_11NG_HT40;
+		else if (IEEE80211_IS_CHAN_G(c))
+			phymode = MODE_11G;
+		else if (IEEE80211_IS_CHAN_B(c))
+			phymode = MODE_11B;
+	}
+
+	if (IEEE80211_IS_CHAN_5GHZ(c)) {
+		if (IEEE80211_IS_CHAN_HT20(c))
+			phymode = MODE_11NA_HT20;
+		else if (IEEE80211_IS_CHAN_HT40(c))
+			phymode = MODE_11NA_HT40;
+		else if (IEEE80211_IS_CHAN_A(c))
+			phymode = MODE_11A;
+	}
+
+	if (phymode == MODE_UNKNOWN) {
+		printf("%s: unknown channel (%d/%d, flags=0x%08x)\n",
+		    __func__,
+		    c->ic_ieee,
+		    c->ic_freq,
+		    c->ic_flags);
+	}
+
+	return (phymode);
+}
+#endif
+
 #if 0
 static inline enum wmi_phy_mode
 chan_to_phymode(const struct cfg80211_chan_def *chandef)
@@ -789,6 +827,9 @@ static int ath10k_mac_set_rts(struct ath10k_vif *arvif, u32 value)
 	u32 vdev_param;
 
 	vdev_param = ar->wmi.vdev_param->rts_threshold;
+	if (vdev_param == 0) {
+		ath10k_err(ar, "%s: rts_threshold vdev_param is invalid?\n", __func__);
+	}
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param, value);
 }
 #endif
@@ -1065,16 +1106,12 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 	arg.vdev_id = vdev_id;
 	arg.channel.freq = channel->ic_freq;
 	arg.channel.band_center_freq1 = channel->ic_freq;
-
-	/*
-	 * XXX hard-coded for now, just for bring-up!
-	 */
-	arg.channel.mode = MODE_11G;
+	arg.channel.mode = chan_to_phymode(channel);
 	arg.channel.chan_radar = 0;	/* XXX TODO: CHAN_RADAR check */
 	arg.channel.min_power = 0;
-	arg.channel.max_power = 30;
+	arg.channel.max_power = 30;	/* XXX TODO: power levels */
 	arg.channel.max_reg_power = 30;
-	arg.channel.max_antenna_gain = 3;
+	arg.channel.max_antenna_gain = 0;
 
 	ath10k_compl_reinit(&ar->vdev_setup_done);
 
@@ -1519,14 +1556,13 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.bcn_intval = arvif->beacon_interval;
 
 	arg.channel.freq = channel->ic_freq;
-	/* XXX NOTE: need this for vht40/vht80/etc operation */
+	/* XXX TODO: NOTE: need this for vht40/vht80/etc operation */
 	arg.channel.band_center_freq1 = channel->ic_freq;
-	arg.channel.mode = MODE_11G; // chan_to_phymode(chandef);
-
+	arg.channel.mode = chan_to_phymode(channel);
 	arg.channel.min_power = 0;
 	arg.channel.max_power = 30; //chandef->chan->max_power * 2;
 	arg.channel.max_reg_power = 30; //chandef->chan->max_reg_power * 2;
-	arg.channel.max_antenna_gain = 3; // chandef->chan->max_antenna_gain * 2;
+	arg.channel.max_antenna_gain = 0; // chandef->chan->max_antenna_gain * 2;
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP) {
 		arg.ssid = arvif->u.ap.ssid;
@@ -3179,39 +3215,48 @@ static int ath10k_update_channel_list(struct ath10k *ar)
  * let's copy/paste it into a BSD specific one to make
  * future merging and re-implementation easier.
  */
-
-/*
- * For now, just hard-code channel 1-11.
- */
-
-static int freq_2ghz[] = { 2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462 };
-
 static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 {
-#if 0
+	uint8_t reported[IEEE80211_CHAN_BYTES];
 	struct ieee80211com *ic = &ar->sc_ic;
-	struct ieee80211_supported_band **bands;
-	enum ieee80211_band band;
-	struct ieee80211_channel *channel;
-#endif
+	struct ieee80211_channel *c;
 	struct wmi_scan_chan_list_arg arg = {0};
 	struct wmi_channel_arg *ch;
-//	bool passive;
-	int len;
-	int ret;
-	int i;
+	int len, ret, i, j, nchan;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	/* For now, channel 1..11 */
-	arg.n_channels = 11;
+	memset(reported, 0, IEEE80211_CHAN_BYTES);
+
+	/*
+	 * First, loop over the channel list, remove duplicates.
+	 */
+	nchan = 0;
+	for (i = 0; i < ic->ic_nchans; i++) {
+		c = &ic->ic_channels[i];
+		if (isset(reported, c->ic_ieee))
+			continue;
+		printf("%s: adding channel %d (%d)\n", __func__, c->ic_ieee, c->ic_freq);
+		setbit(reported, c->ic_ieee);
+		nchan++;
+	}
+	printf("%s: nchan=%d\n", __func__, nchan);
+
+	arg.n_channels = nchan;
 	len = sizeof(struct wmi_channel_arg) * arg.n_channels;
 	arg.channels = malloc(len, M_ATHPDEV, M_ZERO | M_NOWAIT);
 	if (!arg.channels)
 		return -ENOMEM;
 
+	memset(reported, 0, IEEE80211_CHAN_BYTES);
+
 	ch = arg.channels;
-	for (i = 0; i < 11; i++) {
+	for (i = 0, j = 0; i < ic->ic_nchans && j < nchan; i++) {
+		c = &ic->ic_channels[i];
+		if (isset(reported, c->ic_ieee))
+			continue;
+		setbit(reported, c->ic_ieee);
+
 		ch->allow_ht = true;
 		ch->allow_vht = true;
 		ch->allow_ibss = 1;
@@ -3219,15 +3264,32 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 		ch->chan_radar = 0;
 		ch->passive = 0;
 
-		ch->freq = freq_2ghz[i];
-		ch->band_center_freq1 = freq_2ghz[i];
+		ch->freq = c->ic_freq;
+		ch->band_center_freq1 = c->ic_freq;
 		ch->min_power = 0;
-		ch->max_power = 30;	/* 15dBm */
-		ch->max_reg_power = 30;	/* 15dBm */
-		ch->max_antenna_gain = 3;	/* XXX */
+#if 0
+		ch->max_power = c->ic_maxpower * 2;	/* XXX is this right? */
+		ch->max_reg_power = c->ic_maxregpower;	/* XXX is this right? */
+#else
+		/* XXX the maxpower values are 0; need to fetch from ic if that's the case? */
+		ch->max_power = 30;
+		ch->max_reg_power = 30;
+#endif
+		ch->max_antenna_gain = 0;	/* XXX */
 		ch->reg_class_id = 0;
-		ch->mode = MODE_11G;
-		ch++;
+		if (IEEE80211_IS_CHAN_2GHZ(c))
+			ch->mode = MODE_11G;
+		else if (IEEE80211_IS_CHAN_5GHZ(c))
+			ch->mode = MODE_11A;
+		else
+			continue;
+		ath10k_dbg(ar, ATH10K_DBG_WMI,
+			   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d antenna %d mode %d\n",
+			    __func__, j, arg.n_channels,
+			   ch->freq, ch->max_power, ch->max_reg_power,
+			   ch->max_antenna_gain, ch->mode);
+
+		ch++; j++;
 	}
 
 	ret = ath10k_wmi_scan_chan_list(ar, &arg);
@@ -3299,7 +3361,7 @@ static void ath10k_regd_update(struct ath10k *ar)
 					    wmi_dfs_reg);
 #else
 	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x0, 0x0, 0x0, /* CUS223E bringup code, regdomain 0 */
-	    0x10, 0x10,		/* FCC_CTL */
+	    0x1ff, 0x1ff, /* DEBUG_REG_DMN */
 	    wmi_dfs_reg);
 #endif
 	if (ret)
@@ -4187,6 +4249,9 @@ static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 	    (ar->state != ATH10K_STATE_RESTARTED))
 		return 0;
 
+	ath10k_warn(ar, "%s: txchainmask=0x%x, rxchainmask=0x%x\n",
+	    __func__, tx_ant, rx_ant);
+
 	ret = ath10k_wmi_pdev_set_param(ar, ar->wmi.pdev_param->tx_chain_mask,
 					tx_ant);
 	if (ret) {
@@ -4233,6 +4298,8 @@ int ath10k_start(struct ath10k *ar)
 	 */
 	ath10k_drain_tx(ar);
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	ATHP_CONF_LOCK(ar);
 
 	switch (ar->state) {
@@ -4253,6 +4320,7 @@ int ath10k_start(struct ath10k *ar)
 		ret = -EBUSY;
 		goto err;
 	}
+	ath10k_warn(ar, "%s: state=%d\n", __func__, ar->state);
 
 	ret = ath10k_hif_power_up(ar);
 	if (ret) {
@@ -4335,6 +4403,11 @@ int ath10k_start(struct ath10k *ar)
 	ath10k_thermal_set_throttling(ar);
 #else
 	ath10k_warn(ar, "%s: TODO: call spectral_start / set_throttling\n", __func__);
+	/* XXX temporary; just set default quiet time */
+	ret = ath10k_wmi_pdev_set_quiet_mode(ar, ATH10K_QUIET_PERIOD_DEFAULT, 0, ATH10K_QUIET_START_OFFSET, 0);
+	if (ret != 0) {
+		ath10k_warn(ar, "%s: failed to call set_quiet_mode: %d\n", __func__, ret);
+	}
 #endif
 
 	ATHP_CONF_UNLOCK(ar);
@@ -4710,6 +4783,8 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		   arvif->vdev_id, arvif->vdev_type, arvif->vdev_subtype,
 		   arvif->beacon_buf.dd_desc ? "single-buf" : "per-skb");
 
+	ath10k_dbg(ar, ATH10K_DBG_MAC, " -> mac=%s\n", ether_sprintf(mac));
+
 	ret = ath10k_wmi_vdev_create(ar, arvif->vdev_id, arvif->vdev_type,
 				     arvif->vdev_subtype, mac);
 	if (ret) {
@@ -4735,6 +4810,9 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	arvif->def_wep_key_idx = -1;
 
 	vdev_param = ar->wmi.vdev_param->tx_encap_type;
+	if (vdev_param == 0) {
+		ath10k_warn(ar, "%s: tx_encap_type vdev_param is 0?\n", __func__);
+	}
 	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
 					ATH10K_HW_TXRX_NATIVE_WIFI);
 	/* 10.X firmware does not support this VDEV parameter. Do not warn */
@@ -4823,7 +4901,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	arvif->txpower = vif->bss_conf.txpower;
 #else
 	ath10k_warn(ar, "%s: TODO: initialise txpower to something sensible\n", __func__);
-	arvif->txpower = 30;	/* 15dBm? 30dBm? It's just a hard-default for now */
+	arvif->txpower = 15;	/* 15dBm? 30dBm? It's just a hard-default for now */
 #endif
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {

@@ -910,6 +910,9 @@ struct athp_buf *ath10k_htc_alloc_skb(struct ath10k *ar, int size)
 	if (! pbuf)
 		return NULL;
 
+	/* XXX paranoia - pre-zero things */
+	memset(M_START(pbuf->m), 0, M_SIZE(pbuf->m));
+
 	mbuf_skb_reserve(pbuf->m, sizeof(struct ath10k_htc_hdr));
 
 	/* FW/HTC requires 4-byte aligned streams */
