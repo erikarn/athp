@@ -2443,6 +2443,14 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	athp_freebuf(ar, &ar->buf_rx, pbuf);
 
 	/*
+	 * Radiotap!
+	 */
+	if (ieee80211_radiotap_active(ic)) {
+		/* XXX TODO: fill in RX header details */
+		ieee80211_radiotap_rx_all(ic, m);
+	}
+
+	/*
 	 * Do node lookup for RX.
 	 */
 	ni = ieee80211_find_rxnode(ic, (const struct ieee80211_frame_min *) m);

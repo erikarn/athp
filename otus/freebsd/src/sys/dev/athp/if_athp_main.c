@@ -510,7 +510,10 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_update_chw = athp_update_chw;
 	ic->ic_ampdu_enable = athp_ampdu_enable;
 
-	/* XXX TODO: radiotap attach */
+	/* radiotap attach */
+	ieee80211_radiotap_attach(ic,
+	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu), ATH10K_TX_RADIOTAP_PRESENT,
+	    &ar->sc_rxtapu.th.wr_ihdr, sizeof(ar->sc_rxtapu), ATH10K_RX_RADIOTAP_PRESENT);
 
 	/* XXX TODO: sysctl attach */
 

@@ -102,6 +102,37 @@ struct ath10k_wow {
 };
 
 /*
+ * Note - the threaded nature of the driver CE path
+ * may make this racy.  Let's already push the rx/tx
+ * header into a per-packet field, not global.
+ */
+struct ath10k_rx_radiotap_header {
+	struct ieee80211_radiotap_header wr_ihdr;
+	uint8_t wr_flags;
+	uint8_t wr_rate;
+	uint16_t wr_chan_freq;
+	uint16_t wr_chan_flags;
+	uint8_t wr_dbm_antsignal;
+};
+
+#define	ATH10K_RX_RADIOTAP_PRESENT		\
+	    (1 << IEEE80211_RADIOTAP_FLAGS |	\
+	     1 << IEEE80211_RADIOTAP_RATE |	\
+	     1 << IEEE80211_RADIOTAP_CHANNEL |	\
+	     1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL)
+
+struct ath10k_tx_radiotap_header {
+	struct ieee80211_radiotap_header wt_ihdr;
+	uint8_t wr_flags;
+	uint16_t wr_chan_freq;
+	uint16_t wr_chan_flags;
+};
+
+#define	ATH10K_TX_RADIOTAP_PRESENT		\
+	    (1 << IEEE80211_RADIOTAP_FLAGS |	\
+	     1 << IEEE80211_RADIOTAP_CHANNEL)
+
+/*
  * This is the top-level driver state.
  *
  * Since we may see SDIO or USB derived parts at some point, there
@@ -123,6 +154,16 @@ struct ath10k {
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;
+
+	union {
+		struct ath10k_rx_radiotap_header th;
+		uint8_t pad[64];
+	} sc_rxtapu;
+	union {
+		struct ath10k_tx_radiotap_header th;
+		uint8_t pad[64];
+	} sc_txtapu;
+
 
 	struct intr_config_hook		sc_preinit_hook;
 
