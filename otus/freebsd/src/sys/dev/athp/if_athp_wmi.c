@@ -2453,7 +2453,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	/*
 	 * Do node lookup for RX.
 	 */
-	ni = ieee80211_find_rxnode(ic, (const struct ieee80211_frame_min *) m);
+	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni) {
 		if (ni->ni_flags & IEEE80211_NODE_HT)
 			m->m_flags |= M_AMPDU;
