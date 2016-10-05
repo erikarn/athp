@@ -131,3 +131,9 @@ NEED TO DO THIS OR THE FIRMWARE CRASHES
 
 * Fix up the bitops/idr code to have its own namespace for everything so it
   doesn't trip up the linux compat layer symbols.
+
+===
+
+* Extend net80211 rx_stats struct to include MAC timestamp, PHY timestamp,
+  RX duration, RX phy/rate, etc, etc.  Then, teach the htt_r routines
+  (eg things referenced in htt_rx_h_ppdu())
