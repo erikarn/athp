@@ -94,6 +94,16 @@ MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
  * These are the net80211 facing implementation pieces.
  */
 
+/*
+ * 2GHz channel list for ath10k.
+ */
+static uint8_t chan_list_2ghz[] =
+    { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+static uint8_t chan_list_5ghz[] =
+    { 36, 40, 44, 48, 52, 56, 60, 64, 100, 104,
+      108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
+      153, 157, 161, 165 };
+
 static int
 athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
     const struct ieee80211_bpf_params *params)
@@ -119,6 +129,26 @@ athp_scan_end(struct ieee80211com *ic)
 static void
 athp_set_channel(struct ieee80211com *ic)
 {
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *arvif;
+	int ret;
+
+	/* If we have a monitor vap then set that channel */
+	ATHP_CONF_LOCK(ar);
+	if (ar->monitor_arvif == NULL) {
+		goto finish;
+	}
+
+	arvif = ar->monitor_arvif;
+	ret = ath10k_vdev_restart(arvif, ic->ic_curchan);
+	if (ret != 0) {
+		ath10k_err(ar, "%s: error calling vdev_restart; ret=%d\n",
+		    __func__,
+		    ret);
+	}
+finish:
+	ATHP_CONF_UNLOCK(ar);
+
 }
 
 static int
@@ -322,6 +352,35 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
 }
 
 /*
+ * TODO: this doesn't yet take the regulatory domain into account.
+ */
+static void
+athp_setup_channels(struct ath10k *ar)
+{
+	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211_channel *chans = ic->ic_channels;
+	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
+	int *nchans = &ic->ic_nchans;
+	int ht40 = 0;
+
+	memset(bands, 0, sizeof(bands));
+
+	if (ar->phy_capability & WHAL_WLAN_11G_CAPABILITY) {
+		setbit(bands, IEEE80211_MODE_11B);
+		setbit(bands, IEEE80211_MODE_11G);
+		ieee80211_add_channel_list_2ghz(chans, IEEE80211_CHAN_MAX,
+		    nchans, chan_list_2ghz, nitems(chan_list_2ghz),
+		    bands, ht40);
+	}
+	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
+		setbit(bands, IEEE80211_MODE_11A);
+		ieee80211_add_channel_list_5ghz(chans, IEEE80211_CHAN_MAX,
+		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
+		    bands, ht40);
+	}
+}
+
+/*
  * Attach time setup.
  *
  * This needs to be deferred until interrupts are enabled;
@@ -332,7 +391,6 @@ int
 athp_attach_net80211(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
 
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
@@ -359,11 +417,7 @@ athp_attach_net80211(struct ath10k *ar)
 	/* XXX 11ac bits */
 
 	/* Channels/regulatory */
-	memset(bands, 0, sizeof(bands));
-	setbit(bands, IEEE80211_MODE_11A);
-	setbit(bands, IEEE80211_MODE_11B);
-	setbit(bands, IEEE80211_MODE_11G);
-	ieee80211_init_channels(ic, NULL, bands);
+	athp_setup_channels(ar);
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
 
