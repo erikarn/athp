@@ -256,6 +256,8 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 	struct ath10k *ar = htt->ar;
 	int ret, num_deficit, num_to_fill;
 
+	ATHP_HTT_RX_LOCK_ASSERT(htt);
+
 	/* Refilling the whole RX ring buffer proves to be a bad idea. The
 	 * reason is RX may take up significant amount of CPU cycles and starve
 	 * other tasks, e.g. TX on an ethernet device while acting as a bridge
@@ -271,7 +273,7 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 	 *
 	 * This probably comes at a cost of lower maximum throughput but
 	 * improves the average and stability. */
-	ATHP_HTT_RX_LOCK(htt);
+	//ATHP_HTT_RX_LOCK(htt);
 	num_deficit = htt->rx_ring.fill_level - htt->rx_ring.fill_cnt;
 	num_to_fill = min(ATH10K_HTT_MAX_NUM_REFILL, num_deficit);
 	num_deficit -= num_to_fill;
@@ -290,13 +292,17 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 	} else if (num_deficit > 0) {
 		taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 	}
-	ATHP_HTT_RX_UNLOCK(htt);
+	//ATHP_HTT_RX_UNLOCK(htt);
 }
 
 static void ath10k_htt_rx_ring_refill_retry(void *arg)
 {
 	struct ath10k_htt *htt = (struct ath10k_htt *)arg;
 
+	/*
+	 * Note: This callout is called with the lock held.
+	 */
+	ATHP_HTT_RX_LOCK_ASSERT(htt);
 	ath10k_htt_rx_msdu_buff_replenish(htt);
 }
 
@@ -521,7 +527,12 @@ static void ath10k_htt_rx_replenish_task(void *arg, int npending)
 {
 	struct ath10k_htt *htt = arg;
 
+	/*
+	 * Note: this taskqueue isn't called with the lock held.
+	 */
+	ATHP_HTT_RX_LOCK(htt);
 	ath10k_htt_rx_msdu_buff_replenish(htt);
+	ATHP_HTT_RX_UNLOCK(htt);
 }
 
 static struct athp_buf *ath10k_htt_rx_pop_paddr(struct ath10k_htt *htt,

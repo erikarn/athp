@@ -2302,24 +2302,26 @@ static int ath10k_wmi_10_4_op_pull_mgmt_rx_ev(struct ath10k *ar,
 
 int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 {
-#if 0
+#if 1
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_mgmt_rx_ev_arg arg = {};
-	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
-	struct ieee80211_hdr *hdr;
-	struct ieee80211_supported_band *sband;
+	struct ieee80211_rx_stats stat;
+	struct ieee80211_node *ni;
+	struct mbuf *m;
+//	struct ieee80211_hdr *hdr;
 	u32 rx_status;
 	u32 channel;
 	u32 phy_mode;
 	u32 snr;
 	u32 rate;
 	u32 buf_len;
-	u16 fc;
+//	u16 fc;
 	int ret;
 
 	ret = ath10k_wmi_pull_mgmt_rx(ar, pbuf, &arg);
 	if (ret) {
 		ath10k_warn(ar, "failed to parse mgmt rx event: %d\n", ret);
-		dev_kfree_skb(skb);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return ret;
 	}
 
@@ -2330,31 +2332,32 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	phy_mode = __le32_to_cpu(arg.phy_mode);
 	rate = __le32_to_cpu(arg.rate);
 
-	memset(status, 0, sizeof(*status));
+	memset(&stat, 0, sizeof(stat));
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
 		   "event mgmt rx status %08x\n", rx_status);
 
 	if (test_bit(ATH10K_CAC_RUNNING, &ar->dev_flags)) {
-		dev_kfree_skb(skb);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return 0;
 	}
 
 	if (rx_status & WMI_RX_STATUS_ERR_DECRYPT) {
-		dev_kfree_skb(skb);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return 0;
 	}
 
 	if (rx_status & WMI_RX_STATUS_ERR_KEY_CACHE_MISS) {
-		dev_kfree_skb(skb);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return 0;
 	}
 
 	if (rx_status & WMI_RX_STATUS_ERR_CRC) {
-		dev_kfree_skb(skb);
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
 		return 0;
 	}
 
+#if 0
 	if (rx_status & WMI_RX_STATUS_ERR_MIC)
 		status->flag |= RX_FLAG_MMIC_ERROR;
 
@@ -2379,7 +2382,13 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		ath10k_dbg(ar, ATH10K_DBG_MGMT, "wmi mgmt rx 11b (CCK) on 5GHz\n");
 
 	sband = &ar->mac.sbands[status->band];
+#endif
 
+	stat.r_flags = IEEE80211_R_RSSI | IEEE80211_R_IEEE;
+	stat.c_ieee = channel;
+	stat.rssi = snr + ATH10K_DEFAULT_NOISE_FLOOR;	/* XXX TODO: need correct SNR! */
+
+#if 0
 	status->freq = ieee80211_channel_to_frequency(channel, status->band);
 	status->signal = snr + ATH10K_DEFAULT_NOISE_FLOOR;
 	status->rate_idx = ath10k_mac_bitrate_to_idx(sband, rate / 100);
@@ -2408,18 +2417,48 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 
 	if (ieee80211_is_beacon(hdr->frame_control))
 		ath10k_mac_handle_beacon(ar, pbuf);
+#endif
 
+#if 0
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
 		   "event mgmt rx skb %p len %d ftype %02x stype %02x\n",
-		   skb, mbuf_skb_len(pbuf->m),
+		   mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m),
 		   fc & IEEE80211_FCTL_FTYPE, fc & IEEE80211_FCTL_STYPE);
+#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx freq %d band %d snr %d, rate_idx %d\n",
-		   status->freq, status->band, status->signal,
-		   status->rate_idx);
+		   "event mgmt rx chan %d snr %d\n", stat.c_ieee, stat.rssi);
 
-	ieee80211_rx(ar->hw, pbuf);
+	/*
+	 * Committed to RX up the node.  Grab the mbuf.
+	 */
+	m = athp_buf_take_mbuf(ar, &ar->buf_rx, pbuf);
+	if (m == NULL) {
+		/* XXX */
+		athp_freebuf(ar, &ar->buf_rx, pbuf);
+		return 0;
+	}
+
+	/* Free the buffer; mbuf is now gone */
+	athp_freebuf(ar, &ar->buf_rx, pbuf);
+
+	/*
+	 * Do node lookup for RX.
+	 */
+	ni = ieee80211_find_rxnode(ic, (const struct ieee80211_frame_min *) m);
+	if (ni) {
+		if (ni->ni_flags & IEEE80211_NODE_HT)
+			m->m_flags |= M_AMPDU;
+			ieee80211_input_mimo(ni, m, &stat);
+			ieee80211_free_node(ni);
+	} else {
+		/* no node, global */
+		ieee80211_input_mimo_all(ic, m, &stat);
+	}
+
+	/* ... now, the mbuf isn't ours */
+	m = NULL;
+
 	return 0;
 #else
 	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
