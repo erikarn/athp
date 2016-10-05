@@ -348,3 +348,17 @@ athp_buf_list_flush(struct ath10k *ar, struct athp_buf_ring *br,
 		athp_freebuf(ar, br, pbuf);
 	}
 }
+
+struct mbuf *
+athp_buf_take_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
+    struct athp_buf *bf)
+{
+	struct mbuf *m;
+
+	if (bf->m == NULL)
+		return (NULL);
+	athp_unmap_buf(ar, br, bf);
+	m = bf->m;
+	bf->m = NULL;
+	return (m);
+}
