@@ -195,24 +195,6 @@ const struct service_to_pipe target_service_to_ce_map_wlan[] = {
 	},
 };
 
-
-void
-ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
-{
-
-	printf("%s: called\n", __func__);
-}
-
-struct ath10k_fw_crash_data;
-static void
-ath10k_pci_dump_registers(struct athp_pci_softc *psc,
-    struct ath10k_fw_crash_data *crash_data)
-{
-
-	printf("%s: called\n", __func__);
-}
-
-
 static u32
 ath10k_pci_targ_cpu_to_ce_addr(struct ath10k *ar, u32 addr)
 {
@@ -411,6 +393,51 @@ __ath10k_pci_diag_read_hi(struct ath10k *ar, void *dest, u32 src, u32 len)
 
 #define ath10k_pci_diag_read_hi(ar, dest, src, len)		\
 	__ath10k_pci_diag_read_hi(ar, dest, HI_ITEM(src), len)
+
+static void
+ath10k_pci_dump_registers(struct athp_pci_softc *psc,
+    struct ath10k_fw_crash_data *crash_data)
+{
+	struct ath10k *ar = &psc->sc_sc;
+	uint32_t reg_dump_values[REG_DUMP_COUNT_QCA988X] = {};
+	int i, ret;
+
+	/* XXX TODO: conf lock */
+	ret = ath10k_pci_diag_read_hi(ar, &reg_dump_values[0], 
+	    hi_failure_state,
+	    REG_DUMP_COUNT_QCA988X * sizeof(uint32_t));
+	if (ret) {
+		ath10k_err(ar, "%s: failed to read dump info: %d\n", __func__, ret);
+		return;
+	}
+
+	ath10k_err(ar, "%s: firmware crash dump\n", __func__);
+	for (i = 0; i < REG_DUMP_COUNT_QCA988X; i += 4) {
+		ath10k_err(ar, "[%02d]: 0x%08x 0x%08x 0x%08x 0x%08x\n",
+		    i,
+		    __le32_to_cpu(reg_dump_values[i]),
+		    __le32_to_cpu(reg_dump_values[i + 1]),
+		    __le32_to_cpu(reg_dump_values[i + 2]),
+		    __le32_to_cpu(reg_dump_values[i + 3]));
+	}
+
+	if (! crash_data)
+		return;
+	for (i = 0; i < REG_DUMP_COUNT_QCA988X; i++) {
+		crash_data->registers[i] = reg_dump_values[i];
+	}
+}
+
+void
+ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
+{
+
+	printf("%s: called\n", __func__);
+
+	ath10k_pci_dump_registers(psc, NULL);
+}
+
+
 
 static int
 ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
