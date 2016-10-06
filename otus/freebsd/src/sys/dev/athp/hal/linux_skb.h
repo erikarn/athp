@@ -103,9 +103,10 @@ mbuf_skb_pull(struct mbuf *m, int len)
 static inline void
 mbuf_skb_trim(struct mbuf *m, int len)
 {
-
-	m->m_len = len;
-	m->m_pkthdr.len = len;
+	if (m->m_len > len) {
+		m->m_len = len;
+		m->m_pkthdr.len = len;
+	}
 }
 
 /*
