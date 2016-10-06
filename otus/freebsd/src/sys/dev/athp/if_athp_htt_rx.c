@@ -348,7 +348,7 @@ void ath10k_htt_rx_free(struct ath10k_htt *htt)
 static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
-	int idx;
+	int idx, idx_old;
 	struct athp_buf *msdu;
 
 	ATHP_HTT_RX_LOCK_ASSERT(htt);
@@ -359,6 +359,7 @@ static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
 	}
 
 	idx = htt->rx_ring.sw_rd_idx.msdu_payld;
+	idx_old = idx;
 	msdu = htt->rx_ring.netbufs_ring[idx];
 	htt->rx_ring.netbufs_ring[idx] = NULL;
 	htt->rx_ring.paddrs_ring[idx] = 0;
@@ -371,6 +372,12 @@ static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
 	/* post-receive flush */
 	athp_dma_mbuf_post_recv(ar, &ar->buf_rx.dh, &msdu->mb);
 
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: idx=%d, pbuf=%p, m=%p, len=%d\n",
+	    __func__,
+	    idx_old,
+	    msdu,
+	    msdu->m,
+	    mbuf_skb_len(msdu->m));
 	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx netbuf pop: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 
@@ -404,6 +411,12 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 
 		/* FIXME: we must report msdu payload since this is what caller
 		 *        expects now */
+
+		/*
+		 * This moves the beginning of the mbuf along to the start
+		 * of the payload.  It then .. adds that space to the end.
+		 * It's all just pointer/length malarky.
+		 */
 		mbuf_skb_put(msdu->m, offsetof(struct htt_rx_desc, msdu_payload));
 		mbuf_skb_pull(msdu->m, offsetof(struct htt_rx_desc, msdu_payload));
 
@@ -470,11 +483,34 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 			      RX_MSDU_START_INFO0_MSDU_LENGTH);
 		msdu_chained = rx_desc->frag_info.ring2_more_count;
 
+		ath10k_dbg(ar, ATH10K_DBG_HTT,
+		    "%s: m=%p, len=%d, msdu_len=%d, msdu_len_invalid=%d, msdu_chained=%d\n",
+		    __func__,
+		    msdu->m,
+		    mbuf_skb_len(msdu->m),
+		    msdu_len,
+		    msdu_len_invalid,
+		    msdu_chained);
+
 		if (msdu_len_invalid)
 			msdu_len = 0;
 
+		/*
+		 * This sets the msdu length to 0.
+		 */
 		mbuf_skb_trim(msdu->m, 0);
+
+		/*
+		 * This resets the msdu length to the provided msdu size.
+		 * Not yet sure what's going on here; no data has been
+		 * moved around yet.
+		 */
 		mbuf_skb_put(msdu->m, min(msdu_len, HTT_RX_MSDU_SIZE));
+
+		/*
+		 * Trim the current frame length out of the total msdu length.
+		 * Future msdus will provide more data.
+		 */
 		msdu_len -= mbuf_skb_len(msdu->m);
 
 		/* Note: Chained buffers do not contain rx descriptor */
@@ -484,8 +520,17 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 				athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
 				return -ENOENT;
 			}
+			ath10k_dbg(ar, ATH10K_DBG_HTT,
+			    "%s: m=%p, len=%d, msdu_len=%d\n",
+			    __func__,
+			    msdu->m,
+			    mbuf_skb_len(msdu->m),
+			    msdu_len);
 
 			TAILQ_INSERT_TAIL(amsdu, msdu, next);
+			/*
+			 * Trim back the buffer again?
+			 */
 			mbuf_skb_trim(msdu->m, 0);
 			mbuf_skb_put(msdu->m, min(msdu_len, HTT_RX_BUF_SIZE));
 			msdu_len -= mbuf_skb_len(msdu->m);
@@ -1145,6 +1190,13 @@ static void ath10k_process_rx(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_DATA,
 	    "%s: frame; m=%p, len=%d\n", __func__, m, m->m_len);
 
+	/*
+	 * XXX TODO: this is a bug up in the raw path decap; if the msdulen
+	 * is 0 because msdu_len_invalid is set, then the following logic
+	 * (eg subtracting FCS_LEN) is broken.
+	 *
+	 * So we end up having 0 byte frames passed up, which is silly.
+	 */
 	/* Radiotap */
 	if (ieee80211_radiotap_active(ic))
 		ieee80211_radiotap_rx_all(ic, m);
@@ -1157,8 +1209,8 @@ static void ath10k_process_rx(struct ath10k *ar,
 	} else {
 		ieee80211_input_mimo_all(ic, m, rx_status);
 	}
-
 	/* skb/pbuf is done by here */
+
 #endif
 }
 
@@ -1196,6 +1248,14 @@ static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 	is_last = !!(rxd->msdu_end.common.info0 &
 		     __cpu_to_le32(RX_MSDU_END_INFO0_LAST_MSDU));
 
+	ath10k_dbg(ar, ATH10K_DBG_HTT,
+	    "%s: m=%p, len=%d, is_first=%d, is_last=%d\n",
+	    __func__,
+	    msdu->m,
+	    mbuf_skb_len(msdu->m),
+	    is_first,
+	    is_last);
+
 	/* Delivered decapped frame:
 	 * [802.11 header]
 	 * [crypto param] <-- can be trimmed if !fcs_err &&
@@ -1216,7 +1276,8 @@ static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 
 /*XXX*/
 #define	FCS_LEN	4
-	mbuf_skb_trim(msdu->m, mbuf_skb_len(msdu->m) - FCS_LEN);
+	if (mbuf_skb_len(msdu->m) >= 4)
+		mbuf_skb_trim(msdu->m, mbuf_skb_len(msdu->m) - FCS_LEN);
 #undef	FCS_LEN
 
 	/* In most cases this will be true for sniffed frames. It makes sense
@@ -1615,9 +1676,9 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 	}
 }
 
+#if 0
 static int ath10k_unchain_msdu(athp_buf_head *amsdu)
 {
-#if 0
 	struct athp_buf *skb, *first;
 	int space;
 	int total_len = 0;
@@ -1663,18 +1724,74 @@ static int ath10k_unchain_msdu(athp_buf_head *amsdu)
 
 	TAILQ_INSERT_HEAD(amsdu, first, next);
 	return 0;
-#else
-	/*
-	 * XXX TODO: FreeBSD lets me just return an mbuf chain, but
-	 * right now athp_buf's only represent a single mbuf.
-	 * This is one of those places we can optimise things later.
-	 *
-	 * For now, just return an error.
-	 */
-	printf("%s: TODO!\n", __func__);
-	return -1;
-#endif
 }
+#endif
+
+/*
+ * Unchain the MSDU, for FreeBSD.
+ *
+ * Right now it would be better if we could pass an mbuf chain
+ * up. However the rest of the RX processing here still expects
+ * a single mbuf, not a chained mbuf.
+ *
+ * So, allocate a new rx pbuf, copy the data into the
+ * pbuf, and move on.
+ */
+static int
+ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
+{
+	struct athp_buf *pbuf, *np;
+	int total_len = 0;
+
+	/*
+	 * Unlike the Linux version, let's just allocate
+	 * a new mbuf to append everything into.
+	 */
+
+	/*
+	 * Step 1 - figure out how much data we need
+	 * to allocate.
+	 */
+	TAILQ_FOREACH(pbuf, amsdu, next) {
+		total_len += mbuf_skb_len(pbuf->m);
+	}
+	printf("%s: nframes=%d; len=%d\n", __func__,
+	    athp_buf_list_count(amsdu),
+	    total_len);
+
+	np = athp_getbuf(ar, &ar->buf_rx, total_len);
+	if (np == NULL) {
+		printf("%s: failed to allocate buffer of %d bytes\n",
+		    __func__,
+		    total_len);
+		return (-ENOMEM);
+	}
+
+	/*
+	 * Append the rest of the skbs into the original one.
+	 * Copy the payload, not headroom.
+	 */
+	TAILQ_FOREACH(pbuf, amsdu, next) {
+		/* XXX TODO: methodize this! */
+		memcpy(mbuf_skb_data(np->m) + mbuf_skb_len(np->m),
+		    mbuf_skb_data(pbuf->m),
+		    mbuf_skb_len(pbuf->m));
+		mbuf_skb_put(np->m, mbuf_skb_len(pbuf->m));
+	}
+
+	/*
+	 * Ok, now free the whole list.
+	 */
+	athp_buf_list_flush(ar, &ar->buf_rx, amsdu);
+
+	/*
+	 * Finally, add our single chained MSDU.
+	 */
+	TAILQ_INSERT_HEAD(amsdu, np, next);
+
+	return (0);
+}
+
 
 static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 				    athp_buf_head *amsdu,
@@ -1703,7 +1820,7 @@ static void ath10k_htt_rx_h_unchain(struct ath10k *ar,
 		return;
 	}
 
-	ath10k_unchain_msdu(amsdu);
+	ath10k_unchain_msdu_freebsd(ar, amsdu);
 }
 
 static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
