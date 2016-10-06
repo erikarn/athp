@@ -132,6 +132,10 @@ struct ath10k_tx_radiotap_header {
 	    (1 << IEEE80211_RADIOTAP_FLAGS |	\
 	     1 << IEEE80211_RADIOTAP_CHANNEL)
 
+struct ath10k_stats {
+	uint64_t rx_msdu_invalid_len;
+};
+
 /*
  * This is the top-level driver state.
  *
@@ -154,6 +158,8 @@ struct ath10k {
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;
+
+	struct ath10k_stats		sc_stats;
 
 	union {
 		struct ath10k_rx_radiotap_header th;

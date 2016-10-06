@@ -454,6 +454,9 @@ athp_attach_sysctl(struct ath10k *ar)
 
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "debug", CTLFLAG_RW,
 	    &ar->sc_debug, "debug control");
+
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
+	    &ar->sc_stats.rx_msdu_invalid_len, "");
 }
 
 /*
