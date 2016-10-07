@@ -96,6 +96,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_mac2.h"
 
 #include "if_athp_main.h"
 
