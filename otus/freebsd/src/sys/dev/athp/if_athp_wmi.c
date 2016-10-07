@@ -1956,11 +1956,7 @@ static void ath10k_wmi_event_scan_start_failed(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_STARTING:
 		ath10k_compl_wakeup_one(&ar->scan.started);
-#if 0
 		__ath10k_scan_finish(ar);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: scan_finish!\n", __func__);
-#endif
 		break;
 	}
 }
@@ -1986,11 +1982,7 @@ static void ath10k_wmi_event_scan_completed(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-#if 0
 		__ath10k_scan_finish(ar);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: scan_finish!\n", __func__);
-#endif
 		break;
 	}
 }
