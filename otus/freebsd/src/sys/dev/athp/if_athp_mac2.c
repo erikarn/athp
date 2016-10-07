@@ -3892,7 +3892,6 @@ void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 /* Scanning */
 /************/
 
-#if 1
 void __ath10k_scan_finish(struct ath10k *ar)
 {
 	ATHP_DATA_LOCK_ASSERT(ar);
@@ -3924,18 +3923,14 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		break;
 	}
 }
-#endif
 
-#if 1
 void ath10k_scan_finish(struct ath10k *ar)
 {
 	ATHP_DATA_LOCK(ar);
 	__ath10k_scan_finish(ar);
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
-#if 1
 static int ath10k_scan_stop(struct ath10k *ar)
 {
 	struct wmi_stop_scan_arg arg = {
@@ -3976,9 +3971,7 @@ out:
 
 	return ret;
 }
-#endif
 
-#if 1
 static void ath10k_scan_abort(struct ath10k *ar)
 {
 	int ret;
@@ -4014,21 +4007,7 @@ static void ath10k_scan_abort(struct ath10k *ar)
 
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
-#if 0
-void ath10k_scan_timeout_work(struct work_struct *work)
-{
-	struct ath10k *ar = container_of(work, struct ath10k,
-					 scan.timeout.work);
-
-	ATHP_CONF_LOCK(ar);
-	ath10k_scan_abort(ar);
-	ATHP_CONF_UNLOCK(ar);
-}
-#endif
-
-#if 1
 static void ath10k_scan_timeout_cb(void *arg)
 {
 	struct ath10k *ar = arg;
@@ -4037,9 +4016,7 @@ static void ath10k_scan_timeout_cb(void *arg)
 	ath10k_scan_abort(ar);
 	ATHP_CONF_UNLOCK(ar);
 }
-#endif
 
-#if 1
 static int ath10k_start_scan(struct ath10k *ar,
 			     const struct wmi_start_scan_arg *arg)
 {
@@ -4080,7 +4057,6 @@ static int ath10k_start_scan(struct ath10k *ar,
 #endif
 	return 0;
 }
-#endif
 
 /**********************/
 /* mac80211 callbacks */
