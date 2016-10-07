@@ -457,6 +457,15 @@ athp_attach_sysctl(struct ath10k *ar)
 
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_msdu_invalid_len, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_short_len", CTLFLAG_RD,
+	    &ar->sc_stats.rx_pkt_short_len, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_zero_len", CTLFLAG_RD,
+	    &ar->sc_stats.rx_pkt_zero_len, "");
+
+	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_wmi", CTLFLAG_RW,
+	    &ar->sc_rx_wmi, 0, "RX WMI frames");
+	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_htt", CTLFLAG_RW,
+	    &ar->sc_rx_htt, 0, "RX HTT frames");
 }
 
 /*

@@ -134,6 +134,8 @@ struct ath10k_tx_radiotap_header {
 
 struct ath10k_stats {
 	uint64_t rx_msdu_invalid_len;
+	uint64_t rx_pkt_short_len;
+	uint64_t rx_pkt_zero_len;
 };
 
 /*
@@ -160,6 +162,8 @@ struct ath10k {
 	int				sc_isrunning;
 
 	struct ath10k_stats		sc_stats;
+	int				sc_rx_wmi;
+	int				sc_rx_htt;
 
 	union {
 		struct ath10k_rx_radiotap_header th;
@@ -344,6 +348,8 @@ struct ath10k {
 	struct taskqueue *workqueue;
 	/* Auxiliary workqueue */
 	struct taskqueue *workqueue_aux;
+	/* attach workqueue - avoid re-entrant workqueue */
+	struct taskqueue *attach_workqueue;
 
 	/* prevents concurrent FW reconfiguration */
 #if 0

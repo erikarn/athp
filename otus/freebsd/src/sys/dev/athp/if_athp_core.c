@@ -1716,7 +1716,7 @@ int
 ath10k_core_register(struct ath10k *ar)
 {
 
-	taskqueue_enqueue(ar->workqueue, &ar->register_work);
+	taskqueue_enqueue(ar->attach_workqueue, &ar->register_work);
 
 	return 0;
 }
@@ -1822,10 +1822,16 @@ ath10k_core_init(struct ath10k *ar)
 	if (!ar->workqueue_aux)
 		goto err_free_wq;
 
+	ar->attach_workqueue = taskqueue_create("ath10k_attach_wq",
+	    M_NOWAIT, taskqueue_thread_enqueue, &ar->attach_workqueue);
+	/* XXX check */
+
 	taskqueue_start_threads(&ar->workqueue, 1, PI_NET, "%s ath10k_wq",
 	    device_get_nameunit(ar->sc_dev));
 	taskqueue_start_threads(&ar->workqueue_aux, 1, PI_NET,
 	    "%s ath10k_aux_wq", device_get_nameunit(ar->sc_dev));
+	taskqueue_start_threads(&ar->attach_workqueue, 1, PI_NET,
+	    "%s ath10k_at_wq", device_get_nameunit(ar->sc_dev));
 
 #if 0
 	mutex_init(&ar->conf_mutex);
@@ -1877,6 +1883,9 @@ ath10k_core_destroy(struct ath10k *ar)
 
 	taskqueue_drain_all(ar->workqueue_aux);
 	taskqueue_free(ar->workqueue_aux);
+
+	taskqueue_drain_all(ar->attach_workqueue);
+	taskqueue_free(ar->attach_workqueue);
 
 #if 0
 	ath10k_debug_destroy(ar);
