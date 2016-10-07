@@ -5257,21 +5257,22 @@ static void ath10k_bss_info_changed(struct ieee80211_hw *hw,
 
 	ATHP_CONF_UNLOCK(ar);
 }
+#endif
 
-static int ath10k_hw_scan(struct ieee80211_hw *hw,
-			  struct ieee80211_vif *vif,
-			  struct ieee80211_scan_request *hw_req)
+#if 1
+int
+ath10k_hw_scan(struct ath10k *ar,
+    struct ieee80211vap *vif)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct cfg80211_scan_request *req = &hw_req->req;
+//	struct cfg80211_scan_request *req = &hw_req->req;
 	struct wmi_start_scan_arg arg;
 	int ret = 0;
-	int i;
+//	int i;
 
 	ATHP_CONF_LOCK(ar);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	switch (ar->scan.state) {
 	case ATH10K_SCAN_IDLE:
 		ath10k_compl_reinit(&ar->scan.started);
@@ -5284,10 +5285,11 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 	case ATH10K_SCAN_STARTING:
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
+		ath10k_warn(ar, "%s: BUSY; state=%d\n", __func__, ar->scan.state);
 		ret = -EBUSY;
 		break;
 	}
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	if (ret)
 		goto exit;
@@ -5297,6 +5299,7 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 	arg.vdev_id = arvif->vdev_id;
 	arg.scan_id = ATH10K_SCAN_ID;
 
+#if 0
 	if (req->ie_len) {
 		arg.ie_len = req->ie_len;
 		memcpy(arg.ie, req->ie, arg.ie_len);
@@ -5317,24 +5320,28 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 		for (i = 0; i < arg.n_channels; i++)
 			arg.channels[i] = req->channels[i]->center_freq;
 	}
+#else
+	ath10k_warn(ar, "%s: TODO: add scan request from net80211!\n", __func__);
+#endif
 
 	ret = ath10k_start_scan(ar, &arg);
 	if (ret) {
 		ath10k_warn(ar, "failed to start hw scan: %d\n", ret);
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		ar->scan.state = ATH10K_SCAN_IDLE;
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 	}
 
 exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static void ath10k_cancel_hw_scan(struct ieee80211_hw *hw,
-				  struct ieee80211_vif *vif)
+#if 1
+void
+ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 {
-	struct ath10k *ar = hw->priv;
 
 	ATHP_CONF_LOCK(ar);
 	ath10k_scan_abort(ar);
@@ -5342,7 +5349,9 @@ static void ath10k_cancel_hw_scan(struct ieee80211_hw *hw,
 
 	callout_drain(&ar->scan.timeout); /* XXX make sync? */
 }
+#endif
 
+#if 0
 static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 					struct ath10k_vif *arvif,
 					enum set_key_cmd cmd,

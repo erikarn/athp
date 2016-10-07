@@ -119,6 +119,10 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
 static void
 athp_scan_start(struct ieee80211com *ic)
 {
+	ret = ath10k_hw_scan(ar, vap);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: ath10k_hw_scan failed; ret=%d\n", __func__, ret);
+	}
 }
 
 static void
