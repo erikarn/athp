@@ -2573,6 +2573,11 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	}
 
+	/*
+	 * Eventually it would be nice to push channel survey information
+	 * all the way up to net80211.
+	 */
+
 #if 0
 	idx = freq_to_idx(ar, freq);
 	if (idx >= ARRAY_SIZE(ar->survey)) {
@@ -2605,7 +2610,6 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 		ar->survey_last_cycle_count = cycle_count;
 	}
 #endif
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 exit:
 	ATHP_DATA_UNLOCK(ar);
 }
