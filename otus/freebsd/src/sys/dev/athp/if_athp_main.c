@@ -430,6 +430,17 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
 }
 
 /*
+ * XXX TODO: we don't need to send probe requests, and I don't think
+ * we send association requests either?  Should check.
+ */
+static int
+athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
+{
+
+	return (ENOTSUP);
+}
+
+/*
  * TODO: this doesn't yet take the regulatory domain into account.
  */
 static void
@@ -530,6 +541,7 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_scan_end = athp_scan_end;
 	ic->ic_set_channel = athp_set_channel;
 	ic->ic_transmit = athp_transmit;
+	ic->ic_send_mgmt = athp_send_mgmt;
 	ic->ic_parent = athp_parent;
 	ic->ic_vap_create = athp_vap_create;
 	ic->ic_vap_delete = athp_vap_delete;
