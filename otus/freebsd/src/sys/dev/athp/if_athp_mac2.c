@@ -3918,7 +3918,7 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		ar->scan.state = ATH10K_SCAN_IDLE;
 		ar->scan_channel = NULL;
 		ath10k_offchan_tx_purge(ar);
-		callout_drain(&ar->scan.timeout);	/* XXX holding lock? Can't block and wait by calling callout_stop? */
+		callout_drain(&ar->scan.timeout);
 		ath10k_compl_wakeup_all(&ar->scan.completed);
 		break;
 	}
@@ -4046,15 +4046,10 @@ static int ath10k_start_scan(struct ath10k *ar,
 		ATHP_DATA_UNLOCK(ar);
 		return -EINVAL;
 	}
-	ATHP_DATA_UNLOCK(ar);
 
 	/* Add a 200ms margin to account for event/command processing */
-#if 0
-	ieee80211_queue_delayed_work(ar->hw, &ar->scan.timeout,
-				     msecs_to_jiffies(arg->max_scan_time+200));
-#else
 	callout_reset(&ar->scan.timeout, hz * 200, ath10k_scan_timeout_cb, ar);
-#endif
+	ATHP_DATA_UNLOCK(ar);
 	return 0;
 }
 
@@ -4415,7 +4410,9 @@ void ath10k_stop(struct ath10k *ar)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
-	callout_drain(&ar->scan.timeout); /* XXX make sync? */
+	ATHP_DATA_LOCK(ar);
+	callout_drain(&ar->scan.timeout);
+	ATHP_DATA_UNLOCK(ar);
 	taskqueue_drain(ar->workqueue, &ar->restart_work);
 }
 #endif
@@ -5320,7 +5317,9 @@ ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 	ath10k_scan_abort(ar);
 	ATHP_CONF_UNLOCK(ar);
 
-	callout_drain(&ar->scan.timeout); /* XXX make sync? */
+	ATHP_DATA_LOCK(ar);
+	callout_drain(&ar->scan.timeout);
+	ATHP_DATA_UNLOCK(ar);
 }
 #endif
 
@@ -6154,12 +6153,9 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-#if 0
-	ieee80211_queue_delayed_work(ar->hw, &ar->scan.timeout,
-				     msecs_to_jiffies(duration));
-#else
+	ATHP_DATA_LOCK(ar);
 	callout_reset(&ar->scan.timeout, hz * duration, ath10k_scan_timeout_cb, ar);
-#endif
+	ATHP_DATA_UNLOCK(ar);
 	ret = 0;
 exit:
 	ATHP_CONF_UNLOCK(ar);
@@ -6180,7 +6176,9 @@ static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw)
 
 	ATHP_CONF_UNLOCK(ar);
 
+	ATHP_DATA_LOCK(ar);
 	callout_drain(&ar->scan.timeout);	/* XXX TODO: make sync? */
+	ATHP_DATA_UNLOCK(ar);
 
 	return 0;
 }
