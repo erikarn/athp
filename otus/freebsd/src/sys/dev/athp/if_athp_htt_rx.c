@@ -1190,6 +1190,12 @@ static void ath10k_process_rx(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_DATA,
 	    "%s: frame; m=%p, len=%d\n", __func__, m, m->m_len);
 
+	/* mmm configurable */
+	if (ar->sc_rx_htt == 0) {
+		m_freem(m);
+		return;
+	}
+
 	/*
 	 * XXX TODO: this is a bug up in the raw path decap; if the msdulen
 	 * is 0 because msdu_len_invalid is set, then the following logic
@@ -1197,9 +1203,40 @@ static void ath10k_process_rx(struct ath10k *ar,
 	 *
 	 * So we end up having 0 byte frames passed up, which is silly.
 	 */
+	if (m->m_len == 0) {
+		ar->sc_stats.rx_pkt_zero_len++;
+		m_freem(m);
+		return;
+	}
+
+	/*
+	 * Don't pass short frames up to the stack.
+	 */
+	if (m->m_len < IEEE80211_MIN_LEN) {
+		/*
+		 * Call radiotap RX - need to for short frames, eg ACK.
+		 */
+		ar->sc_stats.rx_pkt_short_len++;
+		if (ieee80211_radiotap_active(ic))
+			ieee80211_radiotap_rx_all(ic, m);
+		m_freem(m);
+		return;
+	}
+
+	/*
+	 * XXX TODO: does net80211 expect the FCS/CRC to be provided
+	 * in 802.11 frames?
+	 */
+
 	/* Radiotap */
+	/*
+	 * Note: we don't need to call rx_all; the input path
+	 * will correctly handle inputting frames for us.
+	 */
+#if 0
 	if (ieee80211_radiotap_active(ic))
 		ieee80211_radiotap_rx_all(ic, m);
+#endif
 
 	/* RX path to net80211 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
@@ -1736,11 +1773,21 @@ static int ath10k_unchain_msdu(athp_buf_head *amsdu)
  *
  * So, allocate a new rx pbuf, copy the data into the
  * pbuf, and move on.
+ *
+ * XXX TODO: NOTE: I'm only copying the HTT RX header here; I'm not
+ * copying any other data before the HTT RX header.
+ * I think that's ok here because we're not storing callback data
+ * in the mbuf like Linux does with the skb headroom.
+ *
+ * Maybe add some extra checks to the places where offsets are taken
+ * to make sure we never take a data pointer /before/ the start of
+ * mbuf storage?
  */
 static int
 ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 {
-	struct athp_buf *pbuf, *np;
+	struct athp_buf *pbuf, *np, *first;
+	char *s;
 	int total_len = 0;
 
 	/*
@@ -1755,10 +1802,20 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	TAILQ_FOREACH(pbuf, amsdu, next) {
 		total_len += mbuf_skb_len(pbuf->m);
 	}
-	printf("%s: nframes=%d; len=%d\n", __func__,
+	printf("%s: nframes=%d; msdu len=%d\n", __func__,
 	    athp_buf_list_count(amsdu),
 	    total_len);
 
+	/*
+	 * Step 1.5 - add the HTT RX descriptor to that.
+	 */
+	total_len += sizeof(struct htt_rx_desc);
+
+	/*
+	 * Step 2 - allocate a new mbuf/pbuf, big enough
+	 * to hold the descriptor from the first msdu,
+	 * then just the payloads from all msdus.
+	 */
 	np = athp_getbuf(ar, &ar->buf_rx, total_len);
 	if (np == NULL) {
 		printf("%s: failed to allocate buffer of %d bytes\n",
@@ -1768,15 +1825,67 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	}
 
 	/*
-	 * Append the rest of the skbs into the original one.
-	 * Copy the payload, not headroom.
+	 * XXX TODO: we need to actually copy the htt rx
+	 * descriptor field from the first msdu and then
+	 * do the relevant hijinx to move things around.
+	 *
+	 * The len of that first mbuf is the msdu len;
+	 * m_data points to the bginning of the msdu;
+	 * but we need to take that header htt bit into
+	 * account when copying.
+	 *
+	 * So:
+	 * + When allocating the target mbuf above,
+	 *   add the htt rx descriptor to the length being
+	 *   allocated;
+	 * + Then copy the rtt header into it;
+	 * + Then set the start of the data part to the
+	 *   beginning of the to-be MSDU payload part,
+	 *   and set the length of the mbuf to 0,
+	 * + Then append normally below; it'll start
+	 *   appending at the correct offset.
+	 */
+
+	/*
+	 * Step 3 - copy the first MSDU HTT RX descriptor into
+	 * the target descriptor.
+	 */
+	first = TAILQ_FIRST(amsdu);
+
+	/* Set length offset to 0 */
+	mbuf_skb_trim(np->m, 0);
+
+	/* Allocate headroom for htt_rx_desc; sets m_data to start of msdu */
+	s = mbuf_skb_data(np->m);
+	mbuf_skb_reserve(np->m, sizeof(struct htt_rx_desc));
+
+	/* Copy header from first mbuf into our headroom (htt_rx_desc) */
+	memcpy(s,
+	    mbuf_skb_data(first->m) - sizeof(struct htt_rx_desc),
+	    sizeof(struct htt_rx_desc));
+
+	/*
+	 * Step 4 - set the m_data pointer of the new mbuf
+	 * to the end of the HTT RX descriptor; set len to 0;
+	 * so all the MSDU payloads are just appended after the
+	 * HTT RX descriptor.
+	 */
+	mbuf_skb_trim(np->m, 0);
+
+	/*
+	 * Step 5 - append the rest of the skbs into the original one.
+	 * Copy the payload, not headroom - we already have the
+	 * HTT RX descriptor.
 	 */
 	TAILQ_FOREACH(pbuf, amsdu, next) {
-		/* XXX TODO: methodize this! */
-		memcpy(mbuf_skb_data(np->m) + mbuf_skb_len(np->m),
+		/* XXX mbuf_skb_put is not setting the data pointer along */
+		s = mbuf_skb_put(np->m, mbuf_skb_len(pbuf->m));
+		printf("%s: copying %d bytes to offset %d\n", __func__,
+		    mbuf_skb_len(pbuf->m),
+		    (int) (s - M_START(np->m)));
+		memcpy(s,
 		    mbuf_skb_data(pbuf->m),
 		    mbuf_skb_len(pbuf->m));
-		mbuf_skb_put(np->m, mbuf_skb_len(pbuf->m));
 	}
 
 	/*
