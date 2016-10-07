@@ -2019,12 +2019,9 @@ static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#if 0
-		ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
+		//ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
 		if (ar->scan.is_roc && ar->scan.roc_freq == freq)
 			ath10k_compl_wakeup_one(&ar->scan.on_channel);
-#endif
 		break;
 	}
 }

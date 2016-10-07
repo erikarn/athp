@@ -3902,15 +3902,12 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		if (!ar->scan.is_roc)
-#if 0
-			ieee80211_scan_completed(ar->hw,
-						 (ar->scan.state ==
-						  ATH10K_SCAN_ABORTING));
-#else
-			ath10k_warn(ar, "%s: TODO: scan completed; notify net80211\n", __func__);
-#endif
-		else if (ar->scan.roc_notify) {
+		if (!ar->scan.is_roc) {
+			struct ath10k_vif *vif;
+			vif = ath10k_get_arvif(ar, ar->scan.vdev_id);
+			if (vif != NULL)
+				ieee80211_scan_done(&vif->av_vap);
+		} else if (ar->scan.roc_notify) {
 #if 0
 			ieee80211_remain_on_channel_expired(ar->hw);
 #else
