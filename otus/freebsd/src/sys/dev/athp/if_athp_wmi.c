@@ -96,6 +96,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_hif.h"
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
+#include "if_athp_mac2.h"
 
 #include "if_athp_main.h"
 
@@ -1956,11 +1957,7 @@ static void ath10k_wmi_event_scan_start_failed(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_STARTING:
 		ath10k_compl_wakeup_one(&ar->scan.started);
-#if 0
 		__ath10k_scan_finish(ar);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: scan_finish!\n", __func__);
-#endif
 		break;
 	}
 }
@@ -1986,11 +1983,7 @@ static void ath10k_wmi_event_scan_completed(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-#if 0
 		__ath10k_scan_finish(ar);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: scan_finish!\n", __func__);
-#endif
 		break;
 	}
 }
@@ -2026,12 +2019,9 @@ static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#if 0
-		ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
+		//ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
 		if (ar->scan.is_roc && ar->scan.roc_freq == freq)
 			ath10k_compl_wakeup_one(&ar->scan.on_channel);
-#endif
 		break;
 	}
 }
@@ -2583,6 +2573,11 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	}
 
+	/*
+	 * Eventually it would be nice to push channel survey information
+	 * all the way up to net80211.
+	 */
+
 #if 0
 	idx = freq_to_idx(ar, freq);
 	if (idx >= ARRAY_SIZE(ar->survey)) {
@@ -2615,7 +2610,6 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 		ar->survey_last_cycle_count = cycle_count;
 	}
 #endif
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 exit:
 	ATHP_DATA_UNLOCK(ar);
 }

@@ -443,6 +443,8 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 	mtx_init(&ar->sc_data_mtx, device_get_nameunit(dev), "athp data",
 	    MTX_DEF);
+	/* XXX here instead of in core_init because we need the lock init'ed */
+	callout_init_mtx(&ar->scan.timeout, &ar->sc_data_mtx, 0);
 	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
 	    NULL, psc);
 	(void) taskqueue_start_threads(&psc->pipe_taskq, 1, PI_NET, "%s pipe taskq",

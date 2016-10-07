@@ -1811,6 +1811,7 @@ ath10k_core_init(struct ath10k *ar)
 #if 0
 	INIT_DELAYED_WORK(&ar->scan.timeout, ath10k_scan_timeout_work);
 #endif
+	/* XXX this gets done when the data lock is init'ed */
 
 	ar->workqueue = taskqueue_create("ath10k_wq",
 	    M_NOWAIT, taskqueue_thread_enqueue, &ar->workqueue);

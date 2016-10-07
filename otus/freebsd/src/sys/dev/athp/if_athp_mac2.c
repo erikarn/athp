@@ -3892,7 +3892,6 @@ void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 /* Scanning */
 /************/
 
-#if 1
 void __ath10k_scan_finish(struct ath10k *ar)
 {
 	ATHP_DATA_LOCK_ASSERT(ar);
@@ -3902,15 +3901,12 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		if (!ar->scan.is_roc)
-#if 0
-			ieee80211_scan_completed(ar->hw,
-						 (ar->scan.state ==
-						  ATH10K_SCAN_ABORTING));
-#else
-			ath10k_warn(ar, "%s: TODO: scan completed; notify net80211\n", __func__);
-#endif
-		else if (ar->scan.roc_notify) {
+		if (!ar->scan.is_roc) {
+			struct ath10k_vif *vif;
+			vif = ath10k_get_arvif(ar, ar->scan.vdev_id);
+			if (vif != NULL)
+				ieee80211_scan_done(&vif->av_vap);
+		} else if (ar->scan.roc_notify) {
 #if 0
 			ieee80211_remain_on_channel_expired(ar->hw);
 #else
@@ -3922,23 +3918,19 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		ar->scan.state = ATH10K_SCAN_IDLE;
 		ar->scan_channel = NULL;
 		ath10k_offchan_tx_purge(ar);
-		callout_drain(&ar->scan.timeout);	/* XXX holding lock? Can't block and wait by calling callout_stop? */
+		callout_drain(&ar->scan.timeout);
 		ath10k_compl_wakeup_all(&ar->scan.completed);
 		break;
 	}
 }
-#endif
 
-#if 1
 void ath10k_scan_finish(struct ath10k *ar)
 {
 	ATHP_DATA_LOCK(ar);
 	__ath10k_scan_finish(ar);
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
-#if 1
 static int ath10k_scan_stop(struct ath10k *ar)
 {
 	struct wmi_stop_scan_arg arg = {
@@ -3979,9 +3971,7 @@ out:
 
 	return ret;
 }
-#endif
 
-#if 1
 static void ath10k_scan_abort(struct ath10k *ar)
 {
 	int ret;
@@ -4017,21 +4007,7 @@ static void ath10k_scan_abort(struct ath10k *ar)
 
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
-#if 0
-void ath10k_scan_timeout_work(struct work_struct *work)
-{
-	struct ath10k *ar = container_of(work, struct ath10k,
-					 scan.timeout.work);
-
-	ATHP_CONF_LOCK(ar);
-	ath10k_scan_abort(ar);
-	ATHP_CONF_UNLOCK(ar);
-}
-#endif
-
-#if 1
 static void ath10k_scan_timeout_cb(void *arg)
 {
 	struct ath10k *ar = arg;
@@ -4040,9 +4016,7 @@ static void ath10k_scan_timeout_cb(void *arg)
 	ath10k_scan_abort(ar);
 	ATHP_CONF_UNLOCK(ar);
 }
-#endif
 
-#if 1
 static int ath10k_start_scan(struct ath10k *ar,
 			     const struct wmi_start_scan_arg *arg)
 {
@@ -4072,18 +4046,12 @@ static int ath10k_start_scan(struct ath10k *ar,
 		ATHP_DATA_UNLOCK(ar);
 		return -EINVAL;
 	}
-	ATHP_DATA_UNLOCK(ar);
 
 	/* Add a 200ms margin to account for event/command processing */
-#if 0
-	ieee80211_queue_delayed_work(ar->hw, &ar->scan.timeout,
-				     msecs_to_jiffies(arg->max_scan_time+200));
-#else
 	callout_reset(&ar->scan.timeout, hz * 200, ath10k_scan_timeout_cb, ar);
-#endif
+	ATHP_DATA_UNLOCK(ar);
 	return 0;
 }
-#endif
 
 /**********************/
 /* mac80211 callbacks */
@@ -4442,7 +4410,9 @@ void ath10k_stop(struct ath10k *ar)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
-	callout_drain(&ar->scan.timeout); /* XXX make sync? */
+	ATHP_DATA_LOCK(ar);
+	callout_drain(&ar->scan.timeout);
+	ATHP_DATA_UNLOCK(ar);
 	taskqueue_drain(ar->workqueue, &ar->restart_work);
 }
 #endif
@@ -5257,21 +5227,22 @@ static void ath10k_bss_info_changed(struct ieee80211_hw *hw,
 
 	ATHP_CONF_UNLOCK(ar);
 }
+#endif
 
-static int ath10k_hw_scan(struct ieee80211_hw *hw,
-			  struct ieee80211_vif *vif,
-			  struct ieee80211_scan_request *hw_req)
+#if 1
+int
+ath10k_hw_scan(struct ath10k *ar,
+    struct ieee80211vap *vif)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct cfg80211_scan_request *req = &hw_req->req;
+//	struct cfg80211_scan_request *req = &hw_req->req;
 	struct wmi_start_scan_arg arg;
 	int ret = 0;
-	int i;
+//	int i;
 
 	ATHP_CONF_LOCK(ar);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	switch (ar->scan.state) {
 	case ATH10K_SCAN_IDLE:
 		ath10k_compl_reinit(&ar->scan.started);
@@ -5284,10 +5255,11 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 	case ATH10K_SCAN_STARTING:
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
+		ath10k_warn(ar, "%s: BUSY; state=%d\n", __func__, ar->scan.state);
 		ret = -EBUSY;
 		break;
 	}
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	if (ret)
 		goto exit;
@@ -5297,6 +5269,7 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 	arg.vdev_id = arvif->vdev_id;
 	arg.scan_id = ATH10K_SCAN_ID;
 
+#if 0
 	if (req->ie_len) {
 		arg.ie_len = req->ie_len;
 		memcpy(arg.ie, req->ie, arg.ie_len);
@@ -5317,32 +5290,40 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 		for (i = 0; i < arg.n_channels; i++)
 			arg.channels[i] = req->channels[i]->center_freq;
 	}
+#else
+	ath10k_warn(ar, "%s: TODO: add scan request from net80211!\n", __func__);
+#endif
 
 	ret = ath10k_start_scan(ar, &arg);
 	if (ret) {
 		ath10k_warn(ar, "failed to start hw scan: %d\n", ret);
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		ar->scan.state = ATH10K_SCAN_IDLE;
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 	}
 
 exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static void ath10k_cancel_hw_scan(struct ieee80211_hw *hw,
-				  struct ieee80211_vif *vif)
+#if 1
+void
+ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 {
-	struct ath10k *ar = hw->priv;
 
 	ATHP_CONF_LOCK(ar);
 	ath10k_scan_abort(ar);
 	ATHP_CONF_UNLOCK(ar);
 
-	callout_drain(&ar->scan.timeout); /* XXX make sync? */
+	ATHP_DATA_LOCK(ar);
+	callout_drain(&ar->scan.timeout);
+	ATHP_DATA_UNLOCK(ar);
 }
+#endif
 
+#if 0
 static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 					struct ath10k_vif *arvif,
 					enum set_key_cmd cmd,
@@ -6172,12 +6153,9 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-#if 0
-	ieee80211_queue_delayed_work(ar->hw, &ar->scan.timeout,
-				     msecs_to_jiffies(duration));
-#else
+	ATHP_DATA_LOCK(ar);
 	callout_reset(&ar->scan.timeout, hz * duration, ath10k_scan_timeout_cb, ar);
-#endif
+	ATHP_DATA_UNLOCK(ar);
 	ret = 0;
 exit:
 	ATHP_CONF_UNLOCK(ar);
@@ -6198,7 +6176,9 @@ static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw)
 
 	ATHP_CONF_UNLOCK(ar);
 
+	ATHP_DATA_LOCK(ar);
 	callout_drain(&ar->scan.timeout);	/* XXX TODO: make sync? */
+	ATHP_DATA_UNLOCK(ar);
 
 	return 0;
 }
