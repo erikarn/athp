@@ -2302,7 +2302,6 @@ static int ath10k_wmi_10_4_op_pull_mgmt_rx_ev(struct ath10k *ar,
 
 int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 {
-#if 1
 	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_mgmt_rx_ev_arg arg = {};
 	struct ieee80211_rx_stats stat;
@@ -2442,13 +2441,26 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	/* Free the buffer; mbuf is now gone */
 	athp_freebuf(ar, &ar->buf_rx, pbuf);
 
+	if (ar->sc_rx_wmi == 0) {
+		m_freem(m);
+		return (0);
+	}
+
 	/*
 	 * Radiotap!
+	 *
+	 * Here the radiotap RX status would be set before
+	 * the net80211 input routine runs.
+	 *
+	 * Frames would then appear in RX radiotap for us.
+	 * Yes, with the previously setup global radiotap.
 	 */
+#if 0
 	if (ieee80211_radiotap_active(ic)) {
 		/* XXX TODO: fill in RX header details */
 		ieee80211_radiotap_rx_all(ic, m);
 	}
+#endif
 
 	/*
 	 * Do node lookup for RX.
@@ -2468,11 +2480,6 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	m = NULL;
 
 	return 0;
-#else
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-	athp_freebuf(ar, &ar->buf_rx, pbuf);
-	return (0);
-#endif
 }
 
 #if 0
