@@ -2375,7 +2375,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 
 	stat.r_flags = IEEE80211_R_RSSI | IEEE80211_R_IEEE | IEEE80211_R_NF;
 	stat.c_ieee = channel;
-	stat.c_rssi = snr + ATH10K_DEFAULT_NOISE_FLOOR;	/* XXX TODO: need correct SNR! */
+	stat.c_rssi = snr;
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
 
 #if 0
