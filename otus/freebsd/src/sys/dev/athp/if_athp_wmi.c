@@ -2373,9 +2373,10 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	sband = &ar->mac.sbands[status->band];
 #endif
 
-	stat.r_flags = IEEE80211_R_RSSI | IEEE80211_R_IEEE;
+	stat.r_flags = IEEE80211_R_RSSI | IEEE80211_R_IEEE | IEEE80211_R_NF;
 	stat.c_ieee = channel;
-	stat.rssi = snr + ATH10K_DEFAULT_NOISE_FLOOR;	/* XXX TODO: need correct SNR! */
+	stat.c_rssi = snr + ATH10K_DEFAULT_NOISE_FLOOR;	/* XXX TODO: need correct SNR! */
+	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
 
 #if 0
 	status->freq = ieee80211_channel_to_frequency(channel, status->band);
@@ -2416,7 +2417,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 #endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx chan %d snr %d\n", stat.c_ieee, stat.rssi);
+		   "event mgmt rx chan %d snr %d\n", stat.c_ieee, stat.c_rssi);
 
 	/*
 	 * Committed to RX up the node.  Grab the mbuf.

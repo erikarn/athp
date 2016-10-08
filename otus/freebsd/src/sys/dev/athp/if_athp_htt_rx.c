@@ -1029,9 +1029,9 @@ static void ath10k_htt_rx_h_signal(struct ath10k *ar,
 				   struct htt_rx_desc *rxd)
 {
 	/* FIXME: Get real NF */
-	status->rssi = ATH10K_DEFAULT_NOISE_FLOOR +
+	status->c_rssi = ATH10K_DEFAULT_NOISE_FLOOR +
 			 rxd->ppdu_start.rssi_comb;
-	status->nf = ATH10K_DEFAULT_NOISE_FLOOR;
+	status->c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
 	status->r_flags |= IEEE80211_R_NF | IEEE80211_R_RSSI;
 }
 
