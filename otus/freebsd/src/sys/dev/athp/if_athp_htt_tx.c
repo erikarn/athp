@@ -500,9 +500,14 @@ int ath10k_htt_h2t_aggr_cfg_msg(struct ath10k_htt *htt,
 	return 0;
 }
 
+/*
+ * XXX TODO: note - I think this is used by the QCA9880 (peregrine v2)
+ *   + firmware 10.2.4.  So, it's the minimal transmit path required
+ *   to bootstrap station association.
+ */
+
 int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
-#if 0
 	struct ath10k *ar = htt->ar;
 //	struct device *dev = ar->sc_dev;
 	struct athp_buf *txdesc = NULL;
@@ -582,10 +587,6 @@ err_tx_dec:
 	ath10k_htt_tx_dec_pending(htt);
 err:
 	return res;
-#else
-	device_printf(htt->ar->sc_dev, "%s; TODO implement!\n", __func__);
-	return (-EINVAL);
-#endif
 }
 
 int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
