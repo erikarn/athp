@@ -22,6 +22,10 @@ extern	int ath10k_start(struct ath10k *ar);
 extern	void ath10k_stop(struct ath10k *ar);
 extern	void ath10k_halt(struct ath10k *ar);
 
+/* station */
+extern	void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni);
+extern	void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vap);
+
 extern	int ath10k_vdev_stop(struct ath10k_vif *arvif);
 extern	int ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c);
 extern	int ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c);

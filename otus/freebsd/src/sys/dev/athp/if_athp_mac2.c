@@ -2223,13 +2223,15 @@ static void ath10k_mac_vif_sta_connection_loss_work(struct work_struct *work)
 
 	ieee80211_connection_loss(vif);
 }
+#endif
 
 /**********************/
 /* Station management */
 /**********************/
 
+#if 1
 static u32 ath10k_peer_assoc_h_listen_intval(struct ath10k *ar,
-					     struct ieee80211_vif *vif)
+					     struct ieee80211vap *vif)
 {
 	/* Some firmware revisions have unstable STA powersave when listen
 	 * interval is set too high (e.g. 5). The symptoms are firmware doesn't
@@ -2239,15 +2241,26 @@ static u32 ath10k_peer_assoc_h_listen_intval(struct ath10k *ar,
 	 *
 	 * As a workaround set it to 1.
 	 */
-	if (vif->type == NL80211_IFTYPE_STATION)
+	if (vif->iv_opmode == IEEE80211_M_STA)
 		return 1;
 
-	return ar->hw->conf.listen_interval;
+	//return ar->hw->conf.listen_interval;
+	/* XXX TODO: is this correct? */
+	ath10k_warn(ar, "%s: TODO: what should the default listen intval be?\n", __func__);
+	return 1;
 }
+#endif
 
+/*
+ * Setup basic association paramaters.
+ *
+ * XXX TODO: This uses capinfo, aid which suggests we have already exchanged
+ * association request/response frames before calling this routine.
+ */
+#if 1
 static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
-				      struct ieee80211_vif *vif,
-				      struct ieee80211_sta *sta,
+				      struct ieee80211vap *vif,
+				      struct ieee80211_node *ni,
 				      struct wmi_peer_assoc_complete_arg *arg)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
@@ -2255,20 +2268,33 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (vif->type == NL80211_IFTYPE_STATION)
-		aid = vif->bss_conf.aid;
-	else
-		aid = sta->aid;
+	/*
+	 * note: linux used vif->bss_conf.aid in sta mode,
+	 * and sta->aid for anything else.
+	 * For net80211, ni->ni_associd should always be "right".
+	 */
+	aid = ni->ni_associd;
 
-	ether_addr_copy(arg->addr, sta->addr);
+	ether_addr_copy(arg->addr, ni->ni_macaddr);
 	arg->vdev_id = arvif->vdev_id;
 	arg->peer_aid = aid;
 	arg->peer_flags |= WMI_PEER_AUTH;
 	arg->peer_listen_intval = ath10k_peer_assoc_h_listen_intval(ar, vif);
 	arg->peer_num_spatial_streams = 1;
-	arg->peer_caps = vif->bss_conf.assoc_capability;
-}
 
+	/*
+	 * XXX TODO: is this in host-order, or 802.11 order?
+	 *
+	 * FreeBSD assigns capinfo from the assoc/reassoc response
+	 * by converting it to host endian; I'm unsure about mac80211.
+	 */
+	ath10k_warn(ar, "%s: TODO: check endian-ness of assoc_capability with mac80211!\n", __func__);
+	//arg->peer_caps = vif->bss_conf.assoc_capability;
+	arg->peer_caps = ni->ni_capinfo;
+}
+#endif
+
+#if 0
 static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
 				       struct ieee80211_vif *vif,
 				       struct wmi_peer_assoc_complete_arg *arg)
@@ -2770,54 +2796,60 @@ static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 	arg->peer_phymode = phymode;
 	WARN_ON(phymode == MODE_UNKNOWN);
 }
+#endif
 
+#if 1
 static int ath10k_peer_assoc_prepare(struct ath10k *ar,
-				     struct ieee80211_vif *vif,
-				     struct ieee80211_sta *sta,
+				     struct ieee80211vap *vif,
+				     struct ieee80211_node *ni,
 				     struct wmi_peer_assoc_complete_arg *arg)
 {
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 	memset(arg, 0, sizeof(*arg));
 
-	ath10k_peer_assoc_h_basic(ar, vif, sta, arg);
+	ath10k_peer_assoc_h_basic(ar, vif, ni, arg);
+#if 0
 	ath10k_peer_assoc_h_crypto(ar, vif, arg);
-	ath10k_peer_assoc_h_rates(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_ht(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_vht(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_qos(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_phymode(ar, vif, sta, arg);
-
+	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_phymode(ar, vif, ni, arg);
+#endif
 	return 0;
 }
+#endif
 
-static const u32 ath10k_smps_map[] = {
-	[WLAN_HT_CAP_SM_PS_STATIC] = WMI_PEER_SMPS_STATIC,
-	[WLAN_HT_CAP_SM_PS_DYNAMIC] = WMI_PEER_SMPS_DYNAMIC,
-	[WLAN_HT_CAP_SM_PS_INVALID] = WMI_PEER_SMPS_PS_NONE,
-	[WLAN_HT_CAP_SM_PS_DISABLED] = WMI_PEER_SMPS_PS_NONE,
+#if 1
+static const uint32_t ath10k_smps_map[] = {
+	[0] = WMI_PEER_SMPS_STATIC,
+	[1] = WMI_PEER_SMPS_DYNAMIC,
+	[2] = WMI_PEER_SMPS_PS_NONE,
+	[3] = WMI_PEER_SMPS_PS_NONE,
 };
 
 static int ath10k_setup_peer_smps(struct ath10k *ar, struct ath10k_vif *arvif,
-				  const u8 *addr,
-				  const struct ieee80211_sta_ht_cap *ht_cap)
+    const u8 *addr, struct ieee80211_node *ni)
 {
 	int smps;
 
-	if (!ht_cap->ht_supported)
+	if (!ni->ni_flags & IEEE80211_NODE_HT)
 		return 0;
 
-	smps = ht_cap->cap & IEEE80211_HT_CAP_SM_PS;
-	smps >>= IEEE80211_HT_CAP_SM_PS_SHIFT;
+	smps = ni->ni_htcap & IEEE80211_HTCAP_SMPS;
+	smps >>= 2; //IEEE80211_HT_CAP_SM_PS_SHIFT;
 
-	if (smps >= ARRAY_SIZE(ath10k_smps_map))
+	if (smps >= nitems(ath10k_smps_map))
 		return -EINVAL;
 
 	return ath10k_wmi_peer_set_param(ar, arvif->vdev_id, addr,
 					 WMI_PEER_SMPS_STATE,
 					 ath10k_smps_map[smps]);
 }
+#endif
 
+#if 0
 static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 				      struct ieee80211_vif *vif,
 				      struct ieee80211_sta_vht_cap vht_cap)
@@ -2882,81 +2914,80 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 
 	return 0;
 }
+#endif
 
+/*
+ * XXX adrian - I /think/ this is the "join a BSS" as a station
+ * method.
+ */
 /* can be called only in mac80211 callbacks due to `key_count` usage */
-static void ath10k_bss_assoc(struct ieee80211_hw *hw,
-			     struct ieee80211_vif *vif,
-			     struct ieee80211_bss_conf *bss_conf)
+#if 1
+void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni)
 {
-	struct ath10k *ar = hw->priv;
+	struct ieee80211vap *vif = ni->ni_vap;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct ieee80211_sta_ht_cap ht_cap;
-	struct ieee80211_sta_vht_cap vht_cap;
+//	struct ieee80211_sta_ht_cap ht_cap;
+//	struct ieee80211_sta_vht_cap vht_cap;
 	struct wmi_peer_assoc_complete_arg peer_arg;
-	struct ieee80211_sta *ap_sta;
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %pM aid %d\n",
-		   arvif->vdev_id, arvif->bssid, arvif->aid);
+	/*
+	 * net80211: assume the caller has passed ni vap->iv_bss as the
+	 * node; and has also ref'ed it for us.
+	 */
 
-	rcu_read_lock();
-
-	ap_sta = ieee80211_find_sta(vif, bss_conf->bssid);
-	if (!ap_sta) {
-		ath10k_warn(ar, "failed to find station entry for bss %pM vdev %i\n",
-			    bss_conf->bssid, arvif->vdev_id);
-		rcu_read_unlock();
-		return;
-	}
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %6D aid %d\n",
+		   arvif->vdev_id, arvif->bssid, ":", arvif->aid);
 
 	/* ap_sta must be accessed only within rcu section which must be left
 	 * before calling ath10k_setup_peer_smps() which might sleep. */
-	ht_cap = ap_sta->ht_cap;
-	vht_cap = ap_sta->vht_cap;
+//	htcap = ap_sta->ht_cap;
+//	vht_cap = ap_sta->vht_cap;
 
-	ret = ath10k_peer_assoc_prepare(ar, vif, ap_sta, &peer_arg);
+	ret = ath10k_peer_assoc_prepare(ar, vif, ni, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to prepare peer assoc for %pM vdev %i: %d\n",
-			    bss_conf->bssid, arvif->vdev_id, ret);
-		rcu_read_unlock();
+		ath10k_warn(ar, "failed to prepare peer assoc for %6D vdev %i: %d\n",
+			    ni->ni_macaddr, ":", arvif->vdev_id, ret);
 		return;
 	}
-
-	rcu_read_unlock();
 
 	ret = ath10k_wmi_peer_assoc(ar, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to run peer assoc for %pM vdev %i: %d\n",
-			    bss_conf->bssid, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to run peer assoc for %6D vdev %i: %d\n",
+			    ni->ni_macaddr, ":", arvif->vdev_id, ret);
 		return;
 	}
 
-	ret = ath10k_setup_peer_smps(ar, arvif, bss_conf->bssid, &ht_cap);
+	ret = ath10k_setup_peer_smps(ar, arvif, ni->ni_macaddr, ni);
 	if (ret) {
 		ath10k_warn(ar, "failed to setup peer SMPS for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
 
+#if 0
 	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
 	if (ret) {
-		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %pM: %d\n",
-			    arvif->vdev_id, bss_conf->bssid, ret);
+		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %6D: %d\n",
+			    arvif->vdev_id, bss_conf->bssid, ":", ret);
 		return;
 	}
+#else
+	ath10k_warn(ar, "%s: TODO: vhtcap\n", __func__);
+#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
-		   "mac vdev %d up (associated) bssid %pM aid %d\n",
-		   arvif->vdev_id, bss_conf->bssid, bss_conf->aid);
+		   "mac vdev %d up (associated) bssid %6D aid %d\n",
+		   arvif->vdev_id, ni->ni_macaddr, ":", ni->ni_associd);
 
 	WARN_ON(arvif->is_up);
 
-	arvif->aid = bss_conf->aid;
-	ether_addr_copy(arvif->bssid, bss_conf->bssid);
+	arvif->aid = ni->ni_associd;
+	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
-	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, arvif->aid, arvif->bssid);
+	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, ni->ni_associd, arvif->bssid);
 	if (ret) {
 		ath10k_warn(ar, "failed to set vdev %d up: %d\n",
 			    arvif->vdev_id, ret);
@@ -2972,24 +3003,27 @@ static void ath10k_bss_assoc(struct ieee80211_hw *hw,
 	ret = ath10k_wmi_peer_set_param(ar, arvif->vdev_id, arvif->bssid,
 					WMI_PEER_DUMMY_VAR, 1);
 	if (ret) {
-		ath10k_warn(ar, "failed to poke peer %pM param for ps workaround on vdev %i: %d\n",
-			    arvif->bssid, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to poke peer %6D param for ps workaround on vdev %i: %d\n",
+			    arvif->bssid, ":", arvif->vdev_id, ret);
 		return;
 	}
 }
+#endif
 
-static void ath10k_bss_disassoc(struct ieee80211_hw *hw,
-				struct ieee80211_vif *vif)
+/*
+ * XXX adrian: I think this is the "disconnect from a BSS" STA method.
+ */
+#if 1
+void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct ieee80211_sta_vht_cap vht_cap = {};
+//	struct ieee80211_sta_vht_cap vht_cap = {};
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i disassoc bssid %pM\n",
-		   arvif->vdev_id, arvif->bssid);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i disassoc bssid %6D\n",
+		   arvif->vdev_id, arvif->bssid ,":");
 
 	ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
 	if (ret)
@@ -2998,18 +3032,31 @@ static void ath10k_bss_disassoc(struct ieee80211_hw *hw,
 
 	arvif->def_wep_key_idx = -1;
 
+#if 0
 	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc txbf for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
-
+#else
+	ath10k_warn(ar, "%s: TODO: txbf/vht_cap\n", __func__);
+#endif
 	arvif->is_up = false;
 
+#if 0
 	cancel_delayed_work_sync(&arvif->connection_loss_work);
+#else
+	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
+#endif
 }
+#endif
 
+/*
+ * XXX adrian: I think this is the hostap side "add a new node"
+ * method.
+ */
+#if 0
 static int ath10k_station_assoc(struct ath10k *ar,
 				struct ieee80211_vif *vif,
 				struct ieee80211_sta *sta,
@@ -3078,6 +3125,9 @@ static int ath10k_station_assoc(struct ath10k *ar,
 	return ret;
 }
 
+/*
+ * XXX adrian I think this is the "delete a station from hostap" method.
+ */
 static int ath10k_station_disassoc(struct ath10k *ar,
 				   struct ieee80211_vif *vif,
 				   struct ieee80211_sta *sta)
