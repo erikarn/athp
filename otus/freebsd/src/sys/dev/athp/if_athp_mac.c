@@ -244,3 +244,13 @@ ath10k_drain_tx(struct ath10k *ar)
 {
 	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
 }
+
+void
+ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
+{
+
+	/* XXX TODO: call net80211 to free the original mbuf */
+	/* XXX TODO TODO: yes, this means we have to keep the original mbuf somewhere! */
+	athp_freebuf(ar, &ar->buf_tx, pbuf);
+	ath10k_warn(ar, "%s: TODO: actually handle net80211 TX notification!\n", __func__);
+}

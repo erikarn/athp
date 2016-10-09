@@ -3779,8 +3779,11 @@ unlock:
 
 	return ret;
 }
+#endif
 
-static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
+#if 1
+static void
+ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(skb);
 	struct ath10k_htt *htt = &ar->htt;
@@ -3794,9 +3797,15 @@ static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
 		break;
 	case ATH10K_HW_TXRX_MGMT:
 		if (test_bit(ATH10K_FW_FEATURE_HAS_WMI_MGMT_TX,
-			     ar->fw_features))
+			     ar->fw_features)) {
+#if 0
 			ret = ath10k_mac_tx_wmi_mgmt(ar, skb);
-		else if (ar->htt.target_version_major >= 3)
+#else
+			ath10k_warn(ar, "%s: TODO: implement mac_tx_wmi_mgmt!\n", __func__);
+			ret = -EINVAL;
+			break;
+#endif
+		} else if (ar->htt.target_version_major >= 3)
 			ret = ath10k_htt_tx(htt, skb);
 		else
 			ret = ath10k_htt_mgmt_tx(htt, skb);
@@ -3806,7 +3815,7 @@ static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
 	if (ret) {
 		ath10k_warn(ar, "failed to transmit packet, dropping: %d\n",
 			    ret);
-		ieee80211_free_txskb(ar->hw, skb);
+		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
 }
 #endif
@@ -4109,15 +4118,21 @@ static int ath10k_start_scan(struct ath10k *ar,
 /* mac80211 callbacks */
 /**********************/
 
-#if 0
-static void ath10k_tx(struct ieee80211_hw *hw,
-		      struct ieee80211_tx_control *control,
-		      struct sk_buff *skb)
+/*
+ * Send raw and normal data path frames.
+ *
+ * This routine always consumes buffers for now.  Keep this in mind
+ * when linking it into net80211 - raw_xmit fres the mbuf but not
+ * the reference? and transmit doesn't free buffer/reference if it
+ * fails.  So, it's likely best to make both paths just always succeed
+ * for now.
+ */
+#if 1
+void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *skb)
 {
-	struct ath10k *ar = hw->priv;
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct ieee80211_vif *vif = info->control.vif;
-	struct ieee80211_sta *sta = control->sta;
+//	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211vap *vif = ni->ni_vap;
+//	struct ieee80211_sta *sta = control->sta;
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	__le16 fc = hdr->frame_control;
 
@@ -4130,13 +4145,13 @@ static void ath10k_tx(struct ieee80211_hw *hw,
 	ATH10K_SKB_CB(skb)->htt.tid = ath10k_tx_h_get_tid(hdr);
 	ATH10K_SKB_CB(skb)->htt.nohwcrypt = !ath10k_tx_h_use_hwcrypto(vif, skb);
 	ATH10K_SKB_CB(skb)->vdev_id = ath10k_tx_h_get_vdev_id(ar, vif);
-	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, sta, skb);
+	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ar, skb);
 	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(fc);
 
 	switch (ATH10K_SKB_CB(skb)->txmode) {
 	case ATH10K_HW_TXRX_MGMT:
 	case ATH10K_HW_TXRX_NATIVE_WIFI:
-		ath10k_tx_h_nwifi(hw, skb);
+		ath10k_tx_h_nwifi(ar, skb);
 		ath10k_tx_h_add_p2p_noa_ie(ar, vif, skb);
 		ath10k_tx_h_seq_no(vif, skb);
 		break;
@@ -4146,11 +4161,12 @@ static void ath10k_tx(struct ieee80211_hw *hw,
 	case ATH10K_HW_TXRX_RAW:
 		if (!test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
 			WARN_ON_ONCE(1);
-			ieee80211_free_txskb(hw, skb);
+			ath10k_tx_free_pbuf(ar, skb, 0);
 			return;
 		}
 	}
 
+#if 0
 	if (info->flags & IEEE80211_TX_CTL_TX_OFFCHAN) {
 		spin_lock_bh(&ar->data_lock);
 		ATH10K_SKB_CB(skb)->htt.freq = ar->scan.roc_freq;
@@ -4169,10 +4185,13 @@ static void ath10k_tx(struct ieee80211_hw *hw,
 			return;
 		}
 	}
+#endif
 
 	ath10k_mac_tx(ar, skb);
 }
+#endif
 
+#if 0
 /* Must not be called with conf_mutex held as workers can use that also. */
 void ath10k_drain_tx(struct ath10k *ar)
 {

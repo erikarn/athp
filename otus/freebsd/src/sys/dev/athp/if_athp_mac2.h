@@ -33,4 +33,6 @@ extern	int ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channe
 extern	void ath10k_vif_bring_down(struct ieee80211vap *vap);
 extern	int ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c);
 
+extern	void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *pbuf);
+
 #endif
