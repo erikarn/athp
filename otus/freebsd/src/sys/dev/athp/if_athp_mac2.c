@@ -2816,6 +2816,8 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_phymode(ar, vif, ni, arg);
+#else
+	ath10k_warn(ar, "%s: TODO: need to implement the rest of this before it'll even work!\n", __func__);
 #endif
 	return 0;
 }
