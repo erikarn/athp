@@ -423,6 +423,10 @@ athp_pci_attach(device_t dev)
 	    ATH10K_DBG_WMI_PRINT | ATH10K_DBG_MGMT | ATH10K_DBG_DATA | ATH10K_DBG_HTT;
 	ar->sc_psc = psc;
 
+	/* Enable WMI/HTT RX for now */
+	ar->sc_rx_wmi = 1;
+	ar->sc_rx_htt = 1;
+
 	/*
 	 * Initialise ath10k core bits.
 	 */
