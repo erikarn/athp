@@ -2290,11 +2290,12 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	return 0;
 }
 
-#if 0
 static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 					    struct athp_buf *skb)
 {
-	struct ieee80211_frame *hdr = (struct ieee80211_frame *) (void *) mbuf_skb_data(skb->m);
+	struct ieee80211_frame *hdr;
+
+	hdr = mtod(skb->m, struct ieee80211_frame *);
 
 	if (!ieee80211_has_protected(hdr))
 		return;
@@ -2304,12 +2305,14 @@ static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 	 * will drop the frame.
 	 */
 
-	hdr->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
+	hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
+	printf("%s: TODO: implement telling net80211 about the decrypted frames!\n", __func__);
+#if 0
 	status->flag |= RX_FLAG_DECRYPTED |
 			RX_FLAG_IV_STRIPPED |
 			RX_FLAG_MMIC_STRIPPED;
-}
 #endif
+}
 
 static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 				       athp_buf_head *list)
@@ -2363,15 +2366,12 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		 * if possible later.
 		 */
 
-#if 0
+		/* XXX NOTE: this is where rx_stats is cleared */
 		memset(status, 0, sizeof(*status));
-		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
+		//status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 
 		ath10k_htt_rx_h_rx_offload_prot(status, msdu);
 		ath10k_htt_rx_h_channel(ar, status, NULL, rx->vdev_id);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: offload_prot\n", __func__);
-#endif
 
 		ath10k_process_rx(ar, status, msdu);
 	}
