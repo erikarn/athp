@@ -3077,8 +3077,8 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 		return;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event peer sta kickout %pM\n",
-		   arg.mac_addr);
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event peer sta kickout %6D\n",
+		   arg.mac_addr, ":");
 
 	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 #if 0
@@ -6228,8 +6228,8 @@ ath10k_wmi_10_1_op_gen_peer_assoc(struct ath10k *ar,
 	ath10k_wmi_peer_assoc_fill_10_1(ar, mbuf_skb_data(pbuf->m), arg);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer assoc vdev %d addr %pM (%s)\n",
-		   arg->vdev_id, arg->addr,
+		   "wmi peer assoc vdev %d addr %6D (%s)\n",
+		   arg->vdev_id, arg->addr, ":",
 		   arg->peer_reassoc ? "reassociate" : "new");
 	return pbuf;
 }
@@ -6253,8 +6253,8 @@ ath10k_wmi_10_2_op_gen_peer_assoc(struct ath10k *ar,
 	ath10k_wmi_peer_assoc_fill_10_2(ar, mbuf_skb_data(pbuf->m), arg);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer assoc vdev %d addr %pM (%s)\n",
-		   arg->vdev_id, arg->addr,
+		   "wmi peer assoc vdev %d addr %6D (%s)\n",
+		   arg->vdev_id, arg->addr, ":",
 		   arg->peer_reassoc ? "reassociate" : "new");
 	return pbuf;
 }
@@ -6493,8 +6493,8 @@ ath10k_wmi_op_gen_addba_clear_resp(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->peer_macaddr.addr, mac);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi addba clear resp vdev_id 0x%X mac_addr %pM\n",
-		   vdev_id, mac);
+		   "wmi addba clear resp vdev_id 0x%X mac_addr %6D\n",
+		   vdev_id, mac, ":");
 	return pbuf;
 }
 
@@ -6519,8 +6519,8 @@ ath10k_wmi_op_gen_addba_send(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	cmd->buffersize = __cpu_to_le32(buf_size);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi addba send vdev_id 0x%X mac_addr %pM tid %u bufsize %u\n",
-		   vdev_id, mac, tid, buf_size);
+		   "wmi addba send vdev_id 0x%X mac_addr %6D tid %u bufsize %u\n",
+		   vdev_id, mac, ":", tid, buf_size);
 	return pbuf;
 }
 
@@ -6545,8 +6545,8 @@ ath10k_wmi_op_gen_addba_set_resp(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	cmd->statuscode = __cpu_to_le32(status);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi addba set resp vdev_id 0x%X mac_addr %pM tid %u status %u\n",
-		   vdev_id, mac, tid, status);
+		   "wmi addba set resp vdev_id 0x%X mac_addr %6D tid %u status %u\n",
+		   vdev_id, mac, ":", tid, status);
 	return pbuf;
 }
 
@@ -6572,8 +6572,8 @@ ath10k_wmi_op_gen_delba_send(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	cmd->reasoncode = __cpu_to_le32(reason);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi delba send vdev_id 0x%X mac_addr %pM tid %u initiator %u reason %u\n",
-		   vdev_id, mac, tid, initiator, reason);
+		   "wmi delba send vdev_id 0x%X mac_addr %6D tid %u initiator %u reason %u\n",
+		   vdev_id, mac, ":", tid, initiator, reason);
 	return pbuf;
 }
 
