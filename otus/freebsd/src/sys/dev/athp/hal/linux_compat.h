@@ -273,4 +273,43 @@ static inline bool ieee80211_is_qos_nullfunc(struct ieee80211_frame *wh)
 	return (true);
 }
 
+static inline bool ieee80211_is_nullfunc(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	/* needs to be type data */
+	if (type != IEEE80211_FC0_TYPE_DATA)
+		return (false);
+
+	/* needs to be subtype nullfunc */
+	if (subtype != IEEE80211_FC0_SUBTYPE_NODATA)
+		return (false);
+
+	return (true);
+}
+
+static inline bool ieee80211_is_mgmt(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+
+	return (type == IEEE80211_FC0_TYPE_MGT);
+}
+
+/*
+ * type is data, QOS_DATA bit is set.
+ */
+static inline bool ieee80211_is_data_qos(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	if (type != IEEE80211_FC0_TYPE_DATA)
+		return (false);
+	if ((subtype & IEEE80211_FC0_SUBTYPE_QOS) == 0)
+		return (false);
+
+	return (true);
+}
+
 #endif	/* __LINUX_COMPAT_H__ */
