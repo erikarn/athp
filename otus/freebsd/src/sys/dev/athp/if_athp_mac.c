@@ -257,6 +257,13 @@ ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 		ni = cb->ni;
 	}
 	cb->ni = NULL;
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: pbuf=%p, m=%p, ni=%p, tx_ok=%d\n",
+	    __func__,
+	    pbuf,
+	    m,
+	    ni,
+	    tx_ok);
 	athp_freebuf(ar, &ar->buf_tx, pbuf);
 
 	/* mbuf free time - net80211 gets told about completion; frees refcount */
