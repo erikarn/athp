@@ -146,7 +146,9 @@ static struct ieee80211_rate ath10k_rates[] = {
 			     ATH10K_MAC_FIRST_OFDM_RATE_IDX)
 #define ath10k_g_rates (ath10k_rates + 0)
 #define ath10k_g_rates_size (ARRAY_SIZE(ath10k_rates))
+#endif
 
+#if 1
 static bool ath10k_mac_bitrate_is_cck(int bitrate)
 {
 	switch (bitrate) {
@@ -159,13 +161,17 @@ static bool ath10k_mac_bitrate_is_cck(int bitrate)
 
 	return false;
 }
+#endif
 
+#if 1
 static u8 ath10k_mac_bitrate_to_rate(int bitrate)
 {
 	return DIV_ROUND_UP(bitrate, 5) |
 	       (ath10k_mac_bitrate_is_cck(bitrate) ? BIT(7) : 0);
 }
+#endif
 
+#if 0
 u8 ath10k_mac_hw_rate_to_idx(const struct ieee80211_supported_band *sband,
 			     u8 hw_rate)
 {
@@ -2292,14 +2298,15 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	ath10k_warn(ar, "%s: TODO: check endian-ness of assoc_capability with mac80211!\n", __func__);
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
+	ath10k_warn(ar, "%s: capinfo=0x%08x\n", __func__, ni->ni_capinfo);
 }
 #endif
 
-#if 0
 static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
-				       struct ieee80211_vif *vif,
+				       struct ieee80211vap *vap,
 				       struct wmi_peer_assoc_complete_arg *arg)
 {
+#if 0
 	struct ieee80211_bss_conf *info = &vif->bss_conf;
 	struct cfg80211_chan_def def;
 	struct cfg80211_bss *bss;
@@ -2339,48 +2346,72 @@ static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
-}
+#else
+	ath10k_warn(ar, "%s: TODO: implement!\n", __func__);
 #endif
+}
 
-#if 0
+/*
+ * This is for legacy rates only.  HT/VHT rates are setup elsewhere.
+ */
 static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
-				      struct ieee80211_vif *vif,
-				      struct ieee80211_sta *sta,
-				      struct wmi_peer_assoc_complete_arg *arg)
+    struct ieee80211vap *vif,
+    struct ieee80211_node *ni,
+    struct wmi_peer_assoc_complete_arg *arg)
 {
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_rate_set_arg *rateset = &arg->peer_legacy_rates;
-	struct cfg80211_chan_def def;
-	const struct ieee80211_supported_band *sband;
-	const struct ieee80211_rate *rates;
-	enum ieee80211_band band;
-	u32 ratemask;
-	u8 rate;
 	int i;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
-		return;
-
-	band = def.chan->band;
-	sband = ar->hw->wiphy->bands[band];
-	ratemask = sta->supp_rates[band];
-	ratemask &= arvif->bitrate_mask.control[band].legacy;
-	rates = sband->bitrates;
+	/*
+	 * Look at the current vap channel.  For now, we just assume
+	 * that all rates are available for the given phy mode;
+	 * later on we should look at what's negotiated.
+	 *
+	 * XXX yes, there's no per-vap channel, sigh.
+	 */
 
 	rateset->num_rates = 0;
 
-	for (i = 0; i < 32; i++, ratemask >>= 1, rates++) {
-		if (!(ratemask & 1))
-			continue;
+	if (IEEE80211_IS_CHAN_B(ic->ic_curchan)) {
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
+	} else if (IEEE80211_IS_CHAN_G(ic->ic_curchan)) {
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
 
-		rate = ath10k_mac_bitrate_to_rate(rates->bitrate);
-		rateset->rates[rateset->num_rates] = rate;
-		rateset->num_rates++;
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
+	} else if (IEEE80211_IS_CHAN_A(ic->ic_curchan)) {
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
+	} else {
+		ath10k_err(ar, "%s: TODO: channel isn't a, b, g!\n", __func__);
 	}
-}
+
+	/* Debugging */
+#if 1
+	for (i = 0; i < rateset->num_rates; i++) {
+		ath10k_warn(ar, "%s: %d: 0x%.2x (%d)\n", __func__, i, rateset->rates[i], rateset->rates[i]);
+	}
 #endif
+}
 
 #if 0
 static bool
@@ -2700,12 +2731,11 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 }
 #endif
 
-#if 0
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
-				    struct ieee80211_vif *vif,
-				    struct ieee80211_sta *sta,
-				    struct wmi_peer_assoc_complete_arg *arg)
+    struct ieee80211vap *vif, struct ieee80211_node *ni,
+    struct wmi_peer_assoc_complete_arg *arg)
 {
+#if 0
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 
 	switch (arvif->vdev_type) {
@@ -2729,11 +2759,13 @@ static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
 	default:
 		break;
 	}
-
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %pM qos %d\n",
-		   sta->addr, !!(arg->peer_flags & WMI_PEER_QOS));
-}
+#else
+	if (ni->ni_flags & IEEE80211_NODE_QOS)
+		arg->peer_flags |= WMI_PEER_QOS;
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %6D qos %d\n",
+		   ni->ni_macaddr, ":", !!(arg->peer_flags & WMI_PEER_QOS));
 #endif
+}
 
 #if 0
 static bool ath10k_mac_sta_has_ofdm_only(struct ieee80211_sta *sta)
@@ -2819,6 +2851,42 @@ static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 }
 #endif
 
+/*
+ * Configure the phymode for this node.
+ *
+ * This is very 11abg specific and doesn't at all handle 11n/11ac.
+ * It isn't too hard though - look at the non-freebsd version
+ * when the time comes.
+ */
+static void
+ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
+    struct ieee80211vap *vif,
+    struct ieee80211_node *ni,
+    struct wmi_peer_assoc_complete_arg *arg)
+{
+	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211_channel *c = ic->ic_curchan;
+	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	enum wmi_phy_mode phymode = MODE_UNKNOWN;
+
+	/* Just handle b, g, a for now */
+	if (IEEE80211_IS_CHAN_B(c)) {
+		phymode = MODE_11B;
+	} else if (IEEE80211_IS_CHAN_G(c)) {
+		phymode = MODE_11B;	/* ofdm-only is MODE_11G? */
+	} else if (IEEE80211_IS_CHAN_A(c)) {
+		phymode = MODE_11A;
+	} else {
+		ath10k_err(ar, "%s: TODO: unhandled channel type!\n", __func__);
+	}
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %6D phymode %s\n",
+	    ni->ni_macaddr, ":", ath10k_wmi_phymode_str(phymode));
+
+	arg->peer_phymode = phymode;
+	WARN_ON(phymode == MODE_UNKNOWN);
+}
+
 #if 1
 static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 				     struct ieee80211vap *vif,
@@ -2830,16 +2898,13 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	memset(arg, 0, sizeof(*arg));
 
 	ath10k_peer_assoc_h_basic(ar, vif, ni, arg);
-#if 0
 	ath10k_peer_assoc_h_crypto(ar, vif, arg);
 	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
-	ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
-	ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
+	//ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
+	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
-	ath10k_peer_assoc_h_phymode(ar, vif, ni, arg);
-#else
-	ath10k_warn(ar, "%s: TODO: need to implement the rest of this before it'll even work!\n", __func__);
-#endif
+	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
+	ath10k_warn(ar, "%s: TODO: finish crypto, ht, vht!\n", __func__);
 	return 0;
 }
 #endif

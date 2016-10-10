@@ -117,11 +117,27 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
     const struct ieee80211_bpf_params *params)
 {
 	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct ath10k *ar = ic->ic_softc;
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
+	struct ieee80211_frame *wh;
 
-	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
+	wh = mtod(m, struct ieee80211_frame *);
+	device_printf(ar->sc_dev, "%s: called; m=%p, len=%d, fc0=0x%x, fc1=0x%x\n", __func__, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1]);
+
+	ATHP_CONF_LOCK(ar);
+	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
+	if (vap->iv_opmode == IEEE80211_M_STA) {
+		if (arvif->is_stabss_setup == 0) {
+			ATHP_CONF_UNLOCK(ar);
+			device_printf(ar->sc_dev, "%s: stabss not setup; don't xmit\n", __func__);
+			m_freem(m);
+			return (ENXIO);
+		}
+	}
+	ATHP_CONF_UNLOCK(ar);
 
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
@@ -211,11 +227,29 @@ static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m)
 {
 	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211vap *vap;
+	struct ath10k_vif *arvif;
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_node *ni;
 
 	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
+
+	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
+	vap = ni->ni_vap;
+	arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK(ar);
+	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
+	if (vap->iv_opmode == IEEE80211_M_STA) {
+		if (arvif->is_stabss_setup == 0) {
+			ATHP_CONF_UNLOCK(ar);
+			device_printf(ar->sc_dev, "%s: stabss not setup; don't xmit\n", __func__);
+			return (ENXIO);
+		}
+	}
+	ATHP_CONF_UNLOCK(ar);
+
 
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
@@ -552,7 +586,14 @@ athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 	if (type == IEEE80211_FC0_SUBTYPE_PROBE_REQ)
 		return (ENOTSUP);
 
+	/* Scanning sends out QoS-NULL frames too, which we don't want */
+	if (type == IEEE80211_FC0_SUBTYPE_QOS_NULL)
+		return (ENOTSUP);
+	if (type == IEEE80211_FC0_SUBTYPE_NODATA)
+		return (ENOTSUP);
+
 	/* Send the rest */
+	printf("%s: sending type=0x%x (%d)", __func__, type, type);
 	return (ieee80211_send_mgmt(ni, type, arg));
 
 }

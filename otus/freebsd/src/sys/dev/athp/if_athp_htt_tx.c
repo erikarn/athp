@@ -558,6 +558,15 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	cmd = (struct htt_cmd *)mbuf_skb_data(txdesc->m);
 	memset(cmd, 0, len);
 
+	ath10k_warn(ar, "%s: paddr=%08x, m=%p, len=%d, desc_id=%d, vdev_id=%d\n",
+	    __func__,
+	    (uint32_t) msdu->mb.paddr,
+	    msdu->m,
+	    mbuf_skb_len(msdu->m),
+	    msdu_id,
+	    vdev_id);
+	m_print(msdu->m, -1);
+
 	cmd->hdr.msg_type         = HTT_H2T_MSG_TYPE_MGMT_TX;
 	cmd->mgmt_tx.msdu_paddr = __cpu_to_le32(msdu->mb.paddr);
 	cmd->mgmt_tx.len        = __cpu_to_le32(mbuf_skb_len(msdu->m));
