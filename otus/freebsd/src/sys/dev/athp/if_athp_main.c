@@ -271,12 +271,29 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	enum ieee80211_state ostate = vap->iv_state;
 	int ret;
 	int error = 0;
+	struct ieee80211_node *bss_ni;
 
 	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
 	    ieee80211_state_name[ostate],
 	    ieee80211_state_name[nstate]);
 
+	/* Grab bss node ref before unlocking */
+	bss_ni = ieee80211_ref_node(vap->iv_bss);
+
 	IEEE80211_UNLOCK(ic);
+
+	/*
+	 * Handle tearing down the association state if we're
+	 * a STA mode VAP and we're going to INIT.
+	 *
+	 * Note: it's possible other association states need
+	 * to be handled.
+	 */
+	if (vap->iv_opmode == IEEE80211_M_STA && nstate == IEEE80211_S_INIT) {
+		ATHP_CONF_LOCK(ar);
+		ath10k_bss_update(ar, vap, bss_ni, 0);
+		ATHP_CONF_UNLOCK(ar);
+	}
 
 	switch (nstate) {
 	case IEEE80211_S_RUN:
@@ -287,12 +304,20 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		/* For now, only start vdev on INIT->RUN */
 		/* This should be ok for monitor, but not for station */
 		if (ostate == IEEE80211_S_INIT) {
-			ATHP_CONF_LOCK(ar);
-			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
-			ATHP_CONF_UNLOCK(ar);
-			if (ret != 0) {
-				device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
-				break;
+			/* STA mode - update BSS info */
+			if (vap->iv_opmode == IEEE80211_M_STA) {
+				ATHP_CONF_LOCK(ar);
+				ath10k_bss_update(ar, vap, bss_ni, 1);
+				ATHP_CONF_UNLOCK(ar);
+			}
+			if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+				ATHP_CONF_LOCK(ar);
+				ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
+				ATHP_CONF_UNLOCK(ar);
+				if (ret != 0) {
+					device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
+					break;
+				}
 			}
 		}
 		break;
@@ -302,6 +327,24 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		ath10k_vif_bring_down(vap);
 		ATHP_CONF_UNLOCK(ar);
 		break;
+
+	case IEEE80211_S_AUTH:
+		/*
+		 * When going SCAN->AUTH, we need to plumb up the initial
+		 * BSS before we can send frames to it.
+		 *
+		 * Then for ASSOC and RUN we update the BSS configuration
+		 * with whatever new information we've found.
+		 */
+		ATHP_CONF_LOCK(ar);
+		ath10k_bss_update(ar, vap, bss_ni, 1);
+		ATHP_CONF_UNLOCK(ar);
+		break;
+	case IEEE80211_S_ASSOC:
+		ATHP_CONF_LOCK(ar);
+		ath10k_bss_update(ar, vap, bss_ni, 1);
+		ATHP_CONF_UNLOCK(ar);
+		break;
 	default:
 		ath10k_warn(ar, "%s: state %s not handled\n",
 		    __func__,
@@ -309,6 +352,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		break;
 	}
 	IEEE80211_LOCK(ic);
+
+	ieee80211_free_node(bss_ni);
 
 	error = vif->av_newstate(vap, nstate, arg);
 	return (error);

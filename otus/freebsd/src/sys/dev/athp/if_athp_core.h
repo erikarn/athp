@@ -109,6 +109,8 @@ struct ath10k_vif {
 
 	int is_setup;	/* set if the hardware state vif is setup */
 
+	int is_stabss_setup;	/* set if the station mode BSS is setup */
+
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
 	enum wmi_vdev_subtype vdev_subtype;

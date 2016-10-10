@@ -35,4 +35,6 @@ extern	int ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channe
 
 extern	void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *pbuf);
 
+extern	void ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211_node *ni, int is_assoc);
+
 #endif

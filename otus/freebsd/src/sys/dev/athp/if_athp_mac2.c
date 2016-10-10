@@ -2961,6 +2961,9 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni)
 	 * node; and has also ref'ed it for us.
 	 */
 
+	/* XXX ADRIAN: TODO: do this early; or arvif->bssid is 00:00:00:00:00:00 */
+	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
+
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %6D aid %d\n",
 		   arvif->vdev_id, arvif->bssid, ":", arvif->aid);
 
@@ -5427,6 +5430,8 @@ ath10k_hw_scan(struct ath10k *ar,
 	ath10k_wmi_start_scan_init(ar, &arg);
 	arg.vdev_id = arvif->vdev_id;
 	arg.scan_id = ATH10K_SCAN_ID;
+	arg.dwell_time_active = 50;
+	arg.dwell_time_passive = 50;
 
 #if 0
 	if (req->ie_len) {
@@ -8009,3 +8014,36 @@ void ath10k_mac_unregister(struct ath10k *ar)
 	SET_IEEE80211_DEV(ar->hw, NULL);
 }
 #endif
+
+/*
+ * STA mode: update BSS info as appropriate.
+ */
+void
+ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
+    struct ieee80211_node *ni, int is_assoc)
+{
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d\n",
+	    __func__,
+	    vap,
+	    ni,
+	    is_assoc);
+
+	if (is_assoc) {
+		/* Workaround: Make sure monitor vdev is not running
+		 * when associating to prevent some firmware revisions
+		 * (e.g. 10.1 and 10.2) from crashing.
+		 */
+		if (ar->monitor_started)
+			ath10k_monitor_stop(ar);
+		ath10k_bss_assoc(ar, ni);
+		arvif->is_stabss_setup = 1;
+		ath10k_monitor_recalc(ar);
+	} else {
+		ath10k_bss_disassoc(ar, vap);
+		arvif->is_stabss_setup = 0;
+	}
+}
