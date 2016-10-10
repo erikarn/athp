@@ -139,6 +139,12 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
 	}
 	ATHP_CONF_UNLOCK(ar);
 
+#if 0
+	/* XXX for now, early error out - see if bssinfo commands are crashing firmware before tx */
+	m_freem(m);
+	return (ENXIO);
+#endif
+
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
@@ -371,11 +377,20 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * with whatever new information we've found.
 		 */
 		ATHP_CONF_LOCK(ar);
+		/* XXX bring it down first? or? */
+		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+		if (ret != 0) {
+			ATHP_CONF_UNLOCK(ar);
+			device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
+			break;
+		}
 		ath10k_bss_update(ar, vap, bss_ni, 1);
 		ATHP_CONF_UNLOCK(ar);
 		break;
 	case IEEE80211_S_ASSOC:
 		ATHP_CONF_LOCK(ar);
+		/* XXX bring it down first? or? */
+		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 		ath10k_bss_update(ar, vap, bss_ni, 1);
 		ATHP_CONF_UNLOCK(ar);
 		break;
@@ -532,11 +547,18 @@ static struct ieee80211_node *
 athp_node_alloc(struct ieee80211vap *vap,
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
 	struct athp_node *an;
+
+	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, mac, ":");
 
 	an = malloc(sizeof(struct athp_node), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
 		return (NULL);
+
+	/* XXX TODO: Create peer */
+
 	return (&an->ni);
 }
 
@@ -556,7 +578,11 @@ athp_node_free(struct ieee80211_node *ni)
 	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
+
+	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, ni->ni_macaddr, ":");
+
+	/* XXX TODO: delete peer */
+
 	ar->sc_node_free(ni);
 }
 

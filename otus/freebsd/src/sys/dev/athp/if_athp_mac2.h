@@ -37,4 +37,6 @@ extern	void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_
 
 extern	void ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211_node *ni, int is_assoc);
 
+extern	int ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211_node *ni, struct ieee80211_channel *c);
+
 #endif

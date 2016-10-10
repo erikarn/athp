@@ -996,8 +996,11 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 		return -ESHUTDOWN;
 
+	//time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
+	//    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
+	ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
 	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
-	    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
+	    500);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -1132,8 +1135,8 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 
 	ret = ath10k_vdev_setup_sync(ar);
 	if (ret) {
-		ath10k_warn(ar, "failed to synchronize setup for monitor vdev %i start: %d\n",
-			    vdev_id, ret);
+		ath10k_warn(ar, "%s: failed to synchronize setup for monitor vdev %i start: %d\n",
+			    __func__, vdev_id, ret);
 		return ret;
 	}
 
@@ -1181,8 +1184,8 @@ static int ath10k_monitor_vdev_stop(struct ath10k *ar)
 
 	ret = ath10k_vdev_setup_sync(ar);
 	if (ret)
-		ath10k_warn(ar, "failed to synchronize monitor vdev %i stop: %d\n",
-			    ar->monitor_vdev_id, ret);
+		ath10k_warn(ar, "%s: failed to synchronize monitor vdev %i stop: %d\n",
+			    __func__, ar->monitor_vdev_id, ret);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac monitor vdev %i stopped\n",
 		   ar->monitor_vdev_id);
@@ -1608,8 +1611,8 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	ret = ath10k_vdev_setup_sync(ar);
 	if (ret) {
 		ath10k_warn(ar,
-			    "failed to synchronize setup for vdev %i restart %d: %d\n",
-			    arg.vdev_id, restart, ret);
+			    "%s: failed to synchronize setup for vdev %i restart %d: %d\n",
+			    __func__, arg.vdev_id, restart, ret);
 		return ret;
 	}
 
@@ -3078,6 +3081,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni)
 	arvif->aid = ni->ni_associd;
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
+	/* Note: if we haven't restarted the vdev before here; this causes a firmware panic */
 	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, ni->ni_associd, arvif->bssid);
 	if (ret) {
 		ath10k_warn(ar, "failed to set vdev %d up: %d\n",
@@ -4303,6 +4307,14 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 	ATH10K_SKB_CB(skb)->vdev_id = ath10k_tx_h_get_vdev_id(ar, vif);
 	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ni, skb);
 	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(hdr);
+
+	ath10k_warn(ar, "%s: tid=%d, nohwcrypt=%d, vdev=%d, txmode=%d, is_protected=%d\n",
+	    __func__,
+	    ATH10K_SKB_CB(skb)->htt.tid,
+	    ATH10K_SKB_CB(skb)->htt.nohwcrypt,
+	    ATH10K_SKB_CB(skb)->vdev_id,
+	    ATH10K_SKB_CB(skb)->txmode,
+	    ATH10K_SKB_CB(skb)->is_protected);
 
 	switch (ATH10K_SKB_CB(skb)->txmode) {
 	case ATH10K_HW_TXRX_MGMT:
@@ -7185,6 +7197,55 @@ ath10k_vif_bring_down(struct ieee80211vap *vap)
 }
 #endif
 
+/*
+ * Only call this for STA mode stuff for now - it assumes you're
+ * programming in the bss node bssid.
+ */
+int
+ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211_node *ni, struct ieee80211_channel *c)
+{
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: restarting vap\n", __func__);
+
+	/* XXX stop monitor */
+
+	/* bring down all vdevs */
+	ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
+	if (ret != 0) {
+		ath10k_warn(ar, "%s: failed to down vdev %i: %d\n", __func__,
+		    arvif->vdev_id, ret);
+		return ret;
+	}
+
+	/* restart */
+	ret = ath10k_vdev_restart(arvif, c);
+	if (ret != 0) {
+		ath10k_warn(ar, "%s: failed to restart vdev %i: %d\n", __func__,
+		    arvif->vdev_id, ret);
+		return ret;
+	}
+
+	/*
+	 * XXX TODO: do we need to do this? or can we leave the 'up' bit
+	 * for the bssinfo code to bring 'up' for us?
+	 */
+#if 1
+	/* XXX TODO: bring up - note the aid/bss? Does it have to be updated by now? */
+	ret = ath10k_wmi_vdev_up(arvif->ar, arvif->vdev_id, arvif->aid, ni->ni_macaddr);
+	if (ret != 0) {
+		ath10k_warn(ar, "%s: failed to bring up vdev %i: %d\n", __func__,
+		    arvif->vdev_id, ret);
+		return ret;
+	}
+#endif
+
+	return (0);
+}
+
 #if 0
 static int
 ath10k_mac_op_assign_vif_chanctx(struct ieee80211_hw *hw,
@@ -8097,6 +8158,8 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 	    ni,
 	    is_assoc);
 
+	/* XXX TODO: move the peer creation out! */
+
 	if (is_assoc) {
 		/* Workaround: Make sure monitor vdev is not running
 		 * when associating to prevent some firmware revisions
@@ -8104,11 +8167,19 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 */
 		if (ar->monitor_started)
 			ath10k_monitor_stop(ar);
+		ATHP_DATA_LOCK(ar);
+		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
+			ATHP_DATA_UNLOCK(ar);
+			(void) ath10k_peer_create(ar, arvif->vdev_id, ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
+		} else {
+			ATHP_DATA_UNLOCK(ar);
+		}
 		ath10k_bss_assoc(ar, ni);
 		arvif->is_stabss_setup = 1;
 		ath10k_monitor_recalc(ar);
 	} else {
 		ath10k_bss_disassoc(ar, vap);
 		arvif->is_stabss_setup = 0;
+		ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 	}
 }
