@@ -502,7 +502,14 @@ static int
 athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 {
 
-	return (ENOTSUP);
+	/* Don't send probe requests - I think the firmware does it during scanning */
+	/* XXX TODO: maybe only don't do it when we're scanning? */
+	if (type == IEEE80211_FC0_SUBTYPE_PROBE_REQ)
+		return (ENOTSUP);
+
+	/* Send the rest */
+	return (ieee80211_send_mgmt(ni, type, arg));
+
 }
 
 /*
