@@ -105,10 +105,12 @@ static uint8_t chan_list_5ghz[] =
       153, 157, 161, 165 };
 
 /*
- * Raw frame transmission.
+ * Raw frame transmission - this is "always" 802.11.
  *
  * Free the mbuf if we fail, but don't deref the node.
  * That's the callers job.
+ *
+ * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
  */
 static int
 athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
@@ -117,6 +119,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct athp_buf *pbuf;
+	struct ath10k_skb_cb *cb;
 
 	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
 
@@ -130,6 +133,10 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
 
 	/* Put the mbuf into the given pbuf */
 	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
+
+	/* The node reference is ours to free upon xmit, so .. */
+	cb = ATH10K_SKB_CB(pbuf);
+	cb->ni = ni;
 
 	/* Transmit */
 	ath10k_tx(ar, ni, pbuf);
@@ -191,19 +198,45 @@ finish:
 	return;
 }
 
+/*
+ * data transmission.  For now this is 802.11, but once we get this
+ * driver up it could just as easy be 802.3 frames so we can bypass
+ * almost /all/ of the net80211 side handling.
+ *
+ * Unlike the raw path - if we fail, we don't free the buffer.
+ *
+ * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
+ */
 static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m)
 {
 	struct ath10k *ar = ic->ic_softc;
+	struct athp_buf *pbuf;
+	struct ath10k_skb_cb *cb;
 	struct ieee80211_node *ni;
 
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
+	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
 
-	/* For now, get the node and take ownership of the buffer */
-	ni = (struct ieee80211_node *)m->m_pkthdr.rcvif;
+	/* Allocate a TX mbuf */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		device_printf(ar->sc_dev, "%s: failed to get TX pbuf\n", __func__);
+		return (ENOBUFS);
+	}
+
+	/* Put the mbuf into the given pbuf */
+	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
+
+	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
 	m->m_pkthdr.rcvif = NULL;
 
-	ieee80211_free_node(ni);
+	/* The node reference is ours to free upon xmit, so .. */
+	cb = ATH10K_SKB_CB(pbuf);
+	cb->ni = ni;
+
+	/* Transmit */
+	ath10k_tx(ar, ni, pbuf);
+
 	return (0);
 }
 
