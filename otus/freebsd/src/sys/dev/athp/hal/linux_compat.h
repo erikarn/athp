@@ -251,7 +251,7 @@ static inline u8 *ieee80211_get_qos_ctl(struct ieee80211_frame *hdr)
 
 static inline int ieee80211_has_protected(struct ieee80211_frame *hdr)
 {
-	return !! (hdr->i_fc[1] |= IEEE80211_FC1_PROTECTED);
+	return !! (hdr->i_fc[1] & IEEE80211_FC1_PROTECTED);
 }
 
 /*
