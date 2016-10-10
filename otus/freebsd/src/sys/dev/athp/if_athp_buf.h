@@ -14,6 +14,8 @@ struct ath10k_skb_cb {
 	enum ath10k_hw_txrx_mode txmode;
 	bool is_protected;
 
+	struct ieee80211_node *ni;
+
 	struct {
 		u8 tid;
 		u16 freq;

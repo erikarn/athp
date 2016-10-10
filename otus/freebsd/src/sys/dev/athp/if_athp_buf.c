@@ -223,6 +223,16 @@ void
 athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
+	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(bf);
+
+	/* Complain if the buffer has a noderef left */
+	if (cb->ni != NULL) {
+		ath10k_err(ar, "%s: TODO: pbuf=%p, mbuf=%p, ni is not null (%p) !\n",
+		    __func__,
+		    bf,
+		    bf->m,
+		    cb->ni);
+	}
 
 	ATHP_BUF_LOCK(ar);
 
