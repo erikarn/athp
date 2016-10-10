@@ -77,6 +77,8 @@ extern void athp_buf_cb_clear(struct athp_buf *bf);
 
 extern	struct mbuf * athp_buf_take_mbuf(struct ath10k *ar,
 	    struct athp_buf_ring *br, struct athp_buf *bf);
+extern	void athp_buf_give_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
+	    struct athp_buf *bf, struct mbuf *m);
 
 extern	int athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br,
 	    int count);

@@ -104,16 +104,37 @@ static uint8_t chan_list_5ghz[] =
       108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
       153, 157, 161, 165 };
 
+/*
+ * Raw frame transmission.
+ *
+ * Free the mbuf if we fail, but don't deref the node.
+ * That's the callers job.
+ */
 static int
 athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
     const struct ieee80211_bpf_params *params)
 {
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ath10k *ar = ic->ic_softc;
+	struct athp_buf *pbuf;
 
 	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
-	m_freem(m);
-	return (EINVAL);
+
+	/* Allocate a TX mbuf */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		device_printf(ar->sc_dev, "%s: failed to get TX pbuf\n", __func__);
+		m_freem(m);
+		return (ENOBUFS);
+	}
+
+	/* Put the mbuf into the given pbuf */
+	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
+
+	/* Transmit */
+	ath10k_tx(ar, ni, pbuf);
+
+	return (0);
 }
 
 static void
@@ -153,6 +174,8 @@ athp_set_channel(struct ieee80211com *ic)
 		goto finish;
 	}
 
+	/* XXX TODO: maybe we don't need to do this when in RUN state? */
+
 	arvif = ar->monitor_arvif;
 	vap = (void *) arvif;
 	ath10k_vif_bring_down(vap);
@@ -171,8 +194,17 @@ finish:
 static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m)
 {
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211_node *ni;
 
-	return (ENXIO);
+	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
+
+	/* For now, get the node and take ownership of the buffer */
+	ni = (struct ieee80211_node *)m->m_pkthdr.rcvif;
+	m->m_pkthdr.rcvif = NULL;
+
+	ieee80211_free_node(ni);
+	return (0);
 }
 
 /*

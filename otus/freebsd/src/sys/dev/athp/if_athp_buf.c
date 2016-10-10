@@ -308,12 +308,6 @@ athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 }
 
 /*
- * XXX TODO: write a routine to assign a pbuf to a given mbuf or
- * something, for the transmit side to have everything it needs
- * to transmit a payload, complete with correct 'len'.
- */
-
-/*
  * XXX TODO: need to setup the tx/rx buffer dma tags in if_athp_pci.c.
  * (Since it's a function of the bus/chip..)
  */
@@ -377,4 +371,18 @@ athp_buf_take_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
 	m = bf->m;
 	bf->m = NULL;
 	return (m);
+}
+
+void
+athp_buf_give_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
+    struct athp_buf *bf, struct mbuf *m)
+{
+
+	/* XXX assume the caller has obtained a fresh pbuf tx */
+
+	/* Setup initial mbuf tracking state */
+	bf->m = m;
+	bf->m_size = m->m_pkthdr.len;
+
+	/* XXX the caller will initialise the pbuf map */
 }
