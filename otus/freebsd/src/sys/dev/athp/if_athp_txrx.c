@@ -186,12 +186,12 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	trace_ath10k_txrx_tx_unref(ar, tx_done->msdu_id);
 #endif
 
-#if 0
 	if (tx_done->discard) {
-		ieee80211_free_txskb(htt->ar->hw, msdu);
+		ath10k_tx_free_pbuf(ar, msdu, 1);	/* default to being ok */
 		return;
 	}
 
+#if 0
 	if (!(info->flags & IEEE80211_TX_CTL_NO_ACK))
 		info->flags |= IEEE80211_TX_STAT_ACK;
 
@@ -200,13 +200,9 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 
 	if (tx_done->success && (info->flags & IEEE80211_TX_CTL_NO_ACK))
 		info->flags |= IEEE80211_TX_STAT_NOACK_TRANSMITTED;
-
-	ieee80211_tx_status(htt->ar->hw, msdu);
-	/* we do not own the msdu anymore */
-#else
-	device_printf(ar->sc_dev, "%s: TODO: send the msdu/mbuf up net80211!\n", __func__);
-	athp_freebuf(ar, &ar->buf_tx, msdu);
 #endif
+
+	ath10k_tx_free_pbuf(ar, msdu, !! tx_done->success);	/* default to being ok */
 }
 
 struct ath10k_peer *ath10k_peer_find(struct ath10k *ar, int vdev_id,
