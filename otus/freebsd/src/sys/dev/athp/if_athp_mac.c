@@ -249,13 +249,16 @@ void
 ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 {
 	struct mbuf *m;
+	struct ieee80211_node *ni = NULL;
+	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(pbuf);
 
 	m = athp_buf_take_mbuf(ar, &ar->buf_tx, pbuf);
+	if (cb->ni != NULL) {
+		ni = cb->ni;
+	}
+	cb->ni = NULL;
 	athp_freebuf(ar, &ar->buf_tx, pbuf);
 
-	ath10k_warn(ar, "%s: TODO: actually handle net80211 TX notification!\n", __func__);
-
-	/* XXX TODO: this requires that we actually keep a node reference around .. */
-	/* XXX So, when that's done, we can call ieee80211_process_callback or ieee80211_tx_complete() */
-	m_freem(m);
+	/* mbuf free time - net80211 gets told about completion; frees refcount */
+	ieee80211_tx_complete(ni, m, tx_ok);
 }
