@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include "hal/hw.h"
 #include "hal/htc.h"
 #include "hal/wmi.h"
+#include "hal/linux_skb.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
@@ -2339,7 +2340,9 @@ static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
 				      struct ieee80211_vif *vif,
 				      struct ieee80211_sta *sta,
@@ -2377,7 +2380,9 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
 		rateset->num_rates++;
 	}
 }
+#endif
 
+#if 0
 static bool
 ath10k_peer_assoc_h_ht_masked(const u8 ht_mcs_mask[IEEE80211_HT_MCS_MASK_LEN])
 {
@@ -2389,7 +2394,9 @@ ath10k_peer_assoc_h_ht_masked(const u8 ht_mcs_mask[IEEE80211_HT_MCS_MASK_LEN])
 
 	return true;
 }
+#endif
 
+#if 0
 static bool
 ath10k_peer_assoc_h_vht_masked(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 {
@@ -2401,7 +2408,9 @@ ath10k_peer_assoc_h_vht_masked(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 
 	return true;
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 				   struct ieee80211_vif *vif,
 				   struct ieee80211_sta *sta,
@@ -2506,7 +2515,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		   arg->peer_ht_rates.num_rates,
 		   arg->peer_num_spatial_streams);
 }
+#endif
 
+#if 0
 static int ath10k_peer_assoc_qos_ap(struct ath10k *ar,
 				    struct ath10k_vif *arvif,
 				    struct ieee80211_sta *sta)
@@ -2573,7 +2584,9 @@ static int ath10k_peer_assoc_qos_ap(struct ath10k *ar,
 
 	return 0;
 }
+#endif
 
+#if 0
 static u16
 ath10k_peer_assoc_h_vht_limit(u16 tx_mcs_set,
 			      const u16 vht_mcs_limit[NL80211_VHT_NSS_MAX])
@@ -2624,7 +2637,9 @@ ath10k_peer_assoc_h_vht_limit(u16 tx_mcs_set,
 
 	return tx_mcs_set;
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_sta *sta,
@@ -2683,7 +2698,9 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %pM max_mpdu %d flags 0x%x\n",
 		   sta->addr, arg->peer_max_mpdu, arg->peer_flags);
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_sta *sta,
@@ -2716,13 +2733,17 @@ static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %pM qos %d\n",
 		   sta->addr, !!(arg->peer_flags & WMI_PEER_QOS));
 }
+#endif
 
+#if 0
 static bool ath10k_mac_sta_has_ofdm_only(struct ieee80211_sta *sta)
 {
 	return sta->supp_rates[IEEE80211_BAND_2GHZ] >>
 	       ATH10K_MAC_FIRST_OFDM_RATE_IDX;
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 					struct ieee80211_vif *vif,
 					struct ieee80211_sta *sta,
@@ -3577,22 +3598,34 @@ void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 						   &arg);
 	spin_unlock_bh(&ar->htt.tx_lock);
 }
+#endif
 
-static u8 ath10k_tx_h_get_tid(struct ieee80211_hdr *hdr)
+/*
+ * Get the TID for the given frame, or the fall-back TID.
+ * For 802.3 and native wifi (microsoft) frames, there's nowhere
+ * to put the TID - so we need to insert it into the descriptor.
+ */
+#if 1
+static u8 ath10k_tx_h_get_tid(struct ieee80211_frame *hdr)
 {
-	if (ieee80211_is_mgmt(hdr->frame_control))
+	if (ieee80211_is_mgmt(hdr))
 		return HTT_DATA_TX_EXT_TID_MGMT;
 
-	if (!ieee80211_is_data_qos(hdr->frame_control))
+	if (!ieee80211_is_data_qos(hdr))
 		return HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
-	if (!is_unicast_ether_addr(ieee80211_get_DA(hdr)))
+	//if (!is_unicast_ether_addr(ieee80211_get_DA(hdr)))
+	if (IEEE80211_IS_MULTICAST(ieee80211_get_DA(hdr)))
 		return HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
-	return ieee80211_get_qos_ctl(hdr)[0] & IEEE80211_QOS_CTL_TID_MASK;
+	/* Fetch the TID from the header itself */
+	//return ieee80211_get_qos_ctl(hdr)[0] & IEEE80211_QOS_CTL_TID_MASK;
+	return ieee80211_gettid(hdr);
 }
+#endif
 
-static u8 ath10k_tx_h_get_vdev_id(struct ath10k *ar, struct ieee80211_vif *vif)
+#if 1
+static u8 ath10k_tx_h_get_vdev_id(struct ath10k *ar, struct ieee80211vap *vif)
 {
 	if (vif)
 		return ath10k_vif_to_arvif(vif)->vdev_id;
@@ -3603,18 +3636,22 @@ static u8 ath10k_tx_h_get_vdev_id(struct ath10k *ar, struct ieee80211_vif *vif)
 	ath10k_warn(ar, "failed to resolve vdev id\n");
 	return 0;
 }
+#endif
 
+#if 1
 static enum ath10k_hw_txrx_mode
-ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
-		       struct ieee80211_sta *sta, struct sk_buff *skb)
+ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211vap *vif,
+		       struct ieee80211_node *ni, struct athp_buf *skb)
 {
-	const struct ieee80211_hdr *hdr = (void *)skb->data;
-	__le16 fc = hdr->frame_control;
+	struct ieee80211_frame *hdr;
+	//__le16 fc = hdr->frame_control;
 
-	if (!vif || vif->type == NL80211_IFTYPE_MONITOR)
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+
+	if (!vif || vif->iv_opmode == IEEE80211_M_MONITOR)
 		return ATH10K_HW_TXRX_RAW;
 
-	if (ieee80211_is_mgmt(fc))
+	if (ieee80211_is_mgmt(hdr))
 		return ATH10K_HW_TXRX_MGMT;
 
 	/* Workaround:
@@ -3634,7 +3671,7 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
 	 * mode though because AP don't sleep.
 	 */
 	if (ar->htt.target_version_major < 3 &&
-	    (ieee80211_is_nullfunc(fc) || ieee80211_is_qos_nullfunc(fc)) &&
+	    (ieee80211_is_nullfunc(hdr) || ieee80211_is_qos_nullfunc(hdr)) &&
 	    !test_bit(ATH10K_FW_FEATURE_HAS_WMI_MGMT_TX, ar->fw_features))
 		return ATH10K_HW_TXRX_MGMT;
 
@@ -3646,58 +3683,92 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
 	 *
 	 * FIXME: Check if raw mode works with TDLS.
 	 */
-	if (ieee80211_is_data_present(fc) && sta && sta->tdls)
+#if 0
+	if (ieee80211_is_data_present(hdr) && sta && sta->tdls)
 		return ATH10K_HW_TXRX_ETHERNET;
+#endif
 
 	if (test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags))
 		return ATH10K_HW_TXRX_RAW;
 
 	return ATH10K_HW_TXRX_NATIVE_WIFI;
 }
+#endif
 
-static bool ath10k_tx_h_use_hwcrypto(struct ieee80211_vif *vif,
-				     struct sk_buff *skb) {
+/*
+ * XXX TODO: FreeBSD currently doesn't have per-TX frame flags
+ * that describe things like "we injected it", "don't encrypt", etc.
+ * So stub that out until we grow it.
+ */
+#if 1
+static bool
+ath10k_tx_h_use_hwcrypto(struct ieee80211vap *vif, struct athp_buf *pbuf)
+{
+#if 0
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	const u32 mask = IEEE80211_TX_INTFL_DONT_ENCRYPT |
 			 IEEE80211_TX_CTL_INJECTED;
 	if ((info->flags & mask) == mask)
 		return false;
+#endif
 	if (vif)
 		return !ath10k_vif_to_arvif(vif)->nohwcrypt;
 	return true;
 }
+#endif
 
+#if 1
 /* HTT Tx uses Native Wifi tx mode which expects 802.11 frames without QoS
  * Control in the header.
+ *
+ * Note: "native wifi" mode is Microsoft 802.11 TX mode - frames without
+ * a QoS control in the header.  So, QoS specific things (eg TID) is
+ * supplied in TX descriptor fields.
  */
-static void ath10k_tx_h_nwifi(struct ieee80211_hw *hw, struct sk_buff *skb)
+static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 {
-	struct ieee80211_hdr *hdr = (void *)skb->data;
+	struct ieee80211_frame *hdr;
 	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(skb);
 	u8 *qos_ctl;
 
-	if (!ieee80211_is_data_qos(hdr->frame_control))
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+
+	if (! IEEE80211_IS_QOSDATA(hdr))
 		return;
 
+	/*
+	 * Move the data over the QoS header, effectively removing them.
+	 */
 	qos_ctl = ieee80211_get_qos_ctl(hdr);
-	memmove(skb->data + IEEE80211_QOS_CTL_LEN,
-		skb->data, (void *)qos_ctl - (void *)skb->data);
-	skb_pull(skb, IEEE80211_QOS_CTL_LEN);
+	memmove(mbuf_skb_data(skb->m) + IEEE80211_QOS_CTL_LEN,
+		mbuf_skb_data(skb->m), (char *)qos_ctl - (char *)mbuf_skb_data(skb->m));
+	mbuf_skb_pull(skb->m, IEEE80211_QOS_CTL_LEN);
 
 	/* Some firmware revisions don't handle sending QoS NullFunc well.
 	 * These frames are mainly used for CQM purposes so it doesn't really
 	 * matter whether QoS NullFunc or NullFunc are sent.
 	 */
-	hdr = (void *)skb->data;
-	if (ieee80211_is_qos_nullfunc(hdr->frame_control))
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+	if (ieee80211_is_qos_nullfunc(hdr))
 		cb->htt.tid = HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
-	hdr->frame_control &= ~__cpu_to_le16(IEEE80211_STYPE_QOS_DATA);
+	/* Strip the subtype from the field */
+	hdr->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
 }
+#endif
 
-static void ath10k_tx_h_8023(struct sk_buff *skb)
+/*
+ * 802.3 offload uses .. well, 802.3.  It's designed for simple pass-through
+ * bridging/routine style applications where the network stack already has
+ * frames in 802.3 format.
+ *
+ * For now we aren't going to use it, until we absolutely have to do it
+ * for bringup.
+ */
+static void ath10k_tx_h_8023(struct athp_buf *skb)
 {
-	struct ieee80211_hdr *hdr;
+#if 0
+	struct ieee80211_frame *hdr;
 	struct rfc1042_hdr *rfc1042;
 	struct ethhdr *eth;
 	size_t hdrlen;
@@ -3720,12 +3791,20 @@ static void ath10k_tx_h_8023(struct sk_buff *skb)
 	ether_addr_copy(eth->h_dest, da);
 	ether_addr_copy(eth->h_source, sa);
 	eth->h_proto = type;
+#else
+	printf("%s: TODO: implement!\n", __func__);
+#endif
 }
 
+/*
+ * For now - we don't really do p2p in FreeBSD...
+ */
+#if 1
 static void ath10k_tx_h_add_p2p_noa_ie(struct ath10k *ar,
-				       struct ieee80211_vif *vif,
-				       struct sk_buff *skb)
+				       struct ieee80211vap *vif,
+				       struct athp_buf *skb)
 {
+#if 0
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 
@@ -3744,8 +3823,13 @@ static void ath10k_tx_h_add_p2p_noa_ie(struct ath10k *ar,
 				       arvif->u.ap.noa_len);
 		spin_unlock_bh(&ar->data_lock);
 	}
+#else
+	return;
+#endif
 }
+#endif
 
+#if 0
 static bool ath10k_mac_need_offchan_tx_work(struct ath10k *ar)
 {
 	/* FIXME: Not really sure since when the behaviour changed. At some
@@ -4133,20 +4217,24 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 //	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211vap *vif = ni->ni_vap;
 //	struct ieee80211_sta *sta = control->sta;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
-	__le16 fc = hdr->frame_control;
+	struct ieee80211_frame *hdr;
+//	__le16 fc = hdr->frame_control;
 
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+
+#if 0
 	/* We should disable CCK RATE due to P2P */
 	if (info->flags & IEEE80211_TX_CTL_NO_CCK_RATE)
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "IEEE80211_TX_CTL_NO_CCK_RATE\n");
+#endif
 
 	ATH10K_SKB_CB(skb)->htt.is_offchan = false;
 	ATH10K_SKB_CB(skb)->htt.freq = 0;
 	ATH10K_SKB_CB(skb)->htt.tid = ath10k_tx_h_get_tid(hdr);
 	ATH10K_SKB_CB(skb)->htt.nohwcrypt = !ath10k_tx_h_use_hwcrypto(vif, skb);
 	ATH10K_SKB_CB(skb)->vdev_id = ath10k_tx_h_get_vdev_id(ar, vif);
-	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ar, skb);
-	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(fc);
+	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ni, skb);
+	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(hdr);
 
 	switch (ATH10K_SKB_CB(skb)->txmode) {
 	case ATH10K_HW_TXRX_MGMT:
