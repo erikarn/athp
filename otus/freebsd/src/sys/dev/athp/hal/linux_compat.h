@@ -195,10 +195,14 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define IEEE80211_GCMP_MIC_LEN          16
 #define IEEE80211_GCMP_PN_LEN           6
 
+#if 0
 /* They store it as 16 bit value, not two 8 bit values.. */
 #define IEEE80211_FCTL_VERS             0x0003
+#endif
+/* XXX TODO: get rid of these; so far they're just used for debugging echos */
 #define IEEE80211_FCTL_FTYPE            0x000c
 #define IEEE80211_FCTL_STYPE            0x00f0
+#if 0
 #define IEEE80211_FCTL_TODS             0x0100
 #define IEEE80211_FCTL_FROMDS           0x0200
 #define IEEE80211_FCTL_MOREFRAGS        0x0400
@@ -216,7 +220,12 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define IEEE80211_FTYPE_CTL             0x0004
 #define IEEE80211_FTYPE_DATA            0x0008
 #define IEEE80211_FTYPE_EXT             0x000c
+#endif
 
+/*
+ * mac80211 style routines, but they take an ieee80211_frame pointer.
+ * Should reimplement, move into net80211.
+ */
 static inline u8 *ieee80211_get_DA(struct ieee80211_frame *hdr)
 {
 	if (IEEE80211_IS_DSTODS(hdr))
@@ -245,5 +254,23 @@ static inline int ieee80211_has_protected(struct ieee80211_frame *hdr)
 	return !! (hdr->i_fc[1] |= IEEE80211_FC1_PROTECTED);
 }
 
+/*
+ * data ftype, nullfunc stype.
+ */
+static inline bool ieee80211_is_qos_nullfunc(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	/* needs to be type data */
+	if (type != IEEE80211_FC0_TYPE_DATA)
+		return (false);
+
+	/* needs to be subtype nullfunc */
+	if (subtype != IEEE80211_FC0_SUBTYPE_QOS_NULL)
+		return (false);
+
+	return (true);
+}
 
 #endif	/* __LINUX_COMPAT_H__ */
