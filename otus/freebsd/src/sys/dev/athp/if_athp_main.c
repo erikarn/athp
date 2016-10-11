@@ -113,7 +113,7 @@ static uint8_t chan_list_5ghz[] =
  * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
  */
 static int
-athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
+athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
     const struct ieee80211_bpf_params *params)
 {
 	struct ieee80211com *ic = ni->ni_ic;
@@ -123,9 +123,26 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_frame *wh;
+	struct mbuf *m;
+
+	/*
+	 * For now, the ath10k linux side doesn't handle multi-segment
+	 * mbufs.  The firmware/hardware supports it, but the tx path
+	 * assumes everything is a single linear mbuf.
+	 *
+	 * So, try to defrag.  If we fail, return ENOBUFS.
+	 */
+	m = m_defrag(m0, M_NOWAIT);
+	if (m == NULL) {
+		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+		m_freem(m0);
+		return (ENOBUFS);
+	}
 
 	wh = mtod(m, struct ieee80211_frame *);
-	device_printf(ar->sc_dev, "%s: called; m=%p, len=%d, fc0=0x%x, fc1=0x%x\n", __func__, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1]);
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; m=%p, len=%d, fc0=0x%x, fc1=0x%x\n",
+	    __func__, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1]);
 
 	ATHP_CONF_LOCK(ar);
 	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
@@ -230,7 +247,7 @@ finish:
  * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
  */
 static int
-athp_transmit(struct ieee80211com *ic, struct mbuf *m)
+athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 {
 	struct ath10k *ar = ic->ic_softc;
 	struct ieee80211vap *vap;
@@ -238,7 +255,20 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m)
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_node *ni;
+	struct mbuf *m;
 
+	/*
+	 * For now, the ath10k linux side doesn't handle multi-segment
+	 * mbufs.  The firmware/hardware supports it, but the tx path
+	 * assumes everything is a single linear mbuf.
+	 *
+	 * So, try to defrag.  If we fail, return ENOBUFS.
+	 */
+	m = m_defrag(m0, M_NOWAIT);
+	if (m == NULL) {
+		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+		return (ENOBUFS);
+	}
 	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
 
 	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
