@@ -4308,7 +4308,8 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ni, skb);
 	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(hdr);
 
-	ath10k_warn(ar, "%s: tid=%d, nohwcrypt=%d, vdev=%d, txmode=%d, is_protected=%d\n",
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: tid=%d, nohwcrypt=%d, vdev=%d, txmode=%d, is_protected=%d\n",
 	    __func__,
 	    ATH10K_SKB_CB(skb)->htt.tid,
 	    ATH10K_SKB_CB(skb)->htt.nohwcrypt,

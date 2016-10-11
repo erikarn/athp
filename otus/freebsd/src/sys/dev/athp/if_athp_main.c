@@ -269,7 +269,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		return (ENOBUFS);
 	}
-	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: called; m=%p\n", __func__, m);
 
 	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
 	vap = ni->ni_vap;
