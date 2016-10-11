@@ -5,6 +5,7 @@
 #define	ATHP_BUF_MAPPED		0x00000002
 
 /* XXX TODO: ath10k wants a bit more state here for TX and a little more for RX .. */
+struct athp_descdma;
 struct ath10k_htt_txbuf;
 struct ath10k;
 
@@ -21,6 +22,10 @@ struct ath10k_skb_cb {
 		u16 freq;
 		bool is_offchan;
 		bool nohwcrypt;
+
+		/* This is the HTC header for TX */
+		struct athp_descdma txbuf_dd;
+		/* These just point above; makes code easier to port */
 		struct ath10k_htt_txbuf *txbuf;
 		u32 txbuf_paddr;
 	} __packed htt;

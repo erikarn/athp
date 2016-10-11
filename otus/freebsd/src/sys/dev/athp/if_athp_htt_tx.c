@@ -598,9 +598,18 @@ err:
 	return res;
 }
 
-int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
+/*
+ * Transmit the given msdu.
+ *
+ * Note - it expects the frame to have two parts - a
+ * HTC header (which it allocates) and a linearised transmit
+ * packet.  I believe the firmware/hardware supports more
+ * sg entries but I'm not sure what's required to use them.
+ */
+int
+ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
-#if 0
+#if 1
 	struct ath10k *ar = htt->ar;
 	//struct device *dev = ar->sc_dev;
 	//struct ieee80211_frame *hdr = (struct ieee80211_frame *)mbuf_skb_data(msdu->m);
@@ -613,7 +622,7 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	int res;
 	u8 flags0 = 0;
 	u16 msdu_id, flags1 = 0;
-	dma_addr_t paddr = 0;
+//	dma_addr_t paddr = 0;
 	u32 frags_paddr = 0;
 	struct htt_msdu_ext_desc *ext_desc = NULL;
 
@@ -632,13 +641,22 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	prefetch_len = min(htt->prefetch_len, mbuf_skb_len(msdu->m));
 	prefetch_len = roundup(prefetch_len, 4);
 
-	skb_cb->htt.txbuf = dma_pool_alloc(htt->tx_pool, GFP_ATOMIC,
-					   &paddr);
-	if (!skb_cb->htt.txbuf) {
+	/*
+	 * Linux here would allocate a buffer with physmem mapping
+	 * of size ath10k_htt_txbuf from a dma_pool.
+	 *
+	 * For now we don't pre-allocate them (but we could actually
+	 * do just that) - instead, let's just allocate a descdma
+	 * entry.  We need to make sure they're freed when the pbuf
+	 * is recycled.
+	 */
+	if (athp_descdma_alloc(ar, &skb_cb->htt.txbuf_dd, "htt txbuf", 8, sizeof(struct ath10k_htt_txbuf)) != 0) {
+		ath10k_err(ar, "%s: failed to allocate htc hdr txbuf\n", __func__);
 		res = -ENOMEM;
 		goto err_free_msdu_id;
 	}
-	skb_cb->htt.txbuf_paddr = paddr;
+	skb_cb->htt.txbuf = skb_cb->htt.txbuf_dd.dd_desc;
+	skb_cb->htt.txbuf_paddr = skb_cb->htt.txbuf_dd.dd_desc_paddr;
 
 	if ((IEEE80211_IS_ACTION(hdr) ||
 	     IEEE80211_IS_DEAUTH(hdr) ||
@@ -798,9 +816,7 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 err_unmap_msdu:
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 err_free_txbuf:
-	dma_pool_free(htt->tx_pool,
-		      skb_cb->htt.txbuf,
-		      skb_cb->htt.txbuf_paddr);
+	athp_descdma_free(ar, &skb_cb->htt.txbuf_dd);
 err_free_msdu_id:
 	ATHP_HTT_TX_LOCK(htt);
 	ath10k_htt_tx_free_msdu_id(htt, msdu_id);

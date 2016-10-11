@@ -162,14 +162,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 
 	if (skb_cb->htt.txbuf)
-#if 0
-		dma_pool_free(htt->tx_pool,
-			      skb_cb->htt.txbuf,
-			      skb_cb->htt.txbuf_paddr);
-#else
-	ath10k_warn(ar,
-	    "%s: TODO: htt.txbuf not null, we need to free it!\n", __func__);
-#endif
+		athp_descdma_free(ar, &skb_cb->htt.txbuf_dd);
 
 	ath10k_report_offchan_tx(htt->ar, msdu);
 
