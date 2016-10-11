@@ -149,3 +149,7 @@ NEED TO DO THIS OR THE FIRMWARE CRASHES
 * Add busdma ops to all the places where we do descdma operations - especiall
   ath10k_htt_tx() and the completion path (wherever txbuf_paddr is referenced -
   find where it first checks the txbuf and go from there.)
+
+* Sending frames require a peer.  If there's no peer, then we can't actually
+  transmit it - it'll just get stuck in the transmit queue.  Figure this out?
+
