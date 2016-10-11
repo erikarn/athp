@@ -352,49 +352,58 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 	IEEE80211_UNLOCK(ic);
 
-	/*
-	 * Handle tearing down the association state if we're
-	 * a STA mode VAP and we're going to INIT.
-	 *
-	 * Note: it's possible other association states need
-	 * to be handled.
-	 */
-	if (vap->iv_opmode == IEEE80211_M_STA && nstate == IEEE80211_S_INIT) {
-		ATHP_CONF_LOCK(ar);
-		ath10k_bss_update(ar, vap, bss_ni, 0);
-		ATHP_CONF_UNLOCK(ar);
-	}
-
 	switch (nstate) {
 	case IEEE80211_S_RUN:
 		/* RUN->RUN; ignore for now */
 		if (ostate == IEEE80211_S_RUN)
 			break;
 
+		/*
+		 * XXX TODO: this panics the firmware?
+		 */
+#if 0
+		/* STA mode - update BSS info if we have some */
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			ATHP_CONF_LOCK(ar);
+			if (vif->is_stabss_setup == 1)
+				ath10k_bss_update(ar, vap, bss_ni, 1);
+			ATHP_CONF_UNLOCK(ar);
+		}
+#endif
+
 		/* For now, only start vdev on INIT->RUN */
 		/* This should be ok for monitor, but not for station */
-		if (ostate == IEEE80211_S_INIT) {
-			/* STA mode - update BSS info */
-			if (vap->iv_opmode == IEEE80211_M_STA) {
-				ATHP_CONF_LOCK(ar);
-				ath10k_bss_update(ar, vap, bss_ni, 1);
-				ATHP_CONF_UNLOCK(ar);
-			}
-			if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+			if (ostate == IEEE80211_S_INIT) {
 				ATHP_CONF_LOCK(ar);
 				ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 				ATHP_CONF_UNLOCK(ar);
 				if (ret != 0) {
-					device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
+					device_printf(ar->sc_dev,
+					    "%s: ath10k_vdev_start failed; ret=%d\n",
+					    __func__, ret);
 					break;
 				}
 			}
 		}
 		break;
 
+	/* Transitioning to SCAN from RUN - is fine, you don't need to delete anything */
+	case IEEE80211_S_SCAN:
+		break;
+
 	case IEEE80211_S_INIT:
 		ATHP_CONF_LOCK(ar);
-		ath10k_vif_bring_down(vap);
+		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+			/* Monitor mode - explicit down */
+			ath10k_vif_bring_down(vap);
+		}
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			/* This brings the interface down; delete the peer */
+			if (vif->is_stabss_setup == 1) {
+				ath10k_bss_update(ar, vap, bss_ni, 0);
+			}
+		}
 		ATHP_CONF_UNLOCK(ar);
 		break;
 
@@ -407,22 +416,31 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * with whatever new information we've found.
 		 */
 		ATHP_CONF_LOCK(ar);
-		/* XXX bring it down first? or? */
-		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
-		if (ret != 0) {
-			ATHP_CONF_UNLOCK(ar);
-			device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
-			break;
-		}
+		/*
+		 * XXX TODO: If this isn't restarted before sending a
+		 * bss_update, the firmware panics.  I'm not yet sure why.
+		 */
+//		if (vif->is_stabss_setup == 0) {
+			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				device_printf(ar->sc_dev,
+				    "%s: ath10k_vdev_start failed; ret=%d\n",
+				    __func__, ret);
+				break;
+			}
+//		}
 		ath10k_bss_update(ar, vap, bss_ni, 1);
 		ATHP_CONF_UNLOCK(ar);
 		break;
 	case IEEE80211_S_ASSOC:
+		/* Assuming we already went through AUTH */
+#if 0
 		ATHP_CONF_LOCK(ar);
-		/* XXX bring it down first? or? */
-		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+		/* Update the association state */
 		ath10k_bss_update(ar, vap, bss_ni, 1);
 		ATHP_CONF_UNLOCK(ar);
+#endif
 		break;
 	default:
 		ath10k_warn(ar, "%s: state %s not handled\n",
