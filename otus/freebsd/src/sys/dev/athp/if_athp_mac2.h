@@ -39,4 +39,6 @@ extern	void ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap, struc
 
 extern	int ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211_node *ni, struct ieee80211_channel *c);
 
+extern	void ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vap, u32 queues, bool drop);
+
 #endif

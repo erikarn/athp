@@ -411,6 +411,10 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ath10k_vif_bring_down(vap);
 		}
 		if (vap->iv_opmode == IEEE80211_M_STA) {
+
+			/* Wait for xmit to finish before continuing */
+			ath10k_tx_flush(ar, vap, 0, 1);
+
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
 				ath10k_bss_update(ar, vap, bss_ni, 0);
@@ -559,6 +563,10 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * set it up earlier.
 	 */
 	if (uvp->is_setup) {
+
+		/* Wait for xmit to finish before continuing */
+		ath10k_tx_flush(ar, vap, 0, 1);
+
 		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
 	}

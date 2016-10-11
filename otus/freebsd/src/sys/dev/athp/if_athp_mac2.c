@@ -6467,37 +6467,46 @@ static int ath10k_mac_op_set_frag_threshold(struct ieee80211_hw *hw, u32 value)
 	 */
 	return -EOPNOTSUPP;
 }
+#endif
 
-static void ath10k_flush(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-			 u32 queues, bool drop)
+#if 1
+void
+ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
+    bool drop)
 {
-	struct ath10k *ar = hw->priv;
 	bool skip;
 	long time_left;
+	int interval;
 
 	/* mac80211 doesn't care if we really xmit queued frames or not
 	 * we'll collect those frames either way if we stop/delete vdevs */
 	if (drop)
 		return;
 
+	interval = ticks + ((ATH10K_FLUSH_TIMEOUT_HZ * hz) / 1000);
+
 	ATHP_CONF_LOCK(ar);
 
 	if (ar->state == ATH10K_STATE_WEDGED)
 		goto skip;
 
-	time_left = wait_event_timeout(ar->htt.empty_tx_wq, ({
+	while (! ieee80211_time_after(ticks, interval)) {
 			bool empty;
 
-			spin_lock_bh(&ar->htt.tx_lock);
+			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
+			    "tx_flush", ATH10K_FLUSH_TIMEOUT_HZ);
+
+			ATHP_HTT_TX_LOCK(&ar->htt);
 			empty = (ar->htt.num_pending_tx == 0);
-			spin_unlock_bh(&ar->htt.tx_lock);
+			ATHP_HTT_TX_UNLOCK(&ar->htt);
 
 			skip = (ar->state == ATH10K_STATE_WEDGED) ||
 			       test_bit(ATH10K_FLAG_CRASH_FLUSH,
 					&ar->dev_flags);
 
-			(empty || skip);
-		}), ATH10K_FLUSH_TIMEOUT_HZ);
+			if (empty || skip)
+				break;
+		}
 
 	if (time_left == 0 || skip)
 		ath10k_warn(ar, "failed to flush transmit queue (skip %i ar-state %i): %ld\n",
@@ -6506,11 +6515,13 @@ static void ath10k_flush(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 skip:
 	ATHP_CONF_UNLOCK(ar);
 }
+#endif
 
 /* TODO: Implement this function properly
  * For now it is needed to reply to Probe Requests in IBSS mode.
  * Propably we need this information from FW.
  */
+#if 0
 static int ath10k_tx_last_beacon(struct ieee80211_hw *hw)
 {
 	return 1;
