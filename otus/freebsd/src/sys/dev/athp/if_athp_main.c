@@ -245,6 +245,11 @@ finish:
  * Unlike the raw path - if we fail, we don't free the buffer.
  *
  * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
+ *
+ * XXX TODO: handle fragmented frame list
+ *
+ * XXX TODO: we shouldn't transmit a frame if there's no peer setup
+ * for it!
  */
 static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
@@ -332,6 +337,12 @@ athp_parent(struct ieee80211com *ic)
 	}
 }
 
+/*
+ * TODO:
+ *
+ * + if we fail assoc and move to another bssid, do we go via INIT
+ *   first?  Ie, how do we delete the existing bssid?
+ */
 static int
 athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
@@ -358,18 +369,19 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (ostate == IEEE80211_S_RUN)
 			break;
 
-		/*
-		 * XXX TODO: this panics the firmware?
-		 */
-#if 0
-		/* STA mode - update BSS info if we have some */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
-			if (vif->is_stabss_setup == 1)
-				ath10k_bss_update(ar, vap, bss_ni, 1);
+			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				device_printf(ar->sc_dev,
+				    "%s: ath10k_vdev_start failed; ret=%d\n",
+				    __func__, ret);
+				break;
+			}
+			ath10k_bss_update(ar, vap, bss_ni, 1);
 			ATHP_CONF_UNLOCK(ar);
 		}
-#endif
 
 		/* For now, only start vdev on INIT->RUN */
 		/* This should be ok for monitor, but not for station */
@@ -412,24 +424,20 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * When going SCAN->AUTH, we need to plumb up the initial
 		 * BSS before we can send frames to it.
 		 *
-		 * Then for ASSOC and RUN we update the BSS configuration
+		 * For ASSOC, we do the same.
+		 *
+		 * Then for RUN we update the BSS configuration
 		 * with whatever new information we've found.
 		 */
 		ATHP_CONF_LOCK(ar);
-		/*
-		 * XXX TODO: If this isn't restarted before sending a
-		 * bss_update, the firmware panics.  I'm not yet sure why.
-		 */
-//		if (vif->is_stabss_setup == 0) {
-			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
-			if (ret != 0) {
-				ATHP_CONF_UNLOCK(ar);
-				device_printf(ar->sc_dev,
-				    "%s: ath10k_vdev_start failed; ret=%d\n",
-				    __func__, ret);
-				break;
-			}
-//		}
+		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+		if (ret != 0) {
+			ATHP_CONF_UNLOCK(ar);
+			device_printf(ar->sc_dev,
+			    "%s: ath10k_vdev_start failed; ret=%d\n",
+			    __func__, ret);
+			break;
+		}
 		ath10k_bss_update(ar, vap, bss_ni, 1);
 		ATHP_CONF_UNLOCK(ar);
 		break;
@@ -605,7 +613,12 @@ athp_node_alloc(struct ieee80211vap *vap,
 	if (! an)
 		return (NULL);
 
-	/* XXX TODO: Create peer */
+	/* XXX TODO: Create peer if it's not our MAC address */
+	if (memcmp(mac, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		device_printf(ar->sc_dev,
+		    "%s: TODO: add peer for MAC %6D\n",
+		    __func__, mac, ":");
+	}
 
 	return (&an->ni);
 }
@@ -616,7 +629,9 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
+	device_printf(ar->sc_dev,
+	    "%s: called; mac=%6D; isnew=%d\n",
+	    __func__, ni->ni_macaddr, ":", isnew);
 }
 
 static void
@@ -627,9 +642,16 @@ athp_node_free(struct ieee80211_node *ni)
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 
-	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, ni->ni_macaddr, ":");
+	device_printf(ar->sc_dev,
+	    "%s: called; mac=%6D\n",
+	    __func__, ni->ni_macaddr, ":");
 
 	/* XXX TODO: delete peer */
+	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		device_printf(ar->sc_dev,
+		    "%s: TODO: add peer for MAC %6D\n",
+		    __func__, ni->ni_macaddr, ":");
+	}
 
 	ar->sc_node_free(ni);
 }

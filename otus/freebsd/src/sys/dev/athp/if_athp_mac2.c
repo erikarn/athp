@@ -7200,10 +7200,11 @@ ath10k_vif_bring_down(struct ieee80211vap *vap)
 
 /*
  * Only call this for STA mode stuff for now - it assumes you're
- * programming in the bss node bssid.
+ * about to reinit the bssinfo.
  */
 int
-ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211_node *ni, struct ieee80211_channel *c)
+ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap,
+    struct ieee80211_node *ni, struct ieee80211_channel *c)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	int ret;
@@ -7229,20 +7230,6 @@ ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap, struct ieee80211
 		    arvif->vdev_id, ret);
 		return ret;
 	}
-
-	/*
-	 * XXX TODO: do we need to do this? or can we leave the 'up' bit
-	 * for the bssinfo code to bring 'up' for us?
-	 */
-#if 1
-	/* XXX TODO: bring up - note the aid/bss? Does it have to be updated by now? */
-	ret = ath10k_wmi_vdev_up(arvif->ar, arvif->vdev_id, arvif->aid, ni->ni_macaddr);
-	if (ret != 0) {
-		ath10k_warn(ar, "%s: failed to bring up vdev %i: %d\n", __func__,
-		    arvif->vdev_id, ret);
-		return ret;
-	}
-#endif
 
 	return (0);
 }
