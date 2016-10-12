@@ -594,8 +594,6 @@ athp_pci_attach(device_t dev)
 		goto bad4;
 	}
 
-	/* (here's where ath10k requests IRQs */
-
 	/* Ok, gate open the interrupt handler */
 	ar->sc_invalid = 0;
 
