@@ -90,6 +90,8 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
+extern	void ieee80211_hwscan_assign(struct ieee80211com *ic);
+
 /*
  * These are the net80211 facing implementation pieces.
  */
@@ -104,6 +106,37 @@ static uint8_t chan_list_5ghz[] =
       108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
       153, 157, 161, 165 };
 
+static int
+athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0)
+{
+	struct ieee80211_frame *wh;
+	struct ieee80211_key *k;
+	int iswep;
+
+	wh = mtod(m0, struct ieee80211_frame *);
+	iswep = wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
+
+	if (iswep) {
+
+		/*
+		 * Construct the 802.11 header+trailer for an encrypted
+		 * frame. The only reason this can fail is because of an
+		 * unknown or unsupported cipher/key type.
+		 */
+		k = ieee80211_crypto_encap(ni, m0);
+		if (k == NULL) {
+			/*
+			 * This can happen when the key is yanked after the
+			 * frame was queued.  Just discard the frame; the
+			 * 802.11 layer counts failures and provides
+			 * debugging/diagnostics.
+			 */
+			return (0);
+		}
+	}
+
+	return (1);
+}
 /*
  * Raw frame transmission - this is "always" 802.11.
  *
@@ -141,8 +174,8 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 
 	wh = mtod(m, struct ieee80211_frame *);
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; m=%p, len=%d, fc0=0x%x, fc1=0x%x\n",
-	    __func__, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1]);
+	    "%s: called; m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
+	    __func__, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
 
 	ATHP_CONF_LOCK(ar);
 	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
@@ -155,6 +188,12 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		}
 	}
 	ATHP_CONF_UNLOCK(ar);
+
+	if (! athp_tx_tag_crypto(ar, ni, m)) {
+		device_printf(ar->sc_dev, "%s: failed to tag_crypto\n", __func__);
+		m_freem(m);
+		return (ENXIO);
+	}
 
 #if 0
 	/* XXX for now, early error out - see if bssinfo commands are crashing firmware before tx */
@@ -184,6 +223,16 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 }
 
 static void
+athp_scan_curchan(struct ieee80211_scan_state *ss, unsigned long maxdwell)
+{
+}
+
+static void
+athp_scan_mindwell(struct ieee80211_scan_state *ss)
+{
+}
+
+static void
 athp_scan_start(struct ieee80211com *ic)
 {
 	struct ath10k *ar = ic->ic_softc;
@@ -195,7 +244,11 @@ athp_scan_start(struct ieee80211com *ic)
 	if (vap == NULL)
 		return;
 
-	ret = ath10k_hw_scan(ar, vap);
+	/*
+	 * For now - active scan, hard-coded 200ms active/passive dwell times.
+	 */
+	ret = ath10k_hw_scan(ar, vap, 200, 200);
+
 	if (ret != 0) {
 		device_printf(ar->sc_dev, "%s: ath10k_hw_scan failed; ret=%d\n", __func__, ret);
 	}
@@ -274,9 +327,10 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		return (ENOBUFS);
 	}
-	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: called; m=%p\n", __func__, m);
 
 	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: called; m=%p; ni.macaddr=%6D\n", __func__, m, ni->ni_macaddr,":");
+
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
 
@@ -291,6 +345,10 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
+	if (! athp_tx_tag_crypto(ar, ni, m)) {
+		device_printf(ar->sc_dev, "%s: failed to tag_crypto\n", __func__);
+		return (ENXIO);
+	}
 
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
@@ -302,7 +360,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	/* Put the mbuf into the given pbuf */
 	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
 
-	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
 	m->m_pkthdr.rcvif = NULL;
 
 	/* The node reference is ours to free upon xmit, so .. */
@@ -379,7 +436,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				    __func__, ret);
 				break;
 			}
-			ath10k_bss_update(ar, vap, bss_ni, 1);
+			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			ATHP_CONF_UNLOCK(ar);
 		}
 
@@ -417,7 +474,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
-				ath10k_bss_update(ar, vap, bss_ni, 0);
+				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
 		}
 		ATHP_CONF_UNLOCK(ar);
@@ -442,7 +499,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			    __func__, ret);
 			break;
 		}
-		ath10k_bss_update(ar, vap, bss_ni, 1);
+		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
 		ATHP_CONF_UNLOCK(ar);
 		break;
 	case IEEE80211_S_ASSOC:
@@ -450,7 +507,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 #if 0
 		ATHP_CONF_LOCK(ar);
 		/* Update the association state */
-		ath10k_bss_update(ar, vap, bss_ni, 1);
+		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
 		ATHP_CONF_UNLOCK(ar);
 #endif
 		break;
@@ -517,7 +574,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap = (void *) uvp;
 
 	if (ieee80211_vap_setup(ic, vap, name, unit, opmode,
-	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
+//	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
+	    flags, bssid) != 0) {
 		free(uvp, M_80211_VAP);
 		return (NULL);
 	}
@@ -697,7 +755,7 @@ athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		return (ENOTSUP);
 
 	/* Send the rest */
-	printf("%s: sending type=0x%x (%d)", __func__, type, type);
+	printf("%s: sending type=0x%x (%d)\n", __func__, type, type);
 	return (ieee80211_send_mgmt(ni, type, arg));
 
 }
@@ -785,6 +843,16 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_WPA;
 
 	/* XXX crypto capabilities */
+	ic->ic_cryptocaps |=
+	    IEEE80211_CRYPTO_WEP |
+	    IEEE80211_CRYPTO_AES_OCB |
+	    IEEE80211_CRYPTO_AES_CCM |
+	    IEEE80211_CRYPTO_CKIP |
+	    IEEE80211_CRYPTO_TKIP |
+	    IEEE80211_CRYPTO_TKIPMIC;
+
+	/* capabilities, etc */
+	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD;
 
 	/* XXX 11n bits */
 
@@ -795,11 +863,18 @@ athp_attach_net80211(struct ath10k *ar)
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
 
+#if 0
+	/* attach hw scan methods */
+	ieee80211_hwscan_assign(ic);
+#endif
+
 	ieee80211_ifattach(ic);
 
 	/* required 802.11 methods */
 	ic->ic_raw_xmit = athp_raw_xmit;
 	ic->ic_scan_start = athp_scan_start;
+	ic->ic_scan_curchan = athp_scan_curchan;
+	ic->ic_scan_mindwell = athp_scan_mindwell;
 	ic->ic_scan_end = athp_scan_end;
 	ic->ic_set_channel = athp_set_channel;
 	ic->ic_transmit = athp_transmit;

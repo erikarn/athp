@@ -1616,6 +1616,8 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 		return ret;
 	}
 
+	ar->rx_freq = channel->ic_freq;
+
 	ar->num_started_vdevs++;
 	ath10k_recalc_radar_detection(ar);
 
@@ -2271,7 +2273,8 @@ static u32 ath10k_peer_assoc_h_listen_intval(struct ath10k *ar,
 static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 				      struct ieee80211vap *vif,
 				      struct ieee80211_node *ni,
-				      struct wmi_peer_assoc_complete_arg *arg)
+				      struct wmi_peer_assoc_complete_arg *arg,
+				      int is_run)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	u32 aid;
@@ -2301,57 +2304,66 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	ath10k_warn(ar, "%s: TODO: check endian-ness of assoc_capability with mac80211!\n", __func__);
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
-	ath10k_warn(ar, "%s: capinfo=0x%08x\n", __func__, ni->ni_capinfo);
+
+	/* If is_run=0, then clear the privacy capinfo */
+	if (is_run == 0)
+		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
+
+	ath10k_warn(ar, "%s: capinfo=0x%08x, peer_caps=0x%08x\n", __func__, ni->ni_capinfo, arg->peer_caps);
 }
 #endif
 
-static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
-				       struct ieee80211vap *vap,
-				       struct wmi_peer_assoc_complete_arg *arg)
+
+/*
+ * Setup crypto state for the given peer.
+ *
+ * I'm currently unsure how this works for non-STA mode.
+ * For STA mode, bss is obviously the BSS we're associating
+ * to.  For hostap, ibss, etc mode, is it "our" BSS ?
+ * I'm guessing so?
+ *
+ * There are two sets of ies:
+ *
+ * + vap->iv_rsn_ie / vap->iv_wpa_ie ; and
+ * + ni->ni_ies.wpa_ie / ni->ni_ies.rsn_ie
+ *
+ * I'm not sure yet which is to use where.
+ */
+static void
+ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
+    struct ieee80211_node *bss, struct wmi_peer_assoc_complete_arg *arg,
+    int is_run)
 {
-#if 0
-	struct ieee80211_bss_conf *info = &vif->bss_conf;
-	struct cfg80211_chan_def def;
-	struct cfg80211_bss *bss;
-	const u8 *rsnie = NULL;
-	const u8 *wpaie = NULL;
+
+	ath10k_warn(ar,
+	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
+	    " ni rsn=%p, wpa=%p\n",
+	    __func__,
+	    is_run,
+	    !! (vap->iv_flags & IEEE80211_F_PRIVACY),
+	    !! (vap->iv_flags & IEEE80211_F_WPA),
+	    !! (vap->iv_flags & IEEE80211_F_WPA2),
+	    vap->iv_rsn_ie,
+	    vap->iv_wpa_ie,
+	    bss->ni_ies.rsn_ie,
+	    bss->ni_ies.wpa_ie);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
+	/* Don't plumb in keys until we're in RUN state */
+	if (! is_run)
 		return;
 
-	bss = cfg80211_get_bss(ar->hw->wiphy, def.chan, info->bssid, NULL, 0,
-			       IEEE80211_BSS_TYPE_ANY, IEEE80211_PRIVACY_ANY);
-	if (bss) {
-		const struct cfg80211_bss_ies *ies;
-
-		rcu_read_lock();
-		rsnie = ieee80211_bss_get_ie(bss, WLAN_EID_RSN);
-
-		ies = rcu_dereference(bss->ies);
-
-		wpaie = cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT,
-						WLAN_OUI_TYPE_MICROSOFT_WPA,
-						ies->data,
-						ies->len);
-		rcu_read_unlock();
-		cfg80211_put_bss(ar->hw->wiphy, bss);
-	}
-
 	/* FIXME: base on RSN IE/WPA IE is a correct idea? */
-	if (rsnie || wpaie) {
+	if (bss->ni_ies.rsn_ie || bss->ni_ies.wpa_ie) {
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: rsn ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_PTK_4_WAY;
 	}
 
-	if (wpaie) {
+	if (bss->ni_ies.wpa_ie) {
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
-#else
-	ath10k_warn(ar, "%s: TODO: implement!\n", __func__);
-#endif
 }
 
 /*
@@ -2894,14 +2906,15 @@ ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
 static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 				     struct ieee80211vap *vif,
 				     struct ieee80211_node *ni,
-				     struct wmi_peer_assoc_complete_arg *arg)
+				     struct wmi_peer_assoc_complete_arg *arg,
+				     int is_run)
 {
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 	memset(arg, 0, sizeof(*arg));
 
-	ath10k_peer_assoc_h_basic(ar, vif, ni, arg);
-	ath10k_peer_assoc_h_crypto(ar, vif, arg);
+	ath10k_peer_assoc_h_basic(ar, vif, ni, arg, is_run);
+	ath10k_peer_assoc_h_crypto(ar, vif, ni, arg, is_run);
 	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
 	//ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
 	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
@@ -3013,7 +3026,7 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
  */
 /* can be called only in mac80211 callbacks due to `key_count` usage */
 #if 1
-void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni)
+void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 {
 	struct ieee80211vap *vif = ni->ni_vap;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
@@ -3040,7 +3053,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni)
 //	htcap = ap_sta->ht_cap;
 //	vht_cap = ap_sta->vht_cap;
 
-	ret = ath10k_peer_assoc_prepare(ar, vif, ni, &peer_arg);
+	ret = ath10k_peer_assoc_prepare(ar, vif, ni, &peer_arg, is_run);
 	if (ret) {
 		ath10k_warn(ar, "failed to prepare peer assoc for %6D vdev %i: %d\n",
 			    ni->ni_macaddr, ":", arvif->vdev_id, ret);
@@ -3109,7 +3122,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni)
  * XXX adrian: I think this is the "disconnect from a BSS" STA method.
  */
 #if 1
-void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif)
+void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct ieee80211_sta_vht_cap vht_cap = {};
@@ -4133,7 +4146,7 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		/* fall through */
 	case ATH10K_SCAN_STARTING:
 		ar->scan.state = ATH10K_SCAN_IDLE;
-		ar->scan_channel = NULL;
+		ar->scan_freq = 0;
 		ath10k_offchan_tx_purge(ar);
 		callout_drain(&ar->scan.timeout);
 		ath10k_compl_wakeup_all(&ar->scan.completed);
@@ -5471,8 +5484,7 @@ static void ath10k_bss_info_changed(struct ieee80211_hw *hw,
 
 #if 1
 int
-ath10k_hw_scan(struct ath10k *ar,
-    struct ieee80211vap *vif)
+ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int passive_ms)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct cfg80211_scan_request *req = &hw_req->req;
@@ -5508,8 +5520,8 @@ ath10k_hw_scan(struct ath10k *ar,
 	ath10k_wmi_start_scan_init(ar, &arg);
 	arg.vdev_id = arvif->vdev_id;
 	arg.scan_id = ATH10K_SCAN_ID;
-	arg.dwell_time_active = 50;
-	arg.dwell_time_passive = 50;
+	arg.dwell_time_active = active_ms;
+	arg.dwell_time_passive = passive_ms;
 
 #if 0
 	if (req->ie_len) {
@@ -8145,7 +8157,7 @@ void ath10k_mac_unregister(struct ath10k *ar)
  */
 void
 ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
-    struct ieee80211_node *ni, int is_assoc)
+    struct ieee80211_node *ni, int is_assoc, int is_run)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 
@@ -8166,6 +8178,13 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 */
 		if (ar->monitor_started)
 			ath10k_monitor_stop(ar);
+
+		/*
+		 * Before updating the base parameters, ensure we clear out
+		 * any previous vdev setup.
+		 */
+		ath10k_bss_disassoc(ar, vap, is_run);
+
 		ATHP_DATA_LOCK(ar);
 		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
 			ATHP_DATA_UNLOCK(ar);
@@ -8173,11 +8192,11 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		} else {
 			ATHP_DATA_UNLOCK(ar);
 		}
-		ath10k_bss_assoc(ar, ni);
+		ath10k_bss_assoc(ar, ni, is_run);
 		arvif->is_stabss_setup = 1;
 		ath10k_monitor_recalc(ar);
 	} else {
-		ath10k_bss_disassoc(ar, vap);
+		ath10k_bss_disassoc(ar, vap, is_run);
 		arvif->is_stabss_setup = 0;
 		ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 	}

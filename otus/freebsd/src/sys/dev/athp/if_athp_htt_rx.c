@@ -896,7 +896,7 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 #endif
 }
 
-static struct ieee80211_channel *
+static uint32_t
 ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
@@ -908,26 +908,26 @@ ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 //	ATHP_HTT_RX_LOCK_ASSERT(htt);
 
 	if (!rxd)
-		return NULL;
+		return 0;
 
 	if (rxd->attention.flags &
 	    __cpu_to_le32(RX_ATTENTION_FLAGS_PEER_IDX_INVALID))
-		return NULL;
+		return 0;
 
 	if (!(rxd->msdu_end.common.info0 &
 	      __cpu_to_le32(RX_MSDU_END_INFO0_FIRST_MSDU)))
-		return NULL;
+		return 0;
 
 	peer_id = MS(__le32_to_cpu(rxd->mpdu_start.info0),
 		     RX_MPDU_START_INFO0_PEER_IDX);
 
 	peer = ath10k_peer_find_by_id(ar, peer_id);
 	if (!peer)
-		return NULL;
+		return 0;
 
 	arvif = ath10k_get_arvif(ar, peer->vdev_id);
 	if (WARN_ON_ONCE(!arvif))
-		return NULL;
+		return 0;
 
 #if 0
 	if (WARN_ON(ath10k_mac_vif_chan(arvif->vif, &def)))
@@ -935,7 +935,9 @@ ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 	return def.chan;
 #else
 	/* XXX TODO: is this valid? */
-	return ic->ic_curchan;
+	if (ic->ic_curchan)
+		return ic->ic_curchan->ic_freq;
+	return 0;
 #endif
 }
 
@@ -943,7 +945,7 @@ ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
  * XXX TODO: we don't yet have a per-vif channel context;
  * so don't implement this just yet.
  */
-static struct ieee80211_channel *
+static uint32_t
 ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 {
 #if 0
@@ -958,7 +960,7 @@ ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 			return def.chan;
 	}
 #else
-	return NULL;
+	return 0;
 #endif
 }
 
@@ -974,7 +976,7 @@ ath10k_htt_rx_h_any_chan_iter(struct ieee80211_hw *hw,
 }
 #endif
 
-static struct ieee80211_channel *
+static uint32_t
 ath10k_htt_rx_h_any_channel(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
@@ -987,7 +989,9 @@ ath10k_htt_rx_h_any_channel(struct ath10k *ar)
 
 	return def.chan;
 #else
-	return (ic->ic_curchan);
+	if (ic->ic_curchan != NULL)
+		return (ic->ic_curchan->ic_freq);
+	return 0;
 #endif
 }
 
@@ -1000,12 +1004,12 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 				    struct htt_rx_desc *rxd,
 				    u32 vdev_id)
 {
-	struct ieee80211_channel *ch;
+	uint32_t ch;
 
 	ATHP_DATA_LOCK(ar);
-	ch = ar->scan_channel;
+	ch = ar->scan_freq;
 	if (!ch)
-		ch = ar->rx_channel;
+		ch = ar->rx_freq;
 	if (!ch)
 		ch = ath10k_htt_rx_h_peer_channel(ar, rxd);
 	if (!ch)
@@ -1017,9 +1021,8 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 	if (!ch)
 		return false;
 
-	status->c_freq = ch->ic_freq;
-	status->c_ieee = ch->ic_ieee;
-	status->r_flags |= IEEE80211_R_FREQ | IEEE80211_R_IEEE;
+	status->c_ieee = ch;
+	status->r_flags |= IEEE80211_R_IEEE;
 
 	return true;
 }

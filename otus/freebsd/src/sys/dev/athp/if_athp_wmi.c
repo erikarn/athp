@@ -2001,13 +2001,16 @@ static void ath10k_wmi_event_scan_bss_chan(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		ar->scan_channel = NULL;
+		ar->scan_freq = 0;
+		ath10k_dbg(ar, ATH10K_DBG_WMI,
+		    "%s: setting scan_channel=NULL\n", __func__);
 		break;
 	}
 }
 
 static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 {
+
 	ATHP_DATA_LOCK_ASSERT(ar);
 
 	switch (ar->scan.state) {
@@ -2019,7 +2022,14 @@ static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		//ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
+		/*
+		 * For .. "reasons", we track the current foreign channel
+		 * so we can track the correct frequency for received frames.
+		 * (Ie, it's not reported per-frame?)
+		 */
+		ar->scan_freq = freq;
+		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: freq=%d\n", __func__, freq);
+
 		if (ar->scan.is_roc && ar->scan.roc_freq == freq)
 			ath10k_compl_wakeup_one(&ar->scan.on_channel);
 		break;

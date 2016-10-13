@@ -312,10 +312,10 @@ struct ath10k {
 #endif
 
 	/* should never be NULL; needed for regular htt rx */
-	struct ieee80211_channel *rx_channel;
+	uint32_t rx_freq;
 
 	/* valid during scan; needed for mgmt rx during scan */
-	struct ieee80211_channel *scan_channel;
+	uint32_t scan_freq;
 
 #if 0
 	/* current operating channel definition */
