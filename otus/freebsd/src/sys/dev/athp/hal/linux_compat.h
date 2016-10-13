@@ -146,17 +146,12 @@ IS_ALIGNED(unsigned long ptr, int a)
 	return (ptr % a == 0);
 }
 
-/*
- * This isn't strictly speaking "linux compat"; it's bits that are
- * missing from net80211 that we should really port.
- */
-/* XXX TODO: implement! */
-#define	IEEE80211_IS_ACTION(a)		0
-#define	IEEE80211_IS_DEAUTH(a)		0
-#define	IEEE80211_IS_DISASSOC(a)	0
-#define	IEEE80211_IS_QOS(a)		0
-#define	IEEE80211_HAS_PROT(a)		0
-#define	IEEE80211_IS_MGMT(a)		0
+#define	IEEE80211_HAS_PROT(a)		ieee80211_is_protected(a)
+#define	IEEE80211_IS_MGMT(a)		ieee80211_is_mgmt(a)
+#define	IEEE80211_IS_ACTION(a)		ieee80211_is_action(a)
+#define	IEEE80211_IS_DEAUTH(a)		ieee80211_is_deauth(a)
+#define	IEEE80211_IS_DISASSOC(a)	ieee80211_is_disassoc(a)
+#define	IEEE80211_IS_QOS(a)		ieee80211_is_data_qos(a)
 
 /* XXX temp uAPSD */
 /* U-APSD queue for WMM IEs sent by AP */
@@ -294,6 +289,49 @@ static inline bool ieee80211_is_mgmt(struct ieee80211_frame *wh)
 	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 
 	return (type == IEEE80211_FC0_TYPE_MGT);
+}
+
+static inline bool ieee80211_is_protected(struct ieee80211_frame *wh)
+{
+
+	return !! (wh->i_fc[1] & IEEE80211_FC1_PROTECTED);
+}
+
+
+static inline bool ieee80211_is_auth(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_AUTH));
+}
+
+static inline bool ieee80211_is_action(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_ACTION));
+}
+
+static inline bool ieee80211_is_deauth(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_DEAUTH));
+}
+
+static inline bool ieee80211_is_disassoc(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_DISASSOC));
 }
 
 /*
