@@ -2307,13 +2307,14 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	struct ieee80211_rx_stats stat;
 	struct ieee80211_node *ni;
 	struct mbuf *m;
-//	struct ieee80211_hdr *hdr;
+	struct ieee80211_frame *hdr;
 	u32 rx_status;
 	u32 channel;
 	u32 phy_mode;
 	u32 snr;
 	u32 rate;
 	u32 buf_len;
+	uint32_t band;
 //	u16 fc;
 	int ret;
 
@@ -2383,17 +2384,26 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	sband = &ar->mac.sbands[status->band];
 #endif
 
-	stat.r_flags = IEEE80211_R_RSSI | IEEE80211_R_IEEE | IEEE80211_R_NF;
+	if (channel <= 14)
+		band = IEEE80211_CHAN_2GHZ;
+	else
+		band = IEEE80211_CHAN_5GHZ;
+
+	stat.r_flags = IEEE80211_R_RSSI
+	    | IEEE80211_R_IEEE
+	    | IEEE80211_R_FREQ
+	    | IEEE80211_R_NF;
 	stat.c_ieee = channel;
+	stat.c_freq = ieee80211_ieee2mhz(channel, band);
 	stat.c_rssi = snr;
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
 
+	hdr = mtod(pbuf->m, struct ieee80211_frame *);
 #if 0
 	status->freq = ieee80211_channel_to_frequency(channel, status->band);
 	status->signal = snr + ATH10K_DEFAULT_NOISE_FLOOR;
 	status->rate_idx = ath10k_mac_bitrate_to_idx(sband, rate / 100);
 
-	hdr = (struct ieee80211_hdr *)mbuf_skb_data(pbuf->m);
 	fc = le16_to_cpu(hdr->frame_control);
 
 	ath10k_wmi_handle_wep_reauth(ar, pbuf, status);
@@ -2415,19 +2425,19 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		}
 	}
 
-	if (ieee80211_is_beacon(hdr->frame_control))
-		ath10k_mac_handle_beacon(ar, pbuf);
 #endif
 
 #if 0
-	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx skb %p len %d ftype %02x stype %02x\n",
-		   mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m),
-		   fc & IEEE80211_FCTL_FTYPE, fc & IEEE80211_FCTL_STYPE);
-#endif
+	/* XXX TODO: yes, we should handle beacons for software bmiss */
+	if (ieee80211_is_beacon(hdr))
+		ath10k_mac_handle_beacon(ar, pbuf);
+	#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx chan %d snr %d\n", stat.c_ieee, stat.c_rssi);
+		   "event mgmt rx chan %d snr %d, rate %u isprot %d isauth %d\n",
+		       stat.c_ieee, stat.c_rssi, rate,
+		       ieee80211_is_protected(hdr),
+		       ieee80211_is_auth(hdr));
 
 	/*
 	 * Committed to RX up the node.  Grab the mbuf.
