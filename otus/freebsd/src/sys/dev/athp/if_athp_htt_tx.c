@@ -609,10 +609,9 @@ err:
 int
 ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
-#if 1
 	struct ath10k *ar = htt->ar;
 	//struct device *dev = ar->sc_dev;
-	//struct ieee80211_frame *hdr = (struct ieee80211_frame *)mbuf_skb_data(msdu->m);
+	struct ieee80211_frame *hdr;
 	struct ath10k_skb_cb *skb_cb = ATH10K_SKB_CB(msdu);
 	struct ath10k_hif_sg_item sg_items[2];
 	struct htt_data_tx_desc_frag *frags;
@@ -629,6 +628,8 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	res = ath10k_htt_tx_inc_pending(htt);
 	if (res)
 		goto err;
+
+	hdr = (struct ieee80211_frame *)mbuf_skb_data(msdu->m);
 
 	ATHP_HTT_TX_LOCK(htt);
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
@@ -825,8 +826,4 @@ err_tx_dec:
 	ath10k_htt_tx_dec_pending(htt);
 err:
 	return res;
-#else
-	device_printf(htt->ar->sc_dev, "%s; TODO implement!\n", __func__);
-	return (-EINVAL);
-#endif
 }
