@@ -1005,6 +1005,7 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 				    u32 vdev_id)
 {
 	uint32_t ch;
+	uint32_t band;
 
 	ATHP_DATA_LOCK(ar);
 	ch = ar->scan_freq;
@@ -1021,8 +1022,14 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 	if (!ch)
 		return false;
 
+	if (ch < 15)
+		band = IEEE80211_CHAN_2GHZ;
+	else
+		band = IEEE80211_CHAN_5GHZ;
+
 	status->c_ieee = ch;
-	status->r_flags |= IEEE80211_R_IEEE;
+	status->c_freq = ieee80211_ieee2mhz(ch, band);
+	status->r_flags |= IEEE80211_R_IEEE | IEEE80211_R_FREQ;
 
 	return true;
 }
@@ -1949,7 +1956,7 @@ static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
 	 * invalid/dangerous frames.
 	 */
 
-	if (!rx_status->c_freq) {
+	if (!rx_status->c_ieee) {
 		ath10k_warn(ar, "no channel configured; ignoring frame(s)!\n");
 		return false;
 	}
