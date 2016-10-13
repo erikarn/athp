@@ -813,6 +813,39 @@ athp_attach_sysctl(struct ath10k *ar)
 }
 
 /*
+ * Process regulatory domain changes.
+ *
+ * XXX TODO: this ends up potentially sleeping on COMLOCK.
+ * Maybe defer into a taskqueue later.
+ */
+static int
+athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
+    int nchans, struct ieee80211_channel *chans)
+{
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called; rd %u cc %u location %c%s\n",
+	    __func__,
+	    reg->regdomain,
+	    reg->country,
+	    reg->location,
+	    reg->ecm ? "ecm" : "");
+
+	/*
+	 * Program in the given channel set into the hardware.
+	 */
+	/* XXX locking! */
+	IEEE80211_UNLOCK(ic);
+	ATHP_CONF_LOCK(ar);
+	if (ar->state == ATH10K_STATE_ON)
+		(void) ath10k_regd_update(ar, nchans, chans);
+	ATHP_CONF_UNLOCK(ar);
+	IEEE80211_LOCK(ic);
+
+	return (0);
+}
+
+/*
  * Attach time setup.
  *
  * This needs to be deferred until interrupts are enabled;
@@ -890,6 +923,11 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_newassoc = athp_newassoc;
 	ar->sc_node_free = ic->ic_node_free;
 	ic->ic_node_free = athp_node_free;
+
+	ic->ic_setregdomain = athp_set_regdomain;
+#if 0
+	ic->ic_getradiocaps = athp_get_radiocaps;
+#endif
 
 	/* 11n methods */
 	ic->ic_update_chw = athp_update_chw;

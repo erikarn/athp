@@ -3374,10 +3374,12 @@ static int ath10k_update_channel_list(struct ath10k *ar)
  * let's copy/paste it into a BSD specific one to make
  * future merging and re-implementation easier.
  */
-static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
+int
+ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
+    struct ieee80211_channel *chans)
 {
 	uint8_t reported[IEEE80211_CHAN_BYTES];
-	struct ieee80211com *ic = &ar->sc_ic;
+//	struct ieee80211com *ic = &ar->sc_ic;
 	struct ieee80211_channel *c;
 	struct wmi_scan_chan_list_arg arg = {0};
 	struct wmi_channel_arg *ch;
@@ -3391,8 +3393,8 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 	 * First, loop over the channel list, remove duplicates.
 	 */
 	nchan = 0;
-	for (i = 0; i < ic->ic_nchans; i++) {
-		c = &ic->ic_channels[i];
+	for (i = 0; i < nchans; i++) {
+		c = &chans[i];
 		if (isset(reported, c->ic_ieee))
 			continue;
 		printf("%s: adding channel %d (%d)\n", __func__, c->ic_ieee, c->ic_freq);
@@ -3410,8 +3412,8 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 	memset(reported, 0, IEEE80211_CHAN_BYTES);
 
 	ch = arg.channels;
-	for (i = 0, j = 0; i < ic->ic_nchans && j < nchan; i++) {
-		c = &ic->ic_channels[i];
+	for (i = 0, j = 0; i < nchans && j < nchan; i++) {
+		c = &chans[i];
 		if (isset(reported, c->ic_ieee))
 			continue;
 		setbit(reported, c->ic_ieee);
@@ -3477,7 +3479,13 @@ ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
 #endif
 
 #if 1
-static void ath10k_regd_update(struct ath10k *ar)
+/*
+ * XXX TODO: strictly speaking, this is the full "regdomain
+ * channel change" routine to call from net80211.
+ */
+void
+ath10k_regd_update(struct ath10k *ar, int nchans,
+    struct ieee80211_channel *chans)
 {
 #if 0
 	struct reg_dmn_pair_mapping *regpair;
@@ -3490,7 +3498,8 @@ static void ath10k_regd_update(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ret = ath10k_update_channel_list_freebsd(ar);
+	ret = ath10k_update_channel_list_freebsd(ar, nchans, chans);
+
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
 
@@ -4510,6 +4519,7 @@ static int ath10k_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
 #if 1
 int ath10k_start(struct ath10k *ar)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 	u32 burst_enable;
 	int ret = 0;
 
@@ -4618,7 +4628,7 @@ int ath10k_start(struct ath10k *ar)
 	ar->ani_enabled = true;
 
 	ar->num_started_vdevs = 0;
-	ath10k_regd_update(ar);
+	ath10k_regd_update(ar, ic->ic_nchans, ic->ic_channels);
 
 #if 0
 	ath10k_spectral_start(ar);
