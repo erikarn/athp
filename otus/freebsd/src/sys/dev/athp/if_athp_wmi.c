@@ -2188,24 +2188,24 @@ static inline enum ieee80211_band phy_mode_to_band(u32 phy_mode)
 }
 #endif
 
-#if 0
+#if 1
 /* If keys are configured, HW decrypts all frames
  * with protected bit set. Mark such frames as decrypted.
  */
 static void ath10k_wmi_handle_wep_reauth(struct ath10k *ar,
 					 struct athp_buf *pbuf,
-					 struct ieee80211_rx_status *status)
+					 struct ieee80211_rx_stats *status)
 {
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)mbuf_skb_data(pbuf->m);
+	struct ieee80211_frame *hdr = (struct ieee80211_frame *)mbuf_skb_data(pbuf->m);
 	unsigned int hdrlen;
 	bool peer_key;
 	u8 *addr, keyidx;
 
-	if (!ieee80211_is_auth(hdr->frame_control) ||
-	    !ieee80211_has_protected(hdr->frame_control))
+	if (!ieee80211_is_auth(hdr) ||
+	    !ieee80211_has_protected(hdr))
 		return;
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = ieee80211_anyhdrsize(hdr);
 	if (mbuf_skb_len(pbuf->m) < (hdrlen + IEEE80211_WEP_IV_LEN))
 		return;
 
@@ -2219,7 +2219,9 @@ static void ath10k_wmi_handle_wep_reauth(struct ath10k *ar,
 	if (peer_key) {
 		ath10k_dbg(ar, ATH10K_DBG_MAC,
 			   "mac wep key present for peer %pM\n", addr);
+#if 0
 		status->flag |= RX_FLAG_DECRYPTED;
+#endif
 	}
 }
 #endif
@@ -2399,22 +2401,29 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
 
 	hdr = mtod(pbuf->m, struct ieee80211_frame *);
+	ath10k_wmi_handle_wep_reauth(ar, pbuf, &stat);
 #if 0
 	status->freq = ieee80211_channel_to_frequency(channel, status->band);
 	status->signal = snr + ATH10K_DEFAULT_NOISE_FLOOR;
 	status->rate_idx = ath10k_mac_bitrate_to_idx(sband, rate / 100);
 
 	fc = le16_to_cpu(hdr->frame_control);
-
-	ath10k_wmi_handle_wep_reauth(ar, pbuf, status);
+#endif
 
 	/* FW delivers WEP Shared Auth frame with Protected Bit set and
 	 * encrypted payload. However in case of PMF it delivers decrypted
 	 * frames with Protected Bit set. */
-	if (ieee80211_has_protected(hdr->frame_control) &&
-	    !ieee80211_is_auth(hdr->frame_control)) {
+	if (ieee80211_has_protected(hdr) &&
+	    !ieee80211_is_auth(hdr)) {
+		ath10k_warn(ar, "%s: rx; prot=%d, auth=%d, action=%d, deauth=%d, disassoc=%d\n",
+		    __func__,
+		    ieee80211_has_protected(hdr),
+		    ieee80211_is_auth(hdr),
+		    ieee80211_is_action(hdr),
+		    ieee80211_is_deauth(hdr),
+		    ieee80211_is_disassoc(hdr));
+#if 0
 		status->flag |= RX_FLAG_DECRYPTED;
-
 		if (!ieee80211_is_action(hdr->frame_control) &&
 		    !ieee80211_is_deauth(hdr->frame_control) &&
 		    !ieee80211_is_disassoc(hdr->frame_control)) {
@@ -2423,9 +2432,8 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 			hdr->frame_control = __cpu_to_le16(fc &
 					~IEEE80211_FCTL_PROTECTED);
 		}
-	}
-
 #endif
+	}
 
 #if 0
 	/* XXX TODO: yes, we should handle beacons for software bmiss */
