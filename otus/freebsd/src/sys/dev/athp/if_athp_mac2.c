@@ -446,7 +446,9 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 
 	return first_errno;
 }
+#endif
 
+#if 1
 bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 				    u8 keyidx)
 {
@@ -465,13 +467,15 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 		return false;
 
 	for (i = 0; i < ARRAY_SIZE(peer->keys); i++) {
-		if (peer->keys[i] && peer->keys[i]->keyidx == keyidx)
+		if (peer->keys[i] && peer->keys[i]->wk_keyix == keyidx)
 			return true;
 	}
 
 	return false;
 }
+#endif
 
+#if 0
 static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 				 struct ieee80211_key_conf *key)
 {
