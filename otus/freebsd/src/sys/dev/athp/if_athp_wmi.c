@@ -2482,17 +2482,22 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 #endif
 
 	/*
+	 * Add RX parameters for stack processing.
+	 */
+	(void) ieee80211_add_rx_params(m, &stat);
+
+	/*
 	 * Do node lookup for RX.
 	 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni) {
 		if (ni->ni_flags & IEEE80211_NODE_HT)
 			m->m_flags |= M_AMPDU;
-			ieee80211_input_mimo(ni, m, &stat);
-			ieee80211_free_node(ni);
+		ieee80211_input_mimo(ni, m);
+		ieee80211_free_node(ni);
 	} else {
 		/* no node, global */
-		ieee80211_input_mimo_all(ic, m, &stat);
+		ieee80211_input_mimo_all(ic, m);
 	}
 
 	/* ... now, the mbuf isn't ours */
