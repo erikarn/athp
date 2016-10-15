@@ -110,14 +110,19 @@ static int
 athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0)
 {
 	struct ieee80211_frame *wh;
-	struct ieee80211_key *k;
+//	struct ieee80211_key *k;
 	int iswep;
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	iswep = wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 
 	if (iswep) {
-
+		device_printf(ar->sc_dev,
+		    "%s: ni=%p, m=%p, d=%p, len=%d, pkthdrlen=%d\n",
+		    __func__,
+		    ni, m0, m0->m_data, m0->m_len, m0->m_pkthdr.len);
+		m_print(m0, -1);
+#if 0
 		/*
 		 * Construct the 802.11 header+trailer for an encrypted
 		 * frame. The only reason this can fail is because of an
@@ -125,6 +130,7 @@ athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0
 		 */
 		k = ieee80211_crypto_encap(ni, m0);
 		if (k == NULL) {
+			device_printf(ar->sc_dev, "%s: failed\n", __func__);
 			/*
 			 * This can happen when the key is yanked after the
 			 * frame was queued.  Just discard the frame; the
@@ -133,6 +139,8 @@ athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0
 			 */
 			return (0);
 		}
+#endif
+		device_printf(ar->sc_dev, "%s: skipped for now\n", __func__);
 	}
 
 	return (1);
@@ -171,11 +179,13 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		m_freem(m0);
 		return (ENOBUFS);
 	}
+	m0 = NULL;
 
 	wh = mtod(m, struct ieee80211_frame *);
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
-	    __func__, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
+	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
+	    __func__,
+	    ni, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
 
 	ATHP_CONF_LOCK(ar);
 	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
@@ -327,9 +337,12 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		return (ENOBUFS);
 	}
+	m0 = NULL;
 
 	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
-	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: called; m=%p; ni.macaddr=%6D\n", __func__, m, ni->ni_macaddr,":");
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D\n",
+	    __func__, ni, m, ni->ni_macaddr,":");
 
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
@@ -525,6 +538,35 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	return (error);
 }
 
+static int
+athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
+    ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
+{
+
+	printf("%s: TODO\n", __func__);
+	return (0);
+}
+
+static int
+athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
+{
+
+	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
+		return (1);
+	printf("%s: TODO\n", __func__);
+	return (0);
+}
+
+static int
+athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
+{
+
+	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
+		return (1);
+	printf("%s: TODO\n", __func__);
+	return (0);
+}
+
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     enum ieee80211_opmode opmode, int flags,
@@ -574,8 +616,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap = (void *) uvp;
 
 	if (ieee80211_vap_setup(ic, vap, name, unit, opmode,
-//	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
-	    flags, bssid) != 0) {
+	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
 		free(uvp, M_80211_VAP);
 		return (NULL);
 	}
@@ -583,6 +624,11 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* XXX TODO: override methods */
 	uvp->av_newstate = vap->iv_newstate;
 	vap->iv_newstate = athp_vap_newstate;
+#if 0
+	vap->iv_key_alloc = athp_key_alloc;
+	vap->iv_key_set = athp_key_set;
+	vap->iv_key_delete = athp_key_delete;
+#endif
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -875,6 +921,7 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_MONITOR |
 	    IEEE80211_C_WPA;
 
+#if 0
 	/* XXX crypto capabilities */
 	ic->ic_cryptocaps |=
 	    IEEE80211_CRYPTO_WEP |
@@ -883,6 +930,7 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_CRYPTO_CKIP |
 	    IEEE80211_CRYPTO_TKIP |
 	    IEEE80211_CRYPTO_TKIPMIC;
+#endif
 
 	/* capabilities, etc */
 	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD;

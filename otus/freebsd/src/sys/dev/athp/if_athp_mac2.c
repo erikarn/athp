@@ -2351,7 +2351,7 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
     int is_run)
 {
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
-	int ret;
+//	int ret;
 
 	ath10k_warn(ar,
 	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
