@@ -136,6 +136,7 @@ struct ath10k_stats {
 	uint64_t rx_msdu_invalid_len;
 	uint64_t rx_pkt_short_len;
 	uint64_t rx_pkt_zero_len;
+	uint64_t xmit_fail_crypto_encap;
 };
 
 /*
