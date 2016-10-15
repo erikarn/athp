@@ -1246,13 +1246,18 @@ static void ath10k_process_rx(struct ath10k *ar,
 		ieee80211_radiotap_rx_all(ic, m);
 #endif
 
+	/*
+	 * Add status
+	 */
+	ieee80211_add_rx_params(m, rx_status);
+
 	/* RX path to net80211 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni != NULL) {
-		ieee80211_input_mimo(ni, m, rx_status);
+		ieee80211_input_mimo(ni, m);
 		ieee80211_free_node(ni);
 	} else {
-		ieee80211_input_mimo_all(ic, m, rx_status);
+		ieee80211_input_mimo_all(ic, m);
 	}
 	/* skb/pbuf is done by here */
 
