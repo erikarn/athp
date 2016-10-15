@@ -466,6 +466,17 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 	if (!peer)
 		return false;
 
+	/*
+	 * Note: the wrong keyindex is being ued here.
+	 * wk_keyix is the hardware key index.
+	 * We want to see if there is a WEP key index
+	 * entry at this ID for the given peer.
+	 *
+	 * I'm not sure what to do here; but if we /do/
+	 * get here it's time to handle it.
+	 */
+	ath10k_warn(ar, "%s: **** WARNING **** the wrong keyidx (wk_keyidx) is being compared!\n", __func__);
+
 	for (i = 0; i < ARRAY_SIZE(peer->keys); i++) {
 		if (peer->keys[i] && peer->keys[i]->wk_keyix == keyidx)
 			return true;
@@ -2290,7 +2301,7 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	 * and sta->aid for anything else.
 	 * For net80211, ni->ni_associd should always be "right".
 	 */
-	aid = ni->ni_associd;
+	aid = IEEE80211_AID(ni->ni_associd);
 
 	ether_addr_copy(arg->addr, ni->ni_macaddr);
 	arg->vdev_id = arvif->vdev_id;
@@ -2305,13 +2316,14 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	 * FreeBSD assigns capinfo from the assoc/reassoc response
 	 * by converting it to host endian; I'm unsure about mac80211.
 	 */
-	ath10k_warn(ar, "%s: TODO: check endian-ness of assoc_capability with mac80211!\n", __func__);
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
 
+#if 0
 	/* If is_run=0, then clear the privacy capinfo */
 	if (is_run == 0)
 		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
+#endif
 
 	ath10k_warn(ar, "%s: capinfo=0x%08x, peer_caps=0x%08x\n", __func__, ni->ni_capinfo, arg->peer_caps);
 }
@@ -2338,10 +2350,12 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
     struct ieee80211_node *bss, struct wmi_peer_assoc_complete_arg *arg,
     int is_run)
 {
+//	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
 
 	ath10k_warn(ar,
 	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
-	    " ni rsn=%p, wpa=%p\n",
+	    " ni rsn=%p, wpa=%p; deftxidx=%d\n",
 	    __func__,
 	    is_run,
 	    !! (vap->iv_flags & IEEE80211_F_PRIVACY),
@@ -2350,9 +2364,24 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 	    vap->iv_rsn_ie,
 	    vap->iv_wpa_ie,
 	    bss->ni_ies.rsn_ie,
-	    bss->ni_ies.wpa_ie);
+	    bss->ni_ies.wpa_ie,
+	    vap->iv_def_txkey);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+#if 0
+	/*
+	 * This shouldn't be done here; it needs to be plumbed down
+	 * when net80211 gets told about a new default tx key to use.
+	 *
+	 * And yes, it should only be done when we're doing hardware
+	 * crypto.
+	 */
+	ret = ath10k_wmi_vdev_set_param(arvif->ar,
+					arvif->vdev_id,
+					arvif->ar->wmi.vdev_param->def_keyid,
+					vap->iv_def_txkey & 0xff);
+#endif
 
 	/* Don't plumb in keys until we're in RUN state */
 	if (! is_run)
@@ -2368,6 +2397,7 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
+
 }
 
 /*
@@ -3095,7 +3125,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	WARN_ON(arvif->is_up);
 
-	arvif->aid = ni->ni_associd;
+	arvif->aid = IEEE80211_AID(ni->ni_associd);
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
 	/* Note: if we haven't restarted the vdev before here; this causes a firmware panic */
