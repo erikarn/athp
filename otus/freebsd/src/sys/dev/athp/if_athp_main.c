@@ -107,22 +107,17 @@ static uint8_t chan_list_5ghz[] =
       153, 157, 161, 165 };
 
 static int
-athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0)
+athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni,
+    struct mbuf *m0)
 {
 	struct ieee80211_frame *wh;
-//	struct ieee80211_key *k;
+	struct ieee80211_key *k;
 	int iswep;
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	iswep = wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 
 	if (iswep) {
-		device_printf(ar->sc_dev,
-		    "%s: ni=%p, m=%p, d=%p, len=%d, pkthdrlen=%d\n",
-		    __func__,
-		    ni, m0, m0->m_data, m0->m_len, m0->m_pkthdr.len);
-		m_print(m0, -1);
-#if 0
 		/*
 		 * Construct the 802.11 header+trailer for an encrypted
 		 * frame. The only reason this can fail is because of an
@@ -130,7 +125,6 @@ athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0
 		 */
 		k = ieee80211_crypto_encap(ni, m0);
 		if (k == NULL) {
-			device_printf(ar->sc_dev, "%s: failed\n", __func__);
 			/*
 			 * This can happen when the key is yanked after the
 			 * frame was queued.  Just discard the frame; the
@@ -139,8 +133,6 @@ athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni, struct mbuf *m0
 			 */
 			return (0);
 		}
-#endif
-		device_printf(ar->sc_dev, "%s: skipped for now\n", __func__);
 	}
 
 	return (1);
@@ -164,7 +156,31 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_frame *wh;
-	struct mbuf *m;
+	struct mbuf *m = NULL;
+
+	wh = mtod(m0, struct ieee80211_frame *);
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
+	    __func__,
+	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
+
+	ATHP_CONF_LOCK(ar);
+	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
+	if (vap->iv_opmode == IEEE80211_M_STA) {
+		if (arvif->is_stabss_setup == 0) {
+			ATHP_CONF_UNLOCK(ar);
+			device_printf(ar->sc_dev, "%s: stabss not setup; don't xmit\n", __func__);
+			m_freem(m0);
+			return (ENXIO);
+		}
+	}
+	ATHP_CONF_UNLOCK(ar);
+
+	if (! athp_tx_tag_crypto(ar, ni, m0)) {
+		ar->sc_stats.xmit_fail_crypto_encap++;
+		m_freem(m0);
+		return (ENXIO);
+	}
 
 	/*
 	 * For now, the ath10k linux side doesn't handle multi-segment
@@ -180,30 +196,6 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (ENOBUFS);
 	}
 	m0 = NULL;
-
-	wh = mtod(m, struct ieee80211_frame *);
-	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
-	    __func__,
-	    ni, m, m->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
-
-	ATHP_CONF_LOCK(ar);
-	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
-	if (vap->iv_opmode == IEEE80211_M_STA) {
-		if (arvif->is_stabss_setup == 0) {
-			ATHP_CONF_UNLOCK(ar);
-			device_printf(ar->sc_dev, "%s: stabss not setup; don't xmit\n", __func__);
-			m_freem(m);
-			return (ENXIO);
-		}
-	}
-	ATHP_CONF_UNLOCK(ar);
-
-	if (! athp_tx_tag_crypto(ar, ni, m)) {
-		device_printf(ar->sc_dev, "%s: failed to tag_crypto\n", __func__);
-		m_freem(m);
-		return (ENXIO);
-	}
 
 #if 0
 	/* XXX for now, early error out - see if bssinfo commands are crashing firmware before tx */
@@ -323,26 +315,12 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_node *ni;
-	struct mbuf *m;
+	struct mbuf *m = NULL;
 
-	/*
-	 * For now, the ath10k linux side doesn't handle multi-segment
-	 * mbufs.  The firmware/hardware supports it, but the tx path
-	 * assumes everything is a single linear mbuf.
-	 *
-	 * So, try to defrag.  If we fail, return ENOBUFS.
-	 */
-	m = m_defrag(m0, M_NOWAIT);
-	if (m == NULL) {
-		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
-		return (ENOBUFS);
-	}
-	m0 = NULL;
-
-	ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
+	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
 	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D\n",
-	    __func__, ni, m, ni->ni_macaddr,":");
+	    __func__, ni, m0, ni->ni_macaddr,":");
 
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
@@ -358,10 +336,24 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
-	if (! athp_tx_tag_crypto(ar, ni, m)) {
-		device_printf(ar->sc_dev, "%s: failed to tag_crypto\n", __func__);
+	if (! athp_tx_tag_crypto(ar, ni, m0)) {
+		ar->sc_stats.xmit_fail_crypto_encap++;
 		return (ENXIO);
 	}
+
+	/*
+	 * For now, the ath10k linux side doesn't handle multi-segment
+	 * mbufs.  The firmware/hardware supports it, but the tx path
+	 * assumes everything is a single linear mbuf.
+	 *
+	 * So, try to defrag.  If we fail, return ENOBUFS.
+	 */
+	m = m_defrag(m0, M_NOWAIT);
+	if (m == NULL) {
+		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+		return (ENOBUFS);
+	}
+	m0 = NULL;
 
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
