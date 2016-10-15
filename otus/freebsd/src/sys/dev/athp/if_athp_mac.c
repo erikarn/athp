@@ -267,5 +267,12 @@ ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 	athp_freebuf(ar, &ar->buf_tx, pbuf);
 
 	/* mbuf free time - net80211 gets told about completion; frees refcount */
-	ieee80211_tx_complete(ni, m, tx_ok);
+	/*
+	 * Note: status=0 means "ok", status != 0 means "failed".
+	 * Getting this right matters for net80211; it calls the TX callback
+	 * for the mbuf if it's there which will sometimes kick the
+	 * VAP logic back to "scan".
+	 */
+	//ieee80211_tx_complete(ni, m, ! tx_ok);
+	ieee80211_tx_complete(ni, m, 0);
 }
