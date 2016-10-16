@@ -45,6 +45,8 @@
 #define	ATH10K_DBG_HTT_DUMP	0x02000000
 #define	ATH10K_DBG_DATA		0x04000000
 #define	ATH10K_DBG_CE		0x08000000
+#define	ATH10K_DBG_BUSDMA	0x10000000
+#define	ATH10K_DBG_PBUF		0x20000000
 #define	ATH10K_DBG_ANY		0xffffffff
 
 enum ath10k_pktlog_filter {

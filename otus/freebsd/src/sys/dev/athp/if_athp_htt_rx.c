@@ -372,6 +372,9 @@ static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
 	/* post-receive flush */
 	athp_dma_mbuf_post_recv(ar, &ar->buf_rx.dh, &msdu->mb);
 
+	/* XXX TODO: ath10k does a dmamap_unmap_single()? */
+	athp_dma_mbuf_unload(ar, &ar->buf_rx.dh, &msdu->mb);
+
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: idx=%d, pbuf=%p, m=%p, len=%d\n",
 	    __func__,
 	    idx_old,
@@ -696,7 +699,7 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	size = htt->rx_ring.size * sizeof(htt->rx_ring.paddrs_ring);
 
 	/* XXX TODO: flush ops */
-	if (athp_descdma_alloc(ar, &htt->rx_ring.paddrs_dd, "rxring", 8, size) != 0) {
+	if (athp_descdma_alloc(ar, &htt->rx_ring.paddrs_dd, "rxring", 4, size) != 0) {
 		ath10k_warn(ar, "%s: failed to alloc htt rx ring\n", __func__);
 		goto err_dma_ring;
 	}
@@ -706,7 +709,7 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 
 	/* XXX TODO: flush ops */
 	if (athp_descdma_alloc(ar, &htt->rx_ring.alloc_idx.dd,
-	    "rx_alloc_idx", 8,
+	    "rx_alloc_idx", 4,
 	    sizeof(*htt->rx_ring.alloc_idx.vaddr)) != 0) {
 		ath10k_warn(ar, "%s: failed to alloc htt rx_ring alloc_idx ring\n", __func__);
 		goto err_dma_idx;

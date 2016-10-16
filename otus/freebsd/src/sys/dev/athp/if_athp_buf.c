@@ -259,6 +259,10 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 		    br->btype);
 	}
 
+	ath10k_dbg(ar, ATH10K_DBG_PBUF,
+	    "%s: br=%d, m=%p, bf=%p, paddr=0x%lx\n",
+	    __func__, br->btype, bf->m, bf, bf->mb.paddr);
+
 	/* if there's an mbuf - unmap (if needed) and free it */
 	if (bf->m != NULL)
 		_athp_free_buf(ar, br, bf);

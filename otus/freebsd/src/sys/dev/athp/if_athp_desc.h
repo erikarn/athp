@@ -57,7 +57,7 @@ extern	void athp_descdma_free(struct ath10k *ar,
  * Operations on the top-level busdma tag for doing mbuf tx/rx.
  */
 extern	int athp_dma_head_alloc(struct ath10k *ar,
-	    struct athp_dma_head *dh, int buf_size);
+	    struct athp_dma_head *dh, int buf_size, int align);
 extern	void athp_dma_head_free(struct ath10k *ar,
 	    struct athp_dma_head *dh);
 

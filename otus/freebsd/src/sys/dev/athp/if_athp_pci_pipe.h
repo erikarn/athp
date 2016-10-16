@@ -32,8 +32,11 @@ struct ath10k_pci_pipe {
 	struct ath10k *ar;
 	struct athp_pci_softc *psc;
 
+	/* XXX TODO: do we have different alignment constraints per pci pipe? */
+#if 0
 	/* busdma tag for doing said DMA */
 	struct athp_dma_head dmatag;
+#endif
 
 	size_t buf_sz;
 

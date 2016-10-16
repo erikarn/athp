@@ -166,10 +166,12 @@ athp_descdma_alloc(struct ath10k *ar, struct athp_descdma *dd,
 		goto fail1;
 	}
 
+	ATHP_DMA_LOCK(ar);
 	error = bus_dmamap_load(dd->dd_dmat, dd->dd_dmamap,
 				dd->dd_desc, dd->dd_desc_len,
 				athp_load_cb, &dd->dd_desc_paddr,
 				BUS_DMA_NOWAIT);
+	ATHP_DMA_UNLOCK(ar);
 	if (error != 0) {
 		device_printf(ar->sc_dev,
 		    "unable to map %s descriptors, error %u\n",
@@ -196,11 +198,13 @@ void
 athp_descdma_free(struct ath10k *ar, struct athp_descdma *dd)
 {
 
+	ATHP_DMA_LOCK(ar);
 	if (dd->dd_dmamap != 0) {
 		bus_dmamap_unload(dd->dd_dmat, dd->dd_dmamap);
 		bus_dmamem_free(dd->dd_dmat, dd->dd_desc, dd->dd_dmamap);
 		bus_dma_tag_destroy(dd->dd_dmat);
 	}
+	ATHP_DMA_UNLOCK(ar);
 
 	memset(dd, 0, sizeof(*dd));
 }
@@ -214,12 +218,12 @@ athp_descdma_free(struct ath10k *ar, struct athp_descdma *dd)
  */
 int
 athp_dma_head_alloc(struct ath10k *ar, struct athp_dma_head *dh,
-    int buf_size)
+    int buf_size, int align)
 {
 	int error;
 
 	bzero(dh, sizeof(*dh));
-	device_printf(ar->sc_dev, "%s: called; buf_size=%d\n",
+	ath10k_dbg(ar, ATH10K_DBG_BUSDMA, "%s: called; buf_size=%d\n",
 	    __func__,
 	    buf_size);
 
@@ -228,7 +232,7 @@ athp_dma_head_alloc(struct ath10k *ar, struct athp_dma_head *dh,
 	 * I'm not sure yet about the transmit side.
 	 */
 	error = bus_dma_tag_create(bus_get_dma_tag(ar->sc_dev),
-	    8, 0, /* alignment, bounds */
+	    align, 0, /* alignment, bounds */
 	    BUS_SPACE_MAXADDR_32BIT, /* lowaddr */
 	    BUS_SPACE_MAXADDR, /* highaddr */
 	    NULL, NULL, /* filter, filterarg */
@@ -305,8 +309,10 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 		return ENOMEM;
 	}
 
+	ATHP_DMA_LOCK(ar);
 	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *), m->m_pkthdr.len,
 	    athp_load_cb, &paddr, BUS_DMA_NOWAIT);
+	ATHP_DMA_UNLOCK(ar);
 	if (ret != 0) {
 		device_printf(ar->sc_dev, "%s: failed; ret=%d\n", __func__, ret);
 		return (ENOMEM);
@@ -321,6 +327,10 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 		return (ENOMEM);
 	}
 	dm->paddr = paddr;
+
+	ath10k_dbg(ar, ATH10K_DBG_BUSDMA,
+	    "%s: MAP: dm=%p, m=%p, d=%p, paddr=0x%lx\n",
+	    __func__, dm, m, mtod(m, void *), paddr);
 	return (0);
 #endif
 }
@@ -330,7 +340,12 @@ athp_dma_mbuf_unload(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
+	ath10k_dbg(ar, ATH10K_DBG_BUSDMA,
+	    "%s: UNMAP: dm=%p, paddr=0x%lx\n",
+	    __func__, dm, dm->paddr);
+	ATHP_DMA_LOCK(ar);
 	bus_dmamap_unload(dh->tag, dm->map);
+	ATHP_DMA_UNLOCK(ar);
 	dm->paddr = 0;
 }
 

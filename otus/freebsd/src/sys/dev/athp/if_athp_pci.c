@@ -339,7 +339,7 @@ athp_pci_setup_bufs(struct athp_pci_softc *psc)
 	int ret;
 
 	/* Create dma tag for RX buffers. 8 byte alignment, etc */
-	ret = athp_dma_head_alloc(ar, &ar->buf_rx.dh, 0x4000);
+	ret = athp_dma_head_alloc(ar, &ar->buf_rx.dh, 0x4000, 8);
 	if (ret != 0) {
 		device_printf(ar->sc_dev, "%s: cannot allocate RX DMA tag\n",
 		    __func__);
@@ -347,7 +347,7 @@ athp_pci_setup_bufs(struct athp_pci_softc *psc)
 	}
 
 	/* Create dma tag for TX buffers. 8 byte alignment, etc */
-	ret = athp_dma_head_alloc(ar, &ar->buf_tx.dh, 0x4000);
+	ret = athp_dma_head_alloc(ar, &ar->buf_tx.dh, 0x4000, 4);
 	if (ret != 0) {
 		device_printf(ar->sc_dev, "%s: cannot allocate TX DMA tag\n",
 		    __func__);
@@ -398,6 +398,7 @@ athp_attach_preinit(void *arg)
 	sx_destroy(&ar->sc_conf_sx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
+	mtx_destroy(&ar->sc_dma_mtx);
 	mtx_destroy(&ar->sc_mtx);
 	if (psc->pipe_taskq) {
 		taskqueue_drain_all(psc->pipe_taskq);
@@ -423,9 +424,6 @@ athp_pci_attach(device_t dev)
 	ar->sc_debug = ATH10K_DBG_BOOT | ATH10K_DBG_PCI | ATH10K_DBG_HTC |
 	    ATH10K_DBG_PCI_DUMP | ATH10K_DBG_WMI | ATH10K_DBG_BMI | ATH10K_DBG_MAC |
 	    ATH10K_DBG_WMI_PRINT | ATH10K_DBG_MGMT | ATH10K_DBG_DATA | ATH10K_DBG_HTT;
-#else
-	ar->sc_debug = ATH10K_DBG_BOOT | ATH10K_DBG_WMI | ATH10K_DBG_MAC | ATH10K_DBG_XMIT | ATH10K_DBG_MGMT | ATH10K_DBG_RECV;
-#endif
 
 	ar->sc_psc = psc;
 
@@ -445,6 +443,8 @@ athp_pci_attach(device_t dev)
 	mtx_init(&ar->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 	mtx_init(&ar->sc_buf_mtx, device_get_nameunit(dev), "athp buf",
+	    MTX_DEF);
+	mtx_init(&ar->sc_dma_mtx, device_get_nameunit(dev), "athp dma",
 	    MTX_DEF);
 	sx_init(&ar->sc_conf_sx, "athp conf");
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
@@ -647,6 +647,7 @@ bad:
 	sx_destroy(&ar->sc_conf_sx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
+	mtx_destroy(&ar->sc_dma_mtx);
 	mtx_destroy(&ar->sc_mtx);
 	if (psc->pipe_taskq) {
 		taskqueue_drain_all(psc->pipe_taskq);
@@ -708,6 +709,7 @@ athp_pci_detach(device_t dev)
 	sx_destroy(&ar->sc_conf_sx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
+	mtx_destroy(&ar->sc_dma_mtx);
 	mtx_destroy(&ar->sc_mtx);
 
 	/* Tear down the pipe taskqueue */

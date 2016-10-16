@@ -185,7 +185,7 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 
 	size = htt->max_num_pending_tx * sizeof(struct htt_msdu_ext_desc);
 	if (athp_descdma_alloc(ar, &htt->frag_desc.dd, "htt frag_desc",
-	    8, size) != 0) {
+	    4, size) != 0) {
 		ath10k_warn(ar, "failed to alloc fragment desc memory\n");
 		ret = -ENOMEM;
 		goto free_tx_pool;
@@ -651,7 +651,8 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	 * entry.  We need to make sure they're freed when the pbuf
 	 * is recycled.
 	 */
-	if (athp_descdma_alloc(ar, &skb_cb->htt.txbuf_dd, "htt txbuf", 8, sizeof(struct ath10k_htt_txbuf)) != 0) {
+	if (athp_descdma_alloc(ar, &skb_cb->htt.txbuf_dd, "htt txbuf", 4,
+	    sizeof(struct ath10k_htt_txbuf)) != 0) {
 		ath10k_err(ar, "%s: failed to allocate htc hdr txbuf\n", __func__);
 		res = -ENOMEM;
 		goto err_free_msdu_id;
@@ -805,6 +806,8 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	sg_items[1].vaddr = mbuf_skb_data(msdu->m);
 	sg_items[1].paddr = msdu->mb.paddr;
 	sg_items[1].len = prefetch_len;
+
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: paddr=%x, %x\n", __func__, sg_items[0].paddr, sg_items[1].paddr);
 
 	res = ath10k_hif_tx_sg(htt->ar,
 			       htt->ar->htc.endpoint[htt->eid].ul_pipe_id,

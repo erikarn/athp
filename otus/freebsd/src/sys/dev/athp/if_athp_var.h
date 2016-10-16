@@ -67,6 +67,11 @@ struct athp_node {
 #define	ATHP_BUF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_OWNED)
 #define	ATHP_BUF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_NOTOWNED)
 
+#define	ATHP_DMA_LOCK(sc)		mtx_lock(&(sc)->sc_dma_mtx)
+#define	ATHP_DMA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_dma_mtx)
+#define	ATHP_DMA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
+#define	ATHP_DMA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_NOTOWNED)
+
 struct ath10k_bmi {
 	bool done_sent;
 };
@@ -157,6 +162,7 @@ struct ath10k {
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
 	struct mtx			sc_buf_mtx;
+	struct mtx			sc_dma_mtx;
 	struct sx			sc_conf_sx;
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
