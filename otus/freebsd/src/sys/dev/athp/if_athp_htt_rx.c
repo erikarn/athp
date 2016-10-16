@@ -2660,8 +2660,12 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	ATHP_HTT_TX_COMP_LOCK(htt);
 	while ((skb = TAILQ_FIRST(&htt->tx_compl_q))) {
 		TAILQ_REMOVE(&htt->tx_compl_q, skb, next);
+		/*
+		 * Note - these are TX frame completion notifications;
+		 * but they're RX HTC messages.
+		 */
 		ath10k_htt_rx_frm_tx_compl(htt->ar, skb);
-		athp_freebuf(ar, &ar->buf_tx, skb);
+		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
 	ATHP_HTT_TX_COMP_UNLOCK(htt);
 

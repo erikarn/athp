@@ -37,6 +37,7 @@ struct ath10k_skb_cb {
 };
 
 typedef enum {
+	BUF_TYPE_NONE,
 	BUF_TYPE_RX,
 	BUF_TYPE_TX
 } athp_buf_type_t;
@@ -88,7 +89,7 @@ extern	void athp_buf_give_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
 	    struct athp_buf *bf, struct mbuf *m);
 
 extern	int athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br,
-	    int count);
+	    int count, int btype);
 extern	void athp_free_list(struct ath10k *ar, struct athp_buf_ring *br);
 
 extern	void athp_buf_set_len(struct athp_buf *bf, int len);

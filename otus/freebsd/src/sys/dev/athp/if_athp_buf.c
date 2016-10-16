@@ -172,13 +172,14 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
  * all into the inactive list.
  */
 int
-athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
+athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count, int btype)
 {
 	int i;
 
 	/* Allocate initial buffer list */
 	br->br_list = malloc(sizeof(struct athp_buf) * count, M_ATHPDEV,
 	    M_ZERO | M_NOWAIT);
+	br->btype = btype;
 	if (br->br_list == NULL) {
 		ath10k_err(ar, "%s: malloc failed!\n", __func__);
 		return (-1);
@@ -187,6 +188,7 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
 	/* Setup initial state for each entry */
 	for (i = 0; i < count; i++) {
 		athp_dma_mbuf_setup(ar, &br->dh, &br->br_list[i].mb);
+		br->br_list[i].btype = btype;
 	}
 
 	/* Lists */
@@ -216,6 +218,19 @@ _athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br)
 		TAILQ_REMOVE(&br->br_inactive, bf, next);
 	else
 		bf = NULL;
+
+	if (bf == NULL)
+		return NULL;
+
+	/* Sanity check */
+	if (br->btype != bf->btype) {
+		ath10k_err(ar, "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
+		    __func__,
+		    bf,
+		    bf->btype,
+		    br->btype);
+	}
+
 	return (bf);
 }
 
@@ -236,6 +251,14 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 
 	ATHP_BUF_LOCK(ar);
 
+	if (br->btype != bf->btype) {
+		ath10k_err(ar, "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
+		    __func__,
+		    bf,
+		    bf->btype,
+		    br->btype);
+	}
+
 	/* if there's an mbuf - unmap (if needed) and free it */
 	if (bf->m != NULL)
 		_athp_free_buf(ar, br, bf);
@@ -243,7 +266,6 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 	/* Push it into the inactive queue */
 	TAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
 	ATHP_BUF_UNLOCK(ar);
-
 }
 
 /*

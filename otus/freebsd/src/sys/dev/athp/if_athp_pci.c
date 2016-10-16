@@ -355,8 +355,8 @@ athp_pci_setup_bufs(struct athp_pci_softc *psc)
 		return (ret);
 	}
 
-	athp_alloc_list(ar, &ar->buf_rx, ATHP_RX_LIST_COUNT);
-	athp_alloc_list(ar, &ar->buf_tx, ATHP_TX_LIST_COUNT);
+	athp_alloc_list(ar, &ar->buf_rx, ATHP_RX_LIST_COUNT, BUF_TYPE_RX);
+	athp_alloc_list(ar, &ar->buf_tx, ATHP_TX_LIST_COUNT, BUF_TYPE_TX);
 
 	return (0);
 }
