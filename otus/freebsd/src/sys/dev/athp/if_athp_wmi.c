@@ -4183,23 +4183,17 @@ static int ath10k_wmi_alloc_host_mem(struct ath10k *ar, u32 req_id,
 	if (!pool_size)
 		return -EINVAL;
 
-	/* I'm cheating here and using contigmalloc/vtophys */
-	ar->wmi.mem_chunks[idx].vaddr = contigmalloc(
-	    pool_size,
-	    M_ATHPDEV,
-	    M_NOWAIT | M_ZERO,
-	    0x1000000,		/* paddr low */
-	    0xffffffff,		/* paddr high */
-	    PAGE_SIZE,		/* alignment */
-	    0ul);		/* boundary */
-	if (!ar->wmi.mem_chunks[idx].vaddr) {
+	if (athp_descdma_alloc(ar, &ar->wmi.mem_chunks[idx].dd, "wmi_chunk",
+	    PAGE_SIZE,
+	    pool_size) != 0) {
 		ath10k_warn(ar, "failed to allocate memory chunk\n");
 		return -ENOMEM;
 	}
+	ar->wmi.mem_chunks[idx].vaddr = ar->wmi.mem_chunks[idx].dd.dd_desc;
+	ar->wmi.mem_chunks[idx].paddr = ar->wmi.mem_chunks[idx].dd.dd_desc_paddr;
 
 	memset(ar->wmi.mem_chunks[idx].vaddr, 0, pool_size);
 
-	ar->wmi.mem_chunks[idx].paddr = vtophys(ar->wmi.mem_chunks[idx].vaddr);
 	ar->wmi.mem_chunks[idx].len = pool_size;
 	ar->wmi.mem_chunks[idx].req_id = req_id;
 	ar->wmi.num_mem_chunks++;
@@ -6992,9 +6986,9 @@ void ath10k_wmi_detach(struct ath10k *ar)
 
 	/* free the host memory chunks requested by firmware */
 	for (i = 0; i < ar->wmi.num_mem_chunks; i++) {
-		contigfree(ar->wmi.mem_chunks[i].vaddr,
-		    ar->wmi.mem_chunks[i].len,
-		    M_ATHPDEV);
+		athp_descdma_free(ar, &ar->wmi.mem_chunks[i].dd);
+		ar->wmi.mem_chunks[i].vaddr = NULL;
+		ar->wmi.mem_chunks[i].paddr = 0;
 	}
 
 	ar->wmi.num_mem_chunks = 0;

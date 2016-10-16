@@ -73,7 +73,8 @@ struct ath10k_bmi {
 
 struct ath10k_mem_chunk {
 	void *vaddr;
-	vm_paddr_t paddr;
+	bus_addr_t paddr;
+	struct athp_descdma dd;
 	int len;
 	u32 req_id;
 };
