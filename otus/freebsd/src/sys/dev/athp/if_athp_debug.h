@@ -44,6 +44,7 @@
 #define	ATH10K_DBG_HTT		0x01000000
 #define	ATH10K_DBG_HTT_DUMP	0x02000000
 #define	ATH10K_DBG_DATA		0x04000000
+#define	ATH10K_DBG_CE		0x08000000
 #define	ATH10K_DBG_ANY		0xffffffff
 
 enum ath10k_pktlog_filter {
@@ -57,7 +58,7 @@ enum ath10k_pktlog_filter {
 
 #define	ath10k_dbg(sc, dm, ...) \
 	do { \
-		if ((dm == ATH10K_DBG_ANY) || (dm & (sc)->sc_debug)) \
+		if (((dm) == ATH10K_DBG_ANY) || ((dm) & (sc)->sc_debug)) \
 			device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
