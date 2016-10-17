@@ -90,8 +90,6 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
-extern	void ieee80211_hwscan_assign(struct ieee80211com *ic);
-
 /*
  * These are the net80211 facing implementation pieces.
  */
@@ -196,12 +194,6 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (ENOBUFS);
 	}
 	m0 = NULL;
-
-#if 0
-	/* XXX for now, early error out - see if bssinfo commands are crashing firmware before tx */
-	m_freem(m);
-	return (ENXIO);
-#endif
 
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
@@ -935,11 +927,6 @@ athp_attach_net80211(struct ath10k *ar)
 	athp_setup_channels(ar);
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
-
-#if 0
-	/* attach hw scan methods */
-	ieee80211_hwscan_assign(ic);
-#endif
 
 	ieee80211_ifattach(ic);
 
