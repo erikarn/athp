@@ -1046,25 +1046,18 @@ static void ath10k_htt_rx_h_signal(struct ath10k *ar,
 	status->r_flags |= IEEE80211_R_NF | IEEE80211_R_RSSI;
 }
 
-/*
- * XXX TODO: it would be nice to push an RX TSF into the net80211
- * rx_stats structure.  That way the TSF field can be populated
- * for packets where it's supplied.
- */
 static void ath10k_htt_rx_h_mactime(struct ath10k *ar,
 				    struct ieee80211_rx_stats *status,
 				    struct htt_rx_desc *rxd)
 {
-#if 0
 	/* FIXME: TSF is known only at the end of PPDU, in the last MPDU. This
 	 * means all prior MSDUs in a PPDU are reported to mac80211 without the
 	 * TSF. Is it worth holding frames until end of PPDU is known?
 	 *
 	 * FIXME: Can we get/compute 64bit TSF?
 	 */
-	status->mactime = __le32_to_cpu(rxd->ppdu_end.common.tsf_timestamp);
-	status->flag |= RX_FLAG_MACTIME_END;
-#endif
+	status->c_rx_tsf = __le32_to_cpu(rxd->ppdu_end.common.tsf_timestamp);
+	status->r_flags |= IEEE80211_R_TSF32 | IEEE80211_R_TSF_END;
 }
 
 static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
@@ -1233,21 +1226,6 @@ static void ath10k_process_rx(struct ath10k *ar,
 		m_freem(m);
 		return;
 	}
-
-	/*
-	 * XXX TODO: does net80211 expect the FCS/CRC to be provided
-	 * in 802.11 frames?
-	 */
-
-	/* Radiotap */
-	/*
-	 * Note: we don't need to call rx_all; the input path
-	 * will correctly handle inputting frames for us.
-	 */
-#if 0
-	if (ieee80211_radiotap_active(ic))
-		ieee80211_radiotap_rx_all(ic, m);
-#endif
 
 	/*
 	 * Add status
@@ -1567,7 +1545,9 @@ static void ath10k_htt_rx_h_undecap(struct ath10k *ar,
 	}
 }
 
-#if 0
+#define	CHECKSUM_NONE 0
+#define	CHECKSUM_UNNECESSARY 1
+
 static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb)
 {
 	struct htt_rx_desc *rxd;
@@ -1597,17 +1577,18 @@ static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb)
 		return CHECKSUM_NONE;
 	return CHECKSUM_UNNECESSARY;
 }
-#endif
 
 /*
- * XXX TODO: need to enable setting checksum flags if needed.
+ * Note: freebsd's checksum checks are slightly richer.
+ * It's likely worth fixing up the above function to
+ * return the full gamut of FreeBSD's checksum state.
  */
 static void ath10k_htt_rx_h_csum_offload(struct athp_buf *msdu)
 {
-#if 0
-	msdu->ip_summed = ath10k_htt_rx_get_csum_state(msdu);
-#endif
+	msdu->rx.ip_summed = ath10k_htt_rx_get_csum_state(msdu);
 }
+#undef	CHECKSUM_NONE
+#undef	CHECKSUM_UNNECESSARY
 
 static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 				 athp_buf_head *amsdu,
