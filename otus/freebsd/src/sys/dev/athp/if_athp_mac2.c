@@ -3341,9 +3341,8 @@ static int ath10k_update_channel_list(struct ath10k *ar)
 #endif
 
 /*
- * Note: this is a very mac80211 specific routine;
- * let's copy/paste it into a BSD specific one to make
- * future merging and re-implementation easier.
+ * Note: this is the FreeBSD specific implementation of
+ * the channel list function.
  */
 int
 ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
@@ -3368,11 +3367,14 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 		c = &chans[i];
 		if (isset(reported, c->ic_ieee))
 			continue;
-		printf("%s: adding channel %d (%d)\n", __func__, c->ic_ieee, c->ic_freq);
+		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
+		    "%s: adding channel %d (%d)\n",
+		    __func__, c->ic_ieee, c->ic_freq);
 		setbit(reported, c->ic_ieee);
 		nchan++;
 	}
-	printf("%s: nchan=%d\n", __func__, nchan);
+	ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
+	    "%s: nchan=%d\n", __func__, nchan);
 
 	arg.n_channels = nchan;
 	len = sizeof(struct wmi_channel_arg) * arg.n_channels;
@@ -3389,10 +3391,19 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 			continue;
 		setbit(reported, c->ic_ieee);
 
+		/*
+		 * XXX TODO: we can't allow ht/vht on JP channel 14
+		 * XXX TODO: need to figure out ht40plus flag -
+		 * unfortunately our method for iterating through
+		 * channels makes it hard to determine if we can
+		 * or can't do HT40 (or HT40+? Not sure!) here.
+		 * So, worry about HT40 later on.
+		 */
+
 		ch->allow_ht = true;
 		ch->allow_vht = true;
-		ch->allow_ibss = 1;
-		ch->ht40plus = 0;
+		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
+		ch->ht40plus = true;
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
@@ -3410,11 +3421,12 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 			ch->mode = MODE_11A;
 		else
 			continue;
-		ath10k_dbg(ar, ATH10K_DBG_WMI,
-			   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d antenna %d mode %d\n",
-			    __func__, j, arg.n_channels,
-			   ch->freq, ch->max_power, ch->max_reg_power,
-			   ch->max_antenna_gain, ch->mode);
+		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
+		   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d"
+		   " antenna %d mode %d\n",
+		    __func__, j, arg.n_channels,
+		   ch->freq, ch->max_power, ch->max_reg_power,
+		   ch->max_antenna_gain, ch->mode);
 
 		ch++; j++;
 	}
