@@ -432,6 +432,15 @@ athp_pci_attach(device_t dev)
 	ar->sc_rx_wmi = 1;
 	ar->sc_rx_htt = 1;
 
+	/* Fetch pcie capability offset */
+	ret = pci_find_cap(dev, PCIY_EXPRESS, &psc->sc_cap_off);
+	if (ret != 0) {
+		device_printf(dev,
+		    "%s: failed to find pci-express capability offset\n",
+		    __func__);
+		return (ret);
+	}
+
 	/*
 	 * Initialise ath10k core bits.
 	 */

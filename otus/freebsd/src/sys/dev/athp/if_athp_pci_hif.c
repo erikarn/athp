@@ -930,8 +930,8 @@ ath10k_pci_hif_start(struct ath10k *ar)
 	ath10k_pci_irq_enable(psc);
 	ath10k_pci_rx_post(ar);
 
-	device_printf(ar->sc_dev, "%s: LNKCTL: TODO\n", __func__);
-	//pcie_capability_write_word(psc->pdev, PCI_EXP_LNKCTL, psc->link_ctl);
+	pci_write_config(ar->sc_dev, psc->sc_cap_off + PCIER_LINK_CTL,
+	    psc->link_ctl, 4);
 
 	return 0;
 }
@@ -1139,13 +1139,10 @@ ath10k_pci_hif_power_up(struct ath10k *ar)
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot hif power up\n");
 
-	device_printf(ar->sc_dev, "%s: TODO LNKCTL\n", __func__);
-#if 0
-	pcie_capability_read_word(ar_pci->pdev, PCI_EXP_LNKCTL,
-				  &ar_pci->link_ctl);
-	pcie_capability_write_word(ar_pci->pdev, PCI_EXP_LNKCTL,
-				   ar_pci->link_ctl & ~PCI_EXP_LNKCTL_ASPMC);
-#endif
+	psc->link_ctl = pci_read_config(ar->sc_dev,
+	    psc->sc_cap_off + PCIER_LINK_CTL, 4);
+	pci_write_config(ar->sc_dev, psc->sc_cap_off + PCIER_LINK_CTL,
+	    psc->link_ctl & ~PCIEM_LINK_CTL_ASPMC, 4);
 
 	/*
 	 * Bring the target up cleanly.

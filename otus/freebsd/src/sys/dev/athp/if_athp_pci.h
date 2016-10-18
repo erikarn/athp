@@ -28,6 +28,9 @@ struct athp_pci_softc {
 	bus_space_tag_t		sc_st;          /* bus space tag */
 	bus_space_handle_t	sc_sh;          /* bus handle tag */
 
+	/* PCI state */
+	int			sc_cap_off;
+
 	/*
 	 * ath10k pci state
 	 */
