@@ -768,15 +768,15 @@ static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 
 	ret = ath10k_wmi_peer_create(ar, vdev_id, addr, peer_type);
 	if (ret) {
-		ath10k_warn(ar, "failed to create wmi peer %pM on vdev %i: %i\n",
-			    addr, vdev_id, ret);
+		ath10k_warn(ar, "failed to create wmi peer %6D on vdev %i: %i\n",
+			    addr, ":", vdev_id, ret);
 		return ret;
 	}
 
 	ret = ath10k_wait_for_peer_created(ar, vdev_id, addr);
 	if (ret) {
-		ath10k_warn(ar, "failed to wait for created wmi peer %pM on vdev %i: %i\n",
-			    addr, vdev_id, ret);
+		ath10k_warn(ar, "failed to wait for created wmi peer %6D on vdev %i: %i\n",
+			    addr, ":", vdev_id, ret);
 		return ret;
 	}
 
@@ -872,8 +872,8 @@ static void ath10k_peer_cleanup(struct ath10k *ar, u32 vdev_id)
 		if (peer->vdev_id != vdev_id)
 			continue;
 
-		ath10k_warn(ar, "removing stale peer %pM from vdev_id %d\n",
-			    peer->addr, vdev_id);
+		ath10k_warn(ar, "removing stale peer %6D from vdev_id %d\n",
+			    peer->addr, ":", vdev_id);
 
 		TAILQ_REMOVE(&ar->peers, peer, list);
 		free(peer, M_ATHPDEV);
@@ -2537,8 +2537,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		arg->peer_num_spatial_streams = max_nss;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %pM mcs cnt %d nss %d\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
 		   arg->addr,
+		   ":",
 		   arg->peer_ht_rates.num_rates,
 		   arg->peer_num_spatial_streams);
 }
@@ -2722,8 +2723,8 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	arg->peer_vht_rates.tx_mcs_set = ath10k_peer_assoc_h_vht_limit(
 		__le16_to_cpu(vht_cap->vht_mcs.tx_mcs_map), vht_mcs_mask);
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %pM max_mpdu %d flags 0x%x\n",
-		   sta->addr, arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D max_mpdu %d flags 0x%x\n",
+		   sta->addr, ":", arg->peer_max_mpdu, arg->peer_flags);
 }
 #endif
 
@@ -4970,7 +4971,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		   arvif->vdev_id, arvif->vdev_type, arvif->vdev_subtype,
 		   arvif->beacon_buf.dd_desc ? "single-buf" : "per-skb");
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, " -> mac=%s\n", ether_sprintf(mac));
+	ath10k_dbg(ar, ATH10K_DBG_MAC, " -> mac=%6D\n", mac, ":");
 
 	ret = ath10k_wmi_vdev_create(ar, arvif->vdev_id, arvif->vdev_type,
 				     arvif->vdev_subtype, mac);
@@ -8133,7 +8134,8 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		ATHP_DATA_LOCK(ar);
 		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
 			ATHP_DATA_UNLOCK(ar);
-			(void) ath10k_peer_create(ar, arvif->vdev_id, ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
+			(void) ath10k_peer_create(ar, arvif->vdev_id,
+			    ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
 		} else {
 			ATHP_DATA_UNLOCK(ar);
 		}
