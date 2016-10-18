@@ -853,6 +853,8 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_stats.rx_pkt_short_len, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_zero_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_pkt_zero_len, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_crypto_encap", CTLFLAG_RD,
+	    &ar->sc_stats.xmit_fail_crypto_encap, "");
 
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_wmi", CTLFLAG_RW,
 	    &ar->sc_rx_wmi, 0, "RX WMI frames");
