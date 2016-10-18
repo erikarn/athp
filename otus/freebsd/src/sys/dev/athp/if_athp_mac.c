@@ -161,13 +161,6 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 }
 
 void
-ath10k_mac_handle_beacon(struct ath10k *ar, struct athp_buf *pbuf)
-{
-
-	printf("%s: called\n", __func__);
-}
-
-void
 ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
 {
 

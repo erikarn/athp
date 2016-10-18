@@ -2138,15 +2138,20 @@ static void ath10k_mac_handle_beacon_iter(void *data, u8 *mac,
 
 	cancel_delayed_work(&arvif->connection_loss_work);
 }
+#endif
 
-void ath10k_mac_handle_beacon(struct ath10k *ar, struct sk_buff *skb)
+void
+ath10k_mac_handle_beacon(struct ath10k *ar, struct athp_buf *pbuf)
 {
+#if 0
 	ieee80211_iterate_active_interfaces_atomic(ar->hw,
 						   IEEE80211_IFACE_ITER_NORMAL,
 						   ath10k_mac_handle_beacon_iter,
 						   skb);
+#endif
 }
 
+#if 0
 static void ath10k_mac_handle_beacon_miss_iter(void *data, u8 *mac,
 					       struct ieee80211_vif *vif)
 {

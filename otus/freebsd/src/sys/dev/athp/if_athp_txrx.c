@@ -294,8 +294,8 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer map vdev %d peer %pM id %d\n",
-		   ev->vdev_id, ev->addr, ev->peer_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer map vdev %d peer %6D id %d\n",
+		   ev->vdev_id, ev->addr, ":", ev->peer_id);
 
 	set_bit(ev->peer_id, peer->peer_ids);
 exit:
@@ -316,8 +316,8 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 		goto exit;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer unmap vdev %d peer %pM id %d\n",
-		   peer->vdev_id, peer->addr, ev->peer_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer unmap vdev %d peer %6D id %d\n",
+		   peer->vdev_id, peer->addr, ":", ev->peer_id);
 
 	clear_bit(ev->peer_id, peer->peer_ids);
 

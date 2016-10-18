@@ -2218,10 +2218,8 @@ static void ath10k_wmi_handle_wep_reauth(struct ath10k *ar,
 
 	if (peer_key) {
 		ath10k_dbg(ar, ATH10K_DBG_MAC,
-			   "mac wep key present for peer %pM\n", addr);
-#if 0
-		status->flag |= RX_FLAG_DECRYPTED;
-#endif
+			   "mac wep key present for peer %6D\n", addr, ":");
+		status->c_pktflags |= IEEE80211_RX_F_DECRYPTED;
 	}
 }
 #endif
@@ -2359,10 +2357,10 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		return 0;
 	}
 
-#if 0
 	if (rx_status & WMI_RX_STATUS_ERR_MIC)
-		status->flag |= RX_FLAG_MMIC_ERROR;
+		stat.c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
 
+#if 0
 	/* Hardware can Rx CCK rates on 5GHz. In that case phy_mode is set to
 	 * MODE_11B. This means phy_mode is not a reliable source for the band
 	 * of mgmt rx.
@@ -2391,7 +2389,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	else
 		band = IEEE80211_CHAN_5GHZ;
 
-	stat.r_flags = IEEE80211_R_RSSI
+	stat.r_flags |= IEEE80211_R_RSSI
 	    | IEEE80211_R_IEEE
 	    | IEEE80211_R_FREQ
 	    | IEEE80211_R_NF;
@@ -2415,31 +2413,27 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	 * frames with Protected Bit set. */
 	if (ieee80211_has_protected(hdr) &&
 	    !ieee80211_is_auth(hdr)) {
-		ath10k_warn(ar, "%s: rx; prot=%d, auth=%d, action=%d, deauth=%d, disassoc=%d\n",
+		ath10k_warn(ar,
+		    "%s: rx; prot=%d, auth=%d, action=%d, deauth=%d, "
+		    "disassoc=%d\n",
 		    __func__,
 		    ieee80211_has_protected(hdr),
 		    ieee80211_is_auth(hdr),
 		    ieee80211_is_action(hdr),
 		    ieee80211_is_deauth(hdr),
 		    ieee80211_is_disassoc(hdr));
-#if 0
-		status->flag |= RX_FLAG_DECRYPTED;
-		if (!ieee80211_is_action(hdr->frame_control) &&
-		    !ieee80211_is_deauth(hdr->frame_control) &&
-		    !ieee80211_is_disassoc(hdr->frame_control)) {
-			status->flag |= RX_FLAG_IV_STRIPPED |
-					RX_FLAG_MMIC_STRIPPED;
-			hdr->frame_control = __cpu_to_le16(fc &
-					~IEEE80211_FCTL_PROTECTED);
+		stat.c_pktflags |= IEEE80211_RX_F_DECRYPTED;
+		if (!ieee80211_is_action(hdr) &&
+		    !ieee80211_is_deauth(hdr) &&
+		    !ieee80211_is_disassoc(hdr)) {
+			stat.c_pktflags |= IEEE80211_RX_F_IV_STRIP
+			    | IEEE80211_RX_F_MMIC_STRIP;
+			hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
 		}
-#endif
 	}
 
-#if 0
-	/* XXX TODO: yes, we should handle beacons for software bmiss */
 	if (ieee80211_is_beacon(hdr))
 		ath10k_mac_handle_beacon(ar, pbuf);
-	#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
 		   "event mgmt rx chan %d snr %d, rate %u isprot %d isauth %d\n",

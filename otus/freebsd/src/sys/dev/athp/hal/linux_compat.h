@@ -308,6 +308,16 @@ static inline bool ieee80211_is_mgmt(struct ieee80211_frame *wh)
 	return (type == IEEE80211_FC0_TYPE_MGT);
 }
 
+static inline bool ieee80211_is_beacon(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_BEACON));
+}
+
+
 static inline bool ieee80211_is_protected(struct ieee80211_frame *wh)
 {
 
