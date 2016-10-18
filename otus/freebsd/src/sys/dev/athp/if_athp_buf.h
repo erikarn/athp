@@ -57,7 +57,7 @@ struct athp_buf {
 
 	// RX state
 	struct {
-		int placeholder;
+		int ip_summed;
 	} rx;
 };
 

@@ -1046,25 +1046,18 @@ static void ath10k_htt_rx_h_signal(struct ath10k *ar,
 	status->r_flags |= IEEE80211_R_NF | IEEE80211_R_RSSI;
 }
 
-/*
- * XXX TODO: it would be nice to push an RX TSF into the net80211
- * rx_stats structure.  That way the TSF field can be populated
- * for packets where it's supplied.
- */
 static void ath10k_htt_rx_h_mactime(struct ath10k *ar,
 				    struct ieee80211_rx_stats *status,
 				    struct htt_rx_desc *rxd)
 {
-#if 0
 	/* FIXME: TSF is known only at the end of PPDU, in the last MPDU. This
 	 * means all prior MSDUs in a PPDU are reported to mac80211 without the
 	 * TSF. Is it worth holding frames until end of PPDU is known?
 	 *
 	 * FIXME: Can we get/compute 64bit TSF?
 	 */
-	status->mactime = __le32_to_cpu(rxd->ppdu_end.common.tsf_timestamp);
-	status->flag |= RX_FLAG_MACTIME_END;
-#endif
+	status->c_rx_tsf = __le32_to_cpu(rxd->ppdu_end.common.tsf_timestamp);
+	status->r_flags |= IEEE80211_R_TSF32 | IEEE80211_R_TSF_END;
 }
 
 static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
@@ -1089,12 +1082,14 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 			  __cpu_to_le32(RX_ATTENTION_FLAGS_LAST_MPDU));
 
 	if (is_first_ppdu) {
-#if 0
 		/* New PPDU starts so clear out the old per-PPDU status. */
-		status->freq = 0;
-		status->rate_idx = 0;
-		status->vht_nss = 0;
-		status->vht_flag &= ~RX_VHT_FLAG_80MHZ;
+		status->c_freq = 0;
+		status->c_ieee = 0;
+		status->c_rate = 0;
+		status->c_phytype = 0;
+		//status->vht_nss = 0;
+		//status->vht_flag &= ~RX_VHT_FLAG_80MHZ;
+#if 0
 		status->flag &= ~(RX_FLAG_HT |
 				  RX_FLAG_VHT |
 				  RX_FLAG_SHORT_GI |
@@ -1102,7 +1097,23 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 				  RX_FLAG_MACTIME_END);
 		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 #endif
-		bzero(status, sizeof(*status));
+		status->r_flags &= ~(
+		    IEEE80211_R_NF
+		    | IEEE80211_R_RSSI
+		    | IEEE80211_R_FREQ
+		    | IEEE80211_R_IEEE
+		    | IEEE80211_R_BAND
+		    | IEEE80211_R_TSF32
+		    | IEEE80211_R_TSF64
+		    | IEEE80211_R_TSF_START
+		    | IEEE80211_R_TSF_END
+		    | IEEE80211_R_C_CHAIN
+		    | IEEE80211_R_C_NF
+		    | IEEE80211_R_C_RSSI
+		    );
+		status->c_pktflags &= ~(
+		    IEEE80211_RX_F_SHORTGI
+		    );
 
 		ath10k_htt_rx_h_signal(ar, status, rxd);
 		ath10k_htt_rx_h_channel(ar, status, rxd, vdev_id);
@@ -1233,21 +1244,6 @@ static void ath10k_process_rx(struct ath10k *ar,
 		m_freem(m);
 		return;
 	}
-
-	/*
-	 * XXX TODO: does net80211 expect the FCS/CRC to be provided
-	 * in 802.11 frames?
-	 */
-
-	/* Radiotap */
-	/*
-	 * Note: we don't need to call rx_all; the input path
-	 * will correctly handle inputting frames for us.
-	 */
-#if 0
-	if (ieee80211_radiotap_active(ic))
-		ieee80211_radiotap_rx_all(ic, m);
-#endif
 
 	/*
 	 * Add status
@@ -1567,7 +1563,9 @@ static void ath10k_htt_rx_h_undecap(struct ath10k *ar,
 	}
 }
 
-#if 0
+#define	CHECKSUM_NONE 0
+#define	CHECKSUM_UNNECESSARY 1
+
 static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb)
 {
 	struct htt_rx_desc *rxd;
@@ -1597,17 +1595,18 @@ static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb)
 		return CHECKSUM_NONE;
 	return CHECKSUM_UNNECESSARY;
 }
-#endif
 
 /*
- * XXX TODO: need to enable setting checksum flags if needed.
+ * Note: freebsd's checksum checks are slightly richer.
+ * It's likely worth fixing up the above function to
+ * return the full gamut of FreeBSD's checksum state.
  */
 static void ath10k_htt_rx_h_csum_offload(struct athp_buf *msdu)
 {
-#if 0
-	msdu->ip_summed = ath10k_htt_rx_get_csum_state(msdu);
-#endif
+	msdu->rx.ip_summed = ath10k_htt_rx_get_csum_state(msdu);
 }
+#undef	CHECKSUM_NONE
+#undef	CHECKSUM_UNNECESSARY
 
 static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 				 athp_buf_head *amsdu,
@@ -1671,28 +1670,26 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 			!has_crypto_err &&
 			!has_peer_idx_invalid);
 
-#if 0
 	/* Clear per-MPDU flags while leaving per-PPDU flags intact. */
-	status->flag &= ~(RX_FLAG_FAILED_FCS_CRC |
-			  RX_FLAG_MMIC_ERROR |
-			  RX_FLAG_DECRYPTED |
-			  RX_FLAG_IV_STRIPPED |
-			  RX_FLAG_MMIC_STRIPPED);
+	status->r_flags &= ~(
+		    IEEE80211_RX_F_FAIL_FCSCRC
+		    | IEEE80211_RX_F_FAIL_MIC
+		    | IEEE80211_RX_F_DECRYPTED
+		    | IEEE80211_RX_F_IV_STRIP
+		    | IEEE80211_RX_F_MMIC_STRIP
+		  );
 
 	if (has_fcs_err)
-		status->flag |= RX_FLAG_FAILED_FCS_CRC;
+		status->r_flags |= IEEE80211_RX_F_FAIL_FCSCRC;
 
 	if (has_tkip_err)
-		status->flag |= RX_FLAG_MMIC_ERROR;
+		status->r_flags |= IEEE80211_RX_F_FAIL_MIC;
 
 	if (is_decrypted)
-		status->flag |= RX_FLAG_DECRYPTED |
-				RX_FLAG_IV_STRIPPED |
-				RX_FLAG_MMIC_STRIPPED;
-#else
-//	device_printf(ar->sc_dev, "%s: TODO: fcs_err=%d, tkip_err=%d, is_decrypted=%d\n",
-//	    __func__, has_fcs_err, has_tkip_err, is_decrypted);
-#endif
+		status->r_flags |= IEEE80211_RX_F_DECRYPTED
+			| IEEE80211_RX_F_IV_STRIP
+			| IEEE80211_RX_F_MMIC_STRIP;
+
 	TAILQ_FOREACH(msdu, amsdu, next) {
 		ath10k_htt_rx_h_csum_offload(msdu);
 		ath10k_htt_rx_h_undecap(ar, msdu, status, first_hdr, enctype,
@@ -1719,12 +1716,21 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 	TAILQ_FOREACH_SAFE(msdu, amsdu, next, m_next) {
 		TAILQ_REMOVE(amsdu, msdu, next);
 		/* Setup per-MSDU flags */
+
+		status->r_flags &= (
+		    IEEE80211_RX_F_AMSDU
+		    | IEEE80211_RX_F_AMSDU_MORE);
+		/*
+		 * XXX TODO: actually check if this is an AMSDU or
+		 * just MSDU/MPDU?
+		 */
 #if 0
-		if (TAILQ_EMPTY(amsdu))
-			status->flag &= ~RX_FLAG_AMSDU_MORE;
-		else
-			status->flag |= RX_FLAG_AMSDU_MORE;
+		status->r_flags |= IEEE80211_RX_F_AMSDU;
 #endif
+		if (TAILQ_EMPTY(amsdu))
+			status->r_flags &= ~IEEE80211_RX_F_AMSDU_MORE;
+		else
+			status->r_flags |= IEEE80211_RX_F_AMSDU_MORE;
 		ath10k_process_rx(ar, status, msdu);
 	}
 }
@@ -2284,6 +2290,9 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 		 * prepend each to the destination list.
 		 *
 		 * It's stupid, it's not O(n), but it'll at least work.
+		 *
+		 * XXX TODO: move this into a method, and eventually fix
+		 * it to be O(1).
 		 */
 #if 0
 		skb_queue_splice_init(amsdu, list);
@@ -2322,14 +2331,10 @@ static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 	 * protected in the 802.11 header. Strip the flag.  Otherwise mac80211
 	 * will drop the frame.
 	 */
-
 	hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
-	printf("%s: TODO: implement telling net80211 about the decrypted frames!\n", __func__);
-#if 0
-	status->flag |= RX_FLAG_DECRYPTED |
-			RX_FLAG_IV_STRIPPED |
-			RX_FLAG_MMIC_STRIPPED;
-#endif
+	status->r_flags |= IEEE80211_RX_F_DECRYPTED
+		    | IEEE80211_RX_F_IV_STRIP
+		    | IEEE80211_RX_F_MMIC_STRIP;
 }
 
 static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
