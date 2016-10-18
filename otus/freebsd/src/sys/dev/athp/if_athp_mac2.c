@@ -1126,18 +1126,21 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 		return (-ENOENT);
 	}
 
-	/* No channel context; use the global one for now */
+	/* XXX TODO No channel context; use the global one for now */
 	channel = ar->sc_ic.ic_curchan;
 
 	arg.vdev_id = vdev_id;
 	arg.channel.freq = channel->ic_freq;
 	arg.channel.band_center_freq1 = channel->ic_freq;
 	arg.channel.mode = chan_to_phymode(channel);
-	arg.channel.chan_radar = 0;	/* XXX TODO: CHAN_RADAR check */
-	arg.channel.min_power = 0;
-	arg.channel.max_power = 30;	/* XXX TODO: power levels */
-	arg.channel.max_reg_power = 30;
-	arg.channel.max_antenna_gain = 0;
+	arg.channel.chan_radar = !! IEEE80211_IS_CHAN_RADAR(channel);
+	arg.channel.passive = IEEE80211_IS_CHAN_PASSIVE(channel);
+
+	arg.channel.min_power = channel->ic_minpower; /* already in 1/2dBm */
+	arg.channel.max_power = channel->ic_maxpower; /* already in 1/2dBm */
+	arg.channel.max_reg_power = channel->ic_maxregpower * 2;
+	arg.channel.max_antenna_gain = channel->ic_maxantgain * 2;
+	arg.channel.reg_class_id = 0;
 
 	ath10k_compl_reinit(&ar->vdev_setup_done);
 
@@ -3456,21 +3459,16 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 		ch->allow_vht = true;
 		ch->allow_ibss = 1;
 		ch->ht40plus = 0;
-		ch->chan_radar = 0;
-		ch->passive = 0;
+		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
+		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
 		ch->freq = c->ic_freq;
 		ch->band_center_freq1 = c->ic_freq;
-		ch->min_power = 0;
-#if 0
-		ch->max_power = c->ic_maxpower * 2;	/* XXX is this right? */
-		ch->max_reg_power = c->ic_maxregpower;	/* XXX is this right? */
-#else
-		/* XXX the maxpower values are 0; need to fetch from ic if that's the case? */
-		ch->max_power = 30;
-		ch->max_reg_power = 30;
-#endif
-		ch->max_antenna_gain = 0;	/* XXX */
+		/* XXX center freq2 */
+		ch->min_power = c->ic_minpower; /* already in 1/2dBm */
+		ch->max_power = c->ic_maxpower; /* already in 1/2dBm */
+		ch->max_reg_power = c->ic_maxregpower * 2;
+		ch->max_antenna_gain = c->ic_maxantgain * 2;
 		ch->reg_class_id = 0;
 		if (IEEE80211_IS_CHAN_2GHZ(c))
 			ch->mode = MODE_11G;
