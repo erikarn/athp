@@ -4998,9 +4998,6 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	arvif->def_wep_key_idx = -1;
 
 	vdev_param = ar->wmi.vdev_param->tx_encap_type;
-	if (vdev_param == 0) {
-		ath10k_warn(ar, "%s: tx_encap_type vdev_param is 0?\n", __func__);
-	}
 	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
 					ATH10K_HW_TXRX_NATIVE_WIFI);
 	/* 10.X firmware does not support this VDEV parameter. Do not warn */
