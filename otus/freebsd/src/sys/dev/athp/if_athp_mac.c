@@ -240,12 +240,6 @@ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
 }
 
 void
-ath10k_drain_tx(struct ath10k *ar)
-{
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-}
-
-void
 ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 {
 	struct mbuf *m;
