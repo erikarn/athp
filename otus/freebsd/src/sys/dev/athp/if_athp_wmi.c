@@ -1841,9 +1841,11 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: setup: cmdid=0x%08x, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
+	ath10k_dbg(ar, ATH10K_DBG_WMI,
+	    "%s: setup: cmdid=0x%08x, ticks=%u, interval=%u\n",
+	    __func__, cmd_id, ticks, interval);
+
 	while (! ieee80211_time_after(ticks, interval)) {
-//		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: loop: cmdid=%u, ticks=%u, interval=%u\n", __func__, cmd_id, ticks, interval);
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
 
 		/* try to send pending beacons first. they take priority */
@@ -2001,13 +2003,16 @@ static void ath10k_wmi_event_scan_bss_chan(struct ath10k *ar)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		ar->scan_channel = NULL;
+		ar->scan_freq = 0;
+		ath10k_dbg(ar, ATH10K_DBG_WMI,
+		    "%s: setting scan_channel=NULL\n", __func__);
 		break;
 	}
 }
 
 static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 {
+
 	ATHP_DATA_LOCK_ASSERT(ar);
 
 	switch (ar->scan.state) {
@@ -2019,7 +2024,14 @@ static void ath10k_wmi_event_scan_foreign_chan(struct ath10k *ar, u32 freq)
 		break;
 	case ATH10K_SCAN_RUNNING:
 	case ATH10K_SCAN_ABORTING:
-		//ar->scan_channel = ieee80211_get_channel(ar->hw->wiphy, freq);
+		/*
+		 * For .. "reasons", we track the current foreign channel
+		 * so we can track the correct frequency for received frames.
+		 * (Ie, it's not reported per-frame?)
+		 */
+		ar->scan_freq = freq;
+		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: freq=%d\n", __func__, freq);
+
 		if (ar->scan.is_roc && ar->scan.roc_freq == freq)
 			ath10k_compl_wakeup_one(&ar->scan.on_channel);
 		break;
@@ -2178,24 +2190,24 @@ static inline enum ieee80211_band phy_mode_to_band(u32 phy_mode)
 }
 #endif
 
-#if 0
+#if 1
 /* If keys are configured, HW decrypts all frames
  * with protected bit set. Mark such frames as decrypted.
  */
 static void ath10k_wmi_handle_wep_reauth(struct ath10k *ar,
 					 struct athp_buf *pbuf,
-					 struct ieee80211_rx_status *status)
+					 struct ieee80211_rx_stats *status)
 {
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)mbuf_skb_data(pbuf->m);
+	struct ieee80211_frame *hdr = (struct ieee80211_frame *)mbuf_skb_data(pbuf->m);
 	unsigned int hdrlen;
 	bool peer_key;
 	u8 *addr, keyidx;
 
-	if (!ieee80211_is_auth(hdr->frame_control) ||
-	    !ieee80211_has_protected(hdr->frame_control))
+	if (!ieee80211_is_auth(hdr) ||
+	    !ieee80211_has_protected(hdr))
 		return;
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = ieee80211_anyhdrsize(hdr);
 	if (mbuf_skb_len(pbuf->m) < (hdrlen + IEEE80211_WEP_IV_LEN))
 		return;
 
@@ -2208,8 +2220,8 @@ static void ath10k_wmi_handle_wep_reauth(struct ath10k *ar,
 
 	if (peer_key) {
 		ath10k_dbg(ar, ATH10K_DBG_MAC,
-			   "mac wep key present for peer %pM\n", addr);
-		status->flag |= RX_FLAG_DECRYPTED;
+			   "mac wep key present for peer %6D\n", addr, ":");
+		status->c_pktflags |= IEEE80211_RX_F_DECRYPTED;
 	}
 }
 #endif
@@ -2297,13 +2309,14 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	struct ieee80211_rx_stats stat;
 	struct ieee80211_node *ni;
 	struct mbuf *m;
-//	struct ieee80211_hdr *hdr;
+	struct ieee80211_frame *hdr;
 	u32 rx_status;
 	u32 channel;
 	u32 phy_mode;
 	u32 snr;
 	u32 rate;
 	u32 buf_len;
+	uint32_t band;
 //	u16 fc;
 	int ret;
 
@@ -2346,10 +2359,10 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		return 0;
 	}
 
-#if 0
 	if (rx_status & WMI_RX_STATUS_ERR_MIC)
-		status->flag |= RX_FLAG_MMIC_ERROR;
+		stat.c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
 
+#if 0
 	/* Hardware can Rx CCK rates on 5GHz. In that case phy_mode is set to
 	 * MODE_11B. This means phy_mode is not a reliable source for the band
 	 * of mgmt rx.
@@ -2373,51 +2386,62 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	sband = &ar->mac.sbands[status->band];
 #endif
 
-	stat.r_flags = IEEE80211_R_RSSI | IEEE80211_R_IEEE | IEEE80211_R_NF;
+	if (channel <= 14)
+		band = IEEE80211_CHAN_2GHZ;
+	else
+		band = IEEE80211_CHAN_5GHZ;
+
+	stat.r_flags |= IEEE80211_R_RSSI
+	    | IEEE80211_R_IEEE
+	    | IEEE80211_R_FREQ
+	    | IEEE80211_R_NF;
 	stat.c_ieee = channel;
+	stat.c_freq = ieee80211_ieee2mhz(channel, band);
 	stat.c_rssi = snr;
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
 
+	hdr = mtod(pbuf->m, struct ieee80211_frame *);
+	ath10k_wmi_handle_wep_reauth(ar, pbuf, &stat);
 #if 0
 	status->freq = ieee80211_channel_to_frequency(channel, status->band);
 	status->signal = snr + ATH10K_DEFAULT_NOISE_FLOOR;
 	status->rate_idx = ath10k_mac_bitrate_to_idx(sband, rate / 100);
 
-	hdr = (struct ieee80211_hdr *)mbuf_skb_data(pbuf->m);
 	fc = le16_to_cpu(hdr->frame_control);
-
-	ath10k_wmi_handle_wep_reauth(ar, pbuf, status);
+#endif
 
 	/* FW delivers WEP Shared Auth frame with Protected Bit set and
 	 * encrypted payload. However in case of PMF it delivers decrypted
 	 * frames with Protected Bit set. */
-	if (ieee80211_has_protected(hdr->frame_control) &&
-	    !ieee80211_is_auth(hdr->frame_control)) {
-		status->flag |= RX_FLAG_DECRYPTED;
-
-		if (!ieee80211_is_action(hdr->frame_control) &&
-		    !ieee80211_is_deauth(hdr->frame_control) &&
-		    !ieee80211_is_disassoc(hdr->frame_control)) {
-			status->flag |= RX_FLAG_IV_STRIPPED |
-					RX_FLAG_MMIC_STRIPPED;
-			hdr->frame_control = __cpu_to_le16(fc &
-					~IEEE80211_FCTL_PROTECTED);
+	if (ieee80211_has_protected(hdr) &&
+	    !ieee80211_is_auth(hdr)) {
+		ath10k_warn(ar,
+		    "%s: rx; prot=%d, auth=%d, action=%d, deauth=%d, "
+		    "disassoc=%d\n",
+		    __func__,
+		    ieee80211_has_protected(hdr),
+		    ieee80211_is_auth(hdr),
+		    ieee80211_is_action(hdr),
+		    ieee80211_is_deauth(hdr),
+		    ieee80211_is_disassoc(hdr));
+		stat.c_pktflags |= IEEE80211_RX_F_DECRYPTED;
+		if (!ieee80211_is_action(hdr) &&
+		    !ieee80211_is_deauth(hdr) &&
+		    !ieee80211_is_disassoc(hdr)) {
+			stat.c_pktflags |= IEEE80211_RX_F_IV_STRIP
+			    | IEEE80211_RX_F_MMIC_STRIP;
+			hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
 		}
 	}
 
-	if (ieee80211_is_beacon(hdr->frame_control))
+	if (ieee80211_is_beacon(hdr))
 		ath10k_mac_handle_beacon(ar, pbuf);
-#endif
-
-#if 0
-	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx skb %p len %d ftype %02x stype %02x\n",
-		   mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m),
-		   fc & IEEE80211_FCTL_FTYPE, fc & IEEE80211_FCTL_STYPE);
-#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx chan %d snr %d\n", stat.c_ieee, stat.c_rssi);
+		   "event mgmt rx chan %d snr %d, rate %u isprot %d isauth %d\n",
+		       stat.c_ieee, stat.c_rssi, rate,
+		       ieee80211_is_protected(hdr),
+		       ieee80211_is_auth(hdr));
 
 	/*
 	 * Committed to RX up the node.  Grab the mbuf.
@@ -2454,17 +2478,22 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 #endif
 
 	/*
+	 * Add RX parameters for stack processing.
+	 */
+	(void) ieee80211_add_rx_params(m, &stat);
+
+	/*
 	 * Do node lookup for RX.
 	 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni) {
 		if (ni->ni_flags & IEEE80211_NODE_HT)
 			m->m_flags |= M_AMPDU;
-			ieee80211_input_mimo(ni, m, &stat);
-			ieee80211_free_node(ni);
+		ieee80211_input_mimo(ni, m);
+		ieee80211_free_node(ni);
 	} else {
 		/* no node, global */
-		ieee80211_input_mimo_all(ic, m, &stat);
+		ieee80211_input_mimo_all(ic, m);
 	}
 
 	/* ... now, the mbuf isn't ours */
@@ -3077,8 +3106,8 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 		return;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event peer sta kickout %pM\n",
-		   arg.mac_addr);
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event peer sta kickout %6D\n",
+		   arg.mac_addr, ":");
 
 	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 #if 0
@@ -4150,23 +4179,17 @@ static int ath10k_wmi_alloc_host_mem(struct ath10k *ar, u32 req_id,
 	if (!pool_size)
 		return -EINVAL;
 
-	/* I'm cheating here and using contigmalloc/vtophys */
-	ar->wmi.mem_chunks[idx].vaddr = contigmalloc(
-	    pool_size,
-	    M_ATHPDEV,
-	    M_NOWAIT | M_ZERO,
-	    0x1000000,		/* paddr low */
-	    0xffffffff,		/* paddr high */
-	    PAGE_SIZE,		/* alignment */
-	    0ul);		/* boundary */
-	if (!ar->wmi.mem_chunks[idx].vaddr) {
+	if (athp_descdma_alloc(ar, &ar->wmi.mem_chunks[idx].dd, "wmi_chunk",
+	    PAGE_SIZE,
+	    pool_size) != 0) {
 		ath10k_warn(ar, "failed to allocate memory chunk\n");
 		return -ENOMEM;
 	}
+	ar->wmi.mem_chunks[idx].vaddr = ar->wmi.mem_chunks[idx].dd.dd_desc;
+	ar->wmi.mem_chunks[idx].paddr = ar->wmi.mem_chunks[idx].dd.dd_desc_paddr;
 
 	memset(ar->wmi.mem_chunks[idx].vaddr, 0, pool_size);
 
-	ar->wmi.mem_chunks[idx].paddr = vtophys(ar->wmi.mem_chunks[idx].vaddr);
 	ar->wmi.mem_chunks[idx].len = pool_size;
 	ar->wmi.mem_chunks[idx].req_id = req_id;
 	ar->wmi.num_mem_chunks++;
@@ -6228,8 +6251,8 @@ ath10k_wmi_10_1_op_gen_peer_assoc(struct ath10k *ar,
 	ath10k_wmi_peer_assoc_fill_10_1(ar, mbuf_skb_data(pbuf->m), arg);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer assoc vdev %d addr %pM (%s)\n",
-		   arg->vdev_id, arg->addr,
+		   "wmi peer assoc vdev %d addr %6D (%s)\n",
+		   arg->vdev_id, arg->addr, ":",
 		   arg->peer_reassoc ? "reassociate" : "new");
 	return pbuf;
 }
@@ -6253,8 +6276,8 @@ ath10k_wmi_10_2_op_gen_peer_assoc(struct ath10k *ar,
 	ath10k_wmi_peer_assoc_fill_10_2(ar, mbuf_skb_data(pbuf->m), arg);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi peer assoc vdev %d addr %pM (%s)\n",
-		   arg->vdev_id, arg->addr,
+		   "wmi peer assoc vdev %d addr %6D (%s)\n",
+		   arg->vdev_id, arg->addr, ":",
 		   arg->peer_reassoc ? "reassociate" : "new");
 	return pbuf;
 }
@@ -6493,8 +6516,8 @@ ath10k_wmi_op_gen_addba_clear_resp(struct ath10k *ar, u32 vdev_id,
 	ether_addr_copy(cmd->peer_macaddr.addr, mac);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi addba clear resp vdev_id 0x%X mac_addr %pM\n",
-		   vdev_id, mac);
+		   "wmi addba clear resp vdev_id 0x%X mac_addr %6D\n",
+		   vdev_id, mac, ":");
 	return pbuf;
 }
 
@@ -6519,8 +6542,8 @@ ath10k_wmi_op_gen_addba_send(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	cmd->buffersize = __cpu_to_le32(buf_size);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi addba send vdev_id 0x%X mac_addr %pM tid %u bufsize %u\n",
-		   vdev_id, mac, tid, buf_size);
+		   "wmi addba send vdev_id 0x%X mac_addr %6D tid %u bufsize %u\n",
+		   vdev_id, mac, ":", tid, buf_size);
 	return pbuf;
 }
 
@@ -6545,8 +6568,8 @@ ath10k_wmi_op_gen_addba_set_resp(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	cmd->statuscode = __cpu_to_le32(status);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi addba set resp vdev_id 0x%X mac_addr %pM tid %u status %u\n",
-		   vdev_id, mac, tid, status);
+		   "wmi addba set resp vdev_id 0x%X mac_addr %6D tid %u status %u\n",
+		   vdev_id, mac, ":", tid, status);
 	return pbuf;
 }
 
@@ -6572,8 +6595,8 @@ ath10k_wmi_op_gen_delba_send(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 	cmd->reasoncode = __cpu_to_le32(reason);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi delba send vdev_id 0x%X mac_addr %pM tid %u initiator %u reason %u\n",
-		   vdev_id, mac, tid, initiator, reason);
+		   "wmi delba send vdev_id 0x%X mac_addr %6D tid %u initiator %u reason %u\n",
+		   vdev_id, mac, ":", tid, initiator, reason);
 	return pbuf;
 }
 
@@ -6959,9 +6982,9 @@ void ath10k_wmi_detach(struct ath10k *ar)
 
 	/* free the host memory chunks requested by firmware */
 	for (i = 0; i < ar->wmi.num_mem_chunks; i++) {
-		contigfree(ar->wmi.mem_chunks[i].vaddr,
-		    ar->wmi.mem_chunks[i].len,
-		    M_ATHPDEV);
+		athp_descdma_free(ar, &ar->wmi.mem_chunks[i].dd);
+		ar->wmi.mem_chunks[i].vaddr = NULL;
+		ar->wmi.mem_chunks[i].paddr = 0;
 	}
 
 	ar->wmi.num_mem_chunks = 0;

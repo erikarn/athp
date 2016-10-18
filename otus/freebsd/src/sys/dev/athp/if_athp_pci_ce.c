@@ -399,6 +399,9 @@ ath10k_ce_send_nolock(struct ath10k_ce_pipe *ce_state,
 	if (flags & CE_SEND_FLAG_BYTE_SWAP)
 		desc_flags |= CE_DESC_FLAGS_BYTE_SWAP;
 
+	ath10k_dbg(ar, ATH10K_DBG_CE, "%s: addr=%08x, nbytes=%d, flags=0x%08x\n",
+	    __func__, buffer, nbytes, desc_flags);
+
 	sdesc->addr   = __cpu_to_le32(buffer);
 	sdesc->nbytes = __cpu_to_le16(nbytes);
 	sdesc->flags  = __cpu_to_le16(desc_flags);
@@ -505,6 +508,8 @@ int __ath10k_ce_rx_post_buf(struct ath10k_ce_pipe *pipe, void *ctx, uint32_t pad
 	struct ce_desc *base = dest_ring->base_addr_owner_space;
 	struct ce_desc *desc = CE_DEST_RING_TO_DESC(base, write_index);
 	uint32_t ctrl_addr = pipe->ctrl_addr;
+
+	ath10k_dbg(ar, ATH10K_DBG_CE, "%s: posting paddr=0x%x\n", __func__, paddr);
 
 	ATHP_PCI_CE_LOCK_ASSERT(psc);
 

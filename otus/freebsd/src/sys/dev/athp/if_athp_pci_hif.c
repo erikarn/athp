@@ -753,7 +753,7 @@ ath10k_pci_hif_tx_sg(struct ath10k *ar, u8 pipe_id,
 	}
 
 	for (i = 0; i < n_items - 1; i++) {
-		ath10k_dbg(ar, ATH10K_DBG_PCI,
+		ath10k_dbg(ar, ATH10K_DBG_PCI | ATH10K_DBG_CE,
 			   "pci tx item %d paddr 0x%08x len %d n_items %d\n",
 			   i, items[i].paddr, items[i].len, n_items);
 		athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
@@ -771,7 +771,7 @@ ath10k_pci_hif_tx_sg(struct ath10k *ar, u8 pipe_id,
 
 	/* `i` is equal to `n_items -1` after for() */
 
-	ath10k_dbg(ar, ATH10K_DBG_PCI,
+	ath10k_dbg(ar, ATH10K_DBG_PCI | ATH10K_DBG_CE,
 		   "pci tx item %d paddr 0x%08x len %d n_items %d\n",
 		   i, items[i].paddr, items[i].len, n_items);
 	athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
@@ -1069,7 +1069,7 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 	bzero(&dd_req, sizeof(dd_req));
 	bzero(&dd_resp, sizeof(dd_resp));
 
-	ret = athp_descdma_alloc(ar, &dd_req, "bmi_msg_req", 8, req_len);
+	ret = athp_descdma_alloc(ar, &dd_req, "bmi_msg_req", 4, req_len);
 	if (ret != 0)
 		return -ENOMEM;
 
@@ -1082,7 +1082,7 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 	/* Get a descriptor w/ physical mapping for the response */
 
 	if (resp && resp_len) {
-		ret = athp_descdma_alloc(ar, &dd_resp, "bmi_msg_resp", 8,
+		ret = athp_descdma_alloc(ar, &dd_resp, "bmi_msg_resp", 4,
 		    *resp_len);
 		if (ret != 0) {
 			ret = -ENOMEM;

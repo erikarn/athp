@@ -162,14 +162,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 
 	if (skb_cb->htt.txbuf)
-#if 0
-		dma_pool_free(htt->tx_pool,
-			      skb_cb->htt.txbuf,
-			      skb_cb->htt.txbuf_paddr);
-#else
-	ath10k_warn(ar,
-	    "%s: TODO: htt.txbuf not null, we need to free it!\n", __func__);
-#endif
+		athp_descdma_free(ar, &skb_cb->htt.txbuf_dd);
 
 	ath10k_report_offchan_tx(htt->ar, msdu);
 
@@ -186,12 +179,12 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	trace_ath10k_txrx_tx_unref(ar, tx_done->msdu_id);
 #endif
 
-#if 0
 	if (tx_done->discard) {
-		ieee80211_free_txskb(htt->ar->hw, msdu);
+		ath10k_tx_free_pbuf(ar, msdu, 1);	/* default to being ok */
 		return;
 	}
 
+#if 0
 	if (!(info->flags & IEEE80211_TX_CTL_NO_ACK))
 		info->flags |= IEEE80211_TX_STAT_ACK;
 
@@ -200,13 +193,9 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 
 	if (tx_done->success && (info->flags & IEEE80211_TX_CTL_NO_ACK))
 		info->flags |= IEEE80211_TX_STAT_NOACK_TRANSMITTED;
-
-	ieee80211_tx_status(htt->ar->hw, msdu);
-	/* we do not own the msdu anymore */
-#else
-	device_printf(ar->sc_dev, "%s: TODO: send the msdu/mbuf up net80211!\n", __func__);
-	athp_freebuf(ar, &ar->buf_tx, msdu);
 #endif
+
+	ath10k_tx_free_pbuf(ar, msdu, !! tx_done->success);	/* default to being ok */
 }
 
 struct ath10k_peer *ath10k_peer_find(struct ath10k *ar, int vdev_id,
@@ -305,8 +294,8 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer map vdev %d peer %pM id %d\n",
-		   ev->vdev_id, ev->addr, ev->peer_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer map vdev %d peer %6D id %d\n",
+		   ev->vdev_id, ev->addr, ":", ev->peer_id);
 
 	set_bit(ev->peer_id, peer->peer_ids);
 exit:
@@ -327,8 +316,8 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 		goto exit;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer unmap vdev %d peer %pM id %d\n",
-		   peer->vdev_id, peer->addr, ev->peer_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer unmap vdev %d peer %6D id %d\n",
+		   peer->vdev_id, peer->addr, ":", ev->peer_id);
 
 	clear_bit(ev->peer_id, peer->peer_ids);
 

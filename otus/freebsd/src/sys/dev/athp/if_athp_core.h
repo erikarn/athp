@@ -70,7 +70,7 @@ struct ath10k_peer {
 	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);
 
 	/* protected by ar->data_lock */
-	struct ieee80211_key_conf *keys[WMI_MAX_KEY_INDEX + 1];
+	struct ieee80211_key *keys[WMI_MAX_KEY_INDEX + 1];
 };
 
 struct ath10k_sta {
@@ -109,6 +109,8 @@ struct ath10k_vif {
 
 	int is_setup;	/* set if the hardware state vif is setup */
 
+	int is_stabss_setup;	/* set if the station mode BSS is setup */
+
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
 	enum wmi_vdev_subtype vdev_subtype;
@@ -132,7 +134,7 @@ struct ath10k_vif {
 	u32 aid;
 	u8 bssid[ETH_ALEN];
 
-	struct ieee80211_key_conf *wep_keys[WMI_MAX_KEY_INDEX + 1];
+	struct ieee80211_key *wep_keys[WMI_MAX_KEY_INDEX + 1];
 	s8 def_wep_key_idx;
 
 	u16 tx_seq_no;

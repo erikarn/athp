@@ -161,27 +161,12 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 }
 
 void
-ath10k_mac_handle_beacon(struct ath10k *ar, struct athp_buf *pbuf)
-{
-
-	printf("%s: called\n", __func__);
-}
-
-void
-ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
-{
-
-	printf("%s: called\n", __func__);
-}
-
-void
 ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
     enum wmi_tlv_tx_pause_id pause_id, enum wmi_tlv_tx_pause_action action)
 {
 
 	printf("%s: called\n", __func__);
 }
-
 
 /***************/
 /* TX handlers */
@@ -240,7 +225,33 @@ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
 }
 
 void
-ath10k_drain_tx(struct ath10k *ar)
+ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 {
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
+	struct mbuf *m;
+	struct ieee80211_node *ni = NULL;
+	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(pbuf);
+
+	m = athp_buf_take_mbuf(ar, &ar->buf_tx, pbuf);
+	if (cb->ni != NULL) {
+		ni = cb->ni;
+	}
+	cb->ni = NULL;
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: pbuf=%p, m=%p, ni=%p, tx_ok=%d\n",
+	    __func__,
+	    pbuf,
+	    m,
+	    ni,
+	    tx_ok);
+	athp_freebuf(ar, &ar->buf_tx, pbuf);
+
+	/* mbuf free time - net80211 gets told about completion; frees refcount */
+	/*
+	 * Note: status=0 means "ok", status != 0 means "failed".
+	 * Getting this right matters for net80211; it calls the TX callback
+	 * for the mbuf if it's there which will sometimes kick the
+	 * VAP logic back to "scan".
+	 */
+	//ieee80211_tx_complete(ni, m, ! tx_ok);
+	ieee80211_tx_complete(ni, m, 0);
 }

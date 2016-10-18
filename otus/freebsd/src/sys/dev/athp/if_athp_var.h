@@ -67,13 +67,19 @@ struct athp_node {
 #define	ATHP_BUF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_OWNED)
 #define	ATHP_BUF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_NOTOWNED)
 
+#define	ATHP_DMA_LOCK(sc)		mtx_lock(&(sc)->sc_dma_mtx)
+#define	ATHP_DMA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_dma_mtx)
+#define	ATHP_DMA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
+#define	ATHP_DMA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_NOTOWNED)
+
 struct ath10k_bmi {
 	bool done_sent;
 };
 
 struct ath10k_mem_chunk {
 	void *vaddr;
-	vm_paddr_t paddr;
+	bus_addr_t paddr;
+	struct athp_descdma dd;
 	int len;
 	u32 req_id;
 };
@@ -136,6 +142,7 @@ struct ath10k_stats {
 	uint64_t rx_msdu_invalid_len;
 	uint64_t rx_pkt_short_len;
 	uint64_t rx_pkt_zero_len;
+	uint64_t xmit_fail_crypto_encap;
 };
 
 /*
@@ -155,6 +162,7 @@ struct ath10k {
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
 	struct mtx			sc_buf_mtx;
+	struct mtx			sc_dma_mtx;
 	struct sx			sc_conf_sx;
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
@@ -312,10 +320,10 @@ struct ath10k {
 #endif
 
 	/* should never be NULL; needed for regular htt rx */
-	struct ieee80211_channel *rx_channel;
+	uint32_t rx_freq;
 
 	/* valid during scan; needed for mgmt rx during scan */
-	struct ieee80211_channel *scan_channel;
+	uint32_t scan_freq;
 
 #if 0
 	/* current operating channel definition */

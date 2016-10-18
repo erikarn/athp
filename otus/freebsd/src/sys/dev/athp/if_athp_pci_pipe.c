@@ -516,13 +516,15 @@ ath10k_pci_alloc_pipes(struct ath10k *ar)
 		} else {
 			sz = pipe->buf_sz;
 		}
-		ret = athp_dma_head_alloc(ar, &pipe->dmatag, sz);
+#if 0
+		ret = athp_dma_head_alloc(ar, &pipe->dmatag, sz, 4);
 		if (ret) {
 			ath10k_err(ar, "%s: failed to create dma tag for pipe %d\n",
 			    __func__,
 			    i);
 			return (ret);
 		}
+#endif
 	}
 
 	return 0;
@@ -538,7 +540,9 @@ ath10k_pci_free_pipes(struct ath10k *ar)
 	for (i = 0; i < CE_COUNT(ar); i++) {
 		pipe = &psc->pipe_info[i];
 		ath10k_ce_free_pipe(ar, i);
+#if 0
 		athp_dma_head_free(ar, &pipe->dmatag);
+#endif
 	}
 }
 

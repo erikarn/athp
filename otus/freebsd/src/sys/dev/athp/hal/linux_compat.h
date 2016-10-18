@@ -146,17 +146,12 @@ IS_ALIGNED(unsigned long ptr, int a)
 	return (ptr % a == 0);
 }
 
-/*
- * This isn't strictly speaking "linux compat"; it's bits that are
- * missing from net80211 that we should really port.
- */
-/* XXX TODO: implement! */
-#define	IEEE80211_IS_ACTION(a)		0
-#define	IEEE80211_IS_DEAUTH(a)		0
-#define	IEEE80211_IS_DISASSOC(a)	0
-#define	IEEE80211_IS_QOS(a)		0
-#define	IEEE80211_HAS_PROT(a)		0
-#define	IEEE80211_IS_MGMT(a)		0
+#define	IEEE80211_HAS_PROT(a)		ieee80211_is_protected(a)
+#define	IEEE80211_IS_MGMT(a)		ieee80211_is_mgmt(a)
+#define	IEEE80211_IS_ACTION(a)		ieee80211_is_action(a)
+#define	IEEE80211_IS_DEAUTH(a)		ieee80211_is_deauth(a)
+#define	IEEE80211_IS_DISASSOC(a)	ieee80211_is_disassoc(a)
+#define	IEEE80211_IS_QOS(a)		ieee80211_is_data_qos(a)
 
 /* XXX temp uAPSD */
 /* U-APSD queue for WMM IEs sent by AP */
@@ -195,10 +190,14 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define IEEE80211_GCMP_MIC_LEN          16
 #define IEEE80211_GCMP_PN_LEN           6
 
+#if 0
 /* They store it as 16 bit value, not two 8 bit values.. */
 #define IEEE80211_FCTL_VERS             0x0003
+#endif
+/* XXX TODO: get rid of these; so far they're just used for debugging echos */
 #define IEEE80211_FCTL_FTYPE            0x000c
 #define IEEE80211_FCTL_STYPE            0x00f0
+#if 0
 #define IEEE80211_FCTL_TODS             0x0100
 #define IEEE80211_FCTL_FROMDS           0x0200
 #define IEEE80211_FCTL_MOREFRAGS        0x0400
@@ -216,7 +215,12 @@ IS_ALIGNED(unsigned long ptr, int a)
 #define IEEE80211_FTYPE_CTL             0x0004
 #define IEEE80211_FTYPE_DATA            0x0008
 #define IEEE80211_FTYPE_EXT             0x000c
+#endif
 
+/*
+ * mac80211 style routines, but they take an ieee80211_frame pointer.
+ * Should reimplement, move into net80211.
+ */
 static inline u8 *ieee80211_get_DA(struct ieee80211_frame *hdr)
 {
 	if (IEEE80211_IS_DSTODS(hdr))
@@ -231,6 +235,23 @@ static inline bool ieee80211_has_a4(struct ieee80211_frame *hdr)
 	return (hdr->i_fc[1] & 0x3) == 0x3; /* TODS | FROMDS */
 }
 
+static inline bool ieee80211_has_fromds(struct ieee80211_frame *hdr)
+{
+
+	return (!! hdr->i_fc[1] & IEEE80211_FC1_DIR_FROMDS);
+}
+
+static inline u8 *ieee80211_get_SA(struct ieee80211_frame *hdr)
+{
+	if (ieee80211_has_a4(hdr))
+		return ((struct ieee80211_frame_addr4 *)hdr)->i_addr4;
+	if (ieee80211_has_fromds(hdr))
+		return hdr->i_addr3;
+	else
+		return hdr->i_addr2;
+}
+
+
 
 static inline u8 *ieee80211_get_qos_ctl(struct ieee80211_frame *hdr)
 {
@@ -242,8 +263,118 @@ static inline u8 *ieee80211_get_qos_ctl(struct ieee80211_frame *hdr)
 
 static inline int ieee80211_has_protected(struct ieee80211_frame *hdr)
 {
-	return !! (hdr->i_fc[1] |= IEEE80211_FC1_PROTECTED);
+	return !! (hdr->i_fc[1] & IEEE80211_FC1_PROTECTED);
 }
 
+/*
+ * data ftype, nullfunc stype.
+ */
+static inline bool ieee80211_is_qos_nullfunc(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	/* needs to be type data */
+	if (type != IEEE80211_FC0_TYPE_DATA)
+		return (false);
+
+	/* needs to be subtype nullfunc */
+	if (subtype != IEEE80211_FC0_SUBTYPE_QOS_NULL)
+		return (false);
+
+	return (true);
+}
+
+static inline bool ieee80211_is_nullfunc(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	/* needs to be type data */
+	if (type != IEEE80211_FC0_TYPE_DATA)
+		return (false);
+
+	/* needs to be subtype nullfunc */
+	if (subtype != IEEE80211_FC0_SUBTYPE_NODATA)
+		return (false);
+
+	return (true);
+}
+
+static inline bool ieee80211_is_mgmt(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+
+	return (type == IEEE80211_FC0_TYPE_MGT);
+}
+
+static inline bool ieee80211_is_beacon(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_BEACON));
+}
+
+
+static inline bool ieee80211_is_protected(struct ieee80211_frame *wh)
+{
+
+	return !! (wh->i_fc[1] & IEEE80211_FC1_PROTECTED);
+}
+
+
+static inline bool ieee80211_is_auth(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_AUTH));
+}
+
+static inline bool ieee80211_is_action(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_ACTION));
+}
+
+static inline bool ieee80211_is_deauth(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_DEAUTH));
+}
+
+static inline bool ieee80211_is_disassoc(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	return ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (subtype == IEEE80211_FC0_SUBTYPE_DISASSOC));
+}
+
+/*
+ * type is data, QOS_DATA bit is set.
+ */
+static inline bool ieee80211_is_data_qos(struct ieee80211_frame *wh)
+{
+	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	if (type != IEEE80211_FC0_TYPE_DATA)
+		return (false);
+	if ((subtype & IEEE80211_FC0_SUBTYPE_QOS) == 0)
+		return (false);
+
+	return (true);
+}
 
 #endif	/* __LINUX_COMPAT_H__ */

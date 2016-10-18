@@ -84,4 +84,6 @@ static inline void ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf 
 	printf("%s: TODO\n", __func__);
 }
 
+extern	void ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok);
+
 #endif /* _MAC_H_ */

@@ -172,13 +172,14 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
  * all into the inactive list.
  */
 int
-athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
+athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count, int btype)
 {
 	int i;
 
 	/* Allocate initial buffer list */
 	br->br_list = malloc(sizeof(struct athp_buf) * count, M_ATHPDEV,
 	    M_ZERO | M_NOWAIT);
+	br->btype = btype;
 	if (br->br_list == NULL) {
 		ath10k_err(ar, "%s: malloc failed!\n", __func__);
 		return (-1);
@@ -187,6 +188,7 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count)
 	/* Setup initial state for each entry */
 	for (i = 0; i < count; i++) {
 		athp_dma_mbuf_setup(ar, &br->dh, &br->br_list[i].mb);
+		br->br_list[i].btype = btype;
 	}
 
 	/* Lists */
@@ -216,6 +218,19 @@ _athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br)
 		TAILQ_REMOVE(&br->br_inactive, bf, next);
 	else
 		bf = NULL;
+
+	if (bf == NULL)
+		return NULL;
+
+	/* Sanity check */
+	if (br->btype != bf->btype) {
+		ath10k_err(ar, "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
+		    __func__,
+		    bf,
+		    bf->btype,
+		    br->btype);
+	}
+
 	return (bf);
 }
 
@@ -223,8 +238,30 @@ void
 athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
     struct athp_buf *bf)
 {
+	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(bf);
+
+	/* Complain if the buffer has a noderef left */
+	if (cb->ni != NULL) {
+		ath10k_err(ar, "%s: TODO: pbuf=%p, mbuf=%p, ni is not null (%p) !\n",
+		    __func__,
+		    bf,
+		    bf->m,
+		    cb->ni);
+	}
 
 	ATHP_BUF_LOCK(ar);
+
+	if (br->btype != bf->btype) {
+		ath10k_err(ar, "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
+		    __func__,
+		    bf,
+		    bf->btype,
+		    br->btype);
+	}
+
+	ath10k_dbg(ar, ATH10K_DBG_PBUF,
+	    "%s: br=%d, m=%p, bf=%p, paddr=0x%lx\n",
+	    __func__, br->btype, bf->m, bf, bf->mb.paddr);
 
 	/* if there's an mbuf - unmap (if needed) and free it */
 	if (bf->m != NULL)
@@ -233,7 +270,6 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 	/* Push it into the inactive queue */
 	TAILQ_INSERT_TAIL(&br->br_inactive, bf, next);
 	ATHP_BUF_UNLOCK(ar);
-
 }
 
 /*
@@ -308,12 +344,6 @@ athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 }
 
 /*
- * XXX TODO: write a routine to assign a pbuf to a given mbuf or
- * something, for the transmit side to have everything it needs
- * to transmit a payload, complete with correct 'len'.
- */
-
-/*
  * XXX TODO: need to setup the tx/rx buffer dma tags in if_athp_pci.c.
  * (Since it's a function of the bus/chip..)
  */
@@ -377,4 +407,18 @@ athp_buf_take_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
 	m = bf->m;
 	bf->m = NULL;
 	return (m);
+}
+
+void
+athp_buf_give_mbuf(struct ath10k *ar, struct athp_buf_ring *br,
+    struct athp_buf *bf, struct mbuf *m)
+{
+
+	/* XXX assume the caller has obtained a fresh pbuf tx */
+
+	/* Setup initial mbuf tracking state */
+	bf->m = m;
+	bf->m_size = m->m_pkthdr.len;
+
+	/* XXX the caller will initialise the pbuf map */
 }

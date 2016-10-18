@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include "hal/hw.h"
 #include "hal/htc.h"
 #include "hal/wmi.h"
+#include "hal/linux_skb.h"
 
 #include "if_athp_debug.h"
 #include "if_athp_regio.h"
@@ -145,6 +146,7 @@ static struct ieee80211_rate ath10k_rates[] = {
 			     ATH10K_MAC_FIRST_OFDM_RATE_IDX)
 #define ath10k_g_rates (ath10k_rates + 0)
 #define ath10k_g_rates_size (ARRAY_SIZE(ath10k_rates))
+#endif
 
 static bool ath10k_mac_bitrate_is_cck(int bitrate)
 {
@@ -165,6 +167,7 @@ static u8 ath10k_mac_bitrate_to_rate(int bitrate)
 	       (ath10k_mac_bitrate_is_cck(bitrate) ? BIT(7) : 0);
 }
 
+#if 0
 u8 ath10k_mac_hw_rate_to_idx(const struct ieee80211_supported_band *sband,
 			     u8 hw_rate)
 {
@@ -439,6 +442,7 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 
 	return first_errno;
 }
+#endif
 
 bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 				    u8 keyidx)
@@ -457,14 +461,26 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 	if (!peer)
 		return false;
 
+	/*
+	 * Note: the wrong keyindex is being ued here.
+	 * wk_keyix is the hardware key index.
+	 * We want to see if there is a WEP key index
+	 * entry at this ID for the given peer.
+	 *
+	 * I'm not sure what to do here; but if we /do/
+	 * get here it's time to handle it.
+	 */
+	ath10k_warn(ar, "%s: **** WARNING **** the wrong keyidx (wk_keyidx) is being compared!\n", __func__);
+
 	for (i = 0; i < ARRAY_SIZE(peer->keys); i++) {
-		if (peer->keys[i] && peer->keys[i]->keyidx == keyidx)
+		if (peer->keys[i] && peer->keys[i]->wk_keyix == keyidx)
 			return true;
 	}
 
 	return false;
 }
 
+#if 0
 static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 				 struct ieee80211_key_conf *key)
 {
@@ -550,7 +566,6 @@ static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
 /* General utilities */
 /*********************/
 
-#if 1
 static inline enum wmi_phy_mode
 chan_to_phymode(struct ieee80211_channel *c)
 {
@@ -586,7 +601,6 @@ chan_to_phymode(struct ieee80211_channel *c)
 
 	return (phymode);
 }
-#endif
 
 #if 0
 static inline enum wmi_phy_mode
@@ -734,7 +748,6 @@ ath10k_mac_get_any_chandef_iter(struct ieee80211_hw *hw,
 }
 #endif
 
-#if 1
 static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 			      enum wmi_peer_type peer_type)
 {
@@ -755,15 +768,15 @@ static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 
 	ret = ath10k_wmi_peer_create(ar, vdev_id, addr, peer_type);
 	if (ret) {
-		ath10k_warn(ar, "failed to create wmi peer %pM on vdev %i: %i\n",
-			    addr, vdev_id, ret);
+		ath10k_warn(ar, "failed to create wmi peer %6D on vdev %i: %i\n",
+			    addr, ":", vdev_id, ret);
 		return ret;
 	}
 
 	ret = ath10k_wait_for_peer_created(ar, vdev_id, addr);
 	if (ret) {
-		ath10k_warn(ar, "failed to wait for created wmi peer %pM on vdev %i: %i\n",
-			    addr, vdev_id, ret);
+		ath10k_warn(ar, "failed to wait for created wmi peer %6D on vdev %i: %i\n",
+			    addr, ":", vdev_id, ret);
 		return ret;
 	}
 
@@ -771,9 +784,7 @@ static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_mac_set_kickout(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -818,9 +829,7 @@ static int ath10k_mac_set_kickout(struct ath10k_vif *arvif)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_mac_set_rts(struct ath10k_vif *arvif, u32 value)
 {
 	struct ath10k *ar = arvif->ar;
@@ -832,9 +841,7 @@ static int ath10k_mac_set_rts(struct ath10k_vif *arvif, u32 value)
 	}
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param, value);
 }
-#endif
 
-#if 1
 static int ath10k_peer_delete(struct ath10k *ar, u32 vdev_id, const u8 *addr)
 {
 	int ret;
@@ -853,9 +860,7 @@ static int ath10k_peer_delete(struct ath10k *ar, u32 vdev_id, const u8 *addr)
 
 	return 0;
 }
-#endif
 
-#if 1
 static void ath10k_peer_cleanup(struct ath10k *ar, u32 vdev_id)
 {
 	struct ath10k_peer *peer, *tmp;
@@ -867,8 +872,8 @@ static void ath10k_peer_cleanup(struct ath10k *ar, u32 vdev_id)
 		if (peer->vdev_id != vdev_id)
 			continue;
 
-		ath10k_warn(ar, "removing stale peer %pM from vdev_id %d\n",
-			    peer->addr, vdev_id);
+		ath10k_warn(ar, "removing stale peer %6D from vdev_id %d\n",
+			    peer->addr, ":", vdev_id);
 
 		TAILQ_REMOVE(&ar->peers, peer, list);
 		free(peer, M_ATHPDEV);
@@ -876,7 +881,6 @@ static void ath10k_peer_cleanup(struct ath10k *ar, u32 vdev_id)
 	}
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
 static void ath10k_peer_cleanup_all(struct ath10k *ar)
 {
@@ -933,7 +937,6 @@ static int ath10k_mac_tdls_peer_update(struct ath10k *ar, u32 vdev_id,
 /* Interface management */
 /************************/
 
-#if 1
 void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -956,9 +959,7 @@ void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif)
 	arvif->beacon = NULL;
 	arvif->beacon_state = ATH10K_BEACON_SCHEDULED;
 }
-#endif
 
-#if 1
 static void ath10k_mac_vif_beacon_cleanup(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -977,9 +978,7 @@ static void ath10k_mac_vif_beacon_cleanup(struct ath10k_vif *arvif)
 	athp_descdma_free(ar, &arvif->beacon_buf);
 #endif
 }
-#endif
 
-#if 1
 static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 {
 	unsigned long time_left;
@@ -989,14 +988,16 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 		return -ESHUTDOWN;
 
+	//time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
+	//    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
+	ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
 	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
-	    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
+	    500);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
 	return 0;
 }
-#endif
 
 /*
  * XXX TODO: implement the vdev start/restart/stop routines, and
@@ -1085,7 +1086,6 @@ vdev_stop:
  *
  * This simplifies bring-up for now.
  */
-#if 1
 static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 {
 	struct ieee80211_channel *channel = NULL;
@@ -1101,18 +1101,21 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 		return (-ENOENT);
 	}
 
-	/* No channel context; use the global one for now */
+	/* XXX TODO No channel context; use the global one for now */
 	channel = ar->sc_ic.ic_curchan;
 
 	arg.vdev_id = vdev_id;
 	arg.channel.freq = channel->ic_freq;
 	arg.channel.band_center_freq1 = channel->ic_freq;
 	arg.channel.mode = chan_to_phymode(channel);
-	arg.channel.chan_radar = 0;	/* XXX TODO: CHAN_RADAR check */
-	arg.channel.min_power = 0;
-	arg.channel.max_power = 30;	/* XXX TODO: power levels */
-	arg.channel.max_reg_power = 30;
-	arg.channel.max_antenna_gain = 0;
+	arg.channel.chan_radar = !! IEEE80211_IS_CHAN_RADAR(channel);
+	arg.channel.passive = IEEE80211_IS_CHAN_PASSIVE(channel);
+
+	arg.channel.min_power = channel->ic_minpower; /* already in 1/2dBm */
+	arg.channel.max_power = channel->ic_maxpower; /* already in 1/2dBm */
+	arg.channel.max_reg_power = channel->ic_maxregpower * 2;
+	arg.channel.max_antenna_gain = channel->ic_maxantgain * 2;
+	arg.channel.reg_class_id = 0;
 
 	ath10k_compl_reinit(&ar->vdev_setup_done);
 
@@ -1125,8 +1128,8 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 
 	ret = ath10k_vdev_setup_sync(ar);
 	if (ret) {
-		ath10k_warn(ar, "failed to synchronize setup for monitor vdev %i start: %d\n",
-			    vdev_id, ret);
+		ath10k_warn(ar, "%s: failed to synchronize setup for monitor vdev %i start: %d\n",
+			    __func__, vdev_id, ret);
 		return ret;
 	}
 
@@ -1151,9 +1154,7 @@ vdev_stop:
 
 	return ret;
 }
-#endif
 
-#if 1
 static int ath10k_monitor_vdev_stop(struct ath10k *ar)
 {
 	int ret = 0;
@@ -1174,16 +1175,14 @@ static int ath10k_monitor_vdev_stop(struct ath10k *ar)
 
 	ret = ath10k_vdev_setup_sync(ar);
 	if (ret)
-		ath10k_warn(ar, "failed to synchronize monitor vdev %i stop: %d\n",
-			    ar->monitor_vdev_id, ret);
+		ath10k_warn(ar, "%s: failed to synchronize monitor vdev %i stop: %d\n",
+			    __func__, ar->monitor_vdev_id, ret);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac monitor vdev %i stopped\n",
 		   ar->monitor_vdev_id);
 	return ret;
 }
-#endif
 
-#if 1
 static int ath10k_monitor_vdev_create(struct ath10k *ar)
 {
 	int bit, ret = 0;
@@ -1214,9 +1213,7 @@ static int ath10k_monitor_vdev_create(struct ath10k *ar)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_monitor_vdev_delete(struct ath10k *ar)
 {
 	int ret = 0;
@@ -1238,9 +1235,7 @@ static int ath10k_monitor_vdev_delete(struct ath10k *ar)
 		   ar->monitor_vdev_id);
 	return ret;
 }
-#endif
 
-#if 1
 static int ath10k_monitor_start(struct ath10k *ar)
 {
 	int ret;
@@ -1267,9 +1262,7 @@ static int ath10k_monitor_start(struct ath10k *ar)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_monitor_stop(struct ath10k *ar)
 {
 	int ret;
@@ -1295,9 +1288,7 @@ static int ath10k_monitor_stop(struct ath10k *ar)
 
 	return 0;
 }
-#endif
 
-#if 1
 static bool ath10k_mac_monitor_vdev_is_needed(struct ath10k *ar)
 {
 #if 0
@@ -1320,9 +1311,7 @@ static bool ath10k_mac_monitor_vdev_is_needed(struct ath10k *ar)
 	return ar->monitor ||
 	       test_bit(ATH10K_CAC_RUNNING, &ar->dev_flags);
 }
-#endif
 
-#if 1
 static bool ath10k_mac_monitor_vdev_is_allowed(struct ath10k *ar)
 {
 #if 0
@@ -1340,9 +1329,7 @@ static bool ath10k_mac_monitor_vdev_is_allowed(struct ath10k *ar)
 
 	return true;
 }
-#endif
 
-#if 1
 static int ath10k_monitor_recalc(struct ath10k *ar)
 {
 	bool needed;
@@ -1381,7 +1368,6 @@ static int ath10k_monitor_recalc(struct ath10k *ar)
 	else
 		return ath10k_monitor_stop(ar);
 }
-#endif
 
 #if 0
 static int ath10k_recalc_rtscts_prot(struct ath10k_vif *arvif)
@@ -1465,7 +1451,6 @@ static bool ath10k_mac_has_radar_enabled(struct ath10k *ar)
 }
 #endif
 
-#if 1
 static void ath10k_recalc_radar_detection(struct ath10k *ar)
 {
 #if 0
@@ -1495,9 +1480,7 @@ static void ath10k_recalc_radar_detection(struct ath10k *ar)
 	ath10k_warn(ar, "%s: TODO\n", __func__);
 #endif
 }
-#endif
 
-#if 1
 int
 ath10k_vdev_stop(struct ath10k_vif *arvif)
 {
@@ -1531,9 +1514,7 @@ ath10k_vdev_stop(struct ath10k_vif *arvif)
 
 	return ret;
 }
-#endif
 
-#if 1
 /*
  * XXX TODO: this has been heavily customised for freebsd!
  */
@@ -1560,10 +1541,10 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	/* XXX TODO: NOTE: need this for vht40/vht80/etc operation */
 	arg.channel.band_center_freq1 = channel->ic_freq;
 	arg.channel.mode = chan_to_phymode(channel);
-	arg.channel.min_power = 0;
-	arg.channel.max_power = 30; //chandef->chan->max_power * 2;
-	arg.channel.max_reg_power = 30; //chandef->chan->max_reg_power * 2;
-	arg.channel.max_antenna_gain = 0; // chandef->chan->max_antenna_gain * 2;
+	arg.channel.min_power = channel->ic_minpower;
+	arg.channel.max_power = channel->ic_maxpower;
+	arg.channel.max_reg_power = channel->ic_maxregpower * 2;
+	arg.channel.max_antenna_gain = channel->ic_maxantgain * 2;
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP) {
 		arg.ssid = arvif->u.ap.ssid;
@@ -1601,33 +1582,30 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	ret = ath10k_vdev_setup_sync(ar);
 	if (ret) {
 		ath10k_warn(ar,
-			    "failed to synchronize setup for vdev %i restart %d: %d\n",
-			    arg.vdev_id, restart, ret);
+			    "%s: failed to synchronize setup for vdev %i restart %d: %d\n",
+			    __func__, arg.vdev_id, restart, ret);
 		return ret;
 	}
+
+	ar->rx_freq = channel->ic_freq;
 
 	ar->num_started_vdevs++;
 	ath10k_recalc_radar_detection(ar);
 
 	return ret;
 }
-#endif
 
-#if 1
 int
 ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
 	return ath10k_vdev_start_restart(arvif, c, false);
 }
-#endif
 
-#if 1
 int
 ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
 	return ath10k_vdev_start_restart(arvif, c, true);
 }
-#endif
 
 #if 0
 static int ath10k_mac_setup_bcn_p2p_ie(struct ath10k_vif *arvif,
@@ -1924,7 +1902,6 @@ static void ath10k_control_ibss(struct ath10k_vif *arvif,
 }
 #endif
 
-#if 1
 static int ath10k_mac_vif_recalc_ps_wake_threshold(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -1949,9 +1926,7 @@ static int ath10k_mac_vif_recalc_ps_wake_threshold(struct ath10k_vif *arvif)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_mac_vif_recalc_ps_poll_count(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -1977,9 +1952,7 @@ static int ath10k_mac_vif_recalc_ps_poll_count(struct ath10k_vif *arvif)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_mac_num_vifs_started(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -1994,9 +1967,7 @@ static int ath10k_mac_num_vifs_started(struct ath10k *ar)
 
 	return num;
 }
-#endif
 
-#if 1
 static int ath10k_mac_vif_setup_ps(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -2070,9 +2041,7 @@ static int ath10k_mac_vif_setup_ps(struct ath10k_vif *arvif)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_mac_vif_disable_keepalive(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -2104,7 +2073,6 @@ static int ath10k_mac_vif_disable_keepalive(struct ath10k_vif *arvif)
 
 	return 0;
 }
-#endif
 
 #if 0
 static void ath10k_mac_vif_ap_csa_count_down(struct ath10k_vif *arvif)
@@ -2170,15 +2138,20 @@ static void ath10k_mac_handle_beacon_iter(void *data, u8 *mac,
 
 	cancel_delayed_work(&arvif->connection_loss_work);
 }
+#endif
 
-void ath10k_mac_handle_beacon(struct ath10k *ar, struct sk_buff *skb)
+void
+ath10k_mac_handle_beacon(struct ath10k *ar, struct athp_buf *pbuf)
 {
+#if 0
 	ieee80211_iterate_active_interfaces_atomic(ar->hw,
 						   IEEE80211_IFACE_ITER_NORMAL,
 						   ath10k_mac_handle_beacon_iter,
 						   skb);
+#endif
 }
 
+#if 0
 static void ath10k_mac_handle_beacon_miss_iter(void *data, u8 *mac,
 					       struct ieee80211_vif *vif)
 {
@@ -2203,15 +2176,21 @@ static void ath10k_mac_handle_beacon_miss_iter(void *data, u8 *mac,
 	ieee80211_queue_delayed_work(hw, &arvif->connection_loss_work,
 				     ATH10K_CONNECTION_LOSS_HZ);
 }
+#endif
 
 void ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
 {
+#if 0
 	ieee80211_iterate_active_interfaces_atomic(ar->hw,
 						   IEEE80211_IFACE_ITER_NORMAL,
 						   ath10k_mac_handle_beacon_miss_iter,
 						   &vdev_id);
+#else
+	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
+#endif
 }
 
+#if 0
 static void ath10k_mac_vif_sta_connection_loss_work(struct work_struct *work)
 {
 	struct ath10k_vif *arvif = container_of(work, struct ath10k_vif,
@@ -2223,13 +2202,14 @@ static void ath10k_mac_vif_sta_connection_loss_work(struct work_struct *work)
 
 	ieee80211_connection_loss(vif);
 }
+#endif
 
 /**********************/
 /* Station management */
 /**********************/
 
 static u32 ath10k_peer_assoc_h_listen_intval(struct ath10k *ar,
-					     struct ieee80211_vif *vif)
+					     struct ieee80211vap *vif)
 {
 	/* Some firmware revisions have unstable STA powersave when listen
 	 * interval is set too high (e.g. 5). The symptoms are firmware doesn't
@@ -2239,119 +2219,197 @@ static u32 ath10k_peer_assoc_h_listen_intval(struct ath10k *ar,
 	 *
 	 * As a workaround set it to 1.
 	 */
-	if (vif->type == NL80211_IFTYPE_STATION)
+	if (vif->iv_opmode == IEEE80211_M_STA)
 		return 1;
 
-	return ar->hw->conf.listen_interval;
+	//return ar->hw->conf.listen_interval;
+	/* XXX TODO: is this correct? */
+	ath10k_warn(ar, "%s: TODO: what should the default listen intval be?\n", __func__);
+	return 1;
 }
 
+/*
+ * Setup basic association paramaters.
+ *
+ * XXX TODO: This uses capinfo, aid which suggests we have already exchanged
+ * association request/response frames before calling this routine.
+ */
 static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
-				      struct ieee80211_vif *vif,
-				      struct ieee80211_sta *sta,
-				      struct wmi_peer_assoc_complete_arg *arg)
+				      struct ieee80211vap *vif,
+				      struct ieee80211_node *ni,
+				      struct wmi_peer_assoc_complete_arg *arg,
+				      int is_run)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	u32 aid;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (vif->type == NL80211_IFTYPE_STATION)
-		aid = vif->bss_conf.aid;
-	else
-		aid = sta->aid;
+	/*
+	 * note: linux used vif->bss_conf.aid in sta mode,
+	 * and sta->aid for anything else.
+	 * For net80211, ni->ni_associd should always be "right".
+	 */
+	aid = IEEE80211_AID(ni->ni_associd);
 
-	ether_addr_copy(arg->addr, sta->addr);
+	ether_addr_copy(arg->addr, ni->ni_macaddr);
 	arg->vdev_id = arvif->vdev_id;
 	arg->peer_aid = aid;
 	arg->peer_flags |= WMI_PEER_AUTH;
 	arg->peer_listen_intval = ath10k_peer_assoc_h_listen_intval(ar, vif);
 	arg->peer_num_spatial_streams = 1;
-	arg->peer_caps = vif->bss_conf.assoc_capability;
+
+	/*
+	 * XXX TODO: is this in host-order, or 802.11 order?
+	 *
+	 * FreeBSD assigns capinfo from the assoc/reassoc response
+	 * by converting it to host endian; I'm unsure about mac80211.
+	 */
+	//arg->peer_caps = vif->bss_conf.assoc_capability;
+	arg->peer_caps = ni->ni_capinfo;
+
+#if 0
+	/* If is_run=0, then clear the privacy capinfo */
+	if (is_run == 0)
+		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
+#endif
+
+	ath10k_warn(ar, "%s: capinfo=0x%08x, peer_caps=0x%08x\n", __func__, ni->ni_capinfo, arg->peer_caps);
 }
 
-static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
-				       struct ieee80211_vif *vif,
-				       struct wmi_peer_assoc_complete_arg *arg)
+/*
+ * Setup crypto state for the given peer.
+ *
+ * I'm currently unsure how this works for non-STA mode.
+ * For STA mode, bss is obviously the BSS we're associating
+ * to.  For hostap, ibss, etc mode, is it "our" BSS ?
+ * I'm guessing so?
+ *
+ * There are two sets of ies:
+ *
+ * + vap->iv_rsn_ie / vap->iv_wpa_ie ; and
+ * + ni->ni_ies.wpa_ie / ni->ni_ies.rsn_ie
+ *
+ * I'm not sure yet which is to use where.
+ */
+static void
+ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
+    struct ieee80211_node *bss, struct wmi_peer_assoc_complete_arg *arg,
+    int is_run)
 {
-	struct ieee80211_bss_conf *info = &vif->bss_conf;
-	struct cfg80211_chan_def def;
-	struct cfg80211_bss *bss;
-	const u8 *rsnie = NULL;
-	const u8 *wpaie = NULL;
+//	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+//	int ret;
+
+	ath10k_warn(ar,
+	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
+	    " ni rsn=%p, wpa=%p; deftxidx=%d\n",
+	    __func__,
+	    is_run,
+	    !! (vap->iv_flags & IEEE80211_F_PRIVACY),
+	    !! (vap->iv_flags & IEEE80211_F_WPA),
+	    !! (vap->iv_flags & IEEE80211_F_WPA2),
+	    vap->iv_rsn_ie,
+	    vap->iv_wpa_ie,
+	    bss->ni_ies.rsn_ie,
+	    bss->ni_ies.wpa_ie,
+	    vap->iv_def_txkey);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
+#if 0
+	/*
+	 * This shouldn't be done here; it needs to be plumbed down
+	 * when net80211 gets told about a new default tx key to use.
+	 *
+	 * And yes, it should only be done when we're doing hardware
+	 * crypto.
+	 */
+	ret = ath10k_wmi_vdev_set_param(arvif->ar,
+					arvif->vdev_id,
+					arvif->ar->wmi.vdev_param->def_keyid,
+					vap->iv_def_txkey & 0xff);
+#endif
+
+	/* Don't plumb in keys until we're in RUN state */
+	if (! is_run)
 		return;
 
-	bss = cfg80211_get_bss(ar->hw->wiphy, def.chan, info->bssid, NULL, 0,
-			       IEEE80211_BSS_TYPE_ANY, IEEE80211_PRIVACY_ANY);
-	if (bss) {
-		const struct cfg80211_bss_ies *ies;
-
-		rcu_read_lock();
-		rsnie = ieee80211_bss_get_ie(bss, WLAN_EID_RSN);
-
-		ies = rcu_dereference(bss->ies);
-
-		wpaie = cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT,
-						WLAN_OUI_TYPE_MICROSOFT_WPA,
-						ies->data,
-						ies->len);
-		rcu_read_unlock();
-		cfg80211_put_bss(ar->hw->wiphy, bss);
-	}
-
 	/* FIXME: base on RSN IE/WPA IE is a correct idea? */
-	if (rsnie || wpaie) {
+	if (bss->ni_ies.rsn_ie || bss->ni_ies.wpa_ie) {
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: rsn ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_PTK_4_WAY;
 	}
 
-	if (wpaie) {
+	if (bss->ni_ies.wpa_ie) {
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
+
 }
 
+/*
+ * This is for legacy rates only.  HT/VHT rates are setup elsewhere.
+ */
 static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
-				      struct ieee80211_vif *vif,
-				      struct ieee80211_sta *sta,
-				      struct wmi_peer_assoc_complete_arg *arg)
+    struct ieee80211vap *vif,
+    struct ieee80211_node *ni,
+    struct wmi_peer_assoc_complete_arg *arg)
 {
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_rate_set_arg *rateset = &arg->peer_legacy_rates;
-	struct cfg80211_chan_def def;
-	const struct ieee80211_supported_band *sband;
-	const struct ieee80211_rate *rates;
-	enum ieee80211_band band;
-	u32 ratemask;
-	u8 rate;
 	int i;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
-		return;
-
-	band = def.chan->band;
-	sband = ar->hw->wiphy->bands[band];
-	ratemask = sta->supp_rates[band];
-	ratemask &= arvif->bitrate_mask.control[band].legacy;
-	rates = sband->bitrates;
+	/*
+	 * Look at the current vap channel.  For now, we just assume
+	 * that all rates are available for the given phy mode;
+	 * later on we should look at what's negotiated.
+	 *
+	 * XXX yes, there's no per-vap channel, sigh.
+	 */
 
 	rateset->num_rates = 0;
 
-	for (i = 0; i < 32; i++, ratemask >>= 1, rates++) {
-		if (!(ratemask & 1))
-			continue;
+	if (IEEE80211_IS_CHAN_B(ic->ic_curchan)) {
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
+	} else if (IEEE80211_IS_CHAN_G(ic->ic_curchan)) {
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
 
-		rate = ath10k_mac_bitrate_to_rate(rates->bitrate);
-		rateset->rates[rateset->num_rates] = rate;
-		rateset->num_rates++;
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
+	} else if (IEEE80211_IS_CHAN_A(ic->ic_curchan)) {
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
+		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
+	} else {
+		ath10k_err(ar, "%s: TODO: channel isn't a, b, g!\n", __func__);
 	}
+
+	/* Debugging */
+#if 1
+	for (i = 0; i < rateset->num_rates; i++) {
+		ath10k_warn(ar, "%s: %d: 0x%.2x (%d)\n", __func__, i, rateset->rates[i], rateset->rates[i]);
+	}
+#endif
 }
 
+#if 0
 static bool
 ath10k_peer_assoc_h_ht_masked(const u8 ht_mcs_mask[IEEE80211_HT_MCS_MASK_LEN])
 {
@@ -2363,7 +2421,9 @@ ath10k_peer_assoc_h_ht_masked(const u8 ht_mcs_mask[IEEE80211_HT_MCS_MASK_LEN])
 
 	return true;
 }
+#endif
 
+#if 0
 static bool
 ath10k_peer_assoc_h_vht_masked(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 {
@@ -2375,7 +2435,9 @@ ath10k_peer_assoc_h_vht_masked(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 
 	return true;
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 				   struct ieee80211_vif *vif,
 				   struct ieee80211_sta *sta,
@@ -2475,12 +2537,15 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		arg->peer_num_spatial_streams = max_nss;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %pM mcs cnt %d nss %d\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
 		   arg->addr,
+		   ":",
 		   arg->peer_ht_rates.num_rates,
 		   arg->peer_num_spatial_streams);
 }
+#endif
 
+#if 0
 static int ath10k_peer_assoc_qos_ap(struct ath10k *ar,
 				    struct ath10k_vif *arvif,
 				    struct ieee80211_sta *sta)
@@ -2547,7 +2612,9 @@ static int ath10k_peer_assoc_qos_ap(struct ath10k *ar,
 
 	return 0;
 }
+#endif
 
+#if 0
 static u16
 ath10k_peer_assoc_h_vht_limit(u16 tx_mcs_set,
 			      const u16 vht_mcs_limit[NL80211_VHT_NSS_MAX])
@@ -2598,7 +2665,9 @@ ath10k_peer_assoc_h_vht_limit(u16 tx_mcs_set,
 
 	return tx_mcs_set;
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_sta *sta,
@@ -2654,15 +2723,16 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	arg->peer_vht_rates.tx_mcs_set = ath10k_peer_assoc_h_vht_limit(
 		__le16_to_cpu(vht_cap->vht_mcs.tx_mcs_map), vht_mcs_mask);
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %pM max_mpdu %d flags 0x%x\n",
-		   sta->addr, arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D max_mpdu %d flags 0x%x\n",
+		   sta->addr, ":", arg->peer_max_mpdu, arg->peer_flags);
 }
+#endif
 
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
-				    struct ieee80211_vif *vif,
-				    struct ieee80211_sta *sta,
-				    struct wmi_peer_assoc_complete_arg *arg)
+    struct ieee80211vap *vif, struct ieee80211_node *ni,
+    struct wmi_peer_assoc_complete_arg *arg)
 {
+#if 0
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 
 	switch (arvif->vdev_type) {
@@ -2686,17 +2756,23 @@ static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
 	default:
 		break;
 	}
-
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %pM qos %d\n",
-		   sta->addr, !!(arg->peer_flags & WMI_PEER_QOS));
+#else
+	if (ni->ni_flags & IEEE80211_NODE_QOS)
+		arg->peer_flags |= WMI_PEER_QOS;
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %6D qos %d\n",
+		   ni->ni_macaddr, ":", !!(arg->peer_flags & WMI_PEER_QOS));
+#endif
 }
 
+#if 0
 static bool ath10k_mac_sta_has_ofdm_only(struct ieee80211_sta *sta)
 {
 	return sta->supp_rates[IEEE80211_BAND_2GHZ] >>
 	       ATH10K_MAC_FIRST_OFDM_RATE_IDX;
 }
+#endif
 
+#if 0
 static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 					struct ieee80211_vif *vif,
 					struct ieee80211_sta *sta,
@@ -2770,47 +2846,84 @@ static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 	arg->peer_phymode = phymode;
 	WARN_ON(phymode == MODE_UNKNOWN);
 }
+#endif
+
+/*
+ * Configure the phymode for this node.
+ *
+ * This is very 11abg specific and doesn't at all handle 11n/11ac.
+ * It isn't too hard though - look at the non-freebsd version
+ * when the time comes.
+ */
+static void
+ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
+    struct ieee80211vap *vif,
+    struct ieee80211_node *ni,
+    struct wmi_peer_assoc_complete_arg *arg)
+{
+	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211_channel *c = ic->ic_curchan;
+	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	enum wmi_phy_mode phymode = MODE_UNKNOWN;
+
+	/* Just handle b, g, a for now */
+	if (IEEE80211_IS_CHAN_B(c)) {
+		phymode = MODE_11B;
+	} else if (IEEE80211_IS_CHAN_G(c)) {
+		phymode = MODE_11B;	/* ofdm-only is MODE_11G? */
+	} else if (IEEE80211_IS_CHAN_A(c)) {
+		phymode = MODE_11A;
+	} else {
+		ath10k_err(ar, "%s: TODO: unhandled channel type!\n", __func__);
+	}
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %6D phymode %s\n",
+	    ni->ni_macaddr, ":", ath10k_wmi_phymode_str(phymode));
+
+	arg->peer_phymode = phymode;
+	WARN_ON(phymode == MODE_UNKNOWN);
+}
 
 static int ath10k_peer_assoc_prepare(struct ath10k *ar,
-				     struct ieee80211_vif *vif,
-				     struct ieee80211_sta *sta,
-				     struct wmi_peer_assoc_complete_arg *arg)
+				     struct ieee80211vap *vif,
+				     struct ieee80211_node *ni,
+				     struct wmi_peer_assoc_complete_arg *arg,
+				     int is_run)
 {
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 	memset(arg, 0, sizeof(*arg));
 
-	ath10k_peer_assoc_h_basic(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_crypto(ar, vif, arg);
-	ath10k_peer_assoc_h_rates(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_ht(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_vht(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_qos(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_phymode(ar, vif, sta, arg);
-
+	ath10k_peer_assoc_h_basic(ar, vif, ni, arg, is_run);
+	ath10k_peer_assoc_h_crypto(ar, vif, ni, arg, is_run);
+	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
+	//ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
+	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
+	ath10k_warn(ar, "%s: TODO: finish crypto, ht, vht!\n", __func__);
 	return 0;
 }
 
-static const u32 ath10k_smps_map[] = {
-	[WLAN_HT_CAP_SM_PS_STATIC] = WMI_PEER_SMPS_STATIC,
-	[WLAN_HT_CAP_SM_PS_DYNAMIC] = WMI_PEER_SMPS_DYNAMIC,
-	[WLAN_HT_CAP_SM_PS_INVALID] = WMI_PEER_SMPS_PS_NONE,
-	[WLAN_HT_CAP_SM_PS_DISABLED] = WMI_PEER_SMPS_PS_NONE,
+static const uint32_t ath10k_smps_map[] = {
+	[0] = WMI_PEER_SMPS_STATIC,
+	[1] = WMI_PEER_SMPS_DYNAMIC,
+	[2] = WMI_PEER_SMPS_PS_NONE,
+	[3] = WMI_PEER_SMPS_PS_NONE,
 };
 
 static int ath10k_setup_peer_smps(struct ath10k *ar, struct ath10k_vif *arvif,
-				  const u8 *addr,
-				  const struct ieee80211_sta_ht_cap *ht_cap)
+    const u8 *addr, struct ieee80211_node *ni)
 {
 	int smps;
 
-	if (!ht_cap->ht_supported)
+	if (!ni->ni_flags & IEEE80211_NODE_HT)
 		return 0;
 
-	smps = ht_cap->cap & IEEE80211_HT_CAP_SM_PS;
-	smps >>= IEEE80211_HT_CAP_SM_PS_SHIFT;
+	smps = ni->ni_htcap & IEEE80211_HTCAP_SMPS;
+	smps >>= 2; //IEEE80211_HT_CAP_SM_PS_SHIFT;
 
-	if (smps >= ARRAY_SIZE(ath10k_smps_map))
+	if (smps >= nitems(ath10k_smps_map))
 		return -EINVAL;
 
 	return ath10k_wmi_peer_set_param(ar, arvif->vdev_id, addr,
@@ -2818,6 +2931,7 @@ static int ath10k_setup_peer_smps(struct ath10k *ar, struct ath10k_vif *arvif,
 					 ath10k_smps_map[smps]);
 }
 
+#if 0
 static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 				      struct ieee80211_vif *vif,
 				      struct ieee80211_sta_vht_cap vht_cap)
@@ -2882,81 +2996,83 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 
 	return 0;
 }
+#endif
 
+/*
+ * XXX adrian - I /think/ this is the "join a BSS" as a station
+ * method.
+ */
 /* can be called only in mac80211 callbacks due to `key_count` usage */
-static void ath10k_bss_assoc(struct ieee80211_hw *hw,
-			     struct ieee80211_vif *vif,
-			     struct ieee80211_bss_conf *bss_conf)
+void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 {
-	struct ath10k *ar = hw->priv;
+	struct ieee80211vap *vif = ni->ni_vap;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct ieee80211_sta_ht_cap ht_cap;
-	struct ieee80211_sta_vht_cap vht_cap;
+//	struct ieee80211_sta_ht_cap ht_cap;
+//	struct ieee80211_sta_vht_cap vht_cap;
 	struct wmi_peer_assoc_complete_arg peer_arg;
-	struct ieee80211_sta *ap_sta;
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %pM aid %d\n",
-		   arvif->vdev_id, arvif->bssid, arvif->aid);
+	/*
+	 * net80211: assume the caller has passed ni vap->iv_bss as the
+	 * node; and has also ref'ed it for us.
+	 */
 
-	rcu_read_lock();
+	/* XXX ADRIAN: TODO: do this early; or arvif->bssid is 00:00:00:00:00:00 */
+	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
-	ap_sta = ieee80211_find_sta(vif, bss_conf->bssid);
-	if (!ap_sta) {
-		ath10k_warn(ar, "failed to find station entry for bss %pM vdev %i\n",
-			    bss_conf->bssid, arvif->vdev_id);
-		rcu_read_unlock();
-		return;
-	}
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %6D aid %d\n",
+		   arvif->vdev_id, arvif->bssid, ":", arvif->aid);
 
 	/* ap_sta must be accessed only within rcu section which must be left
 	 * before calling ath10k_setup_peer_smps() which might sleep. */
-	ht_cap = ap_sta->ht_cap;
-	vht_cap = ap_sta->vht_cap;
+//	htcap = ap_sta->ht_cap;
+//	vht_cap = ap_sta->vht_cap;
 
-	ret = ath10k_peer_assoc_prepare(ar, vif, ap_sta, &peer_arg);
+	ret = ath10k_peer_assoc_prepare(ar, vif, ni, &peer_arg, is_run);
 	if (ret) {
-		ath10k_warn(ar, "failed to prepare peer assoc for %pM vdev %i: %d\n",
-			    bss_conf->bssid, arvif->vdev_id, ret);
-		rcu_read_unlock();
+		ath10k_warn(ar, "failed to prepare peer assoc for %6D vdev %i: %d\n",
+			    ni->ni_macaddr, ":", arvif->vdev_id, ret);
 		return;
 	}
-
-	rcu_read_unlock();
 
 	ret = ath10k_wmi_peer_assoc(ar, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to run peer assoc for %pM vdev %i: %d\n",
-			    bss_conf->bssid, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to run peer assoc for %6D vdev %i: %d\n",
+			    ni->ni_macaddr, ":", arvif->vdev_id, ret);
 		return;
 	}
 
-	ret = ath10k_setup_peer_smps(ar, arvif, bss_conf->bssid, &ht_cap);
+	ret = ath10k_setup_peer_smps(ar, arvif, ni->ni_macaddr, ni);
 	if (ret) {
 		ath10k_warn(ar, "failed to setup peer SMPS for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
 
+#if 0
 	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
 	if (ret) {
-		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %pM: %d\n",
-			    arvif->vdev_id, bss_conf->bssid, ret);
+		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %6D: %d\n",
+			    arvif->vdev_id, bss_conf->bssid, ":", ret);
 		return;
 	}
+#else
+	ath10k_warn(ar, "%s: TODO: vhtcap\n", __func__);
+#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
-		   "mac vdev %d up (associated) bssid %pM aid %d\n",
-		   arvif->vdev_id, bss_conf->bssid, bss_conf->aid);
+		   "mac vdev %d up (associated) bssid %6D aid %d\n",
+		   arvif->vdev_id, ni->ni_macaddr, ":", ni->ni_associd);
 
 	WARN_ON(arvif->is_up);
 
-	arvif->aid = bss_conf->aid;
-	ether_addr_copy(arvif->bssid, bss_conf->bssid);
+	arvif->aid = IEEE80211_AID(ni->ni_associd);
+	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
-	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, arvif->aid, arvif->bssid);
+	/* Note: if we haven't restarted the vdev before here; this causes a firmware panic */
+	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, ni->ni_associd, arvif->bssid);
 	if (ret) {
 		ath10k_warn(ar, "failed to set vdev %d up: %d\n",
 			    arvif->vdev_id, ret);
@@ -2972,24 +3088,25 @@ static void ath10k_bss_assoc(struct ieee80211_hw *hw,
 	ret = ath10k_wmi_peer_set_param(ar, arvif->vdev_id, arvif->bssid,
 					WMI_PEER_DUMMY_VAR, 1);
 	if (ret) {
-		ath10k_warn(ar, "failed to poke peer %pM param for ps workaround on vdev %i: %d\n",
-			    arvif->bssid, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to poke peer %6D param for ps workaround on vdev %i: %d\n",
+			    arvif->bssid, ":", arvif->vdev_id, ret);
 		return;
 	}
 }
 
-static void ath10k_bss_disassoc(struct ieee80211_hw *hw,
-				struct ieee80211_vif *vif)
+/*
+ * XXX adrian: I think this is the "disconnect from a BSS" STA method.
+ */
+void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct ieee80211_sta_vht_cap vht_cap = {};
+//	struct ieee80211_sta_vht_cap vht_cap = {};
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i disassoc bssid %pM\n",
-		   arvif->vdev_id, arvif->bssid);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i disassoc bssid %6D\n",
+		   arvif->vdev_id, arvif->bssid ,":");
 
 	ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
 	if (ret)
@@ -2998,18 +3115,30 @@ static void ath10k_bss_disassoc(struct ieee80211_hw *hw,
 
 	arvif->def_wep_key_idx = -1;
 
+#if 0
 	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc txbf for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
-
+#else
+	ath10k_warn(ar, "%s: TODO: txbf/vht_cap\n", __func__);
+#endif
 	arvif->is_up = false;
 
+#if 0
 	cancel_delayed_work_sync(&arvif->connection_loss_work);
+#else
+	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
+#endif
 }
 
+/*
+ * XXX adrian: I think this is the hostap side "add a new node"
+ * method.
+ */
+#if 0
 static int ath10k_station_assoc(struct ath10k *ar,
 				struct ieee80211_vif *vif,
 				struct ieee80211_sta *sta,
@@ -3078,6 +3207,9 @@ static int ath10k_station_assoc(struct ath10k *ar,
 	return ret;
 }
 
+/*
+ * XXX adrian I think this is the "delete a station from hostap" method.
+ */
 static int ath10k_station_disassoc(struct ath10k *ar,
 				   struct ieee80211_vif *vif,
 				   struct ieee80211_sta *sta)
@@ -3209,17 +3341,16 @@ static int ath10k_update_channel_list(struct ath10k *ar)
 }
 #endif
 
-#if 1
-
 /*
- * Note: this is a very mac80211 specific routine;
- * let's copy/paste it into a BSD specific one to make
- * future merging and re-implementation easier.
+ * Note: this is the FreeBSD specific implementation of
+ * the channel list function.
  */
-static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
+int
+ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
+    struct ieee80211_channel *chans)
 {
 	uint8_t reported[IEEE80211_CHAN_BYTES];
-	struct ieee80211com *ic = &ar->sc_ic;
+//	struct ieee80211com *ic = &ar->sc_ic;
 	struct ieee80211_channel *c;
 	struct wmi_scan_chan_list_arg arg = {0};
 	struct wmi_channel_arg *ch;
@@ -3233,15 +3364,18 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 	 * First, loop over the channel list, remove duplicates.
 	 */
 	nchan = 0;
-	for (i = 0; i < ic->ic_nchans; i++) {
-		c = &ic->ic_channels[i];
+	for (i = 0; i < nchans; i++) {
+		c = &chans[i];
 		if (isset(reported, c->ic_ieee))
 			continue;
-		printf("%s: adding channel %d (%d)\n", __func__, c->ic_ieee, c->ic_freq);
+		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
+		    "%s: adding channel %d (%d)\n",
+		    __func__, c->ic_ieee, c->ic_freq);
 		setbit(reported, c->ic_ieee);
 		nchan++;
 	}
-	printf("%s: nchan=%d\n", __func__, nchan);
+	ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
+	    "%s: nchan=%d\n", __func__, nchan);
 
 	arg.n_channels = nchan;
 	len = sizeof(struct wmi_channel_arg) * arg.n_channels;
@@ -3252,31 +3386,35 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 	memset(reported, 0, IEEE80211_CHAN_BYTES);
 
 	ch = arg.channels;
-	for (i = 0, j = 0; i < ic->ic_nchans && j < nchan; i++) {
-		c = &ic->ic_channels[i];
+	for (i = 0, j = 0; i < nchans && j < nchan; i++) {
+		c = &chans[i];
 		if (isset(reported, c->ic_ieee))
 			continue;
 		setbit(reported, c->ic_ieee);
 
+		/*
+		 * XXX TODO: we can't allow ht/vht on JP channel 14
+		 * XXX TODO: need to figure out ht40plus flag -
+		 * unfortunately our method for iterating through
+		 * channels makes it hard to determine if we can
+		 * or can't do HT40 (or HT40+? Not sure!) here.
+		 * So, worry about HT40 later on.
+		 */
+
 		ch->allow_ht = true;
 		ch->allow_vht = true;
-		ch->allow_ibss = 1;
-		ch->ht40plus = 0;
-		ch->chan_radar = 0;
-		ch->passive = 0;
+		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
+		ch->ht40plus = true;
+		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
+		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
 		ch->freq = c->ic_freq;
 		ch->band_center_freq1 = c->ic_freq;
-		ch->min_power = 0;
-#if 0
-		ch->max_power = c->ic_maxpower * 2;	/* XXX is this right? */
-		ch->max_reg_power = c->ic_maxregpower;	/* XXX is this right? */
-#else
-		/* XXX the maxpower values are 0; need to fetch from ic if that's the case? */
-		ch->max_power = 30;
-		ch->max_reg_power = 30;
-#endif
-		ch->max_antenna_gain = 0;	/* XXX */
+		/* XXX center freq2 */
+		ch->min_power = c->ic_minpower; /* already in 1/2dBm */
+		ch->max_power = c->ic_maxpower; /* already in 1/2dBm */
+		ch->max_reg_power = c->ic_maxregpower * 2;
+		ch->max_antenna_gain = c->ic_maxantgain * 2;
 		ch->reg_class_id = 0;
 		if (IEEE80211_IS_CHAN_2GHZ(c))
 			ch->mode = MODE_11G;
@@ -3284,11 +3422,12 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 			ch->mode = MODE_11A;
 		else
 			continue;
-		ath10k_dbg(ar, ATH10K_DBG_WMI,
-			   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d antenna %d mode %d\n",
-			    __func__, j, arg.n_channels,
-			   ch->freq, ch->max_power, ch->max_reg_power,
-			   ch->max_antenna_gain, ch->mode);
+		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
+		   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d"
+		   " antenna %d mode %d\n",
+		    __func__, j, arg.n_channels,
+		   ch->freq, ch->max_power, ch->max_reg_power,
+		   ch->max_antenna_gain, ch->mode);
 
 		ch++; j++;
 	}
@@ -3298,7 +3437,6 @@ static int ath10k_update_channel_list_freebsd(struct ath10k *ar)
 
 	return ret;
 }
-#endif
 
 #if 0
 static enum wmi_dfs_region
@@ -3318,8 +3456,13 @@ ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
 }
 #endif
 
-#if 1
-static void ath10k_regd_update(struct ath10k *ar)
+/*
+ * XXX TODO: strictly speaking, this is the full "regdomain
+ * channel change" routine to call from net80211.
+ */
+void
+ath10k_regd_update(struct ath10k *ar, int nchans,
+    struct ieee80211_channel *chans)
 {
 #if 0
 	struct reg_dmn_pair_mapping *regpair;
@@ -3332,7 +3475,8 @@ static void ath10k_regd_update(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ret = ath10k_update_channel_list_freebsd(ar);
+	ret = ath10k_update_channel_list_freebsd(ar, nchans, chans);
+
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
 
@@ -3368,7 +3512,6 @@ static void ath10k_regd_update(struct ath10k *ar)
 	if (ret)
 		ath10k_warn(ar, "failed to set pdev regdomain: %d\n", ret);
 }
-#endif
 
 #if 0
 static void ath10k_reg_notifier(struct wiphy *wiphy,
@@ -3525,22 +3668,31 @@ void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 						   &arg);
 	spin_unlock_bh(&ar->htt.tx_lock);
 }
+#endif
 
-static u8 ath10k_tx_h_get_tid(struct ieee80211_hdr *hdr)
+/*
+ * Get the TID for the given frame, or the fall-back TID.
+ * For 802.3 and native wifi (microsoft) frames, there's nowhere
+ * to put the TID - so we need to insert it into the descriptor.
+ */
+static u8 ath10k_tx_h_get_tid(struct ieee80211_frame *hdr)
 {
-	if (ieee80211_is_mgmt(hdr->frame_control))
+	if (ieee80211_is_mgmt(hdr))
 		return HTT_DATA_TX_EXT_TID_MGMT;
 
-	if (!ieee80211_is_data_qos(hdr->frame_control))
+	if (!ieee80211_is_data_qos(hdr))
 		return HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
-	if (!is_unicast_ether_addr(ieee80211_get_DA(hdr)))
+	//if (!is_unicast_ether_addr(ieee80211_get_DA(hdr)))
+	if (IEEE80211_IS_MULTICAST(ieee80211_get_DA(hdr)))
 		return HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
-	return ieee80211_get_qos_ctl(hdr)[0] & IEEE80211_QOS_CTL_TID_MASK;
+	/* Fetch the TID from the header itself */
+	//return ieee80211_get_qos_ctl(hdr)[0] & IEEE80211_QOS_CTL_TID_MASK;
+	return ieee80211_gettid(hdr);
 }
 
-static u8 ath10k_tx_h_get_vdev_id(struct ath10k *ar, struct ieee80211_vif *vif)
+static u8 ath10k_tx_h_get_vdev_id(struct ath10k *ar, struct ieee80211vap *vif)
 {
 	if (vif)
 		return ath10k_vif_to_arvif(vif)->vdev_id;
@@ -3553,16 +3705,18 @@ static u8 ath10k_tx_h_get_vdev_id(struct ath10k *ar, struct ieee80211_vif *vif)
 }
 
 static enum ath10k_hw_txrx_mode
-ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
-		       struct ieee80211_sta *sta, struct sk_buff *skb)
+ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211vap *vif,
+		       struct ieee80211_node *ni, struct athp_buf *skb)
 {
-	const struct ieee80211_hdr *hdr = (void *)skb->data;
-	__le16 fc = hdr->frame_control;
+	struct ieee80211_frame *hdr;
+	//__le16 fc = hdr->frame_control;
 
-	if (!vif || vif->type == NL80211_IFTYPE_MONITOR)
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+
+	if (!vif || vif->iv_opmode == IEEE80211_M_MONITOR)
 		return ATH10K_HW_TXRX_RAW;
 
-	if (ieee80211_is_mgmt(fc))
+	if (ieee80211_is_mgmt(hdr))
 		return ATH10K_HW_TXRX_MGMT;
 
 	/* Workaround:
@@ -3582,7 +3736,7 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
 	 * mode though because AP don't sleep.
 	 */
 	if (ar->htt.target_version_major < 3 &&
-	    (ieee80211_is_nullfunc(fc) || ieee80211_is_qos_nullfunc(fc)) &&
+	    (ieee80211_is_nullfunc(hdr) || ieee80211_is_qos_nullfunc(hdr)) &&
 	    !test_bit(ATH10K_FW_FEATURE_HAS_WMI_MGMT_TX, ar->fw_features))
 		return ATH10K_HW_TXRX_MGMT;
 
@@ -3594,8 +3748,10 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
 	 *
 	 * FIXME: Check if raw mode works with TDLS.
 	 */
-	if (ieee80211_is_data_present(fc) && sta && sta->tdls)
+#if 0
+	if (ieee80211_is_data_present(hdr) && sta && sta->tdls)
 		return ATH10K_HW_TXRX_ETHERNET;
+#endif
 
 	if (test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags))
 		return ATH10K_HW_TXRX_RAW;
@@ -3603,13 +3759,21 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211_vif *vif,
 	return ATH10K_HW_TXRX_NATIVE_WIFI;
 }
 
-static bool ath10k_tx_h_use_hwcrypto(struct ieee80211_vif *vif,
-				     struct sk_buff *skb) {
+/*
+ * XXX TODO: FreeBSD currently doesn't have per-TX frame flags
+ * that describe things like "we injected it", "don't encrypt", etc.
+ * So stub that out until we grow it.
+ */
+static bool
+ath10k_tx_h_use_hwcrypto(struct ieee80211vap *vif, struct athp_buf *pbuf)
+{
+#if 0
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	const u32 mask = IEEE80211_TX_INTFL_DONT_ENCRYPT |
 			 IEEE80211_TX_CTL_INJECTED;
 	if ((info->flags & mask) == mask)
 		return false;
+#endif
 	if (vif)
 		return !ath10k_vif_to_arvif(vif)->nohwcrypt;
 	return true;
@@ -3617,35 +3781,54 @@ static bool ath10k_tx_h_use_hwcrypto(struct ieee80211_vif *vif,
 
 /* HTT Tx uses Native Wifi tx mode which expects 802.11 frames without QoS
  * Control in the header.
+ *
+ * Note: "native wifi" mode is Microsoft 802.11 TX mode - frames without
+ * a QoS control in the header.  So, QoS specific things (eg TID) is
+ * supplied in TX descriptor fields.
  */
-static void ath10k_tx_h_nwifi(struct ieee80211_hw *hw, struct sk_buff *skb)
+static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 {
-	struct ieee80211_hdr *hdr = (void *)skb->data;
+	struct ieee80211_frame *hdr;
 	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(skb);
 	u8 *qos_ctl;
 
-	if (!ieee80211_is_data_qos(hdr->frame_control))
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+
+	if (! IEEE80211_IS_QOSDATA(hdr))
 		return;
 
+	/*
+	 * Move the data over the QoS header, effectively removing them.
+	 */
 	qos_ctl = ieee80211_get_qos_ctl(hdr);
-	memmove(skb->data + IEEE80211_QOS_CTL_LEN,
-		skb->data, (void *)qos_ctl - (void *)skb->data);
-	skb_pull(skb, IEEE80211_QOS_CTL_LEN);
+	memmove(mbuf_skb_data(skb->m) + IEEE80211_QOS_CTL_LEN,
+		mbuf_skb_data(skb->m), (char *)qos_ctl - (char *)mbuf_skb_data(skb->m));
+	mbuf_skb_pull(skb->m, IEEE80211_QOS_CTL_LEN);
 
 	/* Some firmware revisions don't handle sending QoS NullFunc well.
 	 * These frames are mainly used for CQM purposes so it doesn't really
 	 * matter whether QoS NullFunc or NullFunc are sent.
 	 */
-	hdr = (void *)skb->data;
-	if (ieee80211_is_qos_nullfunc(hdr->frame_control))
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+	if (ieee80211_is_qos_nullfunc(hdr))
 		cb->htt.tid = HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
-	hdr->frame_control &= ~__cpu_to_le16(IEEE80211_STYPE_QOS_DATA);
+	/* Strip the subtype from the field */
+	hdr->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
 }
 
-static void ath10k_tx_h_8023(struct sk_buff *skb)
+/*
+ * 802.3 offload uses .. well, 802.3.  It's designed for simple pass-through
+ * bridging/routine style applications where the network stack already has
+ * frames in 802.3 format.
+ *
+ * For now we aren't going to use it, until we absolutely have to do it
+ * for bringup.
+ */
+static void ath10k_tx_h_8023(struct athp_buf *skb)
 {
-	struct ieee80211_hdr *hdr;
+#if 0
+	struct ieee80211_frame *hdr;
 	struct rfc1042_hdr *rfc1042;
 	struct ethhdr *eth;
 	size_t hdrlen;
@@ -3668,12 +3851,19 @@ static void ath10k_tx_h_8023(struct sk_buff *skb)
 	ether_addr_copy(eth->h_dest, da);
 	ether_addr_copy(eth->h_source, sa);
 	eth->h_proto = type;
+#else
+	printf("%s: TODO: implement!\n", __func__);
+#endif
 }
 
+/*
+ * For now - we don't really do p2p in FreeBSD...
+ */
 static void ath10k_tx_h_add_p2p_noa_ie(struct ath10k *ar,
-				       struct ieee80211_vif *vif,
-				       struct sk_buff *skb)
+				       struct ieee80211vap *vif,
+				       struct athp_buf *skb)
 {
+#if 0
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 
@@ -3692,8 +3882,12 @@ static void ath10k_tx_h_add_p2p_noa_ie(struct ath10k *ar,
 				       arvif->u.ap.noa_len);
 		spin_unlock_bh(&ar->data_lock);
 	}
+#else
+	return;
+#endif
 }
 
+#if 0
 static bool ath10k_mac_need_offchan_tx_work(struct ath10k *ar)
 {
 	/* FIXME: Not really sure since when the behaviour changed. At some
@@ -3727,8 +3921,10 @@ unlock:
 
 	return ret;
 }
+#endif
 
-static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
+static void
+ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(skb);
 	struct ath10k_htt *htt = &ar->htt;
@@ -3742,9 +3938,15 @@ static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
 		break;
 	case ATH10K_HW_TXRX_MGMT:
 		if (test_bit(ATH10K_FW_FEATURE_HAS_WMI_MGMT_TX,
-			     ar->fw_features))
+			     ar->fw_features)) {
+#if 0
 			ret = ath10k_mac_tx_wmi_mgmt(ar, skb);
-		else if (ar->htt.target_version_major >= 3)
+#else
+			ath10k_warn(ar, "%s: TODO: implement mac_tx_wmi_mgmt!\n", __func__);
+			ret = -EINVAL;
+			break;
+#endif
+		} else if (ar->htt.target_version_major >= 3)
 			ret = ath10k_htt_tx(htt, skb);
 		else
 			ret = ath10k_htt_mgmt_tx(htt, skb);
@@ -3754,12 +3956,10 @@ static void ath10k_mac_tx(struct ath10k *ar, struct sk_buff *skb)
 	if (ret) {
 		ath10k_warn(ar, "failed to transmit packet, dropping: %d\n",
 			    ret);
-		ieee80211_free_txskb(ar->hw, skb);
+		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
 }
-#endif
 
-#if 1
 void ath10k_offchan_tx_purge(struct ath10k *ar)
 {
 #if 0
@@ -3776,7 +3976,6 @@ void ath10k_offchan_tx_purge(struct ath10k *ar)
 	ath10k_warn(ar, "%s: TODO\n", __func__);
 #endif
 }
-#endif
 
 #if 0
 void ath10k_offchan_tx_work(struct work_struct *work)
@@ -3853,9 +4052,11 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 		ATHP_CONF_UNLOCK(ar);
 	}
 }
+#endif
 
-void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
+static void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 {
+#if 0
 	struct sk_buff *skb;
 
 	for (;;) {
@@ -3865,10 +4066,15 @@ void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 
 		ieee80211_free_txskb(ar->hw, skb);
 	}
+#else
+	printf("%s: TODO\n", __func__);
+#endif
 }
 
+#if 0
 void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 {
+#if 0
 	struct ath10k *ar = container_of(work, struct ath10k, wmi_mgmt_tx_work);
 	struct sk_buff *skb;
 	int ret;
@@ -3885,6 +4091,9 @@ void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 			ieee80211_free_txskb(ar->hw, skb);
 		}
 	}
+#else
+	printf("%s: TODO\n", __func__);
+#endif
 }
 #endif
 
@@ -3916,7 +4125,7 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		/* fall through */
 	case ATH10K_SCAN_STARTING:
 		ar->scan.state = ATH10K_SCAN_IDLE;
-		ar->scan_channel = NULL;
+		ar->scan_freq = 0;
 		ath10k_offchan_tx_purge(ar);
 		callout_drain(&ar->scan.timeout);
 		ath10k_compl_wakeup_all(&ar->scan.completed);
@@ -4057,34 +4266,52 @@ static int ath10k_start_scan(struct ath10k *ar,
 /* mac80211 callbacks */
 /**********************/
 
-#if 0
-static void ath10k_tx(struct ieee80211_hw *hw,
-		      struct ieee80211_tx_control *control,
-		      struct sk_buff *skb)
+/*
+ * Send raw and normal data path frames.
+ *
+ * This routine always consumes buffers for now.  Keep this in mind
+ * when linking it into net80211 - raw_xmit fres the mbuf but not
+ * the reference? and transmit doesn't free buffer/reference if it
+ * fails.  So, it's likely best to make both paths just always succeed
+ * for now.
+ */
+void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *skb)
 {
-	struct ath10k *ar = hw->priv;
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct ieee80211_vif *vif = info->control.vif;
-	struct ieee80211_sta *sta = control->sta;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
-	__le16 fc = hdr->frame_control;
+//	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211vap *vif = ni->ni_vap;
+//	struct ieee80211_sta *sta = control->sta;
+	struct ieee80211_frame *hdr;
+//	__le16 fc = hdr->frame_control;
 
+	hdr = mtod(skb->m, struct ieee80211_frame *);
+
+#if 0
 	/* We should disable CCK RATE due to P2P */
 	if (info->flags & IEEE80211_TX_CTL_NO_CCK_RATE)
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "IEEE80211_TX_CTL_NO_CCK_RATE\n");
+#endif
 
 	ATH10K_SKB_CB(skb)->htt.is_offchan = false;
 	ATH10K_SKB_CB(skb)->htt.freq = 0;
 	ATH10K_SKB_CB(skb)->htt.tid = ath10k_tx_h_get_tid(hdr);
 	ATH10K_SKB_CB(skb)->htt.nohwcrypt = !ath10k_tx_h_use_hwcrypto(vif, skb);
 	ATH10K_SKB_CB(skb)->vdev_id = ath10k_tx_h_get_vdev_id(ar, vif);
-	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, sta, skb);
-	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(fc);
+	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ni, skb);
+	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(hdr);
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: tid=%d, nohwcrypt=%d, vdev=%d, txmode=%d, is_protected=%d\n",
+	    __func__,
+	    ATH10K_SKB_CB(skb)->htt.tid,
+	    ATH10K_SKB_CB(skb)->htt.nohwcrypt,
+	    ATH10K_SKB_CB(skb)->vdev_id,
+	    ATH10K_SKB_CB(skb)->txmode,
+	    ATH10K_SKB_CB(skb)->is_protected);
 
 	switch (ATH10K_SKB_CB(skb)->txmode) {
 	case ATH10K_HW_TXRX_MGMT:
 	case ATH10K_HW_TXRX_NATIVE_WIFI:
-		ath10k_tx_h_nwifi(hw, skb);
+		ath10k_tx_h_nwifi(ar, skb);
 		ath10k_tx_h_add_p2p_noa_ie(ar, vif, skb);
 		ath10k_tx_h_seq_no(vif, skb);
 		break;
@@ -4094,11 +4321,12 @@ static void ath10k_tx(struct ieee80211_hw *hw,
 	case ATH10K_HW_TXRX_RAW:
 		if (!test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
 			WARN_ON_ONCE(1);
-			ieee80211_free_txskb(hw, skb);
+			ath10k_tx_free_pbuf(ar, skb, 0);
 			return;
 		}
 	}
 
+#if 0
 	if (info->flags & IEEE80211_TX_CTL_TX_OFFCHAN) {
 		spin_lock_bh(&ar->data_lock);
 		ATH10K_SKB_CB(skb)->htt.freq = ar->scan.roc_freq;
@@ -4117,6 +4345,7 @@ static void ath10k_tx(struct ieee80211_hw *hw,
 			return;
 		}
 	}
+#endif
 
 	ath10k_mac_tx(ar, skb);
 }
@@ -4124,18 +4353,22 @@ static void ath10k_tx(struct ieee80211_hw *hw,
 /* Must not be called with conf_mutex held as workers can use that also. */
 void ath10k_drain_tx(struct ath10k *ar)
 {
+#if 0
 	/* make sure rcu-protected mac80211 tx path itself is drained */
 	synchronize_net();
+#endif
 
 	ath10k_offchan_tx_purge(ar);
 	ath10k_mgmt_over_wmi_tx_purge(ar);
 
+#if 0
 	cancel_work_sync(&ar->offchan_tx_work);
 	cancel_work_sync(&ar->wmi_mgmt_tx_work);
-}
+#else
+	printf("%s: TODO: cancel work!\n", __func__);
 #endif
+}
 
-#if 1
 void ath10k_halt(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -4163,7 +4396,6 @@ void ath10k_halt(struct ath10k *ar)
 		ath10k_mac_vif_beacon_cleanup(arvif);
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
 #if 0
 static int ath10k_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
@@ -4186,7 +4418,6 @@ static int ath10k_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
 }
 #endif
 
-#if 1
 static void ath10k_check_chain_mask(struct ath10k *ar, u32 cm, const char *dbg)
 {
 	/* It is not clear that allowing gaps in chainmask
@@ -4196,12 +4427,11 @@ static void ath10k_check_chain_mask(struct ath10k *ar, u32 cm, const char *dbg)
 	if (cm == 15 || cm == 7 || cm == 3 || cm == 1 || cm == 0)
 		return;
 
-	ath10k_warn(ar, "mac %s antenna chainmask may be invalid: 0x%x.  Suggested values: 15, 7, 3, 1 or 0.\n",
-		    dbg, cm);
+	ath10k_warn(ar, "mac %s antenna chainmask may be invalid: 0x%x. "
+	    "Suggested values: 15, 7, 3, 1 or 0.\n",
+	    dbg, cm);
 }
-#endif
 
-#if 1
 static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 {
 	int ret;
@@ -4239,7 +4469,6 @@ static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 
 	return 0;
 }
-#endif
 
 #if 0
 static int ath10k_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
@@ -4254,9 +4483,9 @@ static int ath10k_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
 }
 #endif
 
-#if 1
 int ath10k_start(struct ath10k *ar)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 	u32 burst_enable;
 	int ret = 0;
 
@@ -4365,7 +4594,7 @@ int ath10k_start(struct ath10k *ar)
 	ar->ani_enabled = true;
 
 	ar->num_started_vdevs = 0;
-	ath10k_regd_update(ar);
+	ath10k_regd_update(ar, ic->ic_nchans, ic->ic_channels);
 
 #if 0
 	ath10k_spectral_start(ar);
@@ -4395,9 +4624,7 @@ err:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
-#endif
 
-#if 1
 void ath10k_stop(struct ath10k *ar)
 {
 
@@ -4415,7 +4642,6 @@ void ath10k_stop(struct ath10k *ar)
 	ATHP_DATA_UNLOCK(ar);
 	taskqueue_drain(ar->workqueue, &ar->restart_work);
 }
-#endif
 
 #if 0
 static int ath10k_config_ps(struct ath10k *ar)
@@ -4437,7 +4663,6 @@ static int ath10k_config_ps(struct ath10k *ar)
 }
 #endif
 
-#if 1
 static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 {
 	int ret;
@@ -4465,9 +4690,7 @@ static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 
 	return 0;
 }
-#endif
 
-#if 1
 static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -4496,7 +4719,6 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 
 	return 0;
 }
-#endif
 
 #if 0
 static int ath10k_config(struct ieee80211_hw *hw, u32 changed)
@@ -4522,7 +4744,6 @@ static int ath10k_config(struct ieee80211_hw *hw, u32 changed)
 }
 #endif
 
-#if 1
 static u32 get_nss_from_chainmask(u16 chain_mask)
 {
 	if ((chain_mask & 0x15) == 0x15)
@@ -4533,9 +4754,7 @@ static u32 get_nss_from_chainmask(u16 chain_mask)
 		return 2;
 	return 1;
 }
-#endif
 
-#if 1
 static int ath10k_mac_set_txbf_conf(struct ath10k_vif *arvif)
 {
 #if 0
@@ -4578,9 +4797,7 @@ static int ath10k_mac_set_txbf_conf(struct ath10k_vif *arvif)
 	return (0);
 #endif
 }
-#endif
 
-#if 1
 /*
  * TODO:
  * Figure out how to handle WMI_VDEV_SUBTYPE_P2P_DEVICE,
@@ -4754,7 +4971,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		   arvif->vdev_id, arvif->vdev_type, arvif->vdev_subtype,
 		   arvif->beacon_buf.dd_desc ? "single-buf" : "per-skb");
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, " -> mac=%s\n", ether_sprintf(mac));
+	ath10k_dbg(ar, ATH10K_DBG_MAC, " -> mac=%6D\n", mac, ":");
 
 	ret = ath10k_wmi_vdev_create(ar, arvif->vdev_id, arvif->vdev_type,
 				     arvif->vdev_subtype, mac);
@@ -4916,9 +5133,6 @@ err:
 
 	return ret;
 }
-#endif
-
-#if 1
 
 static void ath10k_mac_vif_tx_unlock_all(struct ath10k_vif *arvif)
 {
@@ -4931,9 +5145,6 @@ static void ath10k_mac_vif_tx_unlock_all(struct ath10k_vif *arvif)
 	printf("%s: TODO: implement!\n", __func__);
 #endif
 }
-#endif
-
-#if 1
 
 void
 ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
@@ -5016,8 +5227,6 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 
 	ATHP_CONF_UNLOCK(ar);
 }
-
-#endif
 
 #if 0
 
@@ -5229,10 +5438,8 @@ static void ath10k_bss_info_changed(struct ieee80211_hw *hw,
 }
 #endif
 
-#if 1
 int
-ath10k_hw_scan(struct ath10k *ar,
-    struct ieee80211vap *vif)
+ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int passive_ms)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct cfg80211_scan_request *req = &hw_req->req;
@@ -5268,6 +5475,8 @@ ath10k_hw_scan(struct ath10k *ar,
 	ath10k_wmi_start_scan_init(ar, &arg);
 	arg.vdev_id = arvif->vdev_id;
 	arg.scan_id = ATH10K_SCAN_ID;
+	arg.dwell_time_active = active_ms;
+	arg.dwell_time_passive = passive_ms;
 
 #if 0
 	if (req->ie_len) {
@@ -5306,9 +5515,7 @@ exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
-#endif
 
-#if 1
 void
 ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 {
@@ -5321,7 +5528,6 @@ ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 	callout_drain(&ar->scan.timeout);
 	ATHP_DATA_UNLOCK(ar);
 }
-#endif
 
 #if 0
 static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
@@ -6225,37 +6431,45 @@ static int ath10k_mac_op_set_frag_threshold(struct ieee80211_hw *hw, u32 value)
 	 */
 	return -EOPNOTSUPP;
 }
+#endif
 
-static void ath10k_flush(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-			 u32 queues, bool drop)
+void
+ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
+    bool drop)
 {
-	struct ath10k *ar = hw->priv;
 	bool skip;
 	long time_left;
+	int interval;
 
 	/* mac80211 doesn't care if we really xmit queued frames or not
 	 * we'll collect those frames either way if we stop/delete vdevs */
 	if (drop)
 		return;
 
+	interval = ticks + ((ATH10K_FLUSH_TIMEOUT_HZ * hz) / 1000);
+
 	ATHP_CONF_LOCK(ar);
 
 	if (ar->state == ATH10K_STATE_WEDGED)
 		goto skip;
 
-	time_left = wait_event_timeout(ar->htt.empty_tx_wq, ({
+	while (! ieee80211_time_after(ticks, interval)) {
 			bool empty;
 
-			spin_lock_bh(&ar->htt.tx_lock);
+			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
+			    "tx_flush", ATH10K_FLUSH_TIMEOUT_HZ);
+
+			ATHP_HTT_TX_LOCK(&ar->htt);
 			empty = (ar->htt.num_pending_tx == 0);
-			spin_unlock_bh(&ar->htt.tx_lock);
+			ATHP_HTT_TX_UNLOCK(&ar->htt);
 
 			skip = (ar->state == ATH10K_STATE_WEDGED) ||
 			       test_bit(ATH10K_FLAG_CRASH_FLUSH,
 					&ar->dev_flags);
 
-			(empty || skip);
-		}), ATH10K_FLUSH_TIMEOUT_HZ);
+			if (empty || skip)
+				break;
+		}
 
 	if (time_left == 0 || skip)
 		ath10k_warn(ar, "failed to flush transmit queue (skip %i ar-state %i): %ld\n",
@@ -6269,6 +6483,7 @@ skip:
  * For now it is needed to reply to Probe Requests in IBSS mode.
  * Propably we need this information from FW.
  */
+#if 0
 static int ath10k_tx_last_beacon(struct ieee80211_hw *hw)
 {
 	return 1;
@@ -6862,7 +7077,6 @@ unlock:
  * it's doing internal accounting (I think p2p channel change is a good
  * example), but it needs to be brought up in order to receive traffic.
  */
-#if 1
 int
 ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c)
 {
@@ -6918,9 +7132,7 @@ err_stop:
 err:
 	return ret;
 }
-#endif
 
-#if 1
 void
 ath10k_vif_bring_down(struct ieee80211vap *vap)
 {
@@ -6954,7 +7166,42 @@ ath10k_vif_bring_down(struct ieee80211vap *vap)
 
 	arvif->is_started = false;
 }
-#endif
+
+/*
+ * Only call this for STA mode stuff for now - it assumes you're
+ * about to reinit the bssinfo.
+ */
+int
+ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap,
+    struct ieee80211_node *ni, struct ieee80211_channel *c)
+{
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: restarting vap\n", __func__);
+
+	/* XXX stop monitor */
+
+	/* bring down all vdevs */
+	ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
+	if (ret != 0) {
+		ath10k_warn(ar, "%s: failed to down vdev %i: %d\n", __func__,
+		    arvif->vdev_id, ret);
+		return ret;
+	}
+
+	/* restart */
+	ret = ath10k_vdev_restart(arvif, c);
+	if (ret != 0) {
+		ath10k_warn(ar, "%s: failed to restart vdev %i: %d\n", __func__,
+		    arvif->vdev_id, ret);
+		return ret;
+	}
+
+	return (0);
+}
 
 #if 0
 static int
@@ -7850,3 +8097,54 @@ void ath10k_mac_unregister(struct ath10k *ar)
 	SET_IEEE80211_DEV(ar->hw, NULL);
 }
 #endif
+
+/*
+ * STA mode: update BSS info as appropriate.
+ */
+void
+ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
+    struct ieee80211_node *ni, int is_assoc, int is_run)
+{
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d\n",
+	    __func__,
+	    vap,
+	    ni,
+	    is_assoc);
+
+	/* XXX TODO: move the peer creation out! */
+
+	if (is_assoc) {
+		/* Workaround: Make sure monitor vdev is not running
+		 * when associating to prevent some firmware revisions
+		 * (e.g. 10.1 and 10.2) from crashing.
+		 */
+		if (ar->monitor_started)
+			ath10k_monitor_stop(ar);
+
+		/*
+		 * Before updating the base parameters, ensure we clear out
+		 * any previous vdev setup.
+		 */
+		ath10k_bss_disassoc(ar, vap, is_run);
+
+		ATHP_DATA_LOCK(ar);
+		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
+			ATHP_DATA_UNLOCK(ar);
+			(void) ath10k_peer_create(ar, arvif->vdev_id,
+			    ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
+		} else {
+			ATHP_DATA_UNLOCK(ar);
+		}
+		ath10k_bss_assoc(ar, ni, is_run);
+		arvif->is_stabss_setup = 1;
+		ath10k_monitor_recalc(ar);
+	} else {
+		ath10k_bss_disassoc(ar, vap, is_run);
+		arvif->is_stabss_setup = 0;
+		ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
+	}
+}

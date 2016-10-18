@@ -105,15 +105,128 @@ static uint8_t chan_list_5ghz[] =
       153, 157, 161, 165 };
 
 static int
-athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
+athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni,
+    struct mbuf *m0)
+{
+	struct ieee80211_frame *wh;
+	struct ieee80211_key *k;
+	int iswep;
+
+	wh = mtod(m0, struct ieee80211_frame *);
+	iswep = wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
+
+	if (iswep) {
+		/*
+		 * Construct the 802.11 header+trailer for an encrypted
+		 * frame. The only reason this can fail is because of an
+		 * unknown or unsupported cipher/key type.
+		 */
+		k = ieee80211_crypto_encap(ni, m0);
+		if (k == NULL) {
+			/*
+			 * This can happen when the key is yanked after the
+			 * frame was queued.  Just discard the frame; the
+			 * 802.11 layer counts failures and provides
+			 * debugging/diagnostics.
+			 */
+			return (0);
+		}
+	}
+
+	return (1);
+}
+/*
+ * Raw frame transmission - this is "always" 802.11.
+ *
+ * Free the mbuf if we fail, but don't deref the node.
+ * That's the callers job.
+ *
+ * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
+ */
+static int
+athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
     const struct ieee80211_bpf_params *params)
 {
 	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct ath10k *ar = ic->ic_softc;
+	struct athp_buf *pbuf;
+	struct ath10k_skb_cb *cb;
+	struct ieee80211_frame *wh;
+	struct mbuf *m = NULL;
 
-	device_printf(ar->sc_dev, "%s: called; m=%p\n", __func__, m);
-	m_freem(m);
-	return (EINVAL);
+	wh = mtod(m0, struct ieee80211_frame *);
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
+	    __func__,
+	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
+
+	ATHP_CONF_LOCK(ar);
+
+	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
+	if (vap->iv_opmode == IEEE80211_M_STA) {
+		if (arvif->is_stabss_setup == 0) {
+			ATHP_CONF_UNLOCK(ar);
+			ath10k_warn(ar,
+			    "%s: stabss not setup; don't xmit\n",
+			    __func__);
+			m_freem(m0);
+			return (ENXIO);
+		}
+	}
+	ATHP_CONF_UNLOCK(ar);
+
+	if (! athp_tx_tag_crypto(ar, ni, m0)) {
+		ar->sc_stats.xmit_fail_crypto_encap++;
+		m_freem(m0);
+		return (ENXIO);
+	}
+
+	/*
+	 * For now, the ath10k linux side doesn't handle multi-segment
+	 * mbufs.  The firmware/hardware supports it, but the tx path
+	 * assumes everything is a single linear mbuf.
+	 *
+	 * So, try to defrag.  If we fail, return ENOBUFS.
+	 */
+	m = m_defrag(m0, M_NOWAIT);
+	if (m == NULL) {
+		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+		m_freem(m0);
+		return (ENOBUFS);
+	}
+	m0 = NULL;
+
+	/* Allocate a TX mbuf */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+		m_freem(m);
+		return (ENOBUFS);
+	}
+
+	/* Put the mbuf into the given pbuf */
+	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
+
+	/* The node reference is ours to free upon xmit, so .. */
+	cb = ATH10K_SKB_CB(pbuf);
+	cb->ni = ni;
+
+	/* Transmit */
+	ath10k_tx(ar, ni, pbuf);
+
+	return (0);
+}
+
+static void
+athp_scan_curchan(struct ieee80211_scan_state *ss, unsigned long maxdwell)
+{
+}
+
+static void
+athp_scan_mindwell(struct ieee80211_scan_state *ss)
+{
 }
 
 static void
@@ -128,9 +241,14 @@ athp_scan_start(struct ieee80211com *ic)
 	if (vap == NULL)
 		return;
 
-	ret = ath10k_hw_scan(ar, vap);
+	/*
+	 * For now - active scan, hard-coded 200ms active/passive dwell times.
+	 */
+	ret = ath10k_hw_scan(ar, vap, 200, 200);
+
 	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: ath10k_hw_scan failed; ret=%d\n", __func__, ret);
+		ath10k_err(ar, "%s: ath10k_hw_scan failed; ret=%d\n",
+		    __func__, ret);
 	}
 }
 
@@ -153,6 +271,8 @@ athp_set_channel(struct ieee80211com *ic)
 		goto finish;
 	}
 
+	/* XXX TODO: maybe we don't need to do this when in RUN state? */
+
 	arvif = ar->monitor_arvif;
 	vap = (void *) arvif;
 	ath10k_vif_bring_down(vap);
@@ -168,11 +288,89 @@ finish:
 	return;
 }
 
+/*
+ * data transmission.  For now this is 802.11, but once we get this
+ * driver up it could just as easy be 802.3 frames so we can bypass
+ * almost /all/ of the net80211 side handling.
+ *
+ * Unlike the raw path - if we fail, we don't free the buffer.
+ *
+ * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
+ *
+ * XXX TODO: handle fragmented frame list
+ *
+ * XXX TODO: we shouldn't transmit a frame if there's no peer setup
+ * for it!
+ */
 static int
-athp_transmit(struct ieee80211com *ic, struct mbuf *m)
+athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 {
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211vap *vap;
+	struct ath10k_vif *arvif;
+	struct athp_buf *pbuf;
+	struct ath10k_skb_cb *cb;
+	struct ieee80211_node *ni;
+	struct mbuf *m = NULL;
 
-	return (ENXIO);
+	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D\n",
+	    __func__, ni, m0, ni->ni_macaddr,":");
+
+	vap = ni->ni_vap;
+	arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK(ar);
+	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
+	if (vap->iv_opmode == IEEE80211_M_STA) {
+		if (arvif->is_stabss_setup == 0) {
+			ATHP_CONF_UNLOCK(ar);
+			ath10k_warn(ar, "%s: stabss not setup; don't xmit\n", __func__);
+			return (ENXIO);
+		}
+	}
+	ATHP_CONF_UNLOCK(ar);
+
+	if (! athp_tx_tag_crypto(ar, ni, m0)) {
+		ar->sc_stats.xmit_fail_crypto_encap++;
+		return (ENXIO);
+	}
+
+	/*
+	 * For now, the ath10k linux side doesn't handle multi-segment
+	 * mbufs.  The firmware/hardware supports it, but the tx path
+	 * assumes everything is a single linear mbuf.
+	 *
+	 * So, try to defrag.  If we fail, return ENOBUFS.
+	 */
+	m = m_defrag(m0, M_NOWAIT);
+	if (m == NULL) {
+		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+		return (ENOBUFS);
+	}
+	m0 = NULL;
+
+	/* Allocate a TX mbuf */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+		return (ENOBUFS);
+	}
+
+	/* Put the mbuf into the given pbuf */
+	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
+
+	m->m_pkthdr.rcvif = NULL;
+
+	/* The node reference is ours to free upon xmit, so .. */
+	cb = ATH10K_SKB_CB(pbuf);
+	cb->ni = ni;
+
+	/* Transmit */
+	ath10k_tx(ar, ni, pbuf);
+
+	return (0);
 }
 
 /*
@@ -197,6 +395,12 @@ athp_parent(struct ieee80211com *ic)
 	}
 }
 
+/*
+ * TODO:
+ *
+ * + if we fail assoc and move to another bssid, do we go via INIT
+ *   first?  Ie, how do we delete the existing bssid?
+ */
 static int
 athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
@@ -206,10 +410,14 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	enum ieee80211_state ostate = vap->iv_state;
 	int ret;
 	int error = 0;
+	struct ieee80211_node *bss_ni;
 
 	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
 	    ieee80211_state_name[ostate],
 	    ieee80211_state_name[nstate]);
+
+	/* Grab bss node ref before unlocking */
+	bss_ni = ieee80211_ref_node(vap->iv_bss);
 
 	IEEE80211_UNLOCK(ic);
 
@@ -219,23 +427,90 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (ostate == IEEE80211_S_RUN)
 			break;
 
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			ATHP_CONF_LOCK(ar);
+			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				ath10k_err(ar,
+				    "%s: ath10k_vdev_start failed; ret=%d\n",
+				    __func__, ret);
+				break;
+			}
+			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
+			ATHP_CONF_UNLOCK(ar);
+		}
+
 		/* For now, only start vdev on INIT->RUN */
 		/* This should be ok for monitor, but not for station */
-		if (ostate == IEEE80211_S_INIT) {
-			ATHP_CONF_LOCK(ar);
-			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
-			ATHP_CONF_UNLOCK(ar);
-			if (ret != 0) {
-				device_printf(ar->sc_dev, "%s: ath10k_vdev_start failed; ret=%d\n", __func__, ret);
-				break;
+		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+			if (ostate == IEEE80211_S_INIT) {
+				ATHP_CONF_LOCK(ar);
+				ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
+				ATHP_CONF_UNLOCK(ar);
+				if (ret != 0) {
+					ath10k_err(ar,
+					    "%s: ath10k_vdev_start failed; ret=%d\n",
+					    __func__, ret);
+					break;
+				}
 			}
 		}
 		break;
 
+	/* Transitioning to SCAN from RUN - is fine, you don't need to delete anything */
+	case IEEE80211_S_SCAN:
+		break;
+
 	case IEEE80211_S_INIT:
 		ATHP_CONF_LOCK(ar);
-		ath10k_vif_bring_down(vap);
+		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+			/* Monitor mode - explicit down */
+			ath10k_vif_bring_down(vap);
+		}
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+
+			/* Wait for xmit to finish before continuing */
+			ath10k_tx_flush(ar, vap, 0, 1);
+
+			/* This brings the interface down; delete the peer */
+			if (vif->is_stabss_setup == 1) {
+				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
+			}
+		}
 		ATHP_CONF_UNLOCK(ar);
+		break;
+
+	case IEEE80211_S_AUTH:
+		/*
+		 * When going SCAN->AUTH, we need to plumb up the initial
+		 * BSS before we can send frames to it.
+		 *
+		 * For ASSOC, we do the same.
+		 *
+		 * Then for RUN we update the BSS configuration
+		 * with whatever new information we've found.
+		 */
+		ATHP_CONF_LOCK(ar);
+		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+		if (ret != 0) {
+			ATHP_CONF_UNLOCK(ar);
+			ath10k_err(ar,
+			    "%s: ath10k_vdev_start failed; ret=%d\n",
+			    __func__, ret);
+			break;
+		}
+		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
+		ATHP_CONF_UNLOCK(ar);
+		break;
+	case IEEE80211_S_ASSOC:
+		/* Assuming we already went through AUTH */
+#if 0
+		ATHP_CONF_LOCK(ar);
+		/* Update the association state */
+		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
+		ATHP_CONF_UNLOCK(ar);
+#endif
 		break;
 	default:
 		ath10k_warn(ar, "%s: state %s not handled\n",
@@ -245,8 +520,39 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	}
 	IEEE80211_LOCK(ic);
 
+	ieee80211_free_node(bss_ni);
+
 	error = vif->av_newstate(vap, nstate, arg);
 	return (error);
+}
+
+static int
+athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
+    ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
+{
+
+	printf("%s: TODO\n", __func__);
+	return (0);
+}
+
+static int
+athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
+{
+
+	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
+		return (1);
+	printf("%s: TODO\n", __func__);
+	return (0);
+}
+
+static int
+athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
+{
+
+	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
+		return (1);
+	printf("%s: TODO\n", __func__);
+	return (0);
 }
 
 static struct ieee80211vap *
@@ -287,7 +593,9 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 		 */
 		ret = ath10k_start(ar);
 		if (ret != 0) {
-			device_printf(ar->sc_dev, "%s: ath10k_start failed; ret=%d\n", __func__, ret);
+			ath10k_err(ar,
+			    "%s: ath10k_start failed; ret=%d\n",
+			    __func__, ret);
 			return (NULL);
 		}
 	}
@@ -306,6 +614,11 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* XXX TODO: override methods */
 	uvp->av_newstate = vap->iv_newstate;
 	vap->iv_newstate = athp_vap_newstate;
+#if 0
+	vap->iv_key_alloc = athp_key_alloc;
+	vap->iv_key_set = athp_key_set;
+	vap->iv_key_delete = athp_key_delete;
+#endif
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -316,7 +629,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* call into driver; setup state */
 	ret = ath10k_add_interface(ar, vap, opmode, flags, bssid, mac);
 	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: ath10k_add_interface failed; ret=%d\n", __func__, ret);
+		ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
+		    __func__, ret);
 		/*
 		 * For now, we can't abort here - too much state needs
 		 * to be setup before we call the linux ath10k mac.c
@@ -344,6 +658,10 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * set it up earlier.
 	 */
 	if (uvp->is_setup) {
+
+		/* Wait for xmit to finish before continuing */
+		ath10k_tx_flush(ar, vap, 0, 1);
+
 		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
 	}
@@ -388,11 +706,23 @@ static struct ieee80211_node *
 athp_node_alloc(struct ieee80211vap *vap,
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
 	struct athp_node *an;
+
+	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, mac, ":");
 
 	an = malloc(sizeof(struct athp_node), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
 		return (NULL);
+
+	/* XXX TODO: Create peer if it's not our MAC address */
+	if (memcmp(mac, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		device_printf(ar->sc_dev,
+		    "%s: TODO: add peer for MAC %6D\n",
+		    __func__, mac, ":");
+	}
+
 	return (&an->ni);
 }
 
@@ -402,7 +732,9 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
+	device_printf(ar->sc_dev,
+	    "%s: called; mac=%6D; isnew=%d\n",
+	    __func__, ni->ni_macaddr, ":", isnew);
 }
 
 static void
@@ -412,7 +744,18 @@ athp_node_free(struct ieee80211_node *ni)
 	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
+
+	device_printf(ar->sc_dev,
+	    "%s: called; mac=%6D\n",
+	    __func__, ni->ni_macaddr, ":");
+
+	/* XXX TODO: delete peer */
+	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		device_printf(ar->sc_dev,
+		    "%s: TODO: add peer for MAC %6D\n",
+		    __func__, ni->ni_macaddr, ":");
+	}
+
 	ar->sc_node_free(ni);
 }
 
@@ -436,8 +779,33 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
 static int
 athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 {
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
 
-	return (ENOTSUP);
+	/* Don't send probe requests - I think the firmware does it during scanning */
+	/* XXX TODO: maybe only don't do it when we're scanning? */
+	if (type == IEEE80211_FC0_SUBTYPE_PROBE_REQ)
+		return (ENOTSUP);
+
+	/* Scanning sends out QoS-NULL frames too, which we don't want */
+	if (type == IEEE80211_FC0_SUBTYPE_QOS_NULL)
+		return (ENOTSUP);
+	if (type == IEEE80211_FC0_SUBTYPE_NODATA)
+		return (ENOTSUP);
+
+	/*
+	 * XXX TODO: once scan offload/powersave offload in net80211 is
+	 * done, re-enable these - we may need it for eg testing if
+	 * a device is still there.
+	 */
+
+	/* Send the rest */
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: sending type=0x%x (%d)\n", __func__, type, type);
+
+	return (ieee80211_send_mgmt(ni, type, arg));
+
 }
 
 /*
@@ -485,11 +853,46 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_stats.rx_pkt_short_len, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_zero_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_pkt_zero_len, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_crypto_encap", CTLFLAG_RD,
+	    &ar->sc_stats.xmit_fail_crypto_encap, "");
 
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_wmi", CTLFLAG_RW,
 	    &ar->sc_rx_wmi, 0, "RX WMI frames");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_htt", CTLFLAG_RW,
 	    &ar->sc_rx_htt, 0, "RX HTT frames");
+}
+
+/*
+ * Process regulatory domain changes.
+ *
+ * XXX TODO: this ends up potentially sleeping on COMLOCK.
+ * Maybe defer into a taskqueue later.
+ */
+static int
+athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
+    int nchans, struct ieee80211_channel *chans)
+{
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called; rd %u cc %u location %c%s\n",
+	    __func__,
+	    reg->regdomain,
+	    reg->country,
+	    reg->location,
+	    reg->ecm ? "ecm" : "");
+
+	/*
+	 * Program in the given channel set into the hardware.
+	 */
+	/* XXX locking! */
+	IEEE80211_UNLOCK(ic);
+	ATHP_CONF_LOCK(ar);
+	if (ar->state == ATH10K_STATE_ON)
+		(void) ath10k_regd_update(ar, nchans, chans);
+	ATHP_CONF_UNLOCK(ar);
+	IEEE80211_LOCK(ic);
+
+	return (0);
 }
 
 /*
@@ -522,7 +925,19 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_MONITOR |
 	    IEEE80211_C_WPA;
 
+#if 0
 	/* XXX crypto capabilities */
+	ic->ic_cryptocaps |=
+	    IEEE80211_CRYPTO_WEP |
+	    IEEE80211_CRYPTO_AES_OCB |
+	    IEEE80211_CRYPTO_AES_CCM |
+	    IEEE80211_CRYPTO_CKIP |
+	    IEEE80211_CRYPTO_TKIP |
+	    IEEE80211_CRYPTO_TKIPMIC;
+#endif
+
+	/* capabilities, etc */
+	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD;
 
 	/* XXX 11n bits */
 
@@ -538,6 +953,8 @@ athp_attach_net80211(struct ath10k *ar)
 	/* required 802.11 methods */
 	ic->ic_raw_xmit = athp_raw_xmit;
 	ic->ic_scan_start = athp_scan_start;
+	ic->ic_scan_curchan = athp_scan_curchan;
+	ic->ic_scan_mindwell = athp_scan_mindwell;
 	ic->ic_scan_end = athp_scan_end;
 	ic->ic_set_channel = athp_set_channel;
 	ic->ic_transmit = athp_transmit;
@@ -553,6 +970,11 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_newassoc = athp_newassoc;
 	ar->sc_node_free = ic->ic_node_free;
 	ic->ic_node_free = athp_node_free;
+
+	ic->ic_setregdomain = athp_set_regdomain;
+#if 0
+	ic->ic_getradiocaps = athp_get_radiocaps;
+#endif
 
 	/* 11n methods */
 	ic->ic_update_chw = athp_update_chw;

@@ -185,7 +185,7 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 
 	size = htt->max_num_pending_tx * sizeof(struct htt_msdu_ext_desc);
 	if (athp_descdma_alloc(ar, &htt->frag_desc.dd, "htt frag_desc",
-	    8, size) != 0) {
+	    4, size) != 0) {
 		ath10k_warn(ar, "failed to alloc fragment desc memory\n");
 		ret = -ENOMEM;
 		goto free_tx_pool;
@@ -500,9 +500,14 @@ int ath10k_htt_h2t_aggr_cfg_msg(struct ath10k_htt *htt,
 	return 0;
 }
 
+/*
+ * XXX TODO: note - I think this is used by the QCA9880 (peregrine v2)
+ *   + firmware 10.2.4.  So, it's the minimal transmit path required
+ *   to bootstrap station association.
+ */
+
 int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
-#if 0
 	struct ath10k *ar = htt->ar;
 //	struct device *dev = ar->sc_dev;
 	struct athp_buf *txdesc = NULL;
@@ -553,6 +558,15 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	cmd = (struct htt_cmd *)mbuf_skb_data(txdesc->m);
 	memset(cmd, 0, len);
 
+	ath10k_dbg(ar, ATH10K_DBG_HTT,
+	    "%s: paddr=%08x, m=%p, len=%d, desc_id=%d, vdev_id=%d\n",
+	    __func__,
+	    (uint32_t) msdu->mb.paddr,
+	    msdu->m,
+	    mbuf_skb_len(msdu->m),
+	    msdu_id,
+	    vdev_id);
+
 	cmd->hdr.msg_type         = HTT_H2T_MSG_TYPE_MGMT_TX;
 	cmd->mgmt_tx.msdu_paddr = __cpu_to_le32(msdu->mb.paddr);
 	cmd->mgmt_tx.len        = __cpu_to_le32(mbuf_skb_len(msdu->m));
@@ -582,18 +596,22 @@ err_tx_dec:
 	ath10k_htt_tx_dec_pending(htt);
 err:
 	return res;
-#else
-	device_printf(htt->ar->sc_dev, "%s; TODO implement!\n", __func__);
-	return (-EINVAL);
-#endif
 }
 
-int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
+/*
+ * Transmit the given msdu.
+ *
+ * Note - it expects the frame to have two parts - a
+ * HTC header (which it allocates) and a linearised transmit
+ * packet.  I believe the firmware/hardware supports more
+ * sg entries but I'm not sure what's required to use them.
+ */
+int
+ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 {
-#if 0
 	struct ath10k *ar = htt->ar;
 	//struct device *dev = ar->sc_dev;
-	//struct ieee80211_frame *hdr = (struct ieee80211_frame *)mbuf_skb_data(msdu->m);
+	struct ieee80211_frame *hdr;
 	struct ath10k_skb_cb *skb_cb = ATH10K_SKB_CB(msdu);
 	struct ath10k_hif_sg_item sg_items[2];
 	struct htt_data_tx_desc_frag *frags;
@@ -603,13 +621,15 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	int res;
 	u8 flags0 = 0;
 	u16 msdu_id, flags1 = 0;
-	dma_addr_t paddr = 0;
+//	dma_addr_t paddr = 0;
 	u32 frags_paddr = 0;
 	struct htt_msdu_ext_desc *ext_desc = NULL;
 
 	res = ath10k_htt_tx_inc_pending(htt);
 	if (res)
 		goto err;
+
+	hdr = (struct ieee80211_frame *)mbuf_skb_data(msdu->m);
 
 	ATHP_HTT_TX_LOCK(htt);
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
@@ -622,13 +642,23 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	prefetch_len = min(htt->prefetch_len, mbuf_skb_len(msdu->m));
 	prefetch_len = roundup(prefetch_len, 4);
 
-	skb_cb->htt.txbuf = dma_pool_alloc(htt->tx_pool, GFP_ATOMIC,
-					   &paddr);
-	if (!skb_cb->htt.txbuf) {
+	/*
+	 * Linux here would allocate a buffer with physmem mapping
+	 * of size ath10k_htt_txbuf from a dma_pool.
+	 *
+	 * For now we don't pre-allocate them (but we could actually
+	 * do just that) - instead, let's just allocate a descdma
+	 * entry.  We need to make sure they're freed when the pbuf
+	 * is recycled.
+	 */
+	if (athp_descdma_alloc(ar, &skb_cb->htt.txbuf_dd, "htt txbuf", 4,
+	    sizeof(struct ath10k_htt_txbuf)) != 0) {
+		ath10k_err(ar, "%s: failed to allocate htc hdr txbuf\n", __func__);
 		res = -ENOMEM;
 		goto err_free_msdu_id;
 	}
-	skb_cb->htt.txbuf_paddr = paddr;
+	skb_cb->htt.txbuf = skb_cb->htt.txbuf_dd.dd_desc;
+	skb_cb->htt.txbuf_paddr = skb_cb->htt.txbuf_dd.dd_desc_paddr;
 
 	if ((IEEE80211_IS_ACTION(hdr) ||
 	     IEEE80211_IS_DEAUTH(hdr) ||
@@ -777,6 +807,8 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	sg_items[1].paddr = msdu->mb.paddr;
 	sg_items[1].len = prefetch_len;
 
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: paddr=%x, %x\n", __func__, sg_items[0].paddr, sg_items[1].paddr);
+
 	res = ath10k_hif_tx_sg(htt->ar,
 			       htt->ar->htc.endpoint[htt->eid].ul_pipe_id,
 			       sg_items, ARRAY_SIZE(sg_items));
@@ -788,9 +820,7 @@ int ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 err_unmap_msdu:
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 err_free_txbuf:
-	dma_pool_free(htt->tx_pool,
-		      skb_cb->htt.txbuf,
-		      skb_cb->htt.txbuf_paddr);
+	athp_descdma_free(ar, &skb_cb->htt.txbuf_dd);
 err_free_msdu_id:
 	ATHP_HTT_TX_LOCK(htt);
 	ath10k_htt_tx_free_msdu_id(htt, msdu_id);
@@ -799,8 +829,4 @@ err_tx_dec:
 	ath10k_htt_tx_dec_pending(htt);
 err:
 	return res;
-#else
-	device_printf(htt->ar->sc_dev, "%s; TODO implement!\n", __func__);
-	return (-EINVAL);
-#endif
 }

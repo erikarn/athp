@@ -190,7 +190,7 @@ ath10k_swap_code_seg_alloc(struct ath10k *ar, size_t swap_bin_len)
 	if (!seg_info)
 		return NULL;
 
-	if (athp_descdma_alloc(ar, &seg_info->seg_dd, "ath10k code seg", 8,
+	if (athp_descdma_alloc(ar, &seg_info->seg_dd, "ath10k code seg", 4,
 	    swap_bin_len) != 0) {
 		ath10k_err(ar, "failed to allocate dma coherent memory\n");
 		free(seg_info, M_ATHPDEV);
