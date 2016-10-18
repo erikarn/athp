@@ -161,20 +161,12 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 }
 
 void
-ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
-{
-
-	printf("%s: called\n", __func__);
-}
-
-void
 ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
     enum wmi_tlv_tx_pause_id pause_id, enum wmi_tlv_tx_pause_action action)
 {
 
 	printf("%s: called\n", __func__);
 }
-
 
 /***************/
 /* TX handlers */

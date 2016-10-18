@@ -2176,15 +2176,21 @@ static void ath10k_mac_handle_beacon_miss_iter(void *data, u8 *mac,
 	ieee80211_queue_delayed_work(hw, &arvif->connection_loss_work,
 				     ATH10K_CONNECTION_LOSS_HZ);
 }
+#endif
 
 void ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
 {
+#if 0
 	ieee80211_iterate_active_interfaces_atomic(ar->hw,
 						   IEEE80211_IFACE_ITER_NORMAL,
 						   ath10k_mac_handle_beacon_miss_iter,
 						   &vdev_id);
+#else
+	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
+#endif
 }
 
+#if 0
 static void ath10k_mac_vif_sta_connection_loss_work(struct work_struct *work)
 {
 	struct ath10k_vif *arvif = container_of(work, struct ath10k_vif,
