@@ -163,11 +163,14 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
 
 	ATHP_CONF_LOCK(ar);
+
 	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
 	if (vap->iv_opmode == IEEE80211_M_STA) {
 		if (arvif->is_stabss_setup == 0) {
 			ATHP_CONF_UNLOCK(ar);
-			device_printf(ar->sc_dev, "%s: stabss not setup; don't xmit\n", __func__);
+			ath10k_warn(ar,
+			    "%s: stabss not setup; don't xmit\n",
+			    __func__);
 			m_freem(m0);
 			return (ENXIO);
 		}
@@ -198,7 +201,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
-		device_printf(ar->sc_dev, "%s: failed to get TX pbuf\n", __func__);
+		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		m_freem(m);
 		return (ENOBUFS);
 	}
@@ -244,7 +247,8 @@ athp_scan_start(struct ieee80211com *ic)
 	ret = ath10k_hw_scan(ar, vap, 200, 200);
 
 	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: ath10k_hw_scan failed; ret=%d\n", __func__, ret);
+		ath10k_err(ar, "%s: ath10k_hw_scan failed; ret=%d\n",
+		    __func__, ret);
 	}
 }
 
@@ -322,7 +326,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (vap->iv_opmode == IEEE80211_M_STA) {
 		if (arvif->is_stabss_setup == 0) {
 			ATHP_CONF_UNLOCK(ar);
-			device_printf(ar->sc_dev, "%s: stabss not setup; don't xmit\n", __func__);
+			ath10k_warn(ar, "%s: stabss not setup; don't xmit\n", __func__);
 			return (ENXIO);
 		}
 	}
@@ -350,7 +354,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
-		device_printf(ar->sc_dev, "%s: failed to get TX pbuf\n", __func__);
+		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		return (ENOBUFS);
 	}
 
@@ -428,7 +432,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
-				device_printf(ar->sc_dev,
+				ath10k_err(ar,
 				    "%s: ath10k_vdev_start failed; ret=%d\n",
 				    __func__, ret);
 				break;
@@ -445,7 +449,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 				ATHP_CONF_UNLOCK(ar);
 				if (ret != 0) {
-					device_printf(ar->sc_dev,
+					ath10k_err(ar,
 					    "%s: ath10k_vdev_start failed; ret=%d\n",
 					    __func__, ret);
 					break;
@@ -491,7 +495,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 		if (ret != 0) {
 			ATHP_CONF_UNLOCK(ar);
-			device_printf(ar->sc_dev,
+			ath10k_err(ar,
 			    "%s: ath10k_vdev_start failed; ret=%d\n",
 			    __func__, ret);
 			break;
@@ -589,7 +593,9 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 		 */
 		ret = ath10k_start(ar);
 		if (ret != 0) {
-			device_printf(ar->sc_dev, "%s: ath10k_start failed; ret=%d\n", __func__, ret);
+			ath10k_err(ar,
+			    "%s: ath10k_start failed; ret=%d\n",
+			    __func__, ret);
 			return (NULL);
 		}
 	}
@@ -623,7 +629,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* call into driver; setup state */
 	ret = ath10k_add_interface(ar, vap, opmode, flags, bssid, mac);
 	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: ath10k_add_interface failed; ret=%d\n", __func__, ret);
+		ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
+		    __func__, ret);
 		/*
 		 * For now, we can't abort here - too much state needs
 		 * to be setup before we call the linux ath10k mac.c
@@ -772,6 +779,9 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
 static int
 athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 {
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
 
 	/* Don't send probe requests - I think the firmware does it during scanning */
 	/* XXX TODO: maybe only don't do it when we're scanning? */
@@ -784,8 +794,16 @@ athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 	if (type == IEEE80211_FC0_SUBTYPE_NODATA)
 		return (ENOTSUP);
 
+	/*
+	 * XXX TODO: once scan offload/powersave offload in net80211 is
+	 * done, re-enable these - we may need it for eg testing if
+	 * a device is still there.
+	 */
+
 	/* Send the rest */
-	printf("%s: sending type=0x%x (%d)\n", __func__, type, type);
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: sending type=0x%x (%d)\n", __func__, type, type);
+
 	return (ieee80211_send_mgmt(ni, type, arg));
 
 }
