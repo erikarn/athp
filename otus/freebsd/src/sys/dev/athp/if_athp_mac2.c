@@ -1541,10 +1541,10 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	/* XXX TODO: NOTE: need this for vht40/vht80/etc operation */
 	arg.channel.band_center_freq1 = channel->ic_freq;
 	arg.channel.mode = chan_to_phymode(channel);
-	arg.channel.min_power = 0;
-	arg.channel.max_power = 30; //chandef->chan->max_power * 2;
-	arg.channel.max_reg_power = 30; //chandef->chan->max_reg_power * 2;
-	arg.channel.max_antenna_gain = 0; // chandef->chan->max_antenna_gain * 2;
+	arg.channel.min_power = channel->ic_minpower;
+	arg.channel.max_power = channel->ic_maxpower;
+	arg.channel.max_reg_power = channel->ic_maxregpower * 2;
+	arg.channel.max_antenna_gain = channel->ic_maxantgain * 2;
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP) {
 		arg.ssid = arvif->u.ap.ssid;
