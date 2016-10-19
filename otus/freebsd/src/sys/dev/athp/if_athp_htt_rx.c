@@ -1263,9 +1263,8 @@ static void ath10k_process_rx(struct ath10k *ar,
 #endif
 }
 
-#if 0
 static int ath10k_htt_rx_nwifi_hdrlen(struct ath10k *ar,
-				      struct ieee80211_frame *hdr)
+    struct ieee80211_frame *hdr)
 {
 	int len = ieee80211_anyhdrsize(hdr);
 
@@ -1275,7 +1274,6 @@ static int ath10k_htt_rx_nwifi_hdrlen(struct ath10k *ar,
 
 	return len;
 }
-#endif
 
 static void ath10k_htt_rx_h_undecap_raw(struct ath10k *ar,
 					struct athp_buf *msdu,
@@ -1370,8 +1368,8 @@ static void ath10k_htt_rx_h_undecap_nwifi(struct ath10k *ar,
 					  struct ieee80211_rx_stats *status,
 					  const u8 first_hdr[64])
 {
-#if 0
-	struct ieee80211_hdr *hdr;
+	struct ieee80211_frame *hdr;
+	const struct ieee80211_frame *hdr_c;
 	size_t hdr_len;
 	u8 da[ETH_ALEN];
 	u8 sa[ETH_ALEN];
@@ -1388,26 +1386,23 @@ static void ath10k_htt_rx_h_undecap_nwifi(struct ath10k *ar,
 	 */
 
 	/* pull decapped header and copy SA & DA */
-	hdr = (struct ieee80211_hdr *)msdu->data;
+	hdr = mtod(msdu->m, struct ieee80211_frame *);
 	hdr_len = ath10k_htt_rx_nwifi_hdrlen(ar, hdr);
 	ether_addr_copy(da, ieee80211_get_DA(hdr));
 	ether_addr_copy(sa, ieee80211_get_SA(hdr));
-	skb_pull(msdu, hdr_len);
+	mbuf_skb_pull(msdu->m, hdr_len);
 
 	/* push original 802.11 header */
-	hdr = (struct ieee80211_hdr *)first_hdr;
-	hdr_len = ieee80211_anyhdrsize(hdr);
-	memcpy(skb_push(msdu, hdr_len), hdr, hdr_len);
+	hdr_c = (const struct ieee80211_frame *) first_hdr;
+	hdr_len = ieee80211_anyhdrsize(hdr_c);
+	memcpy(mbuf_skb_push(msdu->m, hdr_len), hdr_c, hdr_len);
 
 	/* original 802.11 header has a different DA and in
 	 * case of 4addr it may also have different SA
 	 */
-	hdr = (struct ieee80211_hdr *)msdu->data;
+	hdr = mtod(msdu->m, struct ieee80211_frame *);
 	ether_addr_copy(ieee80211_get_DA(hdr), da);
 	ether_addr_copy(ieee80211_get_SA(hdr), sa);
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 }
 
 #if 0

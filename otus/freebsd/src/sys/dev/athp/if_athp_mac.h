@@ -64,7 +64,12 @@ static inline struct ath10k_vif *ath10k_vif_to_arvif(struct ieee80211vap *vap)
 	return (struct ath10k_vif *) vap;
 }
 
-static inline void ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf *pbuf)
+/*
+ * Fow now, net80211 doesn't require the driver to assign sequence
+ * numbers.
+ */
+static inline void
+ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf *pbuf)
 {
 #if 0
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
@@ -81,7 +86,6 @@ static inline void ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf 
 		hdr->seq_ctrl |= cpu_to_le16(arvif->tx_seq_no);
 	}
 #endif
-	printf("%s: TODO\n", __func__);
 }
 
 extern	void ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok);
