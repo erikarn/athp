@@ -110,7 +110,6 @@ __FBSDID("$FreeBSD$");
 /*
  * XXX TODO: these should be per-softc parameters, not global
  */
-static unsigned int ath10k_cryptmode_param = 1;	/* 0 = hw crypto, 1 = sw crypto */
 static bool uart_print = 0; /* uart (on NIC) printing */
 static bool skip_otp = 0; /* skip otp failure for calibration in testmode */
 
@@ -1196,8 +1195,9 @@ ath10k_core_init_firmware_features(struct ath10k *ar)
 	}
 
 	ar->wmi.rx_decap_mode = ATH10K_HW_TXRX_NATIVE_WIFI;
-	switch (ath10k_cryptmode_param) {
+	switch (ar->sc_conf_crypt_mode) {
 	case ATH10K_CRYPT_MODE_HW:
+		ath10k_warn(ar, "%s: hardware crypto\n", __func__);
 		clear_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags);
 		clear_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags);
 		break;
@@ -1210,10 +1210,11 @@ ath10k_core_init_firmware_features(struct ath10k *ar)
 
 		set_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags);
 		set_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags);
+		ath10k_warn(ar, "%s: software crypto / raw mode \n", __func__);
 		break;
 	default:
 		ath10k_info(ar, "invalid cryptmode: %d\n",
-			    ath10k_cryptmode_param);
+			    ar->sc_conf_crypt_mode);
 		return -EINVAL;
 	}
 

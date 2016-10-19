@@ -425,8 +425,10 @@ athp_pci_attach(device_t dev)
 	    ATH10K_DBG_PCI_DUMP | ATH10K_DBG_WMI | ATH10K_DBG_BMI | ATH10K_DBG_MAC |
 	    ATH10K_DBG_WMI_PRINT | ATH10K_DBG_MGMT | ATH10K_DBG_DATA | ATH10K_DBG_HTT;
 #endif
-
 	ar->sc_psc = psc;
+
+	/* Load-time tunable/sysctl tree */
+	athp_attach_sysctl(ar);
 
 	/* Enable WMI/HTT RX for now */
 	ar->sc_rx_wmi = 1;
