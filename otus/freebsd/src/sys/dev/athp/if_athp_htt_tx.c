@@ -643,14 +643,10 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	prefetch_len = roundup(prefetch_len, 4);
 
 	/*
-	 * Linux here would allocate a buffer with physmem mapping
-	 * of size ath10k_htt_txbuf from a dma_pool.
-	 *
-	 * For now we don't pre-allocate them (but we could actually
-	 * do just that) - instead, let's just allocate a descdma
-	 * entry.  We need to make sure they're freed when the pbuf
-	 * is recycled.
+	 * Note: we pre-allocate these with TX athp_buf entries.
+	 * We can't allocate busdma memory inside any locks held.
 	 */
+#if 0
 	if (athp_descdma_alloc(ar, &skb_cb->htt.txbuf_dd, "htt txbuf", 4,
 	    sizeof(struct ath10k_htt_txbuf)) != 0) {
 		ath10k_err(ar, "%s: failed to allocate htc hdr txbuf\n", __func__);
@@ -659,6 +655,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	}
 	skb_cb->htt.txbuf = skb_cb->htt.txbuf_dd.dd_desc;
 	skb_cb->htt.txbuf_paddr = skb_cb->htt.txbuf_dd.dd_desc_paddr;
+#endif
 
 	if ((IEEE80211_IS_ACTION(hdr) ||
 	     IEEE80211_IS_DEAUTH(hdr) ||
@@ -820,8 +817,10 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 err_unmap_msdu:
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 err_free_txbuf:
+#if 0
 	athp_descdma_free(ar, &skb_cb->htt.txbuf_dd);
 err_free_msdu_id:
+#endif
 	ATHP_HTT_TX_LOCK(htt);
 	ath10k_htt_tx_free_msdu_id(htt, msdu_id);
 	ATHP_HTT_TX_UNLOCK(htt);

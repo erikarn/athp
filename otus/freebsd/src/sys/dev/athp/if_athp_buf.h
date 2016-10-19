@@ -23,8 +23,6 @@ struct ath10k_skb_cb {
 		bool is_offchan;
 		bool nohwcrypt;
 
-		/* This is the HTC header for TX */
-		struct athp_descdma txbuf_dd;
 		/* These just point above; makes code easier to port */
 		struct ath10k_htt_txbuf *txbuf;
 		u32 txbuf_paddr;
@@ -59,6 +57,9 @@ struct athp_buf {
 	struct {
 		int ip_summed;
 	} rx;
+
+	/* This is the (optional) HTC header for TX */
+	struct athp_descdma txbuf_dd;
 };
 
 typedef TAILQ_HEAD(athp_buf_s, athp_buf) athp_buf_head;

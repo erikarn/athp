@@ -158,11 +158,13 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 
 	skb_cb = ATH10K_SKB_CB(msdu);
 
-	//dma_unmap_single(dev, skb_cb->paddr, msdu->len, DMA_TO_DEVICE);
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 
+	/* Note: This is owned by athp_buf now */
+#if 0
 	if (skb_cb->htt.txbuf)
 		athp_descdma_free(ar, &skb_cb->htt.txbuf_dd);
+#endif
 
 	ath10k_report_offchan_tx(htt->ar, msdu);
 

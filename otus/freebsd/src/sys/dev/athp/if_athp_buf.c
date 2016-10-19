@@ -156,9 +156,12 @@ athp_free_list(struct ath10k *ar, struct athp_buf_ring *br)
 	TAILQ_INIT(&br->br_inactive);
 
 	for (i = 0; i < br->br_count; i++) {
-		struct athp_buf *dp = &br->br_list[i];
-		_athp_free_buf(ar, br, dp);
-		athp_dma_mbuf_destroy(ar, &br->dh, &dp->mb);
+		struct athp_buf *bf = &br->br_list[i];
+		_athp_free_buf(ar, br, bf);
+		athp_dma_mbuf_destroy(ar, &br->dh, &bf->mb);
+		if (bf->txbuf_dd.dd_desc != NULL) {
+			athp_descdma_free(ar, &bf->txbuf_dd);
+		}
 	}
 
 	ATHP_BUF_UNLOCK(ar);
@@ -175,6 +178,7 @@ int
 athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count, int btype)
 {
 	int i;
+	int ret;
 
 	/* Allocate initial buffer list */
 	br->br_list = malloc(sizeof(struct athp_buf) * count, M_ATHPDEV,
@@ -189,6 +193,19 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count, int btyp
 	for (i = 0; i < count; i++) {
 		athp_dma_mbuf_setup(ar, &br->dh, &br->br_list[i].mb);
 		br->br_list[i].btype = btype;
+		if (btype == BUF_TYPE_TX) {
+			ret = athp_descdma_alloc(ar,
+			    &br->br_list[i].txbuf_dd,
+			    "htt_txbuf",
+			    4,
+			    sizeof (struct ath10k_htt_txbuf));
+			if (ret != 0) {
+				ath10k_err(ar,
+				    "%s: descdma alloc failed: %d\n",
+				    __func__, ret);
+				goto fail;
+			}
+		}
 	}
 
 	/* Lists */
@@ -198,10 +215,13 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count, int btyp
 		TAILQ_INSERT_HEAD(&br->br_inactive, &br->br_list[i], next);
 
 	return (0);
+fail:
+	athp_free_list(ar, br);
+	return (ENXIO);
 }
 
 /*
- * Return an RX buffer.
+ * Return a buffer.
  *
  * This doesn't allocate the mbuf.
  */
@@ -315,6 +335,25 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 		return (NULL);
 	}
 
+	/*
+	 * If it's a TX ring alloc, and it doesn't have a TX descriptor
+	 * allocated, then explode.
+	 */
+	if (br->btype == BUF_TYPE_TX && bf->txbuf_dd.dd_desc == NULL) {
+		device_printf(ar->sc_dev,
+		    "%s: requested TX buffer, no txbuf!\n", __func__);
+		m_freem(m);
+		athp_freebuf(ar, br, bf);
+		return (NULL);
+	}
+
+	/* Zero out the TX buffer side; re-init the pointers */
+	if (bf->btype == BUF_TYPE_TX) {
+		bf->tx.htt.txbuf = bf->txbuf_dd.dd_desc;
+		bf->tx.htt.txbuf_paddr = bf->txbuf_dd.dd_desc_paddr;
+		bzero(bf->tx.htt.txbuf, sizeof(struct ath10k_htt_txbuf));
+	}
+
 	/* Setup initial mbuf tracking state */
 	bf->m = m;
 	bf->m_size = bufsize;
@@ -337,23 +376,44 @@ athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 	if (bf == NULL)
 		return NULL;
 
+	/*
+	 * If it's a TX ring alloc, and it doesn't have a TX descriptor
+	 * allocated, then explode.
+	 */
+	if (br->btype == BUF_TYPE_TX && bf->txbuf_dd.dd_desc == NULL) {
+		device_printf(ar->sc_dev,
+		    "%s: requested TX buffer, no txbuf!\n", __func__);
+		athp_freebuf(ar, br, bf);
+		return (NULL);
+	}
+
+	/* Zero out the TX buffer side; re-init the pointers */
+	if (bf->btype == BUF_TYPE_TX) {
+		bf->tx.htt.txbuf = bf->txbuf_dd.dd_desc;
+		bf->tx.htt.txbuf_paddr = bf->txbuf_dd.dd_desc_paddr;
+		bzero(bf->tx.htt.txbuf, sizeof(struct ath10k_htt_txbuf));
+	}
+
 	/* No mbuf yet! */
 	bf->m_size = 0;
 
 	return bf;
 }
 
-/*
- * XXX TODO: need to setup the tx/rx buffer dma tags in if_athp_pci.c.
- * (Since it's a function of the bus/chip..)
- */
-
 void
 athp_buf_cb_clear(struct athp_buf *bf)
 {
 
+	/* Zero out the TX/RX callback info */
 	bzero(&bf->tx, sizeof(bf->tx));
 	bzero(&bf->rx, sizeof(bf->rx));
+
+	/* Zero out the TX buffer side; re-init the pointers */
+	if (bf->btype == BUF_TYPE_TX) {
+		bf->tx.htt.txbuf = bf->txbuf_dd.dd_desc;
+		bf->tx.htt.txbuf_paddr = bf->txbuf_dd.dd_desc_paddr;
+		bzero(bf->tx.htt.txbuf, sizeof(struct ath10k_htt_txbuf));
+	}
 }
 
 void
