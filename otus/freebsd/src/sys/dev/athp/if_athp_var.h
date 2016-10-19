@@ -173,6 +173,8 @@ struct ath10k {
 	int				sc_rx_wmi;
 	int				sc_rx_htt;
 
+	int				sc_conf_crypt_mode;
+
 	union {
 		struct ath10k_rx_radiotap_header th;
 		uint8_t pad[64];
