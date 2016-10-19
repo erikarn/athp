@@ -237,9 +237,6 @@ ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 	void *data_buf = NULL;
 	int i;
 
-	ATHP_PCI_CE_LOCK(psc);
-
-	ce_diag = psc->ce_diag;
 
 	/*
 	 * Allocate a temporary bounce buffer to hold caller's data
@@ -255,10 +252,18 @@ ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 	 */
 	orig_nbytes = nbytes;
 	ret = athp_descdma_alloc(ar, &dd, "pci_diag_read_mem", 4, nbytes);
-	if (ret != 0)
-		goto done;
+	if (ret != 0) {
+		ath10k_warn(ar,
+		    "failed to read diag value (alloc) at 0x%x: %d\n",
+		    address, ret);
+		return (ret);
+	}
 	data_buf = dd.dd_desc;
 	ce_data_base = dd.dd_desc_paddr;
+
+	ATHP_PCI_CE_LOCK(psc);
+
+	ce_diag = psc->ce_diag;
 
 	/*
 	 * Paranoia: ensure it's zero'ed.
@@ -347,9 +352,9 @@ done:
 		ath10k_warn(ar, "failed to read diag value at 0x%x: %d\n",
 		    address, ret);
 
-	athp_descdma_free(ar, &dd);
-
 	ATHP_PCI_CE_UNLOCK(psc);
+
+	athp_descdma_free(ar, &dd);
 
 	return ret;
 }
@@ -456,28 +461,26 @@ ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 	bus_addr_t ce_data_base = 0;
 	int i;
 
-	ATHP_PCI_CE_LOCK(psc);
-
-	ce_diag = psc->ce_diag;
-
 	/*
 	 * Allocate a temporary bounce buffer to hold caller's data
 	 * to be DMA'ed to Target. This guarantees
 	 *   1) 4-byte alignment
 	 *   2) Buffer in DMA-able space
 	 */
-	/*
-	 * XXX TODO: this allocates a whole separate tag
-	 * just to allocate a descriptor with the given alignment.
-	 * Ideally we'd just use contigmalloc() and get the paddr
-	 * for it.
-	 */
 	orig_nbytes = nbytes;
 	ret = athp_descdma_alloc(ar, &dd, "pci_diag_read_mem", 4, nbytes);
-	if (ret != 0)
-		goto done;
+	if (ret != 0) {
+		ath10k_warn(ar,
+		    "failed to write diag value (alloc) at 0x%x: %d\n",
+		    address, ret);
+		return (ret);
+	}
 	data_buf = dd.dd_desc;
 	ce_data_base = dd.dd_desc_paddr;
+
+	ATHP_PCI_CE_LOCK(psc);
+
+	ce_diag = psc->ce_diag;
 
 	/* Copy caller's data to allocated DMA buf */
 	memcpy(data_buf, data, orig_nbytes);
@@ -565,11 +568,12 @@ ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 	}
 
 done:
-	athp_descdma_free(ar, &dd);
 	if (ret != 0)
 		ath10k_warn(ar, "failed to write diag value at 0x%x: %d\n",
 		    address, ret);
 	ATHP_PCI_CE_UNLOCK(psc);
+
+	athp_descdma_free(ar, &dd);
 
 	return ret;
 }
