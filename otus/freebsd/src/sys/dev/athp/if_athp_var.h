@@ -129,9 +129,9 @@ struct ath10k_rx_radiotap_header {
 
 struct ath10k_tx_radiotap_header {
 	struct ieee80211_radiotap_header wt_ihdr;
-	uint8_t wr_flags;
-	uint16_t wr_chan_freq;
-	uint16_t wr_chan_flags;
+	uint8_t wt_flags;
+	uint16_t wt_chan_freq;
+	uint16_t wt_chan_flags;
 };
 
 #define	ATH10K_TX_RADIOTAP_PRESENT		\
@@ -143,6 +143,8 @@ struct ath10k_stats {
 	uint64_t rx_pkt_short_len;
 	uint64_t rx_pkt_zero_len;
 	uint64_t xmit_fail_crypto_encap;
+	uint64_t xmit_fail_get_pbuf;
+	uint64_t xmit_fail_mbuf_defrag;
 };
 
 /*

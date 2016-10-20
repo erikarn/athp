@@ -155,8 +155,11 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_frame *wh;
 	struct mbuf *m = NULL;
+	int is_wep;
 
 	wh = mtod(m0, struct ieee80211_frame *);
+	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
+
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
 	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
 	    __func__,
@@ -192,6 +195,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	 */
 	m = m_defrag(m0, M_NOWAIT);
 	if (m == NULL) {
+		ar->sc_stats.xmit_fail_mbuf_defrag++;
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		m_freem(m0);
 		return (ENOBUFS);
@@ -201,6 +205,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
+		ar->sc_stats.xmit_fail_get_pbuf++;
 		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		m_freem(m);
 		return (ENOBUFS);
@@ -212,6 +217,13 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	/* The node reference is ours to free upon xmit, so .. */
 	cb = ATH10K_SKB_CB(pbuf);
 	cb->ni = ni;
+
+	if (ieee80211_radiotap_active_vap(vap)) {
+		ar->sc_txtapu.th.wt_flags = 0;
+		if (is_wep)
+			ar->sc_txtapu.th.wt_flags |= IEEE80211_RADIOTAP_F_WEP;
+		ieee80211_radiotap_tx(vap, m);
+	}
 
 	/* Transmit */
 	ath10k_tx(ar, ni, pbuf);
@@ -312,11 +324,16 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_node *ni;
 	struct mbuf *m = NULL;
+	struct ieee80211_frame *wh;
+	int is_wep;
+
+	wh = mtod(m0, struct ieee80211_frame *);
+	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D\n",
-	    __func__, ni, m0, ni->ni_macaddr,":");
+	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D; iswep=%d\n",
+	    __func__, ni, m0, ni->ni_macaddr, ":", is_wep);
 
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
@@ -346,6 +363,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	 */
 	m = m_defrag(m0, M_NOWAIT);
 	if (m == NULL) {
+		ar->sc_stats.xmit_fail_mbuf_defrag++;
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		return (ENOBUFS);
 	}
@@ -354,6 +372,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	/* Allocate a TX mbuf */
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
+		ar->sc_stats.xmit_fail_get_pbuf++;
 		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		return (ENOBUFS);
 	}
@@ -366,6 +385,13 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	/* The node reference is ours to free upon xmit, so .. */
 	cb = ATH10K_SKB_CB(pbuf);
 	cb->ni = ni;
+
+	if (ieee80211_radiotap_active_vap(vap)) {
+		ar->sc_txtapu.th.wt_flags = 0;
+		if (is_wep)
+			ar->sc_txtapu.th.wt_flags |= IEEE80211_RADIOTAP_F_WEP;
+		ieee80211_radiotap_tx(vap, m);
+	}
 
 	/* Transmit */
 	ath10k_tx(ar, ni, pbuf);
@@ -859,6 +885,10 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_stats.rx_pkt_zero_len, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_crypto_encap", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_crypto_encap, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_mbuf_defrag", CTLFLAG_RD,
+	    &ar->sc_stats.xmit_fail_mbuf_defrag, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_get_pbuf", CTLFLAG_RD,
+	    &ar->sc_stats.xmit_fail_get_pbuf, "");
 
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_wmi", CTLFLAG_RW,
 	    &ar->sc_rx_wmi, 0, "RX WMI frames");
