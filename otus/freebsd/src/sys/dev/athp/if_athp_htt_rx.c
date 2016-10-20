@@ -1665,6 +1665,13 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 			!has_crypto_err &&
 			!has_peer_idx_invalid);
 
+	ath10k_dbg(ar, ATH10K_DBG_RECV,
+	    "%s: enctype=%d, qos=0x%x, fcserr=%d, cryptoerr=%d, tkiperr=%d, "
+	    "peeridxinvalid=%d, isdescrypt=%d, isprot=%d\n",
+	    __func__,
+	    enctype, qos[0], has_fcs_err, has_crypto_err, has_tkip_err,
+	    has_peer_idx_invalid, is_decrypted, ieee80211_has_protected(hdr));
+
 	/* Clear per-MPDU flags while leaving per-PPDU flags intact. */
 	status->r_flags &= ~(
 		    IEEE80211_RX_F_FAIL_FCSCRC
