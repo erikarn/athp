@@ -80,4 +80,7 @@ SRCS    += if_athp_txrx.c
 SRCS    += if_athp_htt_tx.c
 SRCS    += if_athp_htt_rx.c
 
+# This is the firmware log code from linux foundation (BSD!)
+SRCS    += if_athp_fwlog.c
+
 .include <bsd.kmod.mk>
