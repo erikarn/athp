@@ -186,6 +186,10 @@ struct ath10k {
 		uint8_t pad[64];
 	} sc_txtapu;
 
+	/* firmware log */
+	struct task		fwlog_tx_work;
+	athp_buf_head		fwlog_tx_queue;
+	struct mtx		fwlog_mtx;
 
 	struct intr_config_hook		sc_preinit_hook;
 
