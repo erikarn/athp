@@ -96,6 +96,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_swap.h"
 #include "if_athp_wmi_ops.h"
 #include "if_athp_mac.h"
+#include "if_athp_fwlog.h"
 
 /*
  * This is the "core" interface part of ath10k (core.c.)
@@ -1490,7 +1491,7 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_hif_stop;
 #else
 	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_start\n", __func__);
-#if 0
+#if 1
 	ret = ath10k_wmi_dbglog_cfg(ar, 0xffffffff, ATH10K_DBGLOG_LEVEL_VERBOSE);
 	if (ret != 0) {
 		ath10k_err(ar, "%s: failed dbglog_cfg; ret=%d\n", __func__, ret);
@@ -1664,6 +1665,8 @@ ath10k_core_register_work(void *arg, int npending)
 		goto err_release_fw;
 	}
 
+	ath10k_fwlog_register(ar);
+
 #if 0
 	status = ath10k_debug_register(ar);
 	if (status) {
@@ -1698,6 +1701,7 @@ err_debug_destroy:
 	ath10k_debug_destroy(ar);
 err_unregister_mac:
 	ath10k_mac_unregister(ar);
+	ath10k_fwlog_unregister(ar):
 #endif
 err_release_fw:
 	ath10k_core_free_firmware_files(ar);
@@ -1745,6 +1749,8 @@ ath10k_core_unregister(struct ath10k *ar)
 	 * Otherwise we will fail to submit commands to FW and mac80211 will be
 	 * unhappy about callback failures. */
 	ath10k_mac_unregister(ar);
+
+	ath10k_fwlog_unregister(ar);
 
 #if 0
 	ath10k_testmode_destroy(ar);

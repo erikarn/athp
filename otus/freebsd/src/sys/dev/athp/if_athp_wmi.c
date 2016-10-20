@@ -100,6 +100,8 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_main.h"
 
+#include "if_athp_fwlog.h"
+
 MALLOC_DECLARE(M_ATHPDEV);
 
 
@@ -2657,6 +2659,8 @@ int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf)
 #ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_dbglog(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 #endif
+	ath10k_handle_fwlog_msg(ar, pbuf);
+	/* Now it's owned by the fwlog layer */
 
 	return 0;
 }
@@ -4519,6 +4523,7 @@ static void ath10k_wmi_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	case WMI_DEBUG_MESG_EVENTID:
 		ath10k_wmi_event_debug_mesg(ar, pbuf);
+		return;
 		break;
 	case WMI_UPDATE_STATS_EVENTID:
 		ath10k_wmi_event_update_stats(ar, pbuf);
@@ -4655,6 +4660,7 @@ static void ath10k_wmi_10_1_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	case WMI_10X_DEBUG_MESG_EVENTID:
 		ath10k_wmi_event_debug_mesg(ar, pbuf);
+		return;
 		break;
 	case WMI_10X_UPDATE_STATS_EVENTID:
 		ath10k_wmi_event_update_stats(ar, pbuf);
@@ -4770,6 +4776,7 @@ static void ath10k_wmi_10_2_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	case WMI_10_2_DEBUG_MESG_EVENTID:
 		ath10k_wmi_event_debug_mesg(ar, pbuf);
+		return;
 		break;
 	case WMI_10_2_UPDATE_STATS_EVENTID:
 		ath10k_wmi_event_update_stats(ar, pbuf);
@@ -4887,6 +4894,7 @@ static void ath10k_wmi_10_4_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	case WMI_10_4_DEBUG_MESG_EVENTID:
 		ath10k_wmi_event_debug_mesg(ar, pbuf);
+		return;
 		break;
 	case WMI_10_4_SERVICE_READY_EVENTID:
 		ath10k_wmi_event_service_ready(ar, pbuf);
