@@ -3680,7 +3680,7 @@ static u8 ath10k_tx_h_get_tid(struct ieee80211_frame *hdr)
 	if (ieee80211_is_mgmt(hdr))
 		return HTT_DATA_TX_EXT_TID_MGMT;
 
-	if (!ieee80211_is_data_qos(hdr))
+	if (! IEEE80211_IS_QOS(hdr))
 		return HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
 	//if (!is_unicast_ether_addr(ieee80211_get_DA(hdr)))
@@ -3794,7 +3794,7 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
-	if (! IEEE80211_IS_QOSDATA(hdr))
+	if (! IEEE80211_IS_QOS(hdr))
 		return;
 
 	/*
