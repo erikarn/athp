@@ -155,15 +155,16 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_frame *wh;
 	struct mbuf *m = NULL;
-	int is_wep;
+	int is_wep, is_qos;
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
+	is_qos = IEEE80211_IS_QOS(wh);
 
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D\n",
+	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D, is_wep=%d, is_qos=%d\n",
 	    __func__,
-	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":");
+	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":", is_wep, is_qos);
 
 	ATHP_CONF_LOCK(ar);
 
@@ -325,15 +326,17 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	struct ieee80211_node *ni;
 	struct mbuf *m = NULL;
 	struct ieee80211_frame *wh;
-	int is_wep;
+	int is_wep, is_qos;
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
+	is_qos = !! IEEE80211_IS_QOS(wh);
 
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D; iswep=%d\n",
-	    __func__, ni, m0, ni->ni_macaddr, ":", is_wep);
+	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D; iswep=%d, isqos=%d\n",
+	    __func__, ni, m0, ni->ni_macaddr, ":", is_wep,
+	    is_qos);
 
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
@@ -894,6 +897,11 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_rx_wmi, 0, "RX WMI frames");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_htt", CTLFLAG_RW,
 	    &ar->sc_rx_htt, 0, "RX HTT frames");
+
+	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "dbglog_module_mask",
+	    CTLFLAG_RW, &ar->sc_dbglog_module, 0, "Debuglog module mask");
+	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "dbglog_module_level",
+	    CTLFLAG_RW, &ar->sc_dbglog_level, 0, "Debuglog module level");
 }
 
 /*
