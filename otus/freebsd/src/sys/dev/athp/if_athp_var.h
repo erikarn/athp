@@ -177,6 +177,9 @@ struct ath10k {
 
 	int				sc_conf_crypt_mode;
 
+	uint32_t			sc_dbglog_module;
+	uint32_t			sc_dbglog_level;
+
 	union {
 		struct ath10k_rx_radiotap_header th;
 		uint8_t pad[64];
