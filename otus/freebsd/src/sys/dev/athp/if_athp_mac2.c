@@ -232,28 +232,36 @@ ath10k_mac_max_vht_nss(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 
 	return 1;
 }
+#endif
 
 /**********/
 /* Crypto */
 /**********/
 
 static int ath10k_send_key(struct ath10k_vif *arvif,
-			   struct ieee80211_key_conf *key,
-			   enum set_key_cmd cmd,
-			   const u8 *macaddr, u32 flags)
+			   const struct ieee80211_key *k,
+			   int cmd, const u8 *macaddr, u32 flags)
 {
-	struct ath10k *ar = arvif->ar;
-	struct wmi_vdev_install_key_arg arg = {
-		.vdev_id = arvif->vdev_id,
-		.key_idx = key->keyidx,
-		.key_len = key->keylen,
-		.key_data = key->key,
-		.key_flags = flags,
-		.macaddr = macaddr,
-	};
+	//struct ath10k *ar = arvif->ar;
+	//const struct ieee80211_cipher *cip = k->wk_cipher;
+
+	struct wmi_vdev_install_key_arg arg;
+
+	arg.vdev_id = arvif->vdev_id;
+	arg.key_idx = k->wk_keyix;
+	arg.key_len = k->wk_keylen;
+	arg.key_data = k->wk_key;
+	arg.key_flags = flags;
+	arg.macaddr = macaddr;
+
+	/* For now, just program in open cipher keys */
+	arg.key_cipher = WMI_CIPHER_NONE;
+	arg.key_len = 16;
+	arg.key_data = NULL;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+#if 0
 	switch (key->cipher) {
 	case WLAN_CIPHER_SUITE_CCMP:
 		arg.key_cipher = WMI_CIPHER_AES_CCM;
@@ -284,14 +292,14 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		arg.key_cipher = WMI_CIPHER_NONE;
 		arg.key_data = NULL;
 	}
+#endif
 
 	return ath10k_wmi_vdev_install_key(arvif->ar, &arg);
 }
 
-static int ath10k_install_key(struct ath10k_vif *arvif,
-			      struct ieee80211_key_conf *key,
-			      enum set_key_cmd cmd,
-			      const u8 *macaddr, u32 flags)
+int
+ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
+    int cmd, const u8 *macaddr, u32 flags)
 {
 	struct ath10k *ar = arvif->ar;
 	int ret;
@@ -301,8 +309,10 @@ static int ath10k_install_key(struct ath10k_vif *arvif,
 
 	ath10k_compl_reinit(&ar->install_key_done);
 
+#if 0
 	if (arvif->nohwcrypt)
 		return 1;
+#endif
 
 	ret = ath10k_send_key(arvif, key, cmd, macaddr, flags);
 	if (ret)
@@ -315,6 +325,7 @@ static int ath10k_install_key(struct ath10k_vif *arvif,
 	return 0;
 }
 
+#if 0
 static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 					const u8 *addr)
 {
