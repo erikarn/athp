@@ -242,8 +242,8 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 			   const struct ieee80211_key *k,
 			   int cmd, const u8 *macaddr, u32 flags)
 {
-	//struct ath10k *ar = arvif->ar;
-	//const struct ieee80211_cipher *cip = k->wk_cipher;
+	struct ath10k *ar = arvif->ar;
+	const struct ieee80211_cipher *cip = k->wk_cipher;
 
 	struct wmi_vdev_install_key_arg arg;
 
@@ -254,45 +254,39 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 	arg.key_flags = flags;
 	arg.macaddr = macaddr;
 
-	/* For now, just program in open cipher keys */
-	arg.key_cipher = WMI_CIPHER_NONE;
-	arg.key_len = 16;
-	arg.key_data = NULL;
-
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-#if 0
-	switch (key->cipher) {
-	case WLAN_CIPHER_SUITE_CCMP:
+	switch (cip->ic_cipher) {
+	case IEEE80211_CIPHER_AES_CCM:
 		arg.key_cipher = WMI_CIPHER_AES_CCM;
+#if 0
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV_MGMT;
+#endif
 		break;
-	case WLAN_CIPHER_SUITE_TKIP:
+	case IEEE80211_CIPHER_TKIPMIC:
 		arg.key_cipher = WMI_CIPHER_TKIP;
 		arg.key_txmic_len = 8;
 		arg.key_rxmic_len = 8;
 		break;
-	case WLAN_CIPHER_SUITE_WEP40:
-	case WLAN_CIPHER_SUITE_WEP104:
+	case IEEE80211_CIPHER_WEP:
 		arg.key_cipher = WMI_CIPHER_WEP;
 		break;
-	case WLAN_CIPHER_SUITE_AES_CMAC:
-		WARN_ON(1);
-		return -EINVAL;
 	default:
-		ath10k_warn(ar, "cipher %d is not supported\n", key->cipher);
+		ath10k_warn(ar, "cipher %d is not supported\n", cip->ic_cipher);
 		return -EOPNOTSUPP;
 	}
 
+#if 0
 	if (test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
 	}
+#endif
 
-	if (cmd == DISABLE_KEY) {
+	if (cmd == 0) {
 		arg.key_cipher = WMI_CIPHER_NONE;
+		arg.key_len = 16;	/* XXX - firmware needs /something/ */
 		arg.key_data = NULL;
 	}
-#endif
 
 	return ath10k_wmi_vdev_install_key(arvif->ar, &arg);
 }
@@ -309,10 +303,8 @@ ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
 
 	ath10k_compl_reinit(&ar->install_key_done);
 
-#if 0
 	if (arvif->nohwcrypt)
 		return 1;
-#endif
 
 	ret = ath10k_send_key(arvif, key, cmd, macaddr, flags);
 	if (ret)
@@ -3785,6 +3777,7 @@ ath10k_tx_h_use_hwcrypto(struct ieee80211vap *vif, struct athp_buf *pbuf)
 	if ((info->flags & mask) == mask)
 		return false;
 #endif
+
 	if (vif)
 		return !ath10k_vif_to_arvif(vif)->nohwcrypt;
 	return true;
@@ -3805,8 +3798,15 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: isQoS=%d\n", __func__, IEEE80211_IS_QOS(hdr));
+
 	if (! IEEE80211_IS_QOS(hdr))
 		return;
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: pre: len=%d\n", __func__, mbuf_skb_len(skb->m));
+	athp_debug_dump(ar, ATH10K_DBG_XMIT, NULL, "TX pre-adj",
+	    mbuf_skb_data(skb->m),
+	    mbuf_skb_len(skb->m));
 
 	/*
 	 * Move the data over the QoS header, effectively removing them.
@@ -3826,6 +3826,11 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 
 	/* Strip the subtype from the field */
 	hdr->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: post: len=%d\n", __func__, mbuf_skb_len(skb->m));
+	athp_debug_dump(ar, ATH10K_DBG_XMIT, NULL, "TX post-adj",
+	    mbuf_skb_data(skb->m),
+	    mbuf_skb_len(skb->m));
 }
 
 /*
@@ -5718,16 +5723,21 @@ exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static void ath10k_set_default_unicast_key(struct ieee80211_hw *hw,
-					   struct ieee80211_vif *vif,
-					   int keyidx)
+#if 0
+/*
+ * This is for WEP operation.
+ */
+void
+ath10k_set_default_unicast_key(struct ath10k *ar,
+    struct ieee80211vap *vif, int keyidx)
 {
 	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
-	mutex_lock(&arvif->ar->conf_mutex);
+	ATHP_CONF_LOCK(ar);
 
 	if (arvif->ar->state != ATH10K_STATE_ON)
 		goto unlock;
@@ -5750,8 +5760,11 @@ static void ath10k_set_default_unicast_key(struct ieee80211_hw *hw,
 	arvif->def_wep_key_idx = keyidx;
 
 unlock:
-	mutex_unlock(&arvif->ar->conf_mutex);
+	ATHP_CONF_UNLOCK(ar);
 }
+#endif
+
+#if 0
 
 static void ath10k_sta_rc_update_wk(struct work_struct *wk)
 {

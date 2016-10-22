@@ -577,16 +577,16 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
     ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
 {
 	struct ath10k *ar = vap->iv_ic->ic_softc;
-//	uint8_t i;
 
-	ath10k_warn(ar, "%s: TODO; k=%p, keyix=%d\n", __func__, k, k->wk_keyix);
+	ath10k_warn(ar, "%s: TODO; k=%p, keyix=%d; mac=%6D\n",
+	    __func__, k, k->wk_keyix, k->wk_macaddr, ":");
 
 	if (!(&vap->iv_nw_keys[0] <= k &&
 	     k < &vap->iv_nw_keys[IEEE80211_WEP_NKID])) {
 		ath10k_warn(ar, "%s: Pairwise key allocation\n", __func__);
 		if (k->wk_flags & IEEE80211_KEY_GROUP)
 			return (0);
-		*keyix = 0;
+		*keyix = 0;	/* XXX just use 0 for now, even though it's likely wrong */
 	} else {
 		*keyix = k - vap->iv_nw_keys;
 	}
@@ -596,31 +596,36 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 }
 
 /*
- * Even if we're doing software encryption we need to program
- * in a NONE key to the peer to unblock encryption/decryption.
+ * For raw mode operation (software crypto), we don't need to program
+ * in keys.
  *
- * XXX TODO: this is STA oriented!
+ * For hardware encryption mode, we need to program in keys to allow
+ * the firmware to both encrypt frames and also gate the EAPOL frame
+ * exchange.  Yes, it gates the PM4 exchange (the first encrypted one)
+ * until a key is programmed in.
  *
- * Yes, for now this is station oriented - we don't have the
- * relevant information to program in things correctly.
- * The firmware wants the MAC of the BSSID for both unicast
- * and group keys - but the key struct here doesn't tell us
- * which particular peer it is for.
+ * We can't do QoS and software encryption + native wifi right now -
+ * it seems the firmware/hardware does messy things with deleting and
+ * re-inserting a QoS header and that causes "issues" with the
+ * software encryption.
+ *
+ * XXX TODO - no, we actually kinda have to push this into a deferred
+ * context and run it on the taskqueue.  net80211 holds locks that
+ * we shouldn't be sleeping through.
  */
 static int
 athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
-	int ret;
-	uint32_t flags = 0;
 	struct ieee80211_node *ni;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	int ret;
+	uint32_t flags = 0;
 
-	ni = ieee80211_ref_node(vap->iv_bss);
-
-#if 0
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
-#endif
+
+	ni = ieee80211_ref_node(vap->iv_bss);
 
 	/*
 	 * For STA mode keys, we program in the MAC address
@@ -639,26 +644,57 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 		flags |= WMI_KEY_GROUP;
 	if (k->wk_keyix == 0)
 		flags |= WMI_KEY_PAIRWISE;
+
+	ATHP_CONF_LOCK(ar);
 	ret = ath10k_install_key(arvif, k, 1, ni->ni_macaddr, flags);
-	printf("%s: TODO; k=%p, keyix=%d; flags=0x%08x; wmi flags=0x%08x, install ret=%d\n",
-	    __func__, k, k->wk_keyix, k->wk_flags, flags, ret);
+	ATHP_CONF_UNLOCK(ar);
+	printf("%s: TODO; k=%p, keyix=%d; flags=0x%08x; wmi flags=0x%08x, install ret=%d, mac=%6D\n",
+	    __func__, k, k->wk_keyix, k->wk_flags, flags, ret, k->wk_macaddr, ":");
 	ieee80211_free_node(ni);
 	return (1);
 }
 
 /*
- * Just delete the allocated key index.
+ * Just delete the allocated key.
+ *
+ * Again, STA oriented, WPA oriented (not WEP yet.)
+ *
+ * XXX TODO - no, we actually kinda have to push this into a deferred
+ * context and run it on the taskqueue.  net80211 holds locks that
+ * we shouldn't be sleeping through.
  */
 static int
 athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
+	struct ieee80211_node *ni;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	int ret = 0;
+	uint32_t flags = 0;
 
-#if 0
+	printf("%s: TODO! k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
+	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret);
+	return 1;
+
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
-#endif
-	printf("%s: TODO; k=%p, keyix=%d, flags=0x%08x\n",
-	    __func__, k, k->wk_keyix, k->wk_flags);
+
+	ni = ieee80211_ref_node(vap->iv_bss);
+
+	if (k->wk_flags & IEEE80211_KEY_XMIT)
+		flags |= WMI_KEY_TX_USAGE;
+	if (k->wk_flags & IEEE80211_KEY_GROUP)
+		flags |= WMI_KEY_GROUP;
+	if (k->wk_keyix == 0)
+		flags |= WMI_KEY_PAIRWISE;
+
+	ATHP_CONF_LOCK(ar);
+	ret = ath10k_install_key(arvif, k, 0, ni->ni_macaddr, flags);
+	ATHP_CONF_UNLOCK(ar);
+
+	printf("%s: k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
+	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret);
+	ieee80211_free_node(ni);
 	return (1);
 }
 
@@ -1045,7 +1081,6 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_MONITOR |
 	    IEEE80211_C_WPA;
 
-#if 0
 	/* XXX crypto capabilities */
 	ic->ic_cryptocaps |=
 	    IEEE80211_CRYPTO_WEP |
@@ -1054,7 +1089,6 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_CRYPTO_CKIP |
 	    IEEE80211_CRYPTO_TKIP |
 	    IEEE80211_CRYPTO_TKIPMIC;
-#endif
 
 	/* capabilities, etc */
 	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD;

@@ -54,6 +54,7 @@ struct athp_node {
 
 #define	ATHP_CONF_LOCK(sc)		sx_xlock(&(sc)->sc_conf_sx)
 #define	ATHP_CONF_UNLOCK(sc)		sx_unlock(&(sc)->sc_conf_sx)
+/* XXX add lock assertions damnit */
 #define	ATHP_CONF_LOCK_ASSERT(sc)	0
 #define	ATHP_CONF_UNLOCK_ASSERT(sc)	0
 
