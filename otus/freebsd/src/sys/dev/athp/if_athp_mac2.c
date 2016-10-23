@@ -263,7 +263,7 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 	/*
 	 * For now we support a single pairwise keyidx of 0.
 	 */
-	if (k->wk_keyix = ATHP_PAIRWISE_KEY_IDX) {
+	if (k->wk_keyix == ATHP_PAIRWISE_KEY_IDX) {
 		arg.key_idx = 0;
 	}
 
