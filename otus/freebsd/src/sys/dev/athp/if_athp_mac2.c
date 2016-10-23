@@ -3710,7 +3710,7 @@ void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
  */
 static u8 ath10k_tx_h_get_tid(struct ieee80211_frame *hdr)
 {
-	if (ieee80211_is_mgmt(hdr))
+	if (IEEE80211_IS_MGMT(hdr))
 		return HTT_DATA_TX_EXT_TID_MGMT;
 
 	if (! IEEE80211_IS_QOS(hdr))
@@ -3749,7 +3749,7 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211vap *vif,
 	if (!vif || vif->iv_opmode == IEEE80211_M_MONITOR)
 		return ATH10K_HW_TXRX_RAW;
 
-	if (ieee80211_is_mgmt(hdr))
+	if (IEEE80211_IS_MGMT(hdr))
 		return ATH10K_HW_TXRX_MGMT;
 
 	/* Workaround:

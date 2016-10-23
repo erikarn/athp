@@ -147,7 +147,7 @@ IS_ALIGNED(unsigned long ptr, int a)
 }
 
 #define	IEEE80211_HAS_PROT(a)		ieee80211_is_protected(a)
-#define	IEEE80211_IS_MGMT(a)		ieee80211_is_mgmt(a)
+//#define	IEEE80211_IS_MGMT(a)		ieee80211_is_mgmt(a)
 #define	IEEE80211_IS_ACTION(a)		ieee80211_is_action(a)
 #define	IEEE80211_IS_DEAUTH(a)		ieee80211_is_deauth(a)
 #define	IEEE80211_IS_DISASSOC(a)	ieee80211_is_disassoc(a)
@@ -301,12 +301,14 @@ static inline bool ieee80211_is_nullfunc(struct ieee80211_frame *wh)
 	return (true);
 }
 
+#if 0
 static inline bool ieee80211_is_mgmt(struct ieee80211_frame *wh)
 {
 	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 
 	return (type == IEEE80211_FC0_TYPE_MGT);
 }
+#endif
 
 static inline bool ieee80211_is_beacon(struct ieee80211_frame *wh)
 {
