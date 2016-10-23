@@ -592,6 +592,23 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 	}
 	*rxkeyix = *keyix;
 
+	/*
+	 * Management frames require IV.  Not yet sure about TKIP MIC.
+	 * Other frames don't require IV/MIC.
+	 *
+	 * To be clear, ath10k does this:
+	 *
+	 * CCMP - GENERATE_IV_MGMT
+	 * TKIP - nothing (ie, no MIC, etc)
+	 * raw mode - always generate IVs
+	 *
+	 * XXX of course, we should really check this assumption
+	 * XXX of course, we should finish configuring keys as appropriate,
+	 *     rather than the below.
+	 */
+	k->wk_flags |= IEEE80211_KEY_NOIV;
+	k->wk_flags |= IEEE80211_KEY_NOMIC;
+
 	return (1);
 }
 
