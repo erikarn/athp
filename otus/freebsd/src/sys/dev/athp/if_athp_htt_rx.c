@@ -1667,13 +1667,13 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 
 	ath10k_dbg(ar, ATH10K_DBG_RECV,
 	    "%s: enctype=%d, qos=0x%x, fcserr=%d, cryptoerr=%d, tkiperr=%d, "
-	    "peeridxinvalid=%d, isdescrypt=%d, isprot=%d\n",
+	    "peeridxinvalid=%d, isdecrypt=%d, isprot=%d\n",
 	    __func__,
 	    enctype, qos[0], has_fcs_err, has_crypto_err, has_tkip_err,
 	    has_peer_idx_invalid, is_decrypted, ieee80211_has_protected(hdr));
 
 	/* Clear per-MPDU flags while leaving per-PPDU flags intact. */
-	status->r_flags &= ~(
+	status->c_pktflags &= ~(
 		    IEEE80211_RX_F_FAIL_FCSCRC
 		    | IEEE80211_RX_F_FAIL_MIC
 		    | IEEE80211_RX_F_DECRYPTED
@@ -1682,13 +1682,13 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 		  );
 
 	if (has_fcs_err)
-		status->r_flags |= IEEE80211_RX_F_FAIL_FCSCRC;
+		status->c_pktflags |= IEEE80211_RX_F_FAIL_FCSCRC;
 
 	if (has_tkip_err)
-		status->r_flags |= IEEE80211_RX_F_FAIL_MIC;
+		status->c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
 
 	if (is_decrypted)
-		status->r_flags |= IEEE80211_RX_F_DECRYPTED
+		status->c_pktflags |= IEEE80211_RX_F_DECRYPTED
 			| IEEE80211_RX_F_IV_STRIP
 			| IEEE80211_RX_F_MMIC_STRIP;
 
@@ -1719,7 +1719,7 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		TAILQ_REMOVE(amsdu, msdu, next);
 		/* Setup per-MSDU flags */
 
-		status->r_flags &= (
+		status->c_pktflags &= ~(
 		    IEEE80211_RX_F_AMSDU
 		    | IEEE80211_RX_F_AMSDU_MORE);
 		/*
@@ -1727,12 +1727,12 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		 * just MSDU/MPDU?
 		 */
 #if 0
-		status->r_flags |= IEEE80211_RX_F_AMSDU;
+		status->c_pktflags |= IEEE80211_RX_F_AMSDU;
 #endif
 		if (TAILQ_EMPTY(amsdu))
-			status->r_flags &= ~IEEE80211_RX_F_AMSDU_MORE;
+			status->c_pktflags &= ~IEEE80211_RX_F_AMSDU_MORE;
 		else
-			status->r_flags |= IEEE80211_RX_F_AMSDU_MORE;
+			status->c_pktflags |= IEEE80211_RX_F_AMSDU_MORE;
 		ath10k_process_rx(ar, status, msdu);
 	}
 }
@@ -2334,7 +2334,7 @@ static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 	 * will drop the frame.
 	 */
 	hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
-	status->r_flags |= IEEE80211_RX_F_DECRYPTED
+	status->c_pktflags |= IEEE80211_RX_F_DECRYPTED
 		    | IEEE80211_RX_F_IV_STRIP
 		    | IEEE80211_RX_F_MMIC_STRIP;
 }
@@ -2384,7 +2384,8 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		 */
 		offset = 4 - ((unsigned long) mbuf_skb_data(msdu->m) & 3);
 		mbuf_skb_put(msdu->m, offset);
-		memmove(mbuf_skb_data(msdu->m) + offset, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
+		memmove(mbuf_skb_data(msdu->m) + offset,
+		    mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 		mbuf_skb_pull(msdu->m, offset);
 
 		/* FIXME: The frame is NWifi. Re-construct QoS Control
