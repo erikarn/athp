@@ -586,7 +586,7 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 		ath10k_warn(ar, "%s: Pairwise key allocation\n", __func__);
 		if (k->wk_flags & IEEE80211_KEY_GROUP)
 			return (0);
-		*keyix = 0;	/* XXX just use 0 for now, even though it's likely wrong */
+		*keyix = ATHP_PAIRWISE_KEY_IDX;
 	} else {
 		*keyix = k - vap->iv_nw_keys;
 	}
@@ -638,18 +638,26 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 * but .. there isn't.  Sigh.
 	 */
 
+	/* WMI_KEY_TX_USAGE is for static WEP */
+#if 0
 	if (k->wk_flags & IEEE80211_KEY_XMIT)
 		flags |= WMI_KEY_TX_USAGE;
+#endif
 	if (k->wk_flags & IEEE80211_KEY_GROUP)
 		flags |= WMI_KEY_GROUP;
-	if (k->wk_keyix == 0)
+	if (k->wk_keyix == ATHP_PAIRWISE_KEY_IDX)
 		flags |= WMI_KEY_PAIRWISE;
 
 	ATHP_CONF_LOCK(ar);
 	ret = ath10k_install_key(arvif, k, 1, ni->ni_macaddr, flags);
+	printf("%s: TODO; k=%p, keyix=%d; flags=0x%08x; wmi flags=0x%08x, install ret=%d, mac=%6D, wmimac=%6D, keylen=%d\n",
+	    __func__, k, k->wk_keyix, k->wk_flags, flags, ret, k->wk_macaddr, ":", ni->ni_macaddr, ":", k->wk_keylen);
+
+	/* Note: this only matters for WEP. */
+	ret = ath10k_set_key_h_def_keyidx(ar, arvif, 1, k);
+	printf("%s: TODO: gk update=%d\n", __func__, ret);
 	ATHP_CONF_UNLOCK(ar);
-	printf("%s: TODO; k=%p, keyix=%d; flags=0x%08x; wmi flags=0x%08x, install ret=%d, mac=%6D\n",
-	    __func__, k, k->wk_keyix, k->wk_flags, flags, ret, k->wk_macaddr, ":");
+
 	ieee80211_free_node(ni);
 	return (1);
 }
@@ -674,6 +682,14 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	printf("%s: TODO! k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
 	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret);
+
+	/*
+	 * XXX for now! We need to push key generation into a callback
+	 * queue due to key programming sleeping.
+	 *
+	 * .. or net80211 should just grow key updated in its taskqueue
+	 * stuff.
+	 */
 	return 1;
 
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
@@ -681,8 +697,11 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	ni = ieee80211_ref_node(vap->iv_bss);
 
+	/* Again, this is for WEP */
+#if 0
 	if (k->wk_flags & IEEE80211_KEY_XMIT)
 		flags |= WMI_KEY_TX_USAGE;
+#endif
 	if (k->wk_flags & IEEE80211_KEY_GROUP)
 		flags |= WMI_KEY_GROUP;
 	if (k->wk_keyix == 0)
@@ -692,8 +711,8 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	ret = ath10k_install_key(arvif, k, 0, ni->ni_macaddr, flags);
 	ATHP_CONF_UNLOCK(ar);
 
-	printf("%s: k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
-	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret);
+	printf("%s: k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d, wmimac=%6D\n",
+	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret, ni->ni_macaddr, ":");
 	ieee80211_free_node(ni);
 	return (1);
 }

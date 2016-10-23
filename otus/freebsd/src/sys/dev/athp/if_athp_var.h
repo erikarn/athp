@@ -73,6 +73,18 @@ struct athp_node {
 #define	ATHP_DMA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
 #define	ATHP_DMA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_NOTOWNED)
 
+/*
+ * For now, we don't allocate hardware pairwise keys as hardware
+ * indexes - instead, we just set it up with the right key index
+ * when we plumb them in.
+ *
+ * So, we define key index "16" as being "this is a pairwise key".
+ * Later on when we support multiple pairwise keys for a given peer
+ * (rather than enforcing "0" as in the older standard) we can
+ * revisit this.
+ */
+#define	ATHP_PAIRWISE_KEY_IDX		16
+
 struct ath10k_bmi {
 	bool done_sent;
 };

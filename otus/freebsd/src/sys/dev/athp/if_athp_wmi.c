@@ -5874,9 +5874,9 @@ ath10k_wmi_op_gen_vdev_install_key(struct ath10k *ar,
 	if (arg->key_data)
 		memcpy(cmd->key_data, arg->key_data, arg->key_len);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi vdev install key idx %d cipher %d len %d\n",
-		   arg->key_idx, arg->key_cipher, arg->key_len);
+	ath10k_dbg(ar, ATH10K_DBG_WMI | ATH10K_DBG_XMIT,
+		   "wmi vdev install key idx %d cipher %d len %d, miclen %d/%d macaddr %6D\n",
+		   arg->key_idx, arg->key_cipher, arg->key_len, arg->key_txmic_len, arg->key_rxmic_len, arg->macaddr, ":");
 	return pbuf;
 }
 

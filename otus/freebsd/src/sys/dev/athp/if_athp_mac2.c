@@ -247,14 +247,25 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 
 	struct wmi_vdev_install_key_arg arg;
 
+	bzero(&arg, sizeof(arg));
+
 	arg.vdev_id = arvif->vdev_id;
 	arg.key_idx = k->wk_keyix;
 	arg.key_len = k->wk_keylen;
 	arg.key_data = k->wk_key;
 	arg.key_flags = flags;
 	arg.macaddr = macaddr;
+	arg.key_txmic_len = 0;
+	arg.key_rxmic_len = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/*
+	 * For now we support a single pairwise keyidx of 0.
+	 */
+	if (k->wk_keyix = ATHP_PAIRWISE_KEY_IDX) {
+		arg.key_idx = 0;
+	}
 
 	switch (cip->ic_cipher) {
 	case IEEE80211_CIPHER_AES_CCM:
@@ -263,10 +274,19 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV_MGMT;
 #endif
 		break;
-	case IEEE80211_CIPHER_TKIPMIC:
-		arg.key_cipher = WMI_CIPHER_TKIP;
+	case IEEE80211_CIPHER_TKIP:
 		arg.key_txmic_len = 8;
 		arg.key_rxmic_len = 8;
+		/*
+		 * FreeBSD's keylen for TKIP doesn't include MIC.
+		 * So we have to add the MIC length here before we
+		 * pass it up to ath10k firmware.
+		 *
+		 * The key+mic format is the same as mac80211 and what
+		 * is expected by the firmware.
+		 */
+		arg.key_len += 16;
+		arg.key_cipher = WMI_CIPHER_TKIP;
 		break;
 	case IEEE80211_CIPHER_WEP:
 		arg.key_cipher = WMI_CIPHER_WEP;
@@ -287,6 +307,14 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		arg.key_len = 16;	/* XXX - firmware needs /something/ */
 		arg.key_data = NULL;
 	}
+
+	printf("KEYDATA: (%d)\n", k->wk_keylen);
+	for (int i = 0; i < k->wk_keylen; i++) {
+		printf("%.2x ", k->wk_key[i]);
+		if (i % 16 == 15)
+			printf("\n");
+	}
+	printf("\n");
 
 	return ath10k_wmi_vdev_install_key(arvif->ar, &arg);
 }
@@ -2271,7 +2299,7 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
 
-#if 0
+#if 1
 	/* If is_run=0, then clear the privacy capinfo */
 	if (is_run == 0)
 		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
@@ -2326,6 +2354,8 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 	 *
 	 * And yes, it should only be done when we're doing hardware
 	 * crypto.
+	 *
+	 * XXX TODO: WEP?
 	 */
 	ret = ath10k_wmi_vdev_set_param(arvif->ar,
 					arvif->vdev_id,
@@ -5542,12 +5572,11 @@ ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 	ATHP_DATA_UNLOCK(ar);
 }
 
-#if 0
-static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
-					struct ath10k_vif *arvif,
-					enum set_key_cmd cmd,
-					struct ieee80211_key_conf *key)
+int
+ath10k_set_key_h_def_keyidx(struct ath10k *ar,
+    struct ath10k_vif *arvif, int cmd, const struct ieee80211_key *k)
 {
+	const struct ieee80211_cipher *cip = k->wk_cipher;
 	u32 vdev_param = arvif->ar->wmi.vdev_param->def_keyid;
 	int ret;
 
@@ -5564,27 +5593,31 @@ static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 
 	if (arvif->vdev_type != WMI_VDEV_TYPE_AP &&
 	    arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
-		return;
+		return (0);
 
-	if (key->cipher == WLAN_CIPHER_SUITE_WEP40)
-		return;
+	if (cip->ic_cipher == IEEE80211_CIPHER_WEP)
+		return (0);
 
-	if (key->cipher == WLAN_CIPHER_SUITE_WEP104)
-		return;
+	/* XXX TODO yes, should mark keys as pairwise */
+	if (k->wk_keyix == 0)
+		return (0);
 
-	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
-		return;
-
-	if (cmd != SET_KEY)
-		return;
+	if (cmd != 1)
+		return (0);
 
 	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
-					key->keyidx);
+					k->wk_keyix);
 	if (ret)
 		ath10k_warn(ar, "failed to set vdev %i group key as default key: %d\n",
 			    arvif->vdev_id, ret);
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: set default key to %d\n",
+	    __func__, k->wk_keyix);
+
+	return (ret);
 }
 
+#if 0
 static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 			  struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 			  struct ieee80211_key_conf *key)
