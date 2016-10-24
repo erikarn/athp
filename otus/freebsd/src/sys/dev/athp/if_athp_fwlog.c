@@ -1450,7 +1450,7 @@ static void ath10k_fwlog_print(struct ath10k *ar, u32 mod_id, u16 vap_id,
 						 module_id_max,
 						 dbg_msg_arr));
 	else
-		printf("[%u] %s ( ",
+		printf("PKTLOG [%u] %s ( ",
 		       timestamp,
 		       fw_dbglog_get_msg(mod_id, dbg_id,
 					 module_id_max, dbg_msg_arr));
