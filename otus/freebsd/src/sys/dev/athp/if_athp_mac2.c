@@ -3820,15 +3820,8 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
-	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: isQoS=%d\n", __func__, IEEE80211_IS_QOS(hdr));
-
 	if (! IEEE80211_IS_QOS(hdr))
 		return;
-
-	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: pre: len=%d\n", __func__, mbuf_skb_len(skb->m));
-	athp_debug_dump(ar, ATH10K_DBG_XMIT, NULL, "TX pre-adj",
-	    mbuf_skb_data(skb->m),
-	    mbuf_skb_len(skb->m));
 
 	/*
 	 * Move the data over the QoS header, effectively removing them.
@@ -3848,11 +3841,6 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 
 	/* Strip the subtype from the field */
 	hdr->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
-
-	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: post: len=%d\n", __func__, mbuf_skb_len(skb->m));
-	athp_debug_dump(ar, ATH10K_DBG_XMIT, NULL, "TX post-adj",
-	    mbuf_skb_data(skb->m),
-	    mbuf_skb_len(skb->m));
 }
 
 /*
