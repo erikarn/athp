@@ -577,6 +577,7 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
     ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
 {
 	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 
 	ath10k_warn(ar, "%s: TODO; k=%p, keyix=%d; mac=%6D\n",
 	    __func__, k, k->wk_keyix, k->wk_macaddr, ":");
@@ -606,8 +607,10 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 	 * XXX of course, we should finish configuring keys as appropriate,
 	 *     rather than the below.
 	 */
-	k->wk_flags |= IEEE80211_KEY_NOIV;
-	k->wk_flags |= IEEE80211_KEY_NOMIC;
+	if (! arvif->nohwcrypt) {
+		k->wk_flags |= IEEE80211_KEY_NOIV;
+		k->wk_flags |= IEEE80211_KEY_NOMIC;
+	}
 
 	return (1);
 }
@@ -1118,13 +1121,15 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_WPA;
 
 	/* XXX crypto capabilities */
-	ic->ic_cryptocaps |=
-	    IEEE80211_CRYPTO_WEP |
-	    IEEE80211_CRYPTO_AES_OCB |
-	    IEEE80211_CRYPTO_AES_CCM |
-	    IEEE80211_CRYPTO_CKIP |
-	    IEEE80211_CRYPTO_TKIP |
-	    IEEE80211_CRYPTO_TKIPMIC;
+	if (ar->sc_conf_crypt_mode == ATH10K_CRYPT_MODE_HW) {
+		ic->ic_cryptocaps |=
+		    IEEE80211_CRYPTO_WEP |
+		    IEEE80211_CRYPTO_AES_OCB |
+		    IEEE80211_CRYPTO_AES_CCM |
+		    IEEE80211_CRYPTO_CKIP |
+		    IEEE80211_CRYPTO_TKIP |
+		    IEEE80211_CRYPTO_TKIPMIC;
+	}
 
 	/* capabilities, etc */
 	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD;
