@@ -308,14 +308,6 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		arg.key_data = NULL;
 	}
 
-	printf("KEYDATA: (%d)\n", k->wk_keylen);
-	for (int i = 0; i < k->wk_keylen; i++) {
-		printf("%.2x ", k->wk_key[i]);
-		if (i % 16 == 15)
-			printf("\n");
-	}
-	printf("\n");
-
 	return ath10k_wmi_vdev_install_key(arvif->ar, &arg);
 }
 
