@@ -1161,44 +1161,6 @@ static void ath10k_process_rx(struct ath10k *ar,
 			      struct ieee80211_rx_stats *rx_status,
 			      struct athp_buf *skb)
 {
-#if 0
-	struct ieee80211_rx_stats *status;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)mbuf_skb_data(skb->m);
-	char tid[32];
-
-	status = IEEE80211_SKB_RXCB(skb);
-	*status = *rx_status;
-
-	ath10k_dbg(ar, ATH10K_DBG_DATA,
-		   "rx skb %p len %u peer %pM %s %s sn %u %s%s%s%s%s %srate_idx %u vht_nss %u freq %u band %u flag 0x%x fcs-err %i mic-err %i amsdu-more %i\n",
-		   skb,
-		   mbuf_skb_len(skb->m),
-		   ieee80211_get_SA(hdr),
-		   ath10k_get_tid(hdr, tid, sizeof(tid)),
-		   is_multicast_ether_addr(ieee80211_get_DA(hdr)) ?
-							"mcast" : "ucast",
-		   (__le16_to_cpu(hdr->seq_ctrl) & IEEE80211_SCTL_SEQ) >> 4,
-		   status->flag == 0 ? "legacy" : "",
-		   status->flag & RX_FLAG_HT ? "ht" : "",
-		   status->flag & RX_FLAG_VHT ? "vht" : "",
-		   status->flag & RX_FLAG_40MHZ ? "40" : "",
-		   status->vht_flag & RX_VHT_FLAG_80MHZ ? "80" : "",
-		   status->flag & RX_FLAG_SHORT_GI ? "sgi " : "",
-		   status->rate_idx,
-		   status->vht_nss,
-		   status->freq,
-		   status->band, status->flag,
-		   !!(status->flag & RX_FLAG_FAILED_FCS_CRC),
-		   !!(status->flag & RX_FLAG_MMIC_ERROR),
-		   !!(status->flag & RX_FLAG_AMSDU_MORE));
-	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "rx skb: ",
-			mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-#ifdef	ATHP_TRACE_DIAG
-	trace_ath10k_rx_hdr(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-	trace_ath10k_rx_payload(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-#endif
-	ieee80211_rx(ar->hw, skb);
-#else
 	struct ieee80211com *ic = &ar->sc_ic;
 	struct mbuf *m;
 	struct ieee80211_node *ni;
@@ -1262,6 +1224,11 @@ static void ath10k_process_rx(struct ath10k *ar,
 	}
 
 	/*
+	 * Add status - eventually we'll let radiotap RX use this info.
+	 */
+	ieee80211_add_rx_params(m, rx_status);
+
+	/*
 	 * Don't pass short frames up to the stack.
 	 */
 	if (m->m_len < IEEE80211_MIN_LEN) {
@@ -1276,9 +1243,15 @@ static void ath10k_process_rx(struct ath10k *ar,
 	}
 
 	/*
-	 * Add status
+	 * Don't pass frames that fail FCS check up to the stack.
 	 */
-	ieee80211_add_rx_params(m, rx_status);
+	if (rx_status->c_pktflags & IEEE80211_RX_F_FAIL_FCSCRC) {
+		ar->sc_stats.rx_pkt_fail_fcscrc++;
+		if (ieee80211_radiotap_active(ic))
+			ieee80211_radiotap_rx_all(ic, m);
+		m_freem(m);
+		return;
+	}
 
 	/* RX path to net80211 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
@@ -1288,9 +1261,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 	} else {
 		ieee80211_input_mimo_all(ic, m);
 	}
-	/* skb/pbuf is done by here */
-
-#endif
+	/* skb/pbuf is now owned by the net80211 layer */
 }
 
 static int ath10k_htt_rx_nwifi_hdrlen(struct ath10k *ar,
