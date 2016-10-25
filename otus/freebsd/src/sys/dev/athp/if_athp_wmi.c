@@ -2653,8 +2653,10 @@ void ath10k_wmi_event_echo(struct ath10k *ar, struct athp_buf *pbuf)
 
 int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf)
 {
+#if 0
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event debug mesg len %d\n",
 		   mbuf_skb_len(pbuf->m));
+#endif
 
 #ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_dbglog(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
@@ -4751,7 +4753,11 @@ static void ath10k_wmi_10_2_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	cmd_hdr = (struct wmi_cmd_hdr *)mbuf_skb_data(pbuf->m);
 	id = MS(__le32_to_cpu(cmd_hdr->cmd_id), WMI_CMD_HDR_CMD_ID);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event id 0x%08x\n", __func__, id);
+	/*
+	 * Temporary - don't log management RX for now.
+	 */
+	if (id != WMI_10_2_MGMT_RX_EVENTID)
+		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event id 0x%08x\n", __func__, id);
 
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
