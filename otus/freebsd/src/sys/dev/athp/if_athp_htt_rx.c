@@ -1827,9 +1827,12 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	TAILQ_FOREACH(pbuf, amsdu, next) {
 		total_len += mbuf_skb_len(pbuf->m);
 	}
-	printf("%s: nframes=%d; msdu len=%d\n", __func__,
+	ath10k_warn(ar,
+	    "%s: nframes=%d; msdu len=%d, desclen=%d, totallen=%d\n", __func__,
 	    athp_buf_list_count(amsdu),
-	    total_len);
+	    total_len,
+	    (int) sizeof(struct htt_rx_desc),
+	    (int) total_len + (int) sizeof(struct htt_rx_desc));
 
 	/*
 	 * Step 1.5 - add the HTT RX descriptor to that.
@@ -1850,7 +1853,7 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	}
 
 	/*
-	 * XXX TODO: we need to actually copy the htt rx
+	 * Now we need to actually copy the htt rx
 	 * descriptor field from the first msdu and then
 	 * do the relevant hijinx to move things around.
 	 *
