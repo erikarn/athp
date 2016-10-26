@@ -468,7 +468,7 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 
 	/*
-	 * Initialise ath10k BMI bits.
+	 * Initialise ath10k BMI/PCIDIAG bits.
 	 */
 	ret = athp_descdma_alloc(ar, &psc->sc_bmi_txbuf, "bmi_msg_req",
 	    4, 1024);
@@ -668,6 +668,10 @@ bad2:
 bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 bad:
+
+	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
+	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
+
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
@@ -682,8 +686,6 @@ bad:
 	}
 	ath10k_core_destroy(ar);
 bad0:
-	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
-	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
 	return (err);
 }
 

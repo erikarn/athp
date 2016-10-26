@@ -1575,7 +1575,9 @@ ath10k_core_probe_fw(struct ath10k *ar)
 	struct bmi_target_info target_info;
 	int ret = 0;
 
+	ATHP_CONF_LOCK(ar);
 	ret = ath10k_hif_power_up(ar);
+	ATHP_CONF_UNLOCK(ar);
 	if (ret) {
 		ath10k_err(ar, "could not start hif (%d)\n", ret);
 		return ret;

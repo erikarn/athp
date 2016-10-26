@@ -232,11 +232,21 @@ ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 	struct ath10k_ce_pipe *ce_diag;
 	/* Host buffer address in CE space */
 	u32 ce_data;
-	struct athp_descdma dd;
 	bus_addr_t ce_data_base = 0;
 	void *data_buf = NULL;
 	int i;
 
+	/*
+	 * We're sharing the same buffer that BMI uses for exchanging
+	 * messages.
+	 */
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (nbytes > 4096) {
+		ath10k_err(ar, "%s: called with nbytes > bufsize (%d)\n",
+		    __func__, nbytes);
+		return (-ENOMEM);
+	}
 
 	/*
 	 * Allocate a temporary bounce buffer to hold caller's data
@@ -245,21 +255,12 @@ ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 	 *   2) Buffer in DMA-able space
 	 */
 	/*
-	 * XXX TODO: this allocates a whole separate tag
-	 * just to allocate a descriptor with the given alignment.
-	 * Ideally we'd just use contigmalloc() and get the paddr
-	 * for it.
+	 * Note: locks are held here, so share the same buffer from BMI
+	 * whilst holding the conf lock.
 	 */
 	orig_nbytes = nbytes;
-	ret = athp_descdma_alloc(ar, &dd, "pci_diag_read_mem", 4, nbytes);
-	if (ret != 0) {
-		ath10k_warn(ar,
-		    "failed to read diag value (alloc) at 0x%x: %d\n",
-		    address, ret);
-		return (ret);
-	}
-	data_buf = dd.dd_desc;
-	ce_data_base = dd.dd_desc_paddr;
+	data_buf = psc->sc_bmi_txbuf.dd_desc;
+	ce_data_base = psc->sc_bmi_txbuf.dd_desc_paddr;
 
 	ATHP_PCI_CE_LOCK(psc);
 
@@ -353,8 +354,6 @@ done:
 		    address, ret);
 
 	ATHP_PCI_CE_UNLOCK(psc);
-
-	athp_descdma_free(ar, &dd);
 
 	return ret;
 }
@@ -455,11 +454,12 @@ ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 	unsigned int id;
 	unsigned int flags;
 	struct ath10k_ce_pipe *ce_diag;
-	struct athp_descdma dd;
 	void *data_buf = NULL;
 	u32 ce_data;	/* Host buffer address in CE space */
 	bus_addr_t ce_data_base = 0;
 	int i;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	/*
 	 * Allocate a temporary bounce buffer to hold caller's data
@@ -468,15 +468,12 @@ ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 	 *   2) Buffer in DMA-able space
 	 */
 	orig_nbytes = nbytes;
-	ret = athp_descdma_alloc(ar, &dd, "pci_diag_read_mem", 4, nbytes);
-	if (ret != 0) {
-		ath10k_warn(ar,
-		    "failed to write diag value (alloc) at 0x%x: %d\n",
-		    address, ret);
-		return (ret);
-	}
-	data_buf = dd.dd_desc;
-	ce_data_base = dd.dd_desc_paddr;
+
+	/*
+	 * Re-use the BMI TX buffer, under the conf lock.
+	 */
+	data_buf = psc->sc_bmi_txbuf.dd_desc;
+	ce_data_base = psc->sc_bmi_txbuf.dd_desc_paddr;
 
 	ATHP_PCI_CE_LOCK(psc);
 
@@ -572,8 +569,6 @@ done:
 		ath10k_warn(ar, "failed to write diag value at 0x%x: %d\n",
 		    address, ret);
 	ATHP_PCI_CE_UNLOCK(psc);
-
-	athp_descdma_free(ar, &dd);
 
 	return ret;
 }
