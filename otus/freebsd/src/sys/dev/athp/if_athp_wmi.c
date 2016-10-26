@@ -1794,6 +1794,9 @@ static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 	 * XXX TODO: this needs conf_lock held, but unfortunately
 	 * it may already be held.  Maybe see if we can iterate
 	 * the VAPs?
+	 *
+	 * Note: the reason for holding conf lock is that said
+	 * lock looks after the arvifs list.
 	 */
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		ath10k_wmi_tx_beacon_nowait(vif);
@@ -1843,9 +1846,11 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
+#if 0
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
 	    "%s: setup: cmdid=0x%08x, ticks=%u, interval=%u\n",
 	    __func__, cmd_id, ticks, interval);
+#endif
 
 	while (! ieee80211_time_after(ticks, interval)) {
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
