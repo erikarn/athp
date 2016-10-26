@@ -669,6 +669,17 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 #endif
 }
 
+/*
+ * ath10k has a single alloc (and single free) path which
+ * effectively tears down the entire HTT RX side, including
+ * pending buffers, taskqueues, descriptor memory, etc.
+ *
+ * The problem is two fold:
+ * + It does this during NIC powerdown, and brings it up again
+ *   when the NIC is enabled again, and
+ * + It holds the conf mutex when it does so.
+ */
+
 int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
