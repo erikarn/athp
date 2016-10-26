@@ -31,7 +31,6 @@
 
 #define	ATHP_RXBUF_MAX_SCATTER	1
 #define	ATHP_TXBUF_MAX_SCATTER	1
-#define	ATHP_RBUF_SIZE		2048
 /* XXX upped these from 1024 */
 #define	ATHP_RX_LIST_COUNT	2048
 #define	ATHP_TX_LIST_COUNT	2048
