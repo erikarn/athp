@@ -1982,7 +1982,6 @@ static int ath10k_mac_num_vifs_started(struct ath10k *ar)
 	int num = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
-	ATHP_CONF_LOCK_ASSERT(ar);
 
 	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		if (arvif->is_started)
