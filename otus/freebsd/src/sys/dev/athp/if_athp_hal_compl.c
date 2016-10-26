@@ -9,6 +9,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include "if_athp_hal_compl.h"
 
@@ -27,7 +29,8 @@ ath10k_compl_wakeup_one(struct ath10k_compl *p)
 }
 
 int
-ath10k_compl_wait(struct ath10k_compl *p, const char *str, int timo)
+ath10k_compl_wait(struct ath10k_compl *p, const char *str,
+    struct mtx *m, int timo)
 {
 	int ret;
 
@@ -45,7 +48,7 @@ ath10k_compl_wait(struct ath10k_compl *p, const char *str, int timo)
 	if (p->done > 0)
 		return 1;
 
-	ret = tsleep(p, 0, str, timo);
+	ret = mtx_sleep(p, m, 0, str, timo);
 
 	/* Linux compat hack - return 0 if we timed out; else the 'time left' */
 	if (ret == EWOULDBLOCK) {
@@ -100,7 +103,8 @@ ath10k_wait_wakeup_all(struct ath10k_wait *p)
 }
 
 int
-ath10k_wait_wait(struct ath10k_wait *p, const char *str, int timo)
+ath10k_wait_wait(struct ath10k_wait *p, const char *str, struct mtx *m,
+    int timo)
 {
 	int ret;
 
@@ -114,7 +118,7 @@ ath10k_wait_wait(struct ath10k_wait *p, const char *str, int timo)
 		timo = (timo * hz) / 1000;
 	}
 
-	ret = tsleep(p, 0, str, timo);
+	ret = mtx_sleep(p, m, 0, str, timo);
 
 	/* Linux compat hack - return 0 if we timed out; else the 'time left' */
 	if (ret == EWOULDBLOCK) {

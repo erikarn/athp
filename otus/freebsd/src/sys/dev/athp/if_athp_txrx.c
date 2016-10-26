@@ -243,7 +243,8 @@ static int ath10k_wait_for_peer_common(struct ath10k *ar, int vdev_id,
 	while (! ieee80211_time_after(ticks, interval)) {
 			bool mapped;
 
-			ath10k_wait_wait(&ar->peer_mapping_wq, "peer_mapping_wq", 1);
+			ath10k_wait_wait(&ar->peer_mapping_wq, "peer_mapping_wq",
+			    &ar->sc_conf_mtx, 1);
 
 			/* Check to see if the peer exists */
 			ATHP_DATA_LOCK(ar);

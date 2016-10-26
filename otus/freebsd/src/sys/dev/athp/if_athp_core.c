@@ -1537,7 +1537,7 @@ ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 	}
 
 	time_left = ath10k_compl_wait(&ar->target_suspend, "target_suspend",
-	    1000);
+	    &ar->sc_conf_mtx, 1000);
 
 	if (!time_left) {
 		ath10k_warn(ar, "suspend timed out - target pause event never came\n");

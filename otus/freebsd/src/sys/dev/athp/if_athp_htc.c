@@ -656,7 +656,7 @@ int ath10k_htc_wait_target(struct ath10k_htc *htc)
 	u16 credit_size;
 
 	time_left = ath10k_compl_wait(&htc->ctl_resp, "ctl_resp",
-						ATH10K_HTC_WAIT_TIMEOUT_MSEC);
+	    &ar->sc_conf_mtx, ATH10K_HTC_WAIT_TIMEOUT_MSEC);
 	if (!time_left) {
 		/* Workaround: In some cases the PCI HIF doesn't
 		 * receive interrupt for the control response message
@@ -670,7 +670,7 @@ int ath10k_htc_wait_target(struct ath10k_htc *htc)
 			ath10k_hif_send_complete_check(htc->ar, i, 1);
 
 		time_left =
-		ath10k_compl_wait(&htc->ctl_resp, "ctl_resp",
+		ath10k_compl_wait(&htc->ctl_resp, "ctl_resp", &ar->sc_conf_mtx,
 					    ATH10K_HTC_WAIT_TIMEOUT_MSEC);
 
 		if (!time_left)
@@ -804,7 +804,7 @@ int ath10k_htc_connect_service(struct ath10k_htc *htc,
 
 	/* wait for response */
 	time_left = ath10k_compl_wait(&htc->ctl_resp, "ctl_resp",
-	    ATH10K_HTC_CONN_SVC_TIMEOUT_MSEC);
+	    &ar->sc_conf_mtx, ATH10K_HTC_CONN_SVC_TIMEOUT_MSEC);
 	if (!time_left) {
 		ath10k_err(ar, "Service connect timeout\n");
 		return -ETIMEDOUT;

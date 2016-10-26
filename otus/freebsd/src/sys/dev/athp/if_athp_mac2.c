@@ -330,7 +330,8 @@ ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
 	if (ret)
 		return ret;
 
-	time_left = ath10k_compl_wait(&ar->install_key_done, "install_key", 3);
+	time_left = ath10k_compl_wait(&ar->install_key_done, "install_key",
+	    &ar->sc_conf_mtx, 3);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -1015,7 +1016,7 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 	//    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
 	ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
 	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
-	    500);
+	    &ar->sc_conf_mtx, 500);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -4182,7 +4183,8 @@ static int ath10k_scan_stop(struct ath10k *ar)
 		goto out;
 	}
 
-	ret = ath10k_compl_wait(&ar->scan.completed, "scan_stop", 3);
+	ret = ath10k_compl_wait(&ar->scan.completed, "scan_stop",
+	    &ar->sc_conf_mtx, 3);
 	if (ret == 0) {
 		ath10k_warn(ar, "failed to receive scan abortion completion: timed out\n");
 		ret = -ETIMEDOUT;
@@ -4262,7 +4264,8 @@ static int ath10k_start_scan(struct ath10k *ar,
 	if (ret)
 		return ret;
 
-	ret = ath10k_compl_wait(&ar->scan.started, "scan_start", 1);
+	ret = ath10k_compl_wait(&ar->scan.started, "scan_start",
+	    &ar->sc_conf_mtx, 1);
 	if (ret == 0) {
 		ret = ath10k_scan_stop(ar);
 		if (ret)
@@ -6378,7 +6381,7 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-	ret = ath10k_compl_wait(&ar->scan.on_channel, 3);
+	ret = ath10k_compl_wait(&ar->scan.on_channel, &ar->sc_conf_mtx, 3);
 	if (ret == 0) {
 		ath10k_warn(ar, "failed to switch to channel for roc scan\n");
 
@@ -6488,7 +6491,8 @@ ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 			bool empty;
 
 			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
-			    "tx_flush", ATH10K_FLUSH_TIMEOUT_HZ);
+			    "tx_flush", &ar->sc_conf_mtx,
+			    ATH10K_FLUSH_TIMEOUT_HZ);
 
 			ATHP_HTT_TX_LOCK(&ar->htt);
 			empty = (ar->htt.num_pending_tx == 0);

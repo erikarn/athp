@@ -1656,7 +1656,8 @@ int ath10k_wmi_wait_for_service_ready(struct ath10k *ar)
 	unsigned long time_left;
 
 	time_left = ath10k_compl_wait(&ar->wmi.service_ready,
-	    "wmi_service_ready", WMI_SERVICE_READY_TIMEOUT_MSEC);
+	    "wmi_service_ready", &ar->sc_conf_mtx,
+	    WMI_SERVICE_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
 	return 0;
@@ -1667,7 +1668,8 @@ int ath10k_wmi_wait_for_unified_ready(struct ath10k *ar)
 	unsigned long time_left;
 
 	time_left = ath10k_compl_wait(&ar->wmi.unified_ready,
-	    "wmi_unified_ready", WMI_UNIFIED_READY_TIMEOUT_MSEC);
+	    "wmi_unified_ready", &ar->sc_conf_mtx,
+	    WMI_UNIFIED_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
 	return 0;
@@ -1853,7 +1855,8 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 #endif
 
 	while (! ieee80211_time_after(ticks, interval)) {
-		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
+		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq",
+		    &ar->sc_conf_mtx, 1);
 
 		/* try to send pending beacons first. they take priority */
 //		ath10k_wmi_tx_beacons_nowait(ar);
