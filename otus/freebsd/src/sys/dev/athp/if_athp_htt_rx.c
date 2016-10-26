@@ -947,6 +947,8 @@ ath10k_htt_rx_h_peer_channel(struct ath10k *ar, struct htt_rx_desc *rxd)
 /*
  * XXX TODO: we don't yet have a per-vif channel context;
  * so don't implement this just yet.
+ *
+ * XXX would this be iv->iv_des_chan?
  */
 static uint32_t
 ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
@@ -1007,7 +1009,7 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 				    struct htt_rx_desc *rxd,
 				    u32 vdev_id)
 {
-	uint32_t ch;
+	uint32_t ch;	/* NB: ch is actually 'freq' here */
 	uint32_t band;
 
 	ATHP_DATA_LOCK(ar);
@@ -1025,13 +1027,15 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 	if (!ch)
 		return false;
 
-	if (ch < 15)
+	/* NB: channel is 'freq' here */
+	if (ch < 3000)
 		band = IEEE80211_CHAN_2GHZ;
 	else
 		band = IEEE80211_CHAN_5GHZ;
 
-	status->c_ieee = ch;
-	status->c_freq = ieee80211_ieee2mhz(ch, band);
+
+	status->c_freq = ch;
+	status->c_ieee = ieee80211_mhz2ieee(ch, band);
 	status->r_flags |= IEEE80211_R_IEEE | IEEE80211_R_FREQ;
 
 	return true;
@@ -1137,7 +1141,6 @@ static const char * const tid_to_ac[] = {
 
 static char *ath10k_get_tid(struct ieee80211_frame *hdr, char *out, size_t size)
 {
-#if 1
 	u8 *qc;
 	int tid;
 
@@ -1152,65 +1155,54 @@ static char *ath10k_get_tid(struct ieee80211_frame *hdr, char *out, size_t size)
 		snprintf(out, size, "tid %d", tid);
 
 	return out;
-#else
-	return "ath10k_get_tid: TODO";
-#endif
 }
 
 static void ath10k_process_rx(struct ath10k *ar,
 			      struct ieee80211_rx_stats *rx_status,
 			      struct athp_buf *skb)
 {
-#if 0
-	struct ieee80211_rx_stats *status;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)mbuf_skb_data(skb->m);
-	char tid[32];
-
-	status = IEEE80211_SKB_RXCB(skb);
-	*status = *rx_status;
-
-	ath10k_dbg(ar, ATH10K_DBG_DATA,
-		   "rx skb %p len %u peer %pM %s %s sn %u %s%s%s%s%s %srate_idx %u vht_nss %u freq %u band %u flag 0x%x fcs-err %i mic-err %i amsdu-more %i\n",
-		   skb,
-		   mbuf_skb_len(skb->m),
-		   ieee80211_get_SA(hdr),
-		   ath10k_get_tid(hdr, tid, sizeof(tid)),
-		   is_multicast_ether_addr(ieee80211_get_DA(hdr)) ?
-							"mcast" : "ucast",
-		   (__le16_to_cpu(hdr->seq_ctrl) & IEEE80211_SCTL_SEQ) >> 4,
-		   status->flag == 0 ? "legacy" : "",
-		   status->flag & RX_FLAG_HT ? "ht" : "",
-		   status->flag & RX_FLAG_VHT ? "vht" : "",
-		   status->flag & RX_FLAG_40MHZ ? "40" : "",
-		   status->vht_flag & RX_VHT_FLAG_80MHZ ? "80" : "",
-		   status->flag & RX_FLAG_SHORT_GI ? "sgi " : "",
-		   status->rate_idx,
-		   status->vht_nss,
-		   status->freq,
-		   status->band, status->flag,
-		   !!(status->flag & RX_FLAG_FAILED_FCS_CRC),
-		   !!(status->flag & RX_FLAG_MMIC_ERROR),
-		   !!(status->flag & RX_FLAG_AMSDU_MORE));
-	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "rx skb: ",
-			mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-#ifdef	ATHP_TRACE_DIAG
-	trace_ath10k_rx_hdr(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-	trace_ath10k_rx_payload(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-#endif
-	ieee80211_rx(ar->hw, skb);
-#else
 	struct ieee80211com *ic = &ar->sc_ic;
 	struct mbuf *m;
 	struct ieee80211_node *ni;
+	struct ieee80211_frame *wh;
+	char tid[32];
 
 	/* Grab mbuf */
 	m = athp_buf_take_mbuf(ar, &ar->buf_rx, skb);
+	wh = mtod(m, struct ieee80211_frame *);
 
 	/* Free pbuf; no longer needed */
 	athp_freebuf(ar, &ar->buf_rx, skb);
 
-	ath10k_dbg(ar, ATH10K_DBG_DATA,
+	ath10k_dbg(ar, ATH10K_DBG_DATA | ATH10K_DBG_RECV,
 	    "%s: frame; m=%p, len=%d\n", __func__, m, m->m_len);
+	ath10k_dbg(ar, ATH10K_DBG_DATA | ATH10K_DBG_RECV,
+		   "rx mbuf %p len %u peer %6D %s %s sn %u %s%s%s%s %srate %u "
+		   "vht_nss %u chan %u freq %u band %u cflag 0x%x pktflag 0x%x "
+		   "decrypt %i fcs-err %i mic-err %i amsdu-more %i\n",
+		   m,
+		   mbuf_skb_len(m),
+		   ieee80211_get_SA(wh), ":",
+		   ath10k_get_tid(wh, tid, sizeof(tid)),
+		   IEEE80211_IS_MULTICAST(ieee80211_get_DA(wh)) ?
+		    "mcast" : "ucast",
+		   (le16toh(*((uint16_t *) wh->i_seq))) >> 4,
+		   "", // status->flag & RX_FLAG_HT ? "ht" : "",
+		   "", // status->flag & RX_FLAG_VHT ? "vht" : "",
+		   "", // status->flag & RX_FLAG_40MHZ ? "40" : "",
+		   "", // status->vht_flag & RX_VHT_FLAG_80MHZ ? "80" : "",
+		   rx_status->c_pktflags & IEEE80211_RX_F_SHORTGI ? "sgi " : "",
+		   rx_status->c_rate,
+		   0, /* status->vht_nss, */
+		   rx_status->c_ieee,
+		   rx_status->c_freq,
+		   0, /* status->band, */
+		   rx_status->r_flags,
+		   rx_status->c_pktflags,
+		   !!(rx_status->c_pktflags & IEEE80211_RX_F_DECRYPTED),
+		   !!(rx_status->c_pktflags & IEEE80211_RX_F_FAIL_FCSCRC),
+		   !!(rx_status->c_pktflags & IEEE80211_RX_F_FAIL_MIC),
+		   !!(rx_status->c_pktflags & IEEE80211_RX_F_AMSDU_MORE));
 
 	/* mmm configurable */
 	if (ar->sc_rx_htt == 0) {
@@ -1232,6 +1224,11 @@ static void ath10k_process_rx(struct ath10k *ar,
 	}
 
 	/*
+	 * Add status - eventually we'll let radiotap RX use this info.
+	 */
+	ieee80211_add_rx_params(m, rx_status);
+
+	/*
 	 * Don't pass short frames up to the stack.
 	 */
 	if (m->m_len < IEEE80211_MIN_LEN) {
@@ -1246,9 +1243,15 @@ static void ath10k_process_rx(struct ath10k *ar,
 	}
 
 	/*
-	 * Add status
+	 * Don't pass frames that fail FCS check up to the stack.
 	 */
-	ieee80211_add_rx_params(m, rx_status);
+	if (rx_status->c_pktflags & IEEE80211_RX_F_FAIL_FCSCRC) {
+		ar->sc_stats.rx_pkt_fail_fcscrc++;
+		if (ieee80211_radiotap_active(ic))
+			ieee80211_radiotap_rx_all(ic, m);
+		m_freem(m);
+		return;
+	}
 
 	/* RX path to net80211 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
@@ -1258,9 +1261,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 	} else {
 		ieee80211_input_mimo_all(ic, m);
 	}
-	/* skb/pbuf is done by here */
-
-#endif
+	/* skb/pbuf is now owned by the net80211 layer */
 }
 
 static int ath10k_htt_rx_nwifi_hdrlen(struct ath10k *ar,
@@ -1667,13 +1668,13 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 
 	ath10k_dbg(ar, ATH10K_DBG_RECV,
 	    "%s: enctype=%d, qos=0x%x, fcserr=%d, cryptoerr=%d, tkiperr=%d, "
-	    "peeridxinvalid=%d, isdescrypt=%d, isprot=%d\n",
+	    "peeridxinvalid=%d, isdecrypt=%d, isprot=%d\n",
 	    __func__,
 	    enctype, qos[0], has_fcs_err, has_crypto_err, has_tkip_err,
 	    has_peer_idx_invalid, is_decrypted, ieee80211_has_protected(hdr));
 
 	/* Clear per-MPDU flags while leaving per-PPDU flags intact. */
-	status->r_flags &= ~(
+	status->c_pktflags &= ~(
 		    IEEE80211_RX_F_FAIL_FCSCRC
 		    | IEEE80211_RX_F_FAIL_MIC
 		    | IEEE80211_RX_F_DECRYPTED
@@ -1682,13 +1683,13 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 		  );
 
 	if (has_fcs_err)
-		status->r_flags |= IEEE80211_RX_F_FAIL_FCSCRC;
+		status->c_pktflags |= IEEE80211_RX_F_FAIL_FCSCRC;
 
 	if (has_tkip_err)
-		status->r_flags |= IEEE80211_RX_F_FAIL_MIC;
+		status->c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
 
 	if (is_decrypted)
-		status->r_flags |= IEEE80211_RX_F_DECRYPTED
+		status->c_pktflags |= IEEE80211_RX_F_DECRYPTED
 			| IEEE80211_RX_F_IV_STRIP
 			| IEEE80211_RX_F_MMIC_STRIP;
 
@@ -1719,7 +1720,7 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		TAILQ_REMOVE(amsdu, msdu, next);
 		/* Setup per-MSDU flags */
 
-		status->r_flags &= (
+		status->c_pktflags &= ~(
 		    IEEE80211_RX_F_AMSDU
 		    | IEEE80211_RX_F_AMSDU_MORE);
 		/*
@@ -1727,12 +1728,12 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		 * just MSDU/MPDU?
 		 */
 #if 0
-		status->r_flags |= IEEE80211_RX_F_AMSDU;
+		status->c_pktflags |= IEEE80211_RX_F_AMSDU;
 #endif
 		if (TAILQ_EMPTY(amsdu))
-			status->r_flags &= ~IEEE80211_RX_F_AMSDU_MORE;
+			status->c_pktflags &= ~IEEE80211_RX_F_AMSDU_MORE;
 		else
-			status->r_flags |= IEEE80211_RX_F_AMSDU_MORE;
+			status->c_pktflags |= IEEE80211_RX_F_AMSDU_MORE;
 		ath10k_process_rx(ar, status, msdu);
 	}
 }
@@ -1826,9 +1827,12 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	TAILQ_FOREACH(pbuf, amsdu, next) {
 		total_len += mbuf_skb_len(pbuf->m);
 	}
-	printf("%s: nframes=%d; msdu len=%d\n", __func__,
+	ath10k_warn(ar,
+	    "%s: nframes=%d; msdu len=%d, desclen=%d, totallen=%d\n", __func__,
 	    athp_buf_list_count(amsdu),
-	    total_len);
+	    total_len,
+	    (int) sizeof(struct htt_rx_desc),
+	    (int) total_len + (int) sizeof(struct htt_rx_desc));
 
 	/*
 	 * Step 1.5 - add the HTT RX descriptor to that.
@@ -1849,7 +1853,7 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	}
 
 	/*
-	 * XXX TODO: we need to actually copy the htt rx
+	 * Now we need to actually copy the htt rx
 	 * descriptor field from the first msdu and then
 	 * do the relevant hijinx to move things around.
 	 *
@@ -2319,13 +2323,12 @@ static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
 	return 0;
 }
 
-static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
-					    struct athp_buf *skb)
+static void ath10k_htt_rx_h_rx_offload_prot(struct ath10k *ar,
+    struct ieee80211_rx_stats *status, struct athp_buf *skb)
 {
 	struct ieee80211_frame *hdr;
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
-
 	if (!ieee80211_has_protected(hdr))
 		return;
 
@@ -2334,7 +2337,7 @@ static void ath10k_htt_rx_h_rx_offload_prot(struct ieee80211_rx_stats *status,
 	 * will drop the frame.
 	 */
 	hdr->i_fc[1] &= ~IEEE80211_FC1_PROTECTED;
-	status->r_flags |= IEEE80211_RX_F_DECRYPTED
+	status->c_pktflags |= IEEE80211_RX_F_DECRYPTED
 		    | IEEE80211_RX_F_IV_STRIP
 		    | IEEE80211_RX_F_MMIC_STRIP;
 }
@@ -2384,7 +2387,8 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		 */
 		offset = 4 - ((unsigned long) mbuf_skb_data(msdu->m) & 3);
 		mbuf_skb_put(msdu->m, offset);
-		memmove(mbuf_skb_data(msdu->m) + offset, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
+		memmove(mbuf_skb_data(msdu->m) + offset,
+		    mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 		mbuf_skb_pull(msdu->m, offset);
 
 		/* FIXME: The frame is NWifi. Re-construct QoS Control
@@ -2395,7 +2399,7 @@ static void ath10k_htt_rx_h_rx_offload(struct ath10k *ar,
 		memset(status, 0, sizeof(*status));
 		//status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 
-		ath10k_htt_rx_h_rx_offload_prot(status, msdu);
+		ath10k_htt_rx_h_rx_offload_prot(ar, status, msdu);
 		ath10k_htt_rx_h_channel(ar, status, NULL, rx->vdev_id);
 
 		ath10k_process_rx(ar, status, msdu);

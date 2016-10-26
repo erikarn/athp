@@ -22,6 +22,8 @@
 #include "hal/rx_desc.h"
 #include "hal/htt.h"
 
+#include <sys/sx.h>
+
 #include "athp_idr.h"
 
 #include "if_athp_buf.h"
@@ -31,7 +33,6 @@
 
 #define	ATHP_RXBUF_MAX_SCATTER	1
 #define	ATHP_TXBUF_MAX_SCATTER	1
-#define	ATHP_RBUF_SIZE		2048
 /* XXX upped these from 1024 */
 #define	ATHP_RX_LIST_COUNT	2048
 #define	ATHP_TX_LIST_COUNT	2048
@@ -54,8 +55,9 @@ struct athp_node {
 
 #define	ATHP_CONF_LOCK(sc)		sx_xlock(&(sc)->sc_conf_sx)
 #define	ATHP_CONF_UNLOCK(sc)		sx_unlock(&(sc)->sc_conf_sx)
-#define	ATHP_CONF_LOCK_ASSERT(sc)	0
-#define	ATHP_CONF_UNLOCK_ASSERT(sc)	0
+/* XXX add lock assertions damnit */
+#define	ATHP_CONF_LOCK_ASSERT(sc)	sx_assert(&(sc)->sc_conf_sx, SA_LOCKED)
+#define	ATHP_CONF_UNLOCK_ASSERT(sc)	sx_assert(&(sc)->sc_conf_sx, SA_UNLOCKED)
 
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
@@ -71,6 +73,18 @@ struct athp_node {
 #define	ATHP_DMA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_dma_mtx)
 #define	ATHP_DMA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
 #define	ATHP_DMA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_NOTOWNED)
+
+/*
+ * For now, we don't allocate hardware pairwise keys as hardware
+ * indexes - instead, we just set it up with the right key index
+ * when we plumb them in.
+ *
+ * So, we define key index "16" as being "this is a pairwise key".
+ * Later on when we support multiple pairwise keys for a given peer
+ * (rather than enforcing "0" as in the older standard) we can
+ * revisit this.
+ */
+#define	ATHP_PAIRWISE_KEY_IDX		16
 
 struct ath10k_bmi {
 	bool done_sent;
@@ -142,6 +156,7 @@ struct ath10k_stats {
 	uint64_t rx_msdu_invalid_len;
 	uint64_t rx_pkt_short_len;
 	uint64_t rx_pkt_zero_len;
+	uint64_t rx_pkt_fail_fcscrc;
 	uint64_t xmit_fail_crypto_encap;
 	uint64_t xmit_fail_get_pbuf;
 	uint64_t xmit_fail_mbuf_defrag;

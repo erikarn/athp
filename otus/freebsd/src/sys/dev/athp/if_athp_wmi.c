@@ -1794,6 +1794,9 @@ static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 	 * XXX TODO: this needs conf_lock held, but unfortunately
 	 * it may already be held.  Maybe see if we can iterate
 	 * the VAPs?
+	 *
+	 * Note: the reason for holding conf lock is that said
+	 * lock looks after the arvifs list.
 	 */
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		ath10k_wmi_tx_beacon_nowait(vif);
@@ -1843,9 +1846,11 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
+#if 0
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
 	    "%s: setup: cmdid=0x%08x, ticks=%u, interval=%u\n",
 	    __func__, cmd_id, ticks, interval);
+#endif
 
 	while (! ieee80211_time_after(ticks, interval)) {
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
@@ -2653,8 +2658,10 @@ void ath10k_wmi_event_echo(struct ath10k *ar, struct athp_buf *pbuf)
 
 int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf)
 {
+#if 0
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event debug mesg len %d\n",
 		   mbuf_skb_len(pbuf->m));
+#endif
 
 #ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_dbglog(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
@@ -4751,7 +4758,11 @@ static void ath10k_wmi_10_2_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	cmd_hdr = (struct wmi_cmd_hdr *)mbuf_skb_data(pbuf->m);
 	id = MS(__le32_to_cpu(cmd_hdr->cmd_id), WMI_CMD_HDR_CMD_ID);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event id 0x%08x\n", __func__, id);
+	/*
+	 * Temporary - don't log management RX for now.
+	 */
+	if (id != WMI_10_2_MGMT_RX_EVENTID)
+		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event id 0x%08x\n", __func__, id);
 
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
@@ -5874,9 +5885,9 @@ ath10k_wmi_op_gen_vdev_install_key(struct ath10k *ar,
 	if (arg->key_data)
 		memcpy(cmd->key_data, arg->key_data, arg->key_len);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi vdev install key idx %d cipher %d len %d\n",
-		   arg->key_idx, arg->key_cipher, arg->key_len);
+	ath10k_dbg(ar, ATH10K_DBG_WMI | ATH10K_DBG_XMIT,
+		   "wmi vdev install key idx %d cipher %d len %d, miclen %d/%d macaddr %6D\n",
+		   arg->key_idx, arg->key_cipher, arg->key_len, arg->key_txmic_len, arg->key_rxmic_len, arg->macaddr, ":");
 	return pbuf;
 }
 

@@ -232,66 +232,88 @@ ath10k_mac_max_vht_nss(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 
 	return 1;
 }
+#endif
 
 /**********/
 /* Crypto */
 /**********/
 
 static int ath10k_send_key(struct ath10k_vif *arvif,
-			   struct ieee80211_key_conf *key,
-			   enum set_key_cmd cmd,
-			   const u8 *macaddr, u32 flags)
+			   const struct ieee80211_key *k,
+			   int cmd, const u8 *macaddr, u32 flags)
 {
 	struct ath10k *ar = arvif->ar;
-	struct wmi_vdev_install_key_arg arg = {
-		.vdev_id = arvif->vdev_id,
-		.key_idx = key->keyidx,
-		.key_len = key->keylen,
-		.key_data = key->key,
-		.key_flags = flags,
-		.macaddr = macaddr,
-	};
+	const struct ieee80211_cipher *cip = k->wk_cipher;
+
+	struct wmi_vdev_install_key_arg arg;
+
+	bzero(&arg, sizeof(arg));
+
+	arg.vdev_id = arvif->vdev_id;
+	arg.key_idx = k->wk_keyix;
+	arg.key_len = k->wk_keylen;
+	arg.key_data = k->wk_key;
+	arg.key_flags = flags;
+	arg.macaddr = macaddr;
+	arg.key_txmic_len = 0;
+	arg.key_rxmic_len = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	switch (key->cipher) {
-	case WLAN_CIPHER_SUITE_CCMP:
+	/*
+	 * For now we support a single pairwise keyidx of 0.
+	 */
+	if (k->wk_keyix == ATHP_PAIRWISE_KEY_IDX) {
+		arg.key_idx = 0;
+	}
+
+	switch (cip->ic_cipher) {
+	case IEEE80211_CIPHER_AES_CCM:
 		arg.key_cipher = WMI_CIPHER_AES_CCM;
+#if 0
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV_MGMT;
+#endif
 		break;
-	case WLAN_CIPHER_SUITE_TKIP:
-		arg.key_cipher = WMI_CIPHER_TKIP;
+	case IEEE80211_CIPHER_TKIP:
 		arg.key_txmic_len = 8;
 		arg.key_rxmic_len = 8;
+		/*
+		 * FreeBSD's keylen for TKIP doesn't include MIC.
+		 * So we have to add the MIC length here before we
+		 * pass it up to ath10k firmware.
+		 *
+		 * The key+mic format is the same as mac80211 and what
+		 * is expected by the firmware.
+		 */
+		arg.key_len += 16;
+		arg.key_cipher = WMI_CIPHER_TKIP;
 		break;
-	case WLAN_CIPHER_SUITE_WEP40:
-	case WLAN_CIPHER_SUITE_WEP104:
+	case IEEE80211_CIPHER_WEP:
 		arg.key_cipher = WMI_CIPHER_WEP;
 		break;
-	case WLAN_CIPHER_SUITE_AES_CMAC:
-		WARN_ON(1);
-		return -EINVAL;
 	default:
-		ath10k_warn(ar, "cipher %d is not supported\n", key->cipher);
+		ath10k_warn(ar, "cipher %d is not supported\n", cip->ic_cipher);
 		return -EOPNOTSUPP;
 	}
 
+#if 0
 	if (test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
 	}
+#endif
 
-	if (cmd == DISABLE_KEY) {
+	if (cmd == 0) {
 		arg.key_cipher = WMI_CIPHER_NONE;
+		arg.key_len = 16;	/* XXX - firmware needs /something/ */
 		arg.key_data = NULL;
 	}
 
 	return ath10k_wmi_vdev_install_key(arvif->ar, &arg);
 }
 
-static int ath10k_install_key(struct ath10k_vif *arvif,
-			      struct ieee80211_key_conf *key,
-			      enum set_key_cmd cmd,
-			      const u8 *macaddr, u32 flags)
+int
+ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
+    int cmd, const u8 *macaddr, u32 flags)
 {
 	struct ath10k *ar = arvif->ar;
 	int ret;
@@ -315,6 +337,7 @@ static int ath10k_install_key(struct ath10k_vif *arvif,
 	return 0;
 }
 
+#if 0
 static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 					const u8 *addr)
 {
@@ -1959,7 +1982,6 @@ static int ath10k_mac_num_vifs_started(struct ath10k *ar)
 	int num = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
-	ATHP_CONF_LOCK_ASSERT(ar);
 
 	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		if (arvif->is_started)
@@ -2268,7 +2290,7 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
 
-#if 0
+#if 1
 	/* If is_run=0, then clear the privacy capinfo */
 	if (is_run == 0)
 		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
@@ -2323,6 +2345,8 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 	 *
 	 * And yes, it should only be done when we're doing hardware
 	 * crypto.
+	 *
+	 * XXX TODO: WEP?
 	 */
 	ret = ath10k_wmi_vdev_set_param(arvif->ar,
 					arvif->vdev_id,
@@ -3677,7 +3701,7 @@ void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
  */
 static u8 ath10k_tx_h_get_tid(struct ieee80211_frame *hdr)
 {
-	if (ieee80211_is_mgmt(hdr))
+	if (IEEE80211_IS_MGMT(hdr))
 		return HTT_DATA_TX_EXT_TID_MGMT;
 
 	if (! IEEE80211_IS_QOS(hdr))
@@ -3716,7 +3740,7 @@ ath10k_tx_h_get_txmode(struct ath10k *ar, struct ieee80211vap *vif,
 	if (!vif || vif->iv_opmode == IEEE80211_M_MONITOR)
 		return ATH10K_HW_TXRX_RAW;
 
-	if (ieee80211_is_mgmt(hdr))
+	if (IEEE80211_IS_MGMT(hdr))
 		return ATH10K_HW_TXRX_MGMT;
 
 	/* Workaround:
@@ -3774,6 +3798,7 @@ ath10k_tx_h_use_hwcrypto(struct ieee80211vap *vif, struct athp_buf *pbuf)
 	if ((info->flags & mask) == mask)
 		return false;
 #endif
+
 	if (vif)
 		return !ath10k_vif_to_arvif(vif)->nohwcrypt;
 	return true;
@@ -5156,7 +5181,7 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
 #endif
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	ATHP_DATA_LOCK(ar);
 	ath10k_mac_vif_beacon_cleanup(arvif);
@@ -5221,8 +5246,6 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ATHP_HTT_TX_LOCK(&ar->htt);
 	ath10k_mac_vif_tx_unlock_all(arvif);
 	ATHP_HTT_TX_UNLOCK(&ar->htt);
-
-	ATHP_CONF_UNLOCK(ar);
 }
 
 #if 0
@@ -5526,12 +5549,11 @@ ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 	ATHP_DATA_UNLOCK(ar);
 }
 
-#if 0
-static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
-					struct ath10k_vif *arvif,
-					enum set_key_cmd cmd,
-					struct ieee80211_key_conf *key)
+int
+ath10k_set_key_h_def_keyidx(struct ath10k *ar,
+    struct ath10k_vif *arvif, int cmd, const struct ieee80211_key *k)
 {
+	const struct ieee80211_cipher *cip = k->wk_cipher;
 	u32 vdev_param = arvif->ar->wmi.vdev_param->def_keyid;
 	int ret;
 
@@ -5548,27 +5570,31 @@ static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 
 	if (arvif->vdev_type != WMI_VDEV_TYPE_AP &&
 	    arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
-		return;
+		return (0);
 
-	if (key->cipher == WLAN_CIPHER_SUITE_WEP40)
-		return;
+	if (cip->ic_cipher == IEEE80211_CIPHER_WEP)
+		return (0);
 
-	if (key->cipher == WLAN_CIPHER_SUITE_WEP104)
-		return;
+	/* XXX TODO yes, should mark keys as pairwise */
+	if (k->wk_keyix == 0)
+		return (0);
 
-	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
-		return;
-
-	if (cmd != SET_KEY)
-		return;
+	if (cmd != 1)
+		return (0);
 
 	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
-					key->keyidx);
+					k->wk_keyix);
 	if (ret)
 		ath10k_warn(ar, "failed to set vdev %i group key as default key: %d\n",
 			    arvif->vdev_id, ret);
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: set default key to %d\n",
+	    __func__, k->wk_keyix);
+
+	return (ret);
 }
 
+#if 0
 static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 			  struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 			  struct ieee80211_key_conf *key)
@@ -5707,16 +5733,21 @@ exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static void ath10k_set_default_unicast_key(struct ieee80211_hw *hw,
-					   struct ieee80211_vif *vif,
-					   int keyidx)
+#if 0
+/*
+ * This is for WEP operation.
+ */
+void
+ath10k_set_default_unicast_key(struct ath10k *ar,
+    struct ieee80211vap *vif, int keyidx)
 {
 	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
-	mutex_lock(&arvif->ar->conf_mutex);
+	ATHP_CONF_LOCK(ar);
 
 	if (arvif->ar->state != ATH10K_STATE_ON)
 		goto unlock;
@@ -5739,8 +5770,11 @@ static void ath10k_set_default_unicast_key(struct ieee80211_hw *hw,
 	arvif->def_wep_key_idx = keyidx;
 
 unlock:
-	mutex_unlock(&arvif->ar->conf_mutex);
+	ATHP_CONF_UNLOCK(ar);
 }
+#endif
+
+#if 0
 
 static void ath10k_sta_rc_update_wk(struct work_struct *wk)
 {

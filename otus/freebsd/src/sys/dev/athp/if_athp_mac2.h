@@ -51,4 +51,7 @@ extern	int ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap, struc
 
 extern	void ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vap, u32 queues, bool drop);
 
+extern int ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key, int cmd, const u8 *macaddr, u32 flags);
+extern int ath10k_set_key_h_def_keyidx(struct ath10k *ar, struct ath10k_vif *arvif, int cmd, const struct ieee80211_key *key);
+
 #endif
