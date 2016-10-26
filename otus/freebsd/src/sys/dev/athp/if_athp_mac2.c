@@ -5181,7 +5181,7 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
 #endif
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	ATHP_DATA_LOCK(ar);
 	ath10k_mac_vif_beacon_cleanup(arvif);
@@ -5246,8 +5246,6 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ATHP_HTT_TX_LOCK(&ar->htt);
 	ath10k_mac_vif_tx_unlock_all(arvif);
 	ATHP_HTT_TX_UNLOCK(&ar->htt);
-
-	ATHP_CONF_UNLOCK(ar);
 }
 
 #if 0

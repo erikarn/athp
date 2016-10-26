@@ -844,8 +844,10 @@ athp_vap_delete(struct ieee80211vap *vap)
 		/* Wait for xmit to finish before continuing */
 		ath10k_tx_flush(ar, vap, 0, 1);
 
+		ATHP_CONF_LOCK(ar);
 		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
+		ATHP_CONF_UNLOCK(ar);
 	}
 
 	/*
