@@ -1582,7 +1582,9 @@ ath10k_core_probe_fw(struct ath10k *ar)
 	}
 
 	memset(&target_info, 0, sizeof(target_info));
+	ATHP_CONF_LOCK(ar);
 	ret = ath10k_bmi_get_target_info(ar, &target_info);
+	ATHP_CONF_UNLOCK(ar);
 	if (ret) {
 		ath10k_err(ar, "could not get target info (%d)\n", ret);
 		goto err_power_down;
