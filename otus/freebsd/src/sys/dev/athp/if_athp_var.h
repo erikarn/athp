@@ -22,6 +22,8 @@
 #include "hal/rx_desc.h"
 #include "hal/htt.h"
 
+#include <sys/sx.h>
+
 #include "athp_idr.h"
 
 #include "if_athp_buf.h"
@@ -54,8 +56,8 @@ struct athp_node {
 #define	ATHP_CONF_LOCK(sc)		sx_xlock(&(sc)->sc_conf_sx)
 #define	ATHP_CONF_UNLOCK(sc)		sx_unlock(&(sc)->sc_conf_sx)
 /* XXX add lock assertions damnit */
-#define	ATHP_CONF_LOCK_ASSERT(sc)	0
-#define	ATHP_CONF_UNLOCK_ASSERT(sc)	0
+#define	ATHP_CONF_LOCK_ASSERT(sc)	sx_assert(&(sc)->sc_conf_sx, SA_LOCKED)
+#define	ATHP_CONF_UNLOCK_ASSERT(sc)	sx_assert(&(sc)->sc_conf_sx, SA_UNLOCKED)
 
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
