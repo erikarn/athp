@@ -161,6 +161,37 @@ ath10k_msi_err_tasklet(void *arg, int npending)
 }
 #endif
 
+static void
+athp_pci_intr_msi_fw_error_task(void *arg, int pending)
+{
+	struct athp_pci_softc *psc = arg;
+	struct ath10k *ar = &psc->sc_sc;
+
+	ath10k_err(ar, "%s: called; TODO\n", __func__);
+}
+
+static void
+athp_pci_intr_task(void *arg, int pending)
+{
+	struct athp_pci_softc *psc = arg;
+	struct ath10k *ar = &psc->sc_sc;
+
+	if (ar->sc_invalid)
+		return;
+
+	/*
+	 * If this was a filter interrupt then we'd schedule locally.
+	 * (See ath10k_pci_tasklet() versus ath10_pci_interrupt_handler()).
+	 *
+	 * This takes the copy engine lock, updates things, releases the
+	 * lock and calls the callback.  It's going to make consistent and
+	 * predictable locking tricky.
+	 */
+	ath10k_ce_per_engine_service_any(ar);
+	if (psc->num_msi_intrs == 0)
+		ath10k_pci_enable_legacy_irq(psc);
+}
+
 /*
  * This is the single, shared interrupt task.
  */
@@ -187,20 +218,11 @@ athp_pci_intr(void *arg)
 	if (! ath10k_pci_irq_pending(psc))
 		return;
 
-	/*
-	 * If this was a filter interrupt then we'd schedule locally.
-	 * (See ath10k_pci_tasklet() versus ath10_pci_interrupt_handler()).
-	 *
-	 * This takes the copy engine lock, updates things, releases the
-	 * lock and calls the callback.  It's going to make consistent and
-	 * predictable locking tricky.
-	 */
 	if (psc->num_msi_intrs == 0) {
 		ath10k_pci_disable_and_clear_legacy_irq(psc);
 	}
-	ath10k_ce_per_engine_service_any(ar);
-	if (psc->num_msi_intrs == 0)
-		ath10k_pci_enable_legacy_irq(psc);
+
+	taskqueue_enqueue(ar->workqueue, &psc->intr_task);
 }
 
 #define	BS_BAR	0x10
@@ -449,6 +471,8 @@ athp_pci_attach(device_t dev)
 	if (ath10k_core_init(ar) < 0)
 		goto bad0;
 
+	/* Note: taskqueues are allocated by core_init above */
+
 	/*
 	 * Initialise ath10k freebsd bits.
 	 */
@@ -521,6 +545,12 @@ athp_pci_attach(device_t dev)
 	 * that arrive before the HAL is setup are discarded.
 	 */
 	ar->sc_invalid = 1;
+
+	/*
+	 * Setup interrupt taskqueue before we allocate the interrupt itself.
+	 */
+	TASK_INIT(&psc->intr_task, 0, athp_pci_intr_task, ar);
+	TASK_INIT(&psc->msi_fw_error, 0, athp_pci_intr_msi_fw_error_task, ar);
 
 	/*
 	 * Arrange interrupt line.
@@ -687,6 +717,11 @@ athp_pci_detach(device_t dev)
 	 * Do a config read to clear pre-existing pci error status.
 	 */
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
+
+	/*
+	 * First - flush interrupt tasks, before taskqueue is freed.
+	 */
+	taskqueue_drain(ar->workqueue, &psc->intr_task);
 
 	/* stop/free the core */
 	ath10k_core_unregister(ar);
