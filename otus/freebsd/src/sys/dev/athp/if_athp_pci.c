@@ -395,7 +395,7 @@ athp_attach_preinit(void *arg)
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	sx_destroy(&ar->sc_conf_sx);
+	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);
@@ -458,13 +458,28 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 	mtx_init(&ar->sc_dma_mtx, device_get_nameunit(dev), "athp dma",
 	    MTX_DEF);
-	sx_init(&ar->sc_conf_sx, "athp conf");
+	mtx_init(&ar->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
+	    MTX_DEF);
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
 	    MTX_DEF);
 	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), "athp ce",
 	    MTX_DEF);
 	mtx_init(&ar->sc_data_mtx, device_get_nameunit(dev), "athp data",
 	    MTX_DEF);
+
+	/*
+	 * Initialise ath10k BMI bits.
+	 */
+	ret = athp_descdma_alloc(ar, &psc->sc_bmi_txbuf, "bmi_msg_req",
+	    4, 1024);
+	ret |= athp_descdma_alloc(ar, &psc->sc_bmi_rxbuf, "bmi_msg_resp",
+	    4, 1024);
+	if (ret != 0) {
+		device_printf(dev, "%s: failed to allocate BMI TX/RX buffer\n",
+		    __func__);
+		goto bad0;
+	}
+
 	/* XXX here instead of in core_init because we need the lock init'ed */
 	callout_init_mtx(&ar->scan.timeout, &ar->sc_data_mtx, 0);
 	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
@@ -656,7 +671,7 @@ bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	sx_destroy(&ar->sc_conf_sx);
+	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);
@@ -667,6 +682,8 @@ bad:
 	}
 	ath10k_core_destroy(ar);
 bad0:
+	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
+	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
 	return (err);
 }
 
@@ -716,9 +733,14 @@ athp_pci_detach(device_t dev)
 
 	/* XXX disable busmastering? */
 
+	/* Free BMI buffers */
+	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
+	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
+
+	/* Free locks */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	sx_destroy(&ar->sc_conf_sx);
+	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);

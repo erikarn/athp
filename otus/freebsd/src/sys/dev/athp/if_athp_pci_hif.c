@@ -1048,7 +1048,6 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 	struct ath10k_pci_pipe *pci_rx = &psc->pipe_info[BMI_CE_NUM_TO_HOST];
 	struct ath10k_ce_pipe *ce_tx = pci_tx->ce_hdl;
 	struct ath10k_ce_pipe *ce_rx = pci_rx->ce_hdl;
-	struct athp_descdma dd_req, dd_resp;
 	struct bmi_xfer xfer = {};
 	bus_addr_t req_paddr = 0;
 	bus_addr_t resp_paddr = 0;
@@ -1057,12 +1056,20 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 
 	might_sleep();
 
+	ATHP_CONF_LOCK_ASSERT(ar);
+
 	if (resp && !resp_len)
 		return -EINVAL;
 
 	if (resp && resp_len && *resp_len == 0)
 		return -EINVAL;
 
+	/*
+	 * Don't allocate temporary descriptor memory here.
+	 * This should be done for us outside of holding locks.
+	 */
+
+#if 0
 	/*
 	 * Allocate temporary descriptor memory for the request.
 	 * Yes, it's a descriptor and a bit heavyweight.  Grr.
@@ -1072,27 +1079,32 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 	 */
 	bzero(&dd_req, sizeof(dd_req));
 	bzero(&dd_resp, sizeof(dd_resp));
+#endif
 
+#if 0
 	ret = athp_descdma_alloc(ar, &dd_req, "bmi_msg_req", 4, req_len);
 	if (ret != 0)
 		return -ENOMEM;
+#endif
 
 	/* Copy request into the allocate descriptor */
-	memcpy(dd_req.dd_desc, req, req_len);
+	memcpy(psc->sc_bmi_txbuf.dd_desc, req, req_len);
 
 	/* Get physical mapping for the allocated descriptor */
-	req_paddr = dd_req.dd_desc_paddr;
+	req_paddr = psc->sc_bmi_txbuf.dd_desc_paddr;
 
 	/* Get a descriptor w/ physical mapping for the response */
 
 	if (resp && resp_len) {
+#if 0
 		ret = athp_descdma_alloc(ar, &dd_resp, "bmi_msg_resp", 4,
 		    *resp_len);
 		if (ret != 0) {
 			ret = -ENOMEM;
 			goto err_req;
 		}
-		resp_paddr = dd_resp.dd_desc_paddr;
+#endif
+		resp_paddr = psc->sc_bmi_rxbuf.dd_desc_paddr;
 
 		xfer.wait_for_resp = true;
 		xfer.resp_len = 0;
@@ -1122,15 +1134,12 @@ err_resp:
 		u32 unused_buffer;
 		ath10k_ce_revoke_recv_next(ce_rx, NULL, &unused_buffer);
 	}
-err_req:
+
 	if (ret == 0 && resp_len) {
 		*resp_len = min(*resp_len, xfer.resp_len);
 		/* Copy result from response descriptor to caller */
-		memcpy(resp, dd_resp.dd_desc, xfer.resp_len);
+		memcpy(resp, psc->sc_bmi_rxbuf.dd_desc, xfer.resp_len);
 	}
-//err_dma:
-	athp_descdma_free(ar, &dd_req);
-	athp_descdma_free(ar, &dd_resp);
 
 	return ret;
 }
