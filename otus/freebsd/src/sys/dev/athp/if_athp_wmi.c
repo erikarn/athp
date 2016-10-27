@@ -1789,29 +1789,21 @@ static void ath10k_wmi_tx_beacons_iter(void *data, u8 *mac,
 
 static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 {
-#if 0
 	struct ath10k_vif *vif;
 
 	/*
-	 * XXX TODO: this needs conf_lock held, but unfortunately
+	 * XXX Note: this needs conf_lock held, but unfortunately
 	 * it may already be held.  Maybe see if we can iterate
 	 * the VAPs?
 	 *
 	 * Note: the reason for holding conf lock is that said
 	 * lock looks after the arvifs list.
 	 */
+	ATHP_CONF_LOCK(ar);
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		ath10k_wmi_tx_beacon_nowait(vif);
 	}
-#else
-	ath10k_warn(ar, "%s: TODO\n", __func__);
-#endif
-#if 0
-	ieee80211_iterate_active_interfaces_atomic(ar->hw,
-						   IEEE80211_IFACE_ITER_NORMAL,
-						   ath10k_wmi_tx_beacons_iter,
-						   NULL);
-#endif
+	ATHP_CONF_UNLOCK(ar);
 }
 
 static void ath10k_wmi_op_ep_tx_credits(struct ath10k *ar)
