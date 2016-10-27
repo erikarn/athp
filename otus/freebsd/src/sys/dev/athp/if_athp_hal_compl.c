@@ -44,6 +44,9 @@ ath10k_compl_wait(struct ath10k_compl *p, const char *str,
 		timo = (timo * hz) / 1000;
 	}
 
+	if (timo < 20)
+		timo = 20;
+
 	/* Already done? don't bother sleeping */
 	if (p->done > 0)
 		return 1;
@@ -117,6 +120,9 @@ ath10k_wait_wait(struct ath10k_wait *p, const char *str, struct mtx *m,
 	} else {
 		timo = (timo * hz) / 1000;
 	}
+
+	if (timo < 20)
+		timo = 20;
 
 	ret = mtx_sleep(p, m, 0, str, timo);
 

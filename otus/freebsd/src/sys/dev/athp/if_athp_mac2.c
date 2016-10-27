@@ -1014,9 +1014,10 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 
 	//time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
 	//    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
-	ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
+	if (ar->vdev_setup_done.done != 0)
+		ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
 	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
-	    &ar->sc_conf_mtx, 500);
+	    &ar->sc_conf_mtx, ATH10K_VDEV_SETUP_TIMEOUT_HZ);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
