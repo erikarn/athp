@@ -109,6 +109,7 @@ static void
 athp_taskq_task(void *arg, int npending)
 {
 	struct ath10k *ar = arg;
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct athp_taskq_entry *e;
 	struct athp_taskq_head *h;
 	int n = 0;
@@ -147,7 +148,7 @@ athp_taskq_task(void *arg, int npending)
 	ATHP_TASKQ_UNLOCK(h);
 
 	if (n)
-		taskqueue_enqueue(ar->workqueue, &h->run_task);
+		ieee80211_runtask(ic, &h->run_task);
 }
 
 int
@@ -191,6 +192,7 @@ athp_taskq_free(struct ath10k *ar)
 void
 athp_taskq_stop(struct ath10k *ar)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct athp_taskq_head *h;
 
 	h = ar->sc_taskq_head;
@@ -203,12 +205,13 @@ athp_taskq_stop(struct ath10k *ar)
 	h->is_running = 0;
 	ATHP_TASKQ_UNLOCK(h);
 
-	taskqueue_drain(ar->workqueue, &h->run_task);
+	ieee80211_draintask(ic, &h->run_task);
 }
 
 void
 athp_taskq_start(struct ath10k *ar)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct athp_taskq_head *h;
 
 	h = ar->sc_taskq_head;
@@ -221,7 +224,7 @@ athp_taskq_start(struct ath10k *ar)
 	h->is_running = 1;
 	ATHP_TASKQ_UNLOCK(h);
 
-	taskqueue_enqueue(ar->workqueue, &h->run_task);
+	ieee80211_runtask(ic, &h->run_task);
 }
 
 /*
@@ -310,6 +313,7 @@ int
 athp_taskq_queue(struct ath10k *ar, struct athp_taskq_entry *e,
     const char *str, athp_taskq_cmd_cb *cb)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct athp_taskq_head *h;
 
 	h = ar->sc_taskq_head;
@@ -333,7 +337,7 @@ athp_taskq_queue(struct ath10k *ar, struct athp_taskq_entry *e,
 	TAILQ_INSERT_TAIL(&h->list, e, node);
 	ATHP_TASKQ_UNLOCK(h);
 
-	taskqueue_enqueue(ar->workqueue, &h->run_task);
+	ieee80211_runtask(ic, &h->run_task);
 
 	return (0);
 }
