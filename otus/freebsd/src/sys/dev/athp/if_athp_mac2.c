@@ -2323,7 +2323,7 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 //	int ret;
 
-	ath10k_warn(ar,
+	ath10k_dbg(ar, ATH10K_DBG_WMI,
 	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
 	    " ni rsn=%p, wpa=%p; deftxidx=%d\n",
 	    __func__,
@@ -2339,22 +2339,6 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-#if 0
-	/*
-	 * This shouldn't be done here; it needs to be plumbed down
-	 * when net80211 gets told about a new default tx key to use.
-	 *
-	 * And yes, it should only be done when we're doing hardware
-	 * crypto.
-	 *
-	 * XXX TODO: WEP?
-	 */
-	ret = ath10k_wmi_vdev_set_param(arvif->ar,
-					arvif->vdev_id,
-					arvif->ar->wmi.vdev_param->def_keyid,
-					vap->iv_def_txkey & 0xff);
-#endif
-
 	/* Don't plumb in keys until we're in RUN state */
 	if (! is_run)
 		return;
@@ -2369,7 +2353,6 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
-
 }
 
 /*
@@ -2427,11 +2410,14 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
 	}
 
 	/* Debugging */
-#if 1
 	for (i = 0; i < rateset->num_rates; i++) {
-		ath10k_warn(ar, "%s: %d: 0x%.2x (%d)\n", __func__, i, rateset->rates[i], rateset->rates[i]);
+		ath10k_dbg(ar, ATH10K_DBG_RATECTL,
+		    "%s: %d: 0x%.2x (%d)\n",
+		    __func__,
+		    i,
+		    rateset->rates[i],
+		    rateset->rates[i]);
 	}
-#endif
 }
 
 #if 0
