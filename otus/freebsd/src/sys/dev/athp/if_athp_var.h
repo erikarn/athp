@@ -185,6 +185,7 @@ struct ath10k_stats {
  */
 struct athp_pci_softc;
 struct ath10k_hif_ops;
+struct athp_taskq_head;
 struct ath10k {
 
 	/* FreeBSD specific bits up here */
@@ -209,6 +210,8 @@ struct ath10k {
 
 	uint32_t			sc_dbglog_module;
 	uint32_t			sc_dbglog_level;
+
+	struct athp_taskq_head		*sc_taskq_head;
 
 	union {
 		struct ath10k_rx_radiotap_header th;

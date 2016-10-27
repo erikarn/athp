@@ -48,6 +48,7 @@
 #define	ATH10K_DBG_BUSDMA	0x10000000
 #define	ATH10K_DBG_PBUF		0x20000000
 #define	ATH10K_DBG_RATECTL	0x40000000
+#define	ATH10K_DBG_TASKQ	0x80000000
 #define	ATH10K_DBG_ANY		0xffffffff
 
 enum ath10k_pktlog_filter {

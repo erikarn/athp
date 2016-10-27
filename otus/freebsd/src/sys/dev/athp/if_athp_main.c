@@ -87,6 +87,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac2.h"
 
 #include "if_athp_main.h"
+#include "if_athp_taskq.h"
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
@@ -1145,6 +1146,8 @@ athp_attach_net80211(struct ath10k *ar)
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
 
+	(void) athp_taskq_init(ar);
+
 	ieee80211_ifattach(ic);
 
 	/* required 802.11 methods */
@@ -1198,6 +1201,10 @@ athp_detach_net80211(struct ath10k *ar)
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* XXX Drain tasks from net80211 queue */
+
+	/* stop/drain taskq entries */
+	athp_taskq_flush(ar, 0);
+	athp_taskq_free(ar);
 
 	if (ic->ic_softc == ar)
 		ieee80211_ifdetach(ic);
