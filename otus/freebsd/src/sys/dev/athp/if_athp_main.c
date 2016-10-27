@@ -1146,8 +1146,6 @@ athp_attach_net80211(struct ath10k *ar)
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
 
-	(void) athp_taskq_init(ar);
-
 	ieee80211_ifattach(ic);
 
 	/* required 802.11 methods */
@@ -1188,7 +1186,7 @@ athp_attach_net80211(struct ath10k *ar)
 	// if (bootverbose)
 		ieee80211_announce(ic);
 
-	device_printf(ar->sc_dev, "%s: completed! we're ready!\n", __func__);
+	(void) athp_taskq_init(ar);
 
 	return (0);
 }
