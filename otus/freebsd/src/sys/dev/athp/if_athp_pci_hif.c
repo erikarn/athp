@@ -437,9 +437,13 @@ ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
 	ath10k_err(ar, "%s: called\n", __func__);
 
+	ATHP_CONF_LOCK(ar);
 	ath10k_pci_dump_registers(psc, NULL);
+	ATHP_CONF_UNLOCK(ar);
 
 	taskqueue_enqueue(ar->workqueue, &ar->restart_work);
 }
