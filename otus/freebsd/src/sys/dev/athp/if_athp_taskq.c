@@ -166,6 +166,7 @@ athp_taskq_init(struct ath10k *ar)
 	    MTX_DEF);
 
 	TASK_INIT(&h->run_task, 0, athp_taskq_task, ar);
+	TAILQ_INIT(&h->list);
 
 	ar->sc_taskq_head = h;
 
