@@ -32,4 +32,10 @@ extern	void athp_taskq_entry_free(struct ath10k *, struct athp_taskq_entry *);
 extern	int athp_taskq_queue(struct ath10k *, struct athp_taskq_entry *,
 	    const char *str, athp_taskq_cmd_cb *cb);
 
+static inline void *
+athp_taskq_entry_to_ptr(struct athp_taskq_entry *e)
+{
+	return (((char *) (e)) + sizeof(struct athp_taskq_entry));
+}
+
 #endif	/* __IF_ATHP_TASKQ_H__ */
