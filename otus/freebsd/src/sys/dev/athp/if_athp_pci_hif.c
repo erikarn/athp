@@ -435,13 +435,14 @@ ath10k_pci_dump_registers(struct athp_pci_softc *psc,
 void
 ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
 {
+	struct ath10k *ar = &psc->sc_sc;
 
-	printf("%s: called\n", __func__);
+	ath10k_err(ar, "%s: called\n", __func__);
 
 	ath10k_pci_dump_registers(psc, NULL);
+
+	taskqueue_enqueue(ar->workqueue, &ar->restart_work);
 }
-
-
 
 static int
 ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
