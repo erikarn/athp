@@ -1202,6 +1202,20 @@ static void ath10k_process_rx(struct ath10k *ar,
 
 	ath10k_dbg(ar, ATH10K_DBG_DATA | ATH10K_DBG_RECV,
 	    "%s: frame; m=%p, len=%d\n", __func__, m, m->m_len);
+
+	/*
+	 * XXX TODO: this is a bug up in the raw path decap; if the msdulen
+	 * is 0 because msdu_len_invalid is set, then the following logic
+	 * (eg subtracting FCS_LEN) is broken.
+	 *
+	 * So we end up having 0 byte frames passed up, which is silly.
+	 */
+	if (m->m_len == 0) {
+		ar->sc_stats.rx_pkt_zero_len++;
+		m_freem(m);
+		return;
+	}
+
 	ath10k_dbg(ar, ATH10K_DBG_DATA | ATH10K_DBG_RECV,
 		   "rx mbuf %p len %u peer %6D %s %s sn %u %s%s%s%s %srate %u "
 		   "vht_nss %u chan %u freq %u band %u cflag 0x%x pktflag 0x%x "
@@ -1232,19 +1246,6 @@ static void ath10k_process_rx(struct ath10k *ar,
 
 	/* mmm configurable */
 	if (ar->sc_rx_htt == 0) {
-		m_freem(m);
-		return;
-	}
-
-	/*
-	 * XXX TODO: this is a bug up in the raw path decap; if the msdulen
-	 * is 0 because msdu_len_invalid is set, then the following logic
-	 * (eg subtracting FCS_LEN) is broken.
-	 *
-	 * So we end up having 0 byte frames passed up, which is silly.
-	 */
-	if (m->m_len == 0) {
-		ar->sc_stats.rx_pkt_zero_len++;
 		m_freem(m);
 		return;
 	}
