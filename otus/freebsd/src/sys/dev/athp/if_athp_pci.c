@@ -480,8 +480,19 @@ athp_pci_attach(device_t dev)
 		goto bad0;
 	}
 
+	/*
+	 * Initialise HTT descriptors/memory.
+	 */
+	ret = ath10k_htt_rx_alloc_desc(ar, &ar->htt);
+	if (ret != 0) {
+		device_printf(dev, "%s: failed to alloc HTT RX descriptors\n",
+		    __func__);
+		goto bad;
+	}
+
 	/* XXX here instead of in core_init because we need the lock init'ed */
 	callout_init_mtx(&ar->scan.timeout, &ar->sc_data_mtx, 0);
+
 	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
 	    NULL, psc);
 	(void) taskqueue_start_threads(&psc->pipe_taskq, 1, PI_NET, "%s pipe taskq",
@@ -669,6 +680,8 @@ bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 bad:
 
+	ath10k_htt_rx_free_desc(ar, &ar->htt);
+
 	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
 	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
 
@@ -720,6 +733,9 @@ athp_pci_detach(device_t dev)
 
 	/* free pipes */
 	ath10k_pci_free_pipes(ar);
+
+	/* free HTT RX buffers */
+	ath10k_htt_rx_free_desc(ar, &ar->htt);
 
 	/* pci release */
 	/* sleep sync */

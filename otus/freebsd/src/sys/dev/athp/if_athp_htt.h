@@ -259,8 +259,10 @@ int ath10k_htt_setup(struct ath10k_htt *htt);
 int ath10k_htt_tx_alloc(struct ath10k_htt *htt);
 void ath10k_htt_tx_free(struct ath10k_htt *htt);
 
+int ath10k_htt_rx_alloc_desc(struct ath10k *ar, struct ath10k_htt *htt);
 int ath10k_htt_rx_alloc(struct ath10k_htt *htt);
 int ath10k_htt_rx_ring_refill(struct ath10k *ar);
+void ath10k_htt_rx_free_desc(struct ath10k *ar, struct ath10k_htt *htt);
 void ath10k_htt_rx_free(struct ath10k_htt *htt);
 
 void ath10k_htt_htc_tx_complete(struct ath10k *ar, struct athp_buf *pbuf);
