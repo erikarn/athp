@@ -616,6 +616,41 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 	return (1);
 }
 
+static void
+athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct ath10k_vif *arvif;
+	struct athp_key_update *ku;
+	int ret;
+
+	ku = athp_taskq_entry_to_ptr(e);
+
+	/* Yes, it's badly named .. */
+	if (flush == 0)
+		return;
+
+	arvif = ath10k_vif_to_arvif(ku->vap);
+
+	ATHP_CONF_LOCK(ar);
+	ret = ath10k_install_key(arvif, &ku->k, ku->wmi_add, ku->wmi_macaddr,
+	    ku->wmi_flags);
+
+	printf("%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d, wmimac=%6D\n",
+	    __func__,
+	    ku->k.wk_keyix, ku->wmi_add,
+	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
+	    ret, ku->wmi_macaddr, ":");
+
+	if (ku->wmi_add == 1) {
+		/* Note: this only matters for WEP. */
+		ret = ath10k_set_key_h_def_keyidx(ar, arvif, 1, &ku->k);
+		printf("%s: TODO: gk update=%d\n", __func__, ret);
+	}
+
+	ATHP_CONF_UNLOCK(ar);
+
+}
+
 /*
  * For raw mode operation (software crypto), we don't need to program
  * in keys.
@@ -638,10 +673,9 @@ static int
 athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
 	struct ieee80211_node *ni;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct athp_taskq_entry *e;
+	struct athp_key_update *ku;
 	struct ath10k *ar = vap->iv_ic->ic_softc;
-	int ret;
-	uint32_t flags = 0;
 
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
@@ -659,25 +693,42 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 * but .. there isn't.  Sigh.
 	 */
 
+	/*
+	 * Allocate a callback function state.
+	 */
+	e = athp_taskq_entry_alloc(ar, sizeof(struct athp_key_update));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate key-update\n",
+		    __func__);
+		return (0);
+	}
+	ku = athp_taskq_entry_to_ptr(e);
+
 	/* WMI_KEY_TX_USAGE is for static WEP */
 #if 0
 	if (k->wk_flags & IEEE80211_KEY_XMIT)
 		flags |= WMI_KEY_TX_USAGE;
 #endif
+
 	if (k->wk_flags & IEEE80211_KEY_GROUP)
-		flags |= WMI_KEY_GROUP;
-	if (k->wk_keyix == ATHP_PAIRWISE_KEY_IDX)
-		flags |= WMI_KEY_PAIRWISE;
+		ku->wmi_flags |= WMI_KEY_GROUP;
+	if (k->wk_keyix == 0)
+		ku->wmi_flags |= WMI_KEY_PAIRWISE;
 
-	ATHP_CONF_LOCK(ar);
-	ret = ath10k_install_key(arvif, k, 1, ni->ni_macaddr, flags);
-	printf("%s: TODO; k=%p, keyix=%d; flags=0x%08x; wmi flags=0x%08x, install ret=%d, mac=%6D, wmimac=%6D, keylen=%d\n",
-	    __func__, k, k->wk_keyix, k->wk_flags, flags, ret, k->wk_macaddr, ":", ni->ni_macaddr, ":", k->wk_keylen);
+	/* Which MAC to feed to the command */
+	memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 
-	/* Note: this only matters for WEP. */
-	ret = ath10k_set_key_h_def_keyidx(ar, arvif, 1, k);
-	printf("%s: TODO: gk update=%d\n", __func__, ret);
-	ATHP_CONF_UNLOCK(ar);
+	/* Copy the whole key contents for now; which is dirty.. */
+	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
+
+	/* Add */
+	ku->wmi_add = 1;
+
+	/* XXX ugh */
+	ku->vap = vap;
+
+	/* schedule */
+	(void) athp_taskq_queue(ar, e, "athp_key_set", athp_key_update_cb);
 
 	ieee80211_free_node(ni);
 	return (1);
@@ -690,31 +741,40 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
  *
  * XXX TODO - no, we actually kinda have to push this into a deferred
  * context and run it on the taskqueue.  net80211 holds locks that
- * we shouldn't be sleeping through.
+ * we shouldn't be sleeping through - eg, the node table lock when
+ * ieee80211_delucastkey() is called.
  */
 static int
 athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
 	struct ieee80211_node *ni;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct athp_taskq_entry *e;
+	struct athp_key_update *ku;
 	int ret = 0;
-	uint32_t flags = 0;
 
-	printf("%s: TODO! k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
+	printf("%s: k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
 	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret);
 
 	/*
-	 * XXX for now! We need to push key generation into a callback
-	 * queue due to key programming sleeping.
+	 * For now, we don't do any work for software encryption.
 	 *
-	 * .. or net80211 should just grow key updated in its taskqueue
-	 * stuff.
+	 * Later on we can experiment with using CLEAR keys
+	 * if we can get it working.
 	 */
-	return 1;
-
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
+
+	/*
+	 * Allocate a callback function state.
+	 */
+	e = athp_taskq_entry_alloc(ar, sizeof(struct athp_key_update));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate key-update\n",
+		    __func__);
+		return (0);
+	}
+	ku = athp_taskq_entry_to_ptr(e);
 
 	ni = ieee80211_ref_node(vap->iv_bss);
 
@@ -724,16 +784,25 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 		flags |= WMI_KEY_TX_USAGE;
 #endif
 	if (k->wk_flags & IEEE80211_KEY_GROUP)
-		flags |= WMI_KEY_GROUP;
+		ku->wmi_flags |= WMI_KEY_GROUP;
 	if (k->wk_keyix == 0)
-		flags |= WMI_KEY_PAIRWISE;
+		ku->wmi_flags |= WMI_KEY_PAIRWISE;
 
-	ATHP_CONF_LOCK(ar);
-	ret = ath10k_install_key(arvif, k, 0, ni->ni_macaddr, flags);
-	ATHP_CONF_UNLOCK(ar);
+	/* Which MAC to feed to the command */
+	memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 
-	printf("%s: k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d, wmimac=%6D\n",
-	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret, ni->ni_macaddr, ":");
+	/* Copy the whole key contents for now; which is dirty.. */
+	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
+
+	/* Delete */
+	ku->wmi_add = 0;
+
+	/* XXX ugh */
+	ku->vap = vap;
+
+	/* schedule */
+	(void) athp_taskq_queue(ar, e, "athp_key_del", athp_key_update_cb);
+
 	ieee80211_free_node(ni);
 	return (1);
 }
@@ -845,11 +914,23 @@ athp_vap_delete(struct ieee80211vap *vap)
 		/* Wait for xmit to finish before continuing */
 		ath10k_tx_flush(ar, vap, 0, 1);
 
+		/*
+		 * Flush any pending taskq operations.
+		 *
+		 * Now, this is dirty and very single-VAP oriented; it's like
+		 * this because unfortunately we don't know which entries
+		 * reference this VAP or not.
+		 *
+		 * That all needs to, like, die.
+		 */
+		athp_taskq_flush(ar, 0);
+
 		ATHP_CONF_LOCK(ar);
 		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
 		ATHP_CONF_UNLOCK(ar);
 	}
+
 
 	/*
 	 * XXX for now, we only support a single VAP.

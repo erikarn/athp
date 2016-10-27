@@ -37,6 +37,19 @@
 #define	ATHP_RX_LIST_COUNT	2048
 #define	ATHP_TX_LIST_COUNT	2048
 
+/*
+ * XXX TODO: key updates with the vap pointer like this is
+ * a disaster waiting to happen.  Instead we should modify
+ * the API to store a vdev id.
+ */
+struct athp_key_update {
+	struct ieee80211vap *vap;
+	struct ieee80211_key k;
+	uint8_t wmi_macaddr[ETH_ALEN];
+	uint32_t wmi_flags;
+	int wmi_add;
+};
+
 struct athp_node {
 	struct ieee80211_node	ni;
 	uint64_t		tx_done;
