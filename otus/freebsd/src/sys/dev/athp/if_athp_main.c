@@ -580,6 +580,24 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 	struct ath10k *ar = vap->iv_ic->ic_softc;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 
+	/*
+	 * This is a "bit" racy.  It's just a check to make sure
+	 * we don't get called during the vap free/destroy path.
+	 *
+	 * Since we don't hold the conf lock for the whole
+	 * duration of this function (XXX can we? Not likely
+	 * whilst the net80211 com/node lock is held) we can't
+	 * guarantee it's non-racy.
+	 *
+	 * It "should" be okay though.  Should.
+	 */
+	ATHP_CONF_LOCK(ar);
+	if (! arvif->is_setup) {
+		ATHP_CONF_UNLOCK(ar);
+		return (1);
+	}
+	ATHP_CONF_UNLOCK(ar);
+
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
 	    "%s: k=%p, keyix=%d; mac=%6D\n",
 	    __func__, k, k->wk_keyix, k->wk_macaddr, ":");
@@ -676,10 +694,29 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 static int
 athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct ieee80211_node *ni;
 	struct athp_taskq_entry *e;
 	struct athp_key_update *ku;
-	struct ath10k *ar = vap->iv_ic->ic_softc;
+
+	/*
+	 * This is a "bit" racy.  It's just a check to make sure
+	 * we don't get called during the vap free/destroy path.
+	 *
+	 * Since we don't hold the conf lock for the whole
+	 * duration of this function (XXX can we? Not likely
+	 * whilst the net80211 com/node lock is held) we can't
+	 * guarantee it's non-racy.
+	 *
+	 * It "should" be okay though.  Should.
+	 */
+	ATHP_CONF_LOCK(ar);
+	if (! arvif->is_setup) {
+		ATHP_CONF_UNLOCK(ar);
+		return (1);
+	}
+	ATHP_CONF_UNLOCK(ar);
 
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
@@ -743,18 +780,40 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
  *
  * Again, STA oriented, WPA oriented (not WEP yet.)
  *
- * XXX TODO - no, we actually kinda have to push this into a deferred
+ * We actually kinda have to push this into a deferred
  * context and run it on the taskqueue.  net80211 holds locks that
  * we shouldn't be sleeping through - eg, the node table lock when
  * ieee80211_delucastkey() is called.
+ *
+ * XXX: Note And, we can't grab our conflock here without causing a LOR
+ * because this path is sometimes called whilst the node table lock is held.
  */
 static int
 athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
 	struct ieee80211_node *ni;
 	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct athp_taskq_entry *e;
 	struct athp_key_update *ku;
+
+	/*
+	 * This is a "bit" racy.  It's just a check to make sure
+	 * we don't get called during the vap free/destroy path.
+	 *
+	 * Since we don't hold the conf lock for the whole
+	 * duration of this function (XXX can we? Not likely
+	 * whilst the net80211 com/node lock is held) we can't
+	 * guarantee it's non-racy.
+	 *
+	 * It "should" be okay though.  Should.
+	 */
+	ATHP_CONF_LOCK(ar);
+	if (! arvif->is_setup) {
+		ATHP_CONF_UNLOCK(ar);
+		return (1);
+	}
+	ATHP_CONF_UNLOCK(ar);
 
 	/*
 	 * For now, we don't do any work for software encryption.
@@ -905,6 +964,15 @@ athp_vap_delete(struct ieee80211vap *vap)
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/*
+	 * Mark the VAP as dying.  This is to ensure we don't
+	 * queue new frames, keycache modifications, etc after
+	 * this point.
+	 */
+	ATHP_CONF_LOCK(ar);
+	uvp->is_dying = 1;
+	ATHP_CONF_UNLOCK(ar);
+
+	/*
 	 * Only deinit the hardware/driver state if we did successfully
 	 * set it up earlier.
 	 */
@@ -914,7 +982,7 @@ athp_vap_delete(struct ieee80211vap *vap)
 		ath10k_tx_flush(ar, vap, 0, 1);
 
 		/*
-		 * Flush any pending taskq operations.
+		 * Flush/stop any pending taskq operations.
 		 *
 		 * Now, this is dirty and very single-VAP oriented; it's like
 		 * this because unfortunately we don't know which entries
@@ -927,9 +995,14 @@ athp_vap_delete(struct ieee80211vap *vap)
 		ATHP_CONF_LOCK(ar);
 		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
+		uvp->is_setup = 0;
 		ATHP_CONF_UNLOCK(ar);
 	}
 
+	/*
+	 * At this point the ath10k VAP no longer exists, so we can't
+	 * queue things to the vdev anymore.
+	 */
 
 	/*
 	 * XXX for now, we only support a single VAP.
@@ -938,7 +1011,17 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	ath10k_stop(ar);
 
+	/*
+	 * Detaching the VAP at this point may generate other events,
+	 * such as key deletions, sending last second frames, etc.
+	 * So we have to make sure that any callbacks that occur
+	 * at this point doesn't crash things.
+	 */
 	ieee80211_vap_detach(vap);
+
+	/*
+	 * Point of no return!
+	 */
 	free(uvp, M_80211_VAP);
 }
 

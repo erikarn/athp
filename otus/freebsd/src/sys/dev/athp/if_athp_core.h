@@ -111,6 +111,8 @@ struct ath10k_vif {
 
 	int is_stabss_setup;	/* set if the station mode BSS is setup */
 
+	int is_dying;	/* set if we're in the process of being torn down */
+
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
 	enum wmi_vdev_subtype vdev_subtype;
