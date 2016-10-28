@@ -647,7 +647,8 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	if (ku->wmi_add == 1) {
 		/* Note: this only matters for WEP. */
 		ret = ath10k_set_key_h_def_keyidx(ar, arvif, 1, &ku->k);
-		printf("%s: TODO: gk update=%d\n", __func__, ret);
+		ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+		    "%s: TODO: gk update=%d\n", __func__, ret);
 	}
 
 	ATHP_CONF_UNLOCK(ar);
