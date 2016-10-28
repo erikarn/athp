@@ -332,6 +332,17 @@ ath10k_htt_rx_free_desc(struct ath10k *ar, struct ath10k_htt *htt)
 }
 
 void
+ath10k_htt_rx_free_drain(struct ath10k_htt *htt)
+{
+	struct ath10k *ar = htt->ar;
+
+	//ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	taskqueue_drain(ar->workqueue, &htt->rx_replenish_task);
+	taskqueue_drain(ar->workqueue, &htt->txrx_compl_task);
+}
+
+void
 ath10k_htt_rx_free(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
@@ -341,8 +352,10 @@ ath10k_htt_rx_free(struct ath10k_htt *htt)
 	callout_stop(&htt->rx_ring.refill_retry_timer);
 	ATHP_HTT_RX_UNLOCK(htt);
 
+#if 0
 	taskqueue_drain(ar->workqueue, &htt->rx_replenish_task);
 	taskqueue_drain(ar->workqueue, &htt->txrx_compl_task);
+#endif
 
 	athp_buf_list_flush(ar, &ar->buf_tx, &htt->tx_compl_q);
 	athp_buf_list_flush(ar, &ar->buf_rx, &htt->rx_compl_q);

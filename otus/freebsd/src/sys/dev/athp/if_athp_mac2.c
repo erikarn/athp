@@ -4384,6 +4384,15 @@ void ath10k_drain_tx(struct ath10k *ar)
 #endif
 }
 
+void
+ath10k_halt_drain(struct ath10k *ar)
+{
+
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	ath10k_core_stop_drain(ar);
+}
+
 void ath10k_halt(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -4513,6 +4522,13 @@ int ath10k_start(struct ath10k *ar)
 
 	ath10k_warn(ar, "%s: called\n", __func__);
 
+	switch (ar->state) {
+	case ATH10K_STATE_RESTARTING:
+		ath10k_halt_drain(ar);
+	default:
+		break;
+	}
+
 	ATHP_CONF_LOCK(ar);
 
 	switch (ar->state) {
@@ -4626,7 +4642,12 @@ int ath10k_start(struct ath10k *ar)
 	ATHP_CONF_UNLOCK(ar);
 	return 0;
 
+
 err_core_stop:
+	/* XXX sigh, locking */
+	ATHP_CONF_UNLOCK(ar);
+	ath10k_core_stop_drain(ar);
+	ATHP_CONF_LOCK(ar);
 	ath10k_core_stop(ar);
 
 err_power_down:
@@ -4637,6 +4658,7 @@ err_off:
 
 err:
 	ATHP_CONF_UNLOCK(ar);
+	ath10k_core_stop_done(ar);
 	return ret;
 }
 
@@ -4644,6 +4666,10 @@ void ath10k_stop(struct ath10k *ar)
 {
 
 	ath10k_drain_tx(ar);
+
+	if (ar->state != ATH10K_STATE_OFF) {
+		ath10k_halt_drain(ar);
+	}
 
 	ATHP_CONF_LOCK(ar);
 	if (ar->state != ATH10K_STATE_OFF) {

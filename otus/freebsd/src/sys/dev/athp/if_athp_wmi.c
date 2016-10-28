@@ -6985,11 +6985,20 @@ int ath10k_wmi_attach(struct ath10k *ar)
 	return 0;
 }
 
+void
+ath10k_wmi_detach_drain(struct ath10k *ar)
+{
+
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
+}
+
 void ath10k_wmi_detach(struct ath10k *ar)
 {
 	int i;
 
-	taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
+	//taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
 
 	if (ar->svc_rdy_skb)
 		athp_freebuf(ar, &ar->buf_rx, ar->svc_rdy_skb);

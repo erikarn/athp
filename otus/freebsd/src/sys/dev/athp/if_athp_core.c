@@ -1510,13 +1510,22 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 	TAILQ_INIT(&ar->arvifs);
 
 	return 0;
+
+	/* XXX yes, the unlocking/locking here is silly and terrible */
+
 err_hif_stop:
 	ath10k_hif_stop(ar);
 err_htt_rx_detach:
+	ATHP_CONF_UNLOCK(ar);
+	ath10k_htt_rx_free_drain(&ar->htt);
+	ATHP_CONF_LOCK(ar);
 	ath10k_htt_rx_free(&ar->htt);
 err_htt_tx_detach:
 	ath10k_htt_tx_free(&ar->htt);
 err_wmi_detach:
+	ATHP_CONF_UNLOCK(ar);
+	ath10k_wmi_detach_drain(ar);
+	ATHP_CONF_LOCK(ar);
 	ath10k_wmi_detach(ar);
 err:
 	return status;
@@ -1548,6 +1557,23 @@ ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 }
 
 void
+ath10k_core_stop_drain(struct ath10k *ar)
+{
+
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	/*
+	 * XXX TODO: it'd be good if we can block the
+	 * taskqueues here.  Maybe block only the workqueue
+	 * and put anything that does a core stop
+	 * on workqueue_aux.
+	 */
+
+	ath10k_htt_rx_free_drain(&ar->htt);
+	ath10k_wmi_detach_drain(ar);
+}
+
+void
 ath10k_core_stop(struct ath10k *ar)
 {
 
@@ -1563,6 +1589,17 @@ ath10k_core_stop(struct ath10k *ar)
 	ath10k_htt_tx_free(&ar->htt);
 	ath10k_htt_rx_free(&ar->htt);
 	ath10k_wmi_detach(ar);
+}
+
+void
+ath10k_core_stop_done(struct ath10k *ar)
+{
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	/* XXX TODO */
+#if 0
+	taskqueue_unblock(ar->workqueue);
+#endif
 }
 
 /* mac80211 manages fw/hw initialization through start/stop hooks. However in
@@ -1621,6 +1658,7 @@ ath10k_core_probe_fw(struct ath10k *ar)
 		goto err_free_firmware_files;
 	}
 
+
 	ATHP_CONF_LOCK(ar);
 
 	ret = ath10k_core_start(ar, ATH10K_FIRMWARE_MODE_NORMAL);
@@ -1630,9 +1668,15 @@ ath10k_core_probe_fw(struct ath10k *ar)
 	}
 
 	ath10k_print_driver_info(ar);
+
+	ATHP_CONF_UNLOCK(ar);
+	ath10k_core_stop_drain(ar);
+
+	ATHP_CONF_LOCK(ar);
 	ath10k_core_stop(ar);
 
 	ATHP_CONF_UNLOCK(ar);
+	ath10k_core_stop_done(ar);
 
 	ath10k_hif_power_down(ar);
 	return 0;

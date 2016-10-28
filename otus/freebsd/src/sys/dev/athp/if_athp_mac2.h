@@ -30,6 +30,7 @@ extern	void ath10k_offchan_tx_purge(struct ath10k *ar);
 
 extern	int ath10k_start(struct ath10k *ar);
 extern	void ath10k_stop(struct ath10k *ar);
+extern	void ath10k_halt_drain(struct ath10k *ar);
 extern	void ath10k_halt(struct ath10k *ar);
 
 /* station */
