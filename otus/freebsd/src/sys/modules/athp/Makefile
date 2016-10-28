@@ -83,4 +83,7 @@ SRCS    += if_athp_htt_rx.c
 # This is the firmware log code from linux foundation (BSD!)
 SRCS    += if_athp_fwlog.c
 
+# This is the internal task queue for things like keycache updates
+SRCS    += if_athp_taskq.c
+
 .include <bsd.kmod.mk>
