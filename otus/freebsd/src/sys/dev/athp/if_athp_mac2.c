@@ -92,6 +92,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac2.h"
 #include "if_athp_main.h"
 #include "if_athp_txrx.h"
+#include "if_athp_taskq.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -4640,6 +4641,10 @@ int ath10k_start(struct ath10k *ar)
 #endif
 
 	ATHP_CONF_UNLOCK(ar);
+
+	/* Kick-start deferred */
+	athp_taskq_start(ar);
+
 	return 0;
 
 
