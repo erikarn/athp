@@ -84,7 +84,7 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_taskq.h"
 
-MALLOC_DEFINE(M_ATHPDEV_TASKQ, "athp", "athp taskq");
+MALLOC_DEFINE(M_ATHPDEV_TASKQ, "athp_taskq", "athp taskq");
 
 /*
  * This implements a deferred callback mechanism for pieces which
@@ -142,7 +142,7 @@ athp_taskq_task(void *arg, int npending)
 
 	/* Whilst locked, see if there's any more work to do */
 	n = 0;
-	if (TAILQ_FIRST(&h->list) != NULL) {
+	if (h->is_running && TAILQ_FIRST(&h->list) != NULL) {
 		n = 1;
 	}
 	ATHP_TASKQ_UNLOCK(h);
@@ -255,7 +255,7 @@ athp_taskq_flush(struct ath10k *ar, int flush)
 	/* Flush whatever entries are on it */
 	TAILQ_INIT(&te);
 	ATHP_TASKQ_LOCK(h);
-	TAILQ_CONCAT(&h->list, &te, node);
+	TAILQ_CONCAT(&te, &h->list, node);
 	ATHP_TASKQ_UNLOCK(h);
 
 	while ((e = TAILQ_FIRST(&te)) != NULL) {
@@ -315,6 +315,7 @@ athp_taskq_queue(struct ath10k *ar, struct athp_taskq_entry *e,
 {
 	struct ieee80211com *ic = &ar->sc_ic;
 	struct athp_taskq_head *h;
+	int do_run = 0;
 
 	h = ar->sc_taskq_head;
 	if (h == NULL)
@@ -335,9 +336,12 @@ athp_taskq_queue(struct ath10k *ar, struct athp_taskq_entry *e,
 	ATHP_TASKQ_LOCK(h);
 	e->on_queue = 1;
 	TAILQ_INSERT_TAIL(&h->list, e, node);
+	if (h->is_running)
+		do_run = 1;
 	ATHP_TASKQ_UNLOCK(h);
 
-	ieee80211_runtask(ic, &h->run_task);
+	if (do_run)
+		ieee80211_runtask(ic, &h->run_task);
 
 	return (0);
 }
