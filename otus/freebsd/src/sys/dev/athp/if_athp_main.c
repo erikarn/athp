@@ -580,7 +580,8 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 	struct ath10k *ar = vap->iv_ic->ic_softc;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 
-	ath10k_warn(ar, "%s: TODO; k=%p, keyix=%d; mac=%6D\n",
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: k=%p, keyix=%d; mac=%6D\n",
 	    __func__, k, k->wk_keyix, k->wk_macaddr, ":");
 
 	if (!(&vap->iv_nw_keys[0] <= k &&
@@ -635,7 +636,9 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	ret = ath10k_install_key(arvif, &ku->k, ku->wmi_add, ku->wmi_macaddr,
 	    ku->wmi_flags);
 
-	printf("%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d, wmimac=%6D\n",
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d,"
+	    " wmimac=%6D\n",
 	    __func__,
 	    ku->k.wk_keyix, ku->wmi_add,
 	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
@@ -751,10 +754,6 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	struct ath10k *ar = vap->iv_ic->ic_softc;
 	struct athp_taskq_entry *e;
 	struct athp_key_update *ku;
-	int ret = 0;
-
-	printf("%s: k=%p, keyix=%d, flags=0x%08x, mac=%6D; ret=%d\n",
-	    __func__, k, k->wk_keyix, k->wk_flags, k->wk_macaddr, ":", ret);
 
 	/*
 	 * For now, we don't do any work for software encryption.
@@ -863,14 +862,12 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 		return (NULL);
 	}
 
-	/* XXX TODO: override methods */
+	/* Override vap methods */
 	uvp->av_newstate = vap->iv_newstate;
 	vap->iv_newstate = athp_vap_newstate;
-#if 1
 	vap->iv_key_alloc = athp_key_alloc;
 	vap->iv_key_set = athp_key_set;
 	vap->iv_key_delete = athp_key_delete;
-#endif
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -903,6 +900,7 @@ athp_vap_delete(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *uvp = ath10k_vif_to_arvif(vap);
+
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/*
