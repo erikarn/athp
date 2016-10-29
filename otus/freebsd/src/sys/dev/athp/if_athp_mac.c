@@ -146,14 +146,14 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 	struct ath10k_vif *vif;
 
 	/* XXX for now; may need to use another lock, or create a new one */
-	ATHP_LOCK(ar);
+	ATHP_CONF_LOCK(ar);
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		if (vif->vdev_id == vdev_id) {
-			ATHP_UNLOCK(ar);
+			ATHP_CONF_UNLOCK(ar);
 			return vif;
 		}
 	}
-	ATHP_UNLOCK(ar);
+	ATHP_CONF_UNLOCK(ar);
 
 	device_printf(ar->sc_dev, "%s: couldn't find vdev id %d\n",
 	    __func__, vdev_id);
