@@ -32,6 +32,12 @@ struct athp_pci_softc {
 	int			sc_cap_off;
 
 	/*
+	 * BMI descriptors, pre-allocated.
+	 */
+	struct athp_descdma	sc_bmi_txbuf;
+	struct athp_descdma	sc_bmi_rxbuf;
+
+	/*
 	 * ath10k pci state
 	 */
 	int			num_msi_intrs;

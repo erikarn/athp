@@ -1656,7 +1656,8 @@ int ath10k_wmi_wait_for_service_ready(struct ath10k *ar)
 	unsigned long time_left;
 
 	time_left = ath10k_compl_wait(&ar->wmi.service_ready,
-	    "wmi_service_ready", WMI_SERVICE_READY_TIMEOUT_MSEC);
+	    "wmi_service_ready", &ar->sc_conf_mtx,
+	    WMI_SERVICE_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
 	return 0;
@@ -1667,7 +1668,8 @@ int ath10k_wmi_wait_for_unified_ready(struct ath10k *ar)
 	unsigned long time_left;
 
 	time_left = ath10k_compl_wait(&ar->wmi.unified_ready,
-	    "wmi_unified_ready", WMI_UNIFIED_READY_TIMEOUT_MSEC);
+	    "wmi_unified_ready", &ar->sc_conf_mtx,
+	    WMI_UNIFIED_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
 	return 0;
@@ -1787,29 +1789,21 @@ static void ath10k_wmi_tx_beacons_iter(void *data, u8 *mac,
 
 static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 {
-#if 0
 	struct ath10k_vif *vif;
 
 	/*
-	 * XXX TODO: this needs conf_lock held, but unfortunately
+	 * XXX Note: this needs conf_lock held, but unfortunately
 	 * it may already be held.  Maybe see if we can iterate
 	 * the VAPs?
 	 *
 	 * Note: the reason for holding conf lock is that said
 	 * lock looks after the arvifs list.
 	 */
+	ATHP_CONF_LOCK(ar);
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		ath10k_wmi_tx_beacon_nowait(vif);
 	}
-#else
-	ath10k_warn(ar, "%s: TODO\n", __func__);
-#endif
-#if 0
-	ieee80211_iterate_active_interfaces_atomic(ar->hw,
-						   IEEE80211_IFACE_ITER_NORMAL,
-						   ath10k_wmi_tx_beacons_iter,
-						   NULL);
-#endif
+	ATHP_CONF_UNLOCK(ar);
 }
 
 static void ath10k_wmi_op_ep_tx_credits(struct ath10k *ar)
@@ -1837,12 +1831,6 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	interval = ticks + ((3000 * hz) / 1000);
 
 	/*
-	 * Just to generate the debug echo; when it's implemented, uncomment
-	 * the one below.
-	 */
-	ath10k_wmi_tx_beacons_nowait(ar);
-
-	/*
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
@@ -1853,10 +1841,11 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 #endif
 
 	while (! ieee80211_time_after(ticks, interval)) {
-		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq", 1);
+		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq",
+		    &ar->sc_conf_mtx, 1);
 
 		/* try to send pending beacons first. they take priority */
-//		ath10k_wmi_tx_beacons_nowait(ar);
+		ath10k_wmi_tx_beacons_nowait(ar);
 
 		/* Try to send something */
 		ret = ath10k_wmi_cmd_send_nowait(ar, pbuf, cmd_id);
@@ -6990,11 +6979,20 @@ int ath10k_wmi_attach(struct ath10k *ar)
 	return 0;
 }
 
+void
+ath10k_wmi_detach_drain(struct ath10k *ar)
+{
+
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
+}
+
 void ath10k_wmi_detach(struct ath10k *ar)
 {
 	int i;
 
-	taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
+	//taskqueue_drain(ar->workqueue_aux, &ar->svc_rdy_work);
 
 	if (ar->svc_rdy_skb)
 		athp_freebuf(ar, &ar->buf_rx, ar->svc_rdy_skb);

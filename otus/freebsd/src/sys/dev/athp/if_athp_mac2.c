@@ -92,6 +92,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac2.h"
 #include "if_athp_main.h"
 #include "if_athp_txrx.h"
+#include "if_athp_taskq.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -330,7 +331,8 @@ ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
 	if (ret)
 		return ret;
 
-	time_left = ath10k_compl_wait(&ar->install_key_done, "install_key", 3);
+	time_left = ath10k_compl_wait(&ar->install_key_done, "install_key",
+	    &ar->sc_conf_mtx, 3);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -1013,9 +1015,10 @@ static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
 
 	//time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
 	//    ATH10K_VDEV_SETUP_TIMEOUT_HZ);
-	ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
+	if (ar->vdev_setup_done.done != 0)
+		ath10k_warn(ar, "%s: done=%d before call\n", __func__, ar->vdev_setup_done.done);
 	time_left = ath10k_compl_wait(&ar->vdev_setup_done, __func__,
-	    500);
+	    &ar->sc_conf_mtx, ATH10K_VDEV_SETUP_TIMEOUT_HZ);
 	if (time_left == 0)
 		return -ETIMEDOUT;
 
@@ -1549,8 +1552,6 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	struct ath10k *ar = arvif->ar;
 	struct wmi_vdev_start_request_arg arg = {};
 	int ret = 0;
-
-	ath10k_warn(ar, "%s: TODO: make it check channel flags; etc!\n", __func__);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2322,7 +2323,7 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 //	int ret;
 
-	ath10k_warn(ar,
+	ath10k_dbg(ar, ATH10K_DBG_WMI,
 	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
 	    " ni rsn=%p, wpa=%p; deftxidx=%d\n",
 	    __func__,
@@ -2338,22 +2339,6 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-#if 0
-	/*
-	 * This shouldn't be done here; it needs to be plumbed down
-	 * when net80211 gets told about a new default tx key to use.
-	 *
-	 * And yes, it should only be done when we're doing hardware
-	 * crypto.
-	 *
-	 * XXX TODO: WEP?
-	 */
-	ret = ath10k_wmi_vdev_set_param(arvif->ar,
-					arvif->vdev_id,
-					arvif->ar->wmi.vdev_param->def_keyid,
-					vap->iv_def_txkey & 0xff);
-#endif
-
 	/* Don't plumb in keys until we're in RUN state */
 	if (! is_run)
 		return;
@@ -2368,7 +2353,6 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
-
 }
 
 /*
@@ -2426,11 +2410,14 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
 	}
 
 	/* Debugging */
-#if 1
 	for (i = 0; i < rateset->num_rates; i++) {
-		ath10k_warn(ar, "%s: %d: 0x%.2x (%d)\n", __func__, i, rateset->rates[i], rateset->rates[i]);
+		ath10k_dbg(ar, ATH10K_DBG_RATECTL,
+		    "%s: %d: 0x%.2x (%d)\n",
+		    __func__,
+		    i,
+		    rateset->rates[i],
+		    rateset->rates[i]);
 	}
-#endif
 }
 
 #if 0
@@ -4182,7 +4169,8 @@ static int ath10k_scan_stop(struct ath10k *ar)
 		goto out;
 	}
 
-	ret = ath10k_compl_wait(&ar->scan.completed, "scan_stop", 3);
+	ret = ath10k_compl_wait(&ar->scan.completed, "scan_stop",
+	    &ar->sc_conf_mtx, 3);
 	if (ret == 0) {
 		ath10k_warn(ar, "failed to receive scan abortion completion: timed out\n");
 		ret = -ETIMEDOUT;
@@ -4262,7 +4250,8 @@ static int ath10k_start_scan(struct ath10k *ar,
 	if (ret)
 		return ret;
 
-	ret = ath10k_compl_wait(&ar->scan.started, "scan_start", 1);
+	ret = ath10k_compl_wait(&ar->scan.started, "scan_start",
+	    &ar->sc_conf_mtx, 1);
 	if (ret == 0) {
 		ret = ath10k_scan_stop(ar);
 		if (ret)
@@ -4394,6 +4383,15 @@ void ath10k_drain_tx(struct ath10k *ar)
 #endif
 }
 
+void
+ath10k_halt_drain(struct ath10k *ar)
+{
+
+	ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	ath10k_core_stop_drain(ar);
+}
+
 void ath10k_halt(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
@@ -4523,6 +4521,13 @@ int ath10k_start(struct ath10k *ar)
 
 	ath10k_warn(ar, "%s: called\n", __func__);
 
+	switch (ar->state) {
+	case ATH10K_STATE_RESTARTING:
+		ath10k_halt_drain(ar);
+	default:
+		break;
+	}
+
 	ATHP_CONF_LOCK(ar);
 
 	switch (ar->state) {
@@ -4634,9 +4639,18 @@ int ath10k_start(struct ath10k *ar)
 #endif
 
 	ATHP_CONF_UNLOCK(ar);
+
+	/* Kick-start deferred */
+	athp_taskq_start(ar);
+
 	return 0;
 
+
 err_core_stop:
+	/* XXX sigh, locking */
+	ATHP_CONF_UNLOCK(ar);
+	ath10k_core_stop_drain(ar);
+	ATHP_CONF_LOCK(ar);
 	ath10k_core_stop(ar);
 
 err_power_down:
@@ -4647,6 +4661,7 @@ err_off:
 
 err:
 	ATHP_CONF_UNLOCK(ar);
+	ath10k_core_stop_done(ar);
 	return ret;
 }
 
@@ -4654,6 +4669,10 @@ void ath10k_stop(struct ath10k *ar)
 {
 
 	ath10k_drain_tx(ar);
+
+	if (ar->state != ATH10K_STATE_OFF) {
+		ath10k_halt_drain(ar);
+	}
 
 	ATHP_CONF_LOCK(ar);
 	if (ar->state != ATH10K_STATE_OFF) {
@@ -6378,7 +6397,7 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-	ret = ath10k_compl_wait(&ar->scan.on_channel, 3);
+	ret = ath10k_compl_wait(&ar->scan.on_channel, &ar->sc_conf_mtx, 3);
 	if (ret == 0) {
 		ath10k_warn(ar, "failed to switch to channel for roc scan\n");
 
@@ -6488,7 +6507,8 @@ ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 			bool empty;
 
 			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
-			    "tx_flush", ATH10K_FLUSH_TIMEOUT_HZ);
+			    "tx_flush", &ar->sc_conf_mtx,
+			    ATH10K_FLUSH_TIMEOUT_HZ);
 
 			ATHP_HTT_TX_LOCK(&ar->htt);
 			empty = (ar->htt.num_pending_tx == 0);

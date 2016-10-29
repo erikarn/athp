@@ -22,9 +22,9 @@
 #include "hal/rx_desc.h"
 #include "hal/htt.h"
 
-#include <sys/sx.h>
-
 #include "athp_idr.h"
+
+#include <sys/kdb.h>
 
 #include "if_athp_buf.h"
 #include "if_athp_thermal.h"
@@ -37,6 +37,19 @@
 #define	ATHP_RX_LIST_COUNT	2048
 #define	ATHP_TX_LIST_COUNT	2048
 
+/*
+ * XXX TODO: key updates with the vap pointer like this is
+ * a disaster waiting to happen.  Instead we should modify
+ * the API to store a vdev id.
+ */
+struct athp_key_update {
+	struct ieee80211vap *vap;
+	struct ieee80211_key k;
+	uint8_t wmi_macaddr[ETH_ALEN];
+	uint32_t wmi_flags;
+	int wmi_add;
+};
+
 struct athp_node {
 	struct ieee80211_node	ni;
 	uint64_t		tx_done;
@@ -44,35 +57,50 @@ struct athp_node {
 	uint64_t		tx_retries;
 };
 
+static inline void
+athp_mtx_assert(struct mtx *mtx, int op)
+{
+	int ret;
+
+	ret = mtx_owned(mtx);
+	if (op == MA_NOTOWNED)
+		ret = !ret;
+
+	if (ret)
+		return;
+	printf("%s: failed assertion check (%s)", __func__,
+	    op == MA_OWNED ? "owned" : "not-owned");
+	kdb_backtrace();
+}
+
 #define	ATHP_NODE(ni)		((struct athp_node *)(ni))
 
 #define	ATHP_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	ATHP_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
-#define	ATHP_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_mtx, MA_OWNED)
-#define	ATHP_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_mtx, MA_NOTOWNED)
+#define	ATHP_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_mtx, MA_OWNED)
+#define	ATHP_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_mtx, MA_NOTOWNED)
 
 #define	ATHP_FW_VER_STR		128
 
-#define	ATHP_CONF_LOCK(sc)		sx_xlock(&(sc)->sc_conf_sx)
-#define	ATHP_CONF_UNLOCK(sc)		sx_unlock(&(sc)->sc_conf_sx)
-/* XXX add lock assertions damnit */
-#define	ATHP_CONF_LOCK_ASSERT(sc)	sx_assert(&(sc)->sc_conf_sx, SA_LOCKED)
-#define	ATHP_CONF_UNLOCK_ASSERT(sc)	sx_assert(&(sc)->sc_conf_sx, SA_UNLOCKED)
+#define	ATHP_CONF_LOCK(sc)		mtx_lock(&(sc)->sc_conf_mtx)
+#define	ATHP_CONF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_conf_mtx)
+#define	ATHP_CONF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
+#define	ATHP_CONF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
 
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
-#define	ATHP_DATA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_data_mtx, MA_OWNED)
-#define	ATHP_DATA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_data_mtx, MA_NOTOWNED)
+#define	ATHP_DATA_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_data_mtx, MA_OWNED)
+#define	ATHP_DATA_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_data_mtx, MA_NOTOWNED)
 
 #define	ATHP_BUF_LOCK(sc)		mtx_lock(&(sc)->sc_buf_mtx)
 #define	ATHP_BUF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_buf_mtx)
-#define	ATHP_BUF_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_OWNED)
-#define	ATHP_BUF_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_buf_mtx, MA_NOTOWNED)
+#define	ATHP_BUF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_buf_mtx, MA_OWNED)
+#define	ATHP_BUF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_buf_mtx, MA_NOTOWNED)
 
 #define	ATHP_DMA_LOCK(sc)		mtx_lock(&(sc)->sc_dma_mtx)
 #define	ATHP_DMA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_dma_mtx)
-#define	ATHP_DMA_LOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
-#define	ATHP_DMA_UNLOCK_ASSERT(sc)	mtx_assert(&(sc)->sc_dma_mtx, MA_NOTOWNED)
+#define	ATHP_DMA_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
+#define	ATHP_DMA_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_dma_mtx, MA_NOTOWNED)
 
 /*
  * For now, we don't allocate hardware pairwise keys as hardware
@@ -170,6 +198,7 @@ struct ath10k_stats {
  */
 struct athp_pci_softc;
 struct ath10k_hif_ops;
+struct athp_taskq_head;
 struct ath10k {
 
 	/* FreeBSD specific bits up here */
@@ -180,7 +209,7 @@ struct ath10k {
 	struct mtx			sc_mtx;
 	struct mtx			sc_buf_mtx;
 	struct mtx			sc_dma_mtx;
-	struct sx			sc_conf_sx;
+	struct mtx			sc_conf_mtx;
 	struct mtx			sc_data_mtx;
 	int				sc_invalid;
 	uint64_t			sc_debug;
@@ -194,6 +223,8 @@ struct ath10k {
 
 	uint32_t			sc_dbglog_module;
 	uint32_t			sc_dbglog_level;
+
+	struct athp_taskq_head		*sc_taskq_head;
 
 	union {
 		struct ath10k_rx_radiotap_header th;

@@ -232,11 +232,21 @@ ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 	struct ath10k_ce_pipe *ce_diag;
 	/* Host buffer address in CE space */
 	u32 ce_data;
-	struct athp_descdma dd;
 	bus_addr_t ce_data_base = 0;
 	void *data_buf = NULL;
 	int i;
 
+	/*
+	 * We're sharing the same buffer that BMI uses for exchanging
+	 * messages.
+	 */
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (nbytes > 4096) {
+		ath10k_err(ar, "%s: called with nbytes > bufsize (%d)\n",
+		    __func__, nbytes);
+		return (-ENOMEM);
+	}
 
 	/*
 	 * Allocate a temporary bounce buffer to hold caller's data
@@ -245,21 +255,12 @@ ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 	 *   2) Buffer in DMA-able space
 	 */
 	/*
-	 * XXX TODO: this allocates a whole separate tag
-	 * just to allocate a descriptor with the given alignment.
-	 * Ideally we'd just use contigmalloc() and get the paddr
-	 * for it.
+	 * Note: locks are held here, so share the same buffer from BMI
+	 * whilst holding the conf lock.
 	 */
 	orig_nbytes = nbytes;
-	ret = athp_descdma_alloc(ar, &dd, "pci_diag_read_mem", 4, nbytes);
-	if (ret != 0) {
-		ath10k_warn(ar,
-		    "failed to read diag value (alloc) at 0x%x: %d\n",
-		    address, ret);
-		return (ret);
-	}
-	data_buf = dd.dd_desc;
-	ce_data_base = dd.dd_desc_paddr;
+	data_buf = psc->sc_bmi_txbuf.dd_desc;
+	ce_data_base = psc->sc_bmi_txbuf.dd_desc_paddr;
 
 	ATHP_PCI_CE_LOCK(psc);
 
@@ -354,8 +355,6 @@ done:
 
 	ATHP_PCI_CE_UNLOCK(psc);
 
-	athp_descdma_free(ar, &dd);
-
 	return ret;
 }
 
@@ -436,13 +435,18 @@ ath10k_pci_dump_registers(struct athp_pci_softc *psc,
 void
 ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
 {
+	struct ath10k *ar = &psc->sc_sc;
 
-	printf("%s: called\n", __func__);
+	ATHP_CONF_UNLOCK_ASSERT(ar);
 
+	ath10k_err(ar, "%s: called\n", __func__);
+
+	ATHP_CONF_LOCK(ar);
 	ath10k_pci_dump_registers(psc, NULL);
+	ATHP_CONF_UNLOCK(ar);
+
+	taskqueue_enqueue(ar->workqueue, &ar->restart_work);
 }
-
-
 
 static int
 ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
@@ -455,11 +459,12 @@ ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 	unsigned int id;
 	unsigned int flags;
 	struct ath10k_ce_pipe *ce_diag;
-	struct athp_descdma dd;
 	void *data_buf = NULL;
 	u32 ce_data;	/* Host buffer address in CE space */
 	bus_addr_t ce_data_base = 0;
 	int i;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	/*
 	 * Allocate a temporary bounce buffer to hold caller's data
@@ -468,15 +473,12 @@ ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 	 *   2) Buffer in DMA-able space
 	 */
 	orig_nbytes = nbytes;
-	ret = athp_descdma_alloc(ar, &dd, "pci_diag_read_mem", 4, nbytes);
-	if (ret != 0) {
-		ath10k_warn(ar,
-		    "failed to write diag value (alloc) at 0x%x: %d\n",
-		    address, ret);
-		return (ret);
-	}
-	data_buf = dd.dd_desc;
-	ce_data_base = dd.dd_desc_paddr;
+
+	/*
+	 * Re-use the BMI TX buffer, under the conf lock.
+	 */
+	data_buf = psc->sc_bmi_txbuf.dd_desc;
+	ce_data_base = psc->sc_bmi_txbuf.dd_desc_paddr;
 
 	ATHP_PCI_CE_LOCK(psc);
 
@@ -572,8 +574,6 @@ done:
 		ath10k_warn(ar, "failed to write diag value at 0x%x: %d\n",
 		    address, ret);
 	ATHP_PCI_CE_UNLOCK(psc);
-
-	athp_descdma_free(ar, &dd);
 
 	return ret;
 }
@@ -1048,7 +1048,6 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 	struct ath10k_pci_pipe *pci_rx = &psc->pipe_info[BMI_CE_NUM_TO_HOST];
 	struct ath10k_ce_pipe *ce_tx = pci_tx->ce_hdl;
 	struct ath10k_ce_pipe *ce_rx = pci_rx->ce_hdl;
-	struct athp_descdma dd_req, dd_resp;
 	struct bmi_xfer xfer = {};
 	bus_addr_t req_paddr = 0;
 	bus_addr_t resp_paddr = 0;
@@ -1057,12 +1056,20 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 
 	might_sleep();
 
+	ATHP_CONF_LOCK_ASSERT(ar);
+
 	if (resp && !resp_len)
 		return -EINVAL;
 
 	if (resp && resp_len && *resp_len == 0)
 		return -EINVAL;
 
+	/*
+	 * Don't allocate temporary descriptor memory here.
+	 * This should be done for us outside of holding locks.
+	 */
+
+#if 0
 	/*
 	 * Allocate temporary descriptor memory for the request.
 	 * Yes, it's a descriptor and a bit heavyweight.  Grr.
@@ -1072,27 +1079,32 @@ ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
 	 */
 	bzero(&dd_req, sizeof(dd_req));
 	bzero(&dd_resp, sizeof(dd_resp));
+#endif
 
+#if 0
 	ret = athp_descdma_alloc(ar, &dd_req, "bmi_msg_req", 4, req_len);
 	if (ret != 0)
 		return -ENOMEM;
+#endif
 
 	/* Copy request into the allocate descriptor */
-	memcpy(dd_req.dd_desc, req, req_len);
+	memcpy(psc->sc_bmi_txbuf.dd_desc, req, req_len);
 
 	/* Get physical mapping for the allocated descriptor */
-	req_paddr = dd_req.dd_desc_paddr;
+	req_paddr = psc->sc_bmi_txbuf.dd_desc_paddr;
 
 	/* Get a descriptor w/ physical mapping for the response */
 
 	if (resp && resp_len) {
+#if 0
 		ret = athp_descdma_alloc(ar, &dd_resp, "bmi_msg_resp", 4,
 		    *resp_len);
 		if (ret != 0) {
 			ret = -ENOMEM;
 			goto err_req;
 		}
-		resp_paddr = dd_resp.dd_desc_paddr;
+#endif
+		resp_paddr = psc->sc_bmi_rxbuf.dd_desc_paddr;
 
 		xfer.wait_for_resp = true;
 		xfer.resp_len = 0;
@@ -1122,15 +1134,12 @@ err_resp:
 		u32 unused_buffer;
 		ath10k_ce_revoke_recv_next(ce_rx, NULL, &unused_buffer);
 	}
-err_req:
+
 	if (ret == 0 && resp_len) {
 		*resp_len = min(*resp_len, xfer.resp_len);
 		/* Copy result from response descriptor to caller */
-		memcpy(resp, dd_resp.dd_desc, xfer.resp_len);
+		memcpy(resp, psc->sc_bmi_rxbuf.dd_desc, xfer.resp_len);
 	}
-//err_dma:
-	athp_descdma_free(ar, &dd_req);
-	athp_descdma_free(ar, &dd_resp);
 
 	return ret;
 }

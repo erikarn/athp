@@ -111,6 +111,8 @@ struct ath10k_vif {
 
 	int is_stabss_setup;	/* set if the station mode BSS is setup */
 
+	int is_dying;	/* set if we're in the process of being torn down */
+
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
 	enum wmi_vdev_subtype vdev_subtype;
@@ -403,6 +405,8 @@ extern	int ath10k_core_start(struct ath10k *ar,
 	    enum ath10k_firmware_mode mode);
 extern	int ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt);
 extern	void ath10k_core_stop(struct ath10k *ar);
+extern	void ath10k_core_stop_drain(struct ath10k *ar);
+extern	void ath10k_core_stop_done(struct ath10k *ar);
 extern	int ath10k_core_probe_fw(struct ath10k *ar);
 extern	int ath10k_core_register(struct ath10k *ar);
 extern	void ath10k_core_unregister(struct ath10k *ar);

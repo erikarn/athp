@@ -395,7 +395,7 @@ athp_attach_preinit(void *arg)
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	sx_destroy(&ar->sc_conf_sx);
+	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);
@@ -458,15 +458,41 @@ athp_pci_attach(device_t dev)
 	    MTX_DEF);
 	mtx_init(&ar->sc_dma_mtx, device_get_nameunit(dev), "athp dma",
 	    MTX_DEF);
-	sx_init(&ar->sc_conf_sx, "athp conf");
+	mtx_init(&ar->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
+	    MTX_DEF | MTX_RECURSE);
 	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
 	    MTX_DEF);
 	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), "athp ce",
 	    MTX_DEF);
 	mtx_init(&ar->sc_data_mtx, device_get_nameunit(dev), "athp data",
 	    MTX_DEF);
+
+	/*
+	 * Initialise ath10k BMI/PCIDIAG bits.
+	 */
+	ret = athp_descdma_alloc(ar, &psc->sc_bmi_txbuf, "bmi_msg_req",
+	    4, 1024);
+	ret |= athp_descdma_alloc(ar, &psc->sc_bmi_rxbuf, "bmi_msg_resp",
+	    4, 1024);
+	if (ret != 0) {
+		device_printf(dev, "%s: failed to allocate BMI TX/RX buffer\n",
+		    __func__);
+		goto bad0;
+	}
+
+	/*
+	 * Initialise HTT descriptors/memory.
+	 */
+	ret = ath10k_htt_rx_alloc_desc(ar, &ar->htt);
+	if (ret != 0) {
+		device_printf(dev, "%s: failed to alloc HTT RX descriptors\n",
+		    __func__);
+		goto bad;
+	}
+
 	/* XXX here instead of in core_init because we need the lock init'ed */
 	callout_init_mtx(&ar->scan.timeout, &ar->sc_data_mtx, 0);
+
 	psc->pipe_taskq = taskqueue_create("athp pipe taskq", M_NOWAIT,
 	    NULL, psc);
 	(void) taskqueue_start_threads(&psc->pipe_taskq, 1, PI_NET, "%s pipe taskq",
@@ -653,10 +679,16 @@ bad2:
 bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 bad:
+
+	ath10k_htt_rx_free_desc(ar, &ar->htt);
+
+	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
+	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
+
 	/* XXX disable busmaster? */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	sx_destroy(&ar->sc_conf_sx);
+	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);
@@ -702,6 +734,9 @@ athp_pci_detach(device_t dev)
 	/* free pipes */
 	ath10k_pci_free_pipes(ar);
 
+	/* free HTT RX buffers */
+	ath10k_htt_rx_free_desc(ar, &ar->htt);
+
 	/* pci release */
 	/* sleep sync */
 
@@ -716,9 +751,14 @@ athp_pci_detach(device_t dev)
 
 	/* XXX disable busmastering? */
 
+	/* Free BMI buffers */
+	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
+	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
+
+	/* Free locks */
 	mtx_destroy(&psc->ps_mtx);
 	mtx_destroy(&psc->ce_mtx);
-	sx_destroy(&ar->sc_conf_sx);
+	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);

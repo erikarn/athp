@@ -322,7 +322,28 @@ int ath10k_htt_rx_ring_refill(struct ath10k *ar)
 	return ret;
 }
 
-void ath10k_htt_rx_free(struct ath10k_htt *htt)
+void
+ath10k_htt_rx_free_desc(struct ath10k *ar, struct ath10k_htt *htt)
+{
+
+	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
+	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
+	free(htt->rx_ring.netbufs_ring, M_ATHPDEV);
+}
+
+void
+ath10k_htt_rx_free_drain(struct ath10k_htt *htt)
+{
+	struct ath10k *ar = htt->ar;
+
+	//ATHP_CONF_UNLOCK_ASSERT(ar);
+
+	taskqueue_drain(ar->workqueue, &htt->rx_replenish_task);
+	taskqueue_drain(ar->workqueue, &htt->txrx_compl_task);
+}
+
+void
+ath10k_htt_rx_free(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
 
@@ -330,19 +351,17 @@ void ath10k_htt_rx_free(struct ath10k_htt *htt)
 	ATHP_HTT_RX_LOCK(htt);
 	callout_stop(&htt->rx_ring.refill_retry_timer);
 	ATHP_HTT_RX_UNLOCK(htt);
+
+#if 0
 	taskqueue_drain(ar->workqueue, &htt->rx_replenish_task);
 	taskqueue_drain(ar->workqueue, &htt->txrx_compl_task);
+#endif
 
 	athp_buf_list_flush(ar, &ar->buf_tx, &htt->tx_compl_q);
 	athp_buf_list_flush(ar, &ar->buf_rx, &htt->rx_compl_q);
 	athp_buf_list_flush(ar, &ar->buf_rx, &htt->rx_in_ord_compl_q);
 
 	ath10k_htt_rx_ring_free(htt);
-
-	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
-	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
-
-	free(htt->rx_ring.netbufs_ring, M_ATHPDEV);
 }
 
 static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
@@ -669,13 +688,10 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 #endif
 }
 
-int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
+int
+ath10k_htt_rx_alloc_desc(struct ath10k *ar, struct ath10k_htt *htt)
 {
-	struct ath10k *ar = htt->ar;
 	size_t size;
-	struct callout *timer = &htt->rx_ring.refill_retry_timer;
-
-	htt->rx_confused = false;
 
 	/* XXX: The fill level could be changed during runtime in response to
 	 * the host processing latency. Is this really worth it?
@@ -704,9 +720,6 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 		goto err_dma_ring;
 	}
 
-	htt->rx_ring.paddrs_ring = htt->rx_ring.paddrs_dd.dd_desc;
-	htt->rx_ring.base_paddr = htt->rx_ring.paddrs_dd.dd_desc_paddr;
-
 	/* XXX TODO: flush ops */
 	if (athp_descdma_alloc(ar, &htt->rx_ring.alloc_idx.dd,
 	    "rx_alloc_idx", 4,
@@ -714,6 +727,41 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 		ath10k_warn(ar, "%s: failed to alloc htt rx_ring alloc_idx ring\n", __func__);
 		goto err_dma_idx;
 	}
+
+	return (0);
+
+err_dma_idx:
+	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
+	/* XXX TODO: does ath10k leak this? */
+	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
+err_dma_ring:
+	free(htt->rx_ring.netbufs_ring, M_ATHPDEV);
+err_netbuf:
+	return -ENOMEM;
+}
+
+/*
+ * ath10k has a single alloc (and single free) path which
+ * effectively tears down the entire HTT RX side, including
+ * pending buffers, taskqueues, descriptor memory, etc.
+ *
+ * The problem is two fold:
+ * + It does this during NIC powerdown, and brings it up again
+ *   when the NIC is enabled again, and
+ * + It holds the conf mutex when it does so.
+ */
+
+int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
+{
+	struct ath10k *ar = htt->ar;
+	struct callout *timer = &htt->rx_ring.refill_retry_timer;
+
+	htt->rx_confused = false;
+
+
+	htt->rx_ring.paddrs_ring = htt->rx_ring.paddrs_dd.dd_desc;
+	htt->rx_ring.base_paddr = htt->rx_ring.paddrs_dd.dd_desc_paddr;
+
 
 	htt->rx_ring.alloc_idx.vaddr = htt->rx_ring.alloc_idx.dd.dd_desc;
 	htt->rx_ring.alloc_idx.paddr = htt->rx_ring.alloc_idx.dd.dd_desc_paddr;
@@ -747,15 +795,6 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "htt rx ring size %d fill_level %d\n",
 		   htt->rx_ring.size, htt->rx_ring.fill_level);
 	return 0;
-
-err_dma_idx:
-	athp_descdma_free(ar, &htt->rx_ring.paddrs_dd);
-	/* XXX TODO: does ath10k leak this? */
-	athp_descdma_free(ar, &htt->rx_ring.alloc_idx.dd);
-err_dma_ring:
-	free(htt->rx_ring.netbufs_ring, M_ATHPDEV);
-err_netbuf:
-	return -ENOMEM;
 }
 
 static int ath10k_htt_rx_crypto_param_len(struct ath10k *ar,
@@ -1176,6 +1215,20 @@ static void ath10k_process_rx(struct ath10k *ar,
 
 	ath10k_dbg(ar, ATH10K_DBG_DATA | ATH10K_DBG_RECV,
 	    "%s: frame; m=%p, len=%d\n", __func__, m, m->m_len);
+
+	/*
+	 * XXX TODO: this is a bug up in the raw path decap; if the msdulen
+	 * is 0 because msdu_len_invalid is set, then the following logic
+	 * (eg subtracting FCS_LEN) is broken.
+	 *
+	 * So we end up having 0 byte frames passed up, which is silly.
+	 */
+	if (m->m_len == 0) {
+		ar->sc_stats.rx_pkt_zero_len++;
+		m_freem(m);
+		return;
+	}
+
 	ath10k_dbg(ar, ATH10K_DBG_DATA | ATH10K_DBG_RECV,
 		   "rx mbuf %p len %u peer %6D %s %s sn %u %s%s%s%s %srate %u "
 		   "vht_nss %u chan %u freq %u band %u cflag 0x%x pktflag 0x%x "
@@ -1206,19 +1259,6 @@ static void ath10k_process_rx(struct ath10k *ar,
 
 	/* mmm configurable */
 	if (ar->sc_rx_htt == 0) {
-		m_freem(m);
-		return;
-	}
-
-	/*
-	 * XXX TODO: this is a bug up in the raw path decap; if the msdulen
-	 * is 0 because msdu_len_invalid is set, then the following logic
-	 * (eg subtracting FCS_LEN) is broken.
-	 *
-	 * So we end up having 0 byte frames passed up, which is silly.
-	 */
-	if (m->m_len == 0) {
-		ar->sc_stats.rx_pkt_zero_len++;
 		m_freem(m);
 		return;
 	}
