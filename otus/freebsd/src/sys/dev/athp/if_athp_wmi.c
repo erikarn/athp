@@ -1831,12 +1831,6 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	interval = ticks + ((3000 * hz) / 1000);
 
 	/*
-	 * Just to generate the debug echo; when it's implemented, uncomment
-	 * the one below.
-	 */
-	ath10k_wmi_tx_beacons_nowait(ar);
-
-	/*
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
@@ -1851,7 +1845,7 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		    &ar->sc_conf_mtx, 1);
 
 		/* try to send pending beacons first. they take priority */
-//		ath10k_wmi_tx_beacons_nowait(ar);
+		ath10k_wmi_tx_beacons_nowait(ar);
 
 		/* Try to send something */
 		ret = ath10k_wmi_cmd_send_nowait(ar, pbuf, cmd_id);
