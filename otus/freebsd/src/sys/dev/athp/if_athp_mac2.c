@@ -1553,8 +1553,6 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	struct wmi_vdev_start_request_arg arg = {};
 	int ret = 0;
 
-	ath10k_warn(ar, "%s: TODO: make it check channel flags; etc!\n", __func__);
-
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 	ath10k_compl_reinit(&ar->vdev_setup_done);
