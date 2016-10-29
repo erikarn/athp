@@ -974,6 +974,11 @@ athp_vap_delete(struct ieee80211vap *vap)
 	ATHP_CONF_UNLOCK(ar);
 
 	/*
+	 * Ideally we'd stop both TX and RX so we can ensure nothing
+	 * is referencing a now-dead VAP.
+	 */
+
+	/*
 	 * Only deinit the hardware/driver state if we did successfully
 	 * set it up earlier.
 	 */
@@ -1024,6 +1029,8 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * Point of no return!
 	 */
 	free(uvp, M_80211_VAP);
+
+	ath10k_warn(ar, "%s: finished!\n", __func__);
 }
 
 static int
