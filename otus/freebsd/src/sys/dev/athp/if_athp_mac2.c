@@ -3549,6 +3549,7 @@ static void ath10k_reg_notifier(struct wiphy *wiphy,
 		ath10k_regd_update(ar);
 	ATHP_CONF_UNLOCK(ar);
 }
+#endif
 
 /***************/
 /* TX handlers */
@@ -3556,13 +3557,18 @@ static void ath10k_reg_notifier(struct wiphy *wiphy,
 
 void ath10k_mac_tx_lock(struct ath10k *ar, int reason)
 {
-	lockdep_assert_held(&ar->htt.tx_lock);
+	ATHP_HTT_TX_LOCK_ASSERT(&ar->htt);
 
 	WARN_ON(reason >= ATH10K_TX_PAUSE_MAX);
 	ar->tx_paused |= BIT(reason);
+#if 0
 	ieee80211_stop_queues(ar->hw);
+#else
+	ath10k_warn(ar, "%s: TODO: called!\n", __func__);
+#endif
 }
 
+#if 0
 static void ath10k_mac_tx_unlock_iter(void *data, u8 *mac,
 				      struct ieee80211_vif *vif)
 {
@@ -3574,10 +3580,11 @@ static void ath10k_mac_tx_unlock_iter(void *data, u8 *mac,
 
 	ieee80211_wake_queue(ar->hw, arvif->vdev_id);
 }
+#endif
 
 void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
 {
-	lockdep_assert_held(&ar->htt.tx_lock);
+	ATHP_HTT_TX_LOCK_ASSERT(&ar->htt);
 
 	WARN_ON(reason >= ATH10K_TX_PAUSE_MAX);
 	ar->tx_paused &= ~BIT(reason);
@@ -3585,14 +3592,19 @@ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
 	if (ar->tx_paused)
 		return;
 
+#if 0
 	ieee80211_iterate_active_interfaces_atomic(ar->hw,
 						   IEEE80211_IFACE_ITER_RESUME_ALL,
 						   ath10k_mac_tx_unlock_iter,
 						   ar);
 
 	ieee80211_wake_queue(ar->hw, ar->hw->offchannel_tx_hw_queue);
+#else
+	ath10k_warn(ar, "%s: TODO: called!\n", __func__);
+#endif
 }
 
+#if 0
 void ath10k_mac_vif_tx_lock(struct ath10k_vif *arvif, int reason)
 {
 	struct ath10k *ar = arvif->ar;
@@ -3661,11 +3673,13 @@ static void ath10k_mac_handle_tx_pause_iter(void *data, u8 *mac,
 
 	ath10k_mac_vif_handle_tx_pause(arvif, arg->pause_id, arg->action);
 }
+#endif
 
 void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 				     enum wmi_tlv_tx_pause_id pause_id,
 				     enum wmi_tlv_tx_pause_action action)
 {
+#if 0
 	struct ath10k_mac_tx_pause arg = {
 		.vdev_id = vdev_id,
 		.pause_id = pause_id,
@@ -3678,8 +3692,10 @@ void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 						   ath10k_mac_handle_tx_pause_iter,
 						   &arg);
 	spin_unlock_bh(&ar->htt.tx_lock);
-}
+#else
+	ath10k_warn(ar, "%s: TODO: called!\n", __func__);
 #endif
+}
 
 /*
  * Get the TID for the given frame, or the fall-back TID.
