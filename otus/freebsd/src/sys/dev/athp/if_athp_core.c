@@ -96,6 +96,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_swap.h"
 #include "if_athp_wmi_ops.h"
 #include "if_athp_mac.h"
+#include "if_athp_mac2.h"
 #include "if_athp_fwlog.h"
 
 /*
@@ -1903,9 +1904,7 @@ ath10k_core_init(struct ath10k *ar)
 #endif
 	TAILQ_INIT(&ar->offchan_tx_queue);
 
-#if 0
-	INIT_WORK(&ar->wmi_mgmt_tx_work, ath10k_mgmt_over_wmi_tx_work);
-#endif
+	TASK_INIT(&ar->wmi_mgmt_tx_work, 0, ath10k_mgmt_over_wmi_tx_work, ar);
 	TAILQ_INIT(&ar->wmi_mgmt_tx_queue);
 
 	TASK_INIT(&ar->register_work, 0, ath10k_core_register_work, ar);

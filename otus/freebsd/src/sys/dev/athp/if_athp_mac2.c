@@ -3911,29 +3911,31 @@ static bool ath10k_mac_need_offchan_tx_work(struct ath10k *ar)
 	return !(ar->htt.target_version_major >= 3 &&
 		 ar->htt.target_version_minor >= 4);
 }
+#endif
 
-static int ath10k_mac_tx_wmi_mgmt(struct ath10k *ar, struct sk_buff *skb)
+static int ath10k_mac_tx_wmi_mgmt(struct ath10k *ar, struct athp_buf *skb)
 {
-	struct sk_buff_head *q = &ar->wmi_mgmt_tx_queue;
+	struct ieee80211com *ic = &ar->sc_ic;
 	int ret = 0;
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 
+	/* XXX TODO: yes, should just make the athpbuf queues a type .. */
+#if 0
 	if (skb_queue_len(q) == ATH10K_MAX_NUM_MGMT_PENDING) {
 		ath10k_warn(ar, "wmi mgmt tx queue is full\n");
 		ret = -ENOSPC;
 		goto unlock;
 	}
+#endif
+	TAILQ_INSERT_TAIL(&ar->wmi_mgmt_tx_queue, skb, next);
+	ieee80211_runtask(ic, &ar->wmi_mgmt_tx_work);
 
-	__skb_queue_tail(q, skb);
-	ieee80211_queue_work(ar->hw, &ar->wmi_mgmt_tx_work);
-
-unlock:
-	spin_unlock_bh(&ar->data_lock);
+//unlock:
+	ATHP_DATA_UNLOCK(ar);
 
 	return ret;
 }
-#endif
 
 static void
 ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
@@ -3951,13 +3953,8 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	case ATH10K_HW_TXRX_MGMT:
 		if (test_bit(ATH10K_FW_FEATURE_HAS_WMI_MGMT_TX,
 			     ar->fw_features)) {
-#if 0
 			ret = ath10k_mac_tx_wmi_mgmt(ar, skb);
-#else
-			ath10k_warn(ar, "%s: TODO: implement mac_tx_wmi_mgmt!\n", __func__);
-			ret = -EINVAL;
 			break;
-#endif
 		} else if (ar->htt.target_version_major >= 3)
 			ret = ath10k_htt_tx(htt, skb);
 		else
@@ -4068,46 +4065,50 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 
 static void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 {
-#if 0
-	struct sk_buff *skb;
+	struct athp_buf *skb;
 
 	for (;;) {
-		skb = skb_dequeue(&ar->wmi_mgmt_tx_queue);
-		if (!skb)
+		ATHP_DATA_LOCK(ar);
+		skb = TAILQ_FIRST(&ar->wmi_mgmt_tx_queue);
+		if (!skb) {
+			ATHP_DATA_UNLOCK(ar);
 			break;
+		}
+		TAILQ_REMOVE(&ar->wmi_mgmt_tx_queue, skb, next);
+		ATHP_DATA_UNLOCK(ar);
 
-		ieee80211_free_txskb(ar->hw, skb);
+		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
-#else
-	printf("%s: TODO\n", __func__);
-#endif
 }
 
-#if 0
-void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
+void
+ath10k_mgmt_over_wmi_tx_work(void *arg, int npending)
 {
-#if 0
-	struct ath10k *ar = container_of(work, struct ath10k, wmi_mgmt_tx_work);
-	struct sk_buff *skb;
+	struct ath10k *ar = arg;
+	struct athp_buf *skb;
 	int ret;
 
 	for (;;) {
-		skb = skb_dequeue(&ar->wmi_mgmt_tx_queue);
-		if (!skb)
+		ATHP_DATA_LOCK(ar);
+		skb = TAILQ_FIRST(&ar->wmi_mgmt_tx_queue);
+		if (!skb) {
+			ATHP_DATA_UNLOCK(ar);
 			break;
+		}
+		TAILQ_REMOVE(&ar->wmi_mgmt_tx_queue, skb, next);
+		ATHP_DATA_UNLOCK(ar);
 
+		/*
+		 * XXX TODO: do I need to hold the data lock for wmi mgmt tx?
+		 */
 		ret = ath10k_wmi_mgmt_tx(ar, skb);
 		if (ret) {
 			ath10k_warn(ar, "failed to transmit management frame via WMI: %d\n",
 				    ret);
-			ieee80211_free_txskb(ar->hw, skb);
+			ath10k_tx_free_pbuf(ar, skb, 0);
 		}
 	}
-#else
-	printf("%s: TODO\n", __func__);
-#endif
 }
-#endif
 
 /************/
 /* Scanning */
@@ -4367,6 +4368,7 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 /* Must not be called with conf_mutex held as workers can use that also. */
 void ath10k_drain_tx(struct ath10k *ar)
 {
+	struct ieee80211com *ic = &ar->sc_ic;
 #if 0
 	/* make sure rcu-protected mac80211 tx path itself is drained */
 	synchronize_net();
@@ -4375,9 +4377,9 @@ void ath10k_drain_tx(struct ath10k *ar)
 	ath10k_offchan_tx_purge(ar);
 	ath10k_mgmt_over_wmi_tx_purge(ar);
 
+	ieee80211_draintask(ic, &ar->wmi_mgmt_tx_work);
 #if 0
 	cancel_work_sync(&ar->offchan_tx_work);
-	cancel_work_sync(&ar->wmi_mgmt_tx_work);
 #else
 	printf("%s: TODO: cancel work!\n", __func__);
 #endif
