@@ -604,7 +604,8 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 
 	if (!(&vap->iv_nw_keys[0] <= k &&
 	     k < &vap->iv_nw_keys[IEEE80211_WEP_NKID])) {
-		ath10k_warn(ar, "%s: Pairwise key allocation\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+		    "%s: Pairwise key allocation\n", __func__);
 		if (k->wk_flags & IEEE80211_KEY_GROUP)
 			return (0);
 		*keyix = ATHP_PAIRWISE_KEY_IDX;
