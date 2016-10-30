@@ -1880,7 +1880,7 @@ ath10k_core_init(struct ath10k *ar)
 	ar->attach_workqueue = taskqueue_create("ath10k_attach_wq",
 	    M_NOWAIT, taskqueue_thread_enqueue, &ar->attach_workqueue);
 	if (!ar->attach_workqueue)
-		goto err_free_wq_aux;
+		goto err_free_aux_wq;
 
 	taskqueue_start_threads(&ar->workqueue, 1, PI_NET, "%s ath10k_wq",
 	    device_get_nameunit(ar->sc_dev));
