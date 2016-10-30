@@ -743,6 +743,9 @@ athp_pci_detach(device_t dev)
 	/* buffers */
 	athp_pci_free_bufs(psc);
 
+	/* core itself */
+	ath10k_core_destroy(ar);
+
 	/* Free bus resources */
 	bus_generic_detach(dev);
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
