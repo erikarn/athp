@@ -3990,7 +3990,7 @@ ath10k_offchan_tx_purge(struct ath10k *ar)
 {
 	struct athp_buf *skb;
 
-	// ATHP_DATA_LOCK_ASSERT(ar);
+	ATHP_DATA_LOCK_ASSERT(ar);
 
 	for (;;) {
 		//ATHP_DATA_LOCK(ar);
