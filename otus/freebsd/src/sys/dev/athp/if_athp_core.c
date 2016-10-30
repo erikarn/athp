@@ -1879,7 +1879,8 @@ ath10k_core_init(struct ath10k *ar)
 
 	ar->attach_workqueue = taskqueue_create("ath10k_attach_wq",
 	    M_NOWAIT, taskqueue_thread_enqueue, &ar->attach_workqueue);
-	/* XXX check */
+	if (!ar->attach_workqueue)
+		goto err_free_wq_aux;
 
 	taskqueue_start_threads(&ar->workqueue, 1, PI_NET, "%s ath10k_wq",
 	    device_get_nameunit(ar->sc_dev));
@@ -1888,6 +1889,7 @@ ath10k_core_init(struct ath10k *ar)
 	taskqueue_start_threads(&ar->attach_workqueue, 1, PI_NET,
 	    "%s ath10k_at_wq", device_get_nameunit(ar->sc_dev));
 
+	/* Note: locks are initialised in the bus glue for now */
 #if 0
 	mutex_init(&ar->conf_mutex);
 	spin_lock_init(&ar->data_lock);
@@ -1899,9 +1901,7 @@ ath10k_core_init(struct ath10k *ar)
 	ath10k_wait_init(&ar->wmi.tx_credits_wq);
 
 	ath10k_compl_init(&ar->offchan_tx_completed);
-#if 0
-	INIT_WORK(&ar->offchan_tx_work, ath10k_offchan_tx_work);
-#endif
+	TASK_INIT(&ar->offchan_tx_work, 0, ath10k_offchan_tx_work, 0);
 	TAILQ_INIT(&ar->offchan_tx_queue);
 
 	TASK_INIT(&ar->wmi_mgmt_tx_work, 0, ath10k_mgmt_over_wmi_tx_work, ar);
@@ -1919,8 +1919,10 @@ ath10k_core_init(struct ath10k *ar)
 
 	return 0;
 
-//err_free_aux_wq:
-//	taskqueue_free(ar->workqueue_aux);
+//err_free_all_wq:
+	//taskqueue_free(ar->attach_workqueue);
+err_free_aux_wq:
+	taskqueue_free(ar->workqueue_aux);
 err_free_wq:
 	taskqueue_free(ar->workqueue);
 err_free_mac:

@@ -3985,30 +3985,34 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	}
 }
 
-void ath10k_offchan_tx_purge(struct ath10k *ar)
+void
+ath10k_offchan_tx_purge(struct ath10k *ar)
 {
-#if 0
-	struct sk_buff *skb;
+	struct athp_buf *skb;
+
+	// ATHP_DATA_LOCK_ASSERT(ar);
 
 	for (;;) {
-		skb = skb_dequeue(&ar->offchan_tx_queue);
-		if (!skb)
+		//ATHP_DATA_LOCK(ar);
+		skb = TAILQ_FIRST(&ar->offchan_tx_queue);
+		if (!skb) {
+			//ATHP_DATA_UNLOCK(ar);
 			break;
+		}
+		TAILQ_REMOVE(&ar->offchan_tx_queue, skb, next);
+		//ATHP_DATA_UNLOCK(ar);
 
-		ieee80211_free_txskb(ar->hw, skb);
+		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
-#else
-	ath10k_warn(ar, "%s: TODO\n", __func__);
-#endif
 }
 
-#if 0
-void ath10k_offchan_tx_work(struct work_struct *work)
+void
+ath10k_offchan_tx_work(void *arg, int npending)
 {
-	struct ath10k *ar = container_of(work, struct ath10k, offchan_tx_work);
+	struct ath10k *ar = arg;
 	struct ath10k_peer *peer;
-	struct ieee80211_hdr *hdr;
-	struct sk_buff *skb;
+	struct ieee80211_frame *hdr;
+	struct athp_buf *skb;
 	const u8 *peer_addr;
 	int vdev_id;
 	int ret;
@@ -4022,47 +4026,55 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 	 * present. However it may be in some rare cases so account for that.
 	 * Otherwise we might remove a legitimate peer and break stuff. */
 
+	ath10k_warn(ar, "%s: TODO: locking\n", __func__);
+
 	for (;;) {
-		skb = skb_dequeue(&ar->offchan_tx_queue);
-		if (!skb)
+		ATHP_DATA_LOCK(ar);
+		skb = TAILQ_FIRST(&ar->offchan_tx_queue);
+		if (!skb) {
+			ATHP_DATA_UNLOCK(ar);
 			break;
+		}
+		TAILQ_REMOVE(&ar->offchan_tx_queue, skb, next);
+		ATHP_DATA_UNLOCK(ar);
 
 		ATHP_CONF_LOCK(ar);
 
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac offchannel skb %p\n",
 			   skb);
 
-		hdr = (struct ieee80211_hdr *)skb->data;
+		hdr = mtod(skb->m, struct ieee80211_frame *);
 		peer_addr = ieee80211_get_DA(hdr);
 		vdev_id = ATH10K_SKB_CB(skb)->vdev_id;
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		peer = ath10k_peer_find(ar, vdev_id, peer_addr);
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 
 		if (peer)
 			/* FIXME: should this use ath10k_warn()? */
-			ath10k_dbg(ar, ATH10K_DBG_MAC, "peer %pM on vdev %d already present\n",
-				   peer_addr, vdev_id);
+			ath10k_dbg(ar, ATH10K_DBG_MAC, "peer %6D on vdev %d already present\n",
+				   peer_addr, ":", vdev_id);
 
 		if (!peer) {
 			ret = ath10k_peer_create(ar, vdev_id, peer_addr,
 						 WMI_PEER_TYPE_DEFAULT);
 			if (ret)
-				ath10k_warn(ar, "failed to create peer %pM on vdev %d: %d\n",
-					    peer_addr, vdev_id, ret);
+				ath10k_warn(ar, "failed to create peer %6D on vdev %d: %d\n",
+					    peer_addr, ":", vdev_id, ret);
 			tmp_peer_created = (ret == 0);
 		}
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		ath10k_compl_reinit(&ar->offchan_tx_completed);
-		ar->offchan_tx_skb = skb;
-		spin_unlock_bh(&ar->data_lock);
+		ar->offchan_tx_pbuf = skb;
+		ATHP_DATA_UNLOCK(ar);
 
 		ath10k_mac_tx(ar, skb);
 
 		time_left =
-		ath10k_compl_wait(&ar->offchan_tx_completed, "ofchn_tx", 3 * HZ);
+		ath10k_compl_wait(&ar->offchan_tx_completed, "ofchn_tx",
+		    &ar->sc_conf_mtx, 3);
 		if (time_left == 0)
 			ath10k_warn(ar, "timed out waiting for offchannel skb %p\n",
 				    skb);
@@ -4070,14 +4082,13 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 		if (!peer && tmp_peer_created) {
 			ret = ath10k_peer_delete(ar, vdev_id, peer_addr);
 			if (ret)
-				ath10k_warn(ar, "failed to delete peer %pM on vdev %d: %d\n",
-					    peer_addr, vdev_id, ret);
+				ath10k_warn(ar, "failed to delete peer %6D on vdev %d: %d\n",
+					    peer_addr, ":", vdev_id, ret);
 		}
 
 		ATHP_CONF_UNLOCK(ar);
 	}
 }
-#endif
 
 static void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 {
