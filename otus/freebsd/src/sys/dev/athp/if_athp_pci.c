@@ -775,8 +775,12 @@ athp_pci_detach(device_t dev)
 	bus_generic_detach(dev);
 
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
-	pci_release_msi(dev);
+	if (psc->num_msi_intrs == 1) {
+		bus_release_resource(dev, SYS_RES_IRQ, 1, psc->sc_irq);
+		pci_release_msi(dev);
+	} else {
+		bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
+	}
 
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
