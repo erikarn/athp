@@ -708,6 +708,8 @@ athp_pci_detach(device_t dev)
 	struct athp_pci_softc *psc = device_get_softc(dev);
 	struct ath10k *ar = &psc->sc_sc;
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	/* Signal things we're going down.. */
 	ATHP_LOCK(ar);
 	ar->sc_invalid = 1;
@@ -720,7 +722,7 @@ athp_pci_detach(device_t dev)
 	 */
 	(void) pci_read_config(dev, PCIR_COMMAND, 4);
 
-	/* stop/free the core */
+	/* stop/free the core - this detaches net80211 state */
 	ath10k_core_unregister(ar);
 
 	/* kill tasklet(s) */
@@ -743,7 +745,7 @@ athp_pci_detach(device_t dev)
 	/* buffers */
 	athp_pci_free_bufs(psc);
 
-	/* core itself */
+	/* core itself - destroys taskqueues, etc */
 	ath10k_core_destroy(ar);
 
 	/* Free bus resources */
