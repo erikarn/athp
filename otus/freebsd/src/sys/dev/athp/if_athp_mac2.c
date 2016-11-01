@@ -3818,7 +3818,7 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ieee80211_frame *hdr;
 	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(skb);
-	u8 *qos_ctl;
+//	u8 *qos_ctl;
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
@@ -3826,13 +3826,36 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 		return;
 
 	/*
+	 * So, a bit of amusement.
+	 *
+	 * The 'more efficient' way of doing this is yes, to move the header
+	 * forward.  However, this puts the start of the buffer at 2 bytes
+	 * into the buffer.  If we're using VT-d and DMAR to debug device
+	 * access issues, this breaks the DWORD alignment constraint.
+	 *
+	 * Bounce buffers will just, well, copy it into a bounce buffer
+	 * to get around alignment issues.
+	 *
+	 * So, until a lot more of this stuff is ironed out (including
+	 * verifying if we can have TX buffers be byte aligned?)  let's
+	 * do the less efficient copy of the payload back /over/ the
+	 * original payload.
+	 */
+#if 0
+	/*
 	 * Move the data over the QoS header, effectively removing them.
 	 */
 	qos_ctl = ieee80211_get_qos_ctl(hdr);
 	memmove(mbuf_skb_data(skb->m) + IEEE80211_QOS_CTL_LEN,
 		mbuf_skb_data(skb->m), (char *)qos_ctl - (char *)mbuf_skb_data(skb->m));
 	mbuf_skb_pull(skb->m, IEEE80211_QOS_CTL_LEN);
-
+#else
+	/* move the post-QoS payload over the top of the QoS header; trim from the end */
+	memmove(mbuf_skb_data(skb->m) + ieee80211_get_qos_ctl_len(hdr),
+	    mbuf_skb_data(skb->m) + ieee80211_get_qos_ctl_len(hdr) + IEEE80211_QOS_CTL_LEN,
+	    mbuf_skb_len(skb->m) - ieee80211_get_qos_ctl_len(hdr) - IEEE80211_QOS_CTL_LEN);
+	mbuf_skb_trim(skb->m, mbuf_skb_len(skb->m) - IEEE80211_QOS_CTL_LEN);
+#endif
 	/* Some firmware revisions don't handle sending QoS NullFunc well.
 	 * These frames are mainly used for CQM purposes so it doesn't really
 	 * matter whether QoS NullFunc or NullFunc are sent.
@@ -4405,11 +4428,7 @@ void ath10k_drain_tx(struct ath10k *ar)
 	ath10k_mgmt_over_wmi_tx_purge(ar);
 
 	ieee80211_draintask(ic, &ar->wmi_mgmt_tx_work);
-#if 0
-	cancel_work_sync(&ar->offchan_tx_work);
-#else
-	printf("%s: TODO: cancel work!\n", __func__);
-#endif
+	ieee80211_draintask(ic, &ar->offchan_tx_work);
 }
 
 void
@@ -4424,6 +4443,8 @@ ath10k_halt_drain(struct ath10k *ar)
 void ath10k_halt(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -4548,7 +4569,7 @@ int ath10k_start(struct ath10k *ar)
 	 */
 	ath10k_drain_tx(ar);
 
-	ath10k_warn(ar, "%s: called\n", __func__);
+	ath10k_warn(ar, "%s: called; state=%d\n", __func__, ar->state);
 
 	switch (ar->state) {
 	case ATH10K_STATE_RESTARTING:
@@ -6516,18 +6537,30 @@ void
 ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
     bool drop)
 {
+
+	ATHP_CONF_LOCK(ar);
+	ath10k_tx_flush_locked(ar, vif, queues, drop);
+	ATHP_CONF_UNLOCK(ar);
+}
+
+void
+ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
+    bool drop)
+{
 	bool skip;
 	long time_left;
 	int interval;
 
+#if 0
 	/* mac80211 doesn't care if we really xmit queued frames or not
 	 * we'll collect those frames either way if we stop/delete vdevs */
 	if (drop)
 		return;
+#endif
 
 	interval = ticks + ((ATH10K_FLUSH_TIMEOUT_HZ * hz) / 1000);
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	if (ar->state == ATH10K_STATE_WEDGED)
 		goto skip;
@@ -6556,7 +6589,7 @@ ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 			    skip, ar->state, time_left);
 
 skip:
-	ATHP_CONF_UNLOCK(ar);
+	return;
 }
 
 /* TODO: Implement this function properly
