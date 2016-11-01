@@ -399,8 +399,12 @@ ath10k_ce_send_nolock(struct ath10k_ce_pipe *ce_state,
 	if (flags & CE_SEND_FLAG_BYTE_SWAP)
 		desc_flags |= CE_DESC_FLAGS_BYTE_SWAP;
 
-	ath10k_dbg(ar, ATH10K_DBG_CE, "%s: addr=%08x, nbytes=%d, flags=0x%08x\n",
-	    __func__, buffer, nbytes, desc_flags);
+	ath10k_dbg(ar, ATH10K_DBG_CE,
+	    "%s: ring=%d, write_index=%i, addr=%08x, nbytes=%d, flags=0x%08x\n",
+	    __func__,
+	    ce_state->id,
+	    write_index,
+	    buffer, nbytes, desc_flags);
 
 	sdesc->addr   = __cpu_to_le32(buffer);
 	sdesc->nbytes = __cpu_to_le16(nbytes);
