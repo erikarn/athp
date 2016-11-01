@@ -250,14 +250,23 @@ static inline u8 *ieee80211_get_SA(struct ieee80211_frame *hdr)
 		return hdr->i_addr2;
 }
 
-
-
+/*
+ * Get a pointer to the QoS DWORD.
+ */
 static inline u8 *ieee80211_get_qos_ctl(struct ieee80211_frame *hdr)
 {
         if (ieee80211_has_a4(hdr))
                 return (u8 *)hdr + 30;
         else
                 return (u8 *)hdr + 24;
+}
+
+static inline int ieee80211_get_qos_ctl_len(struct ieee80211_frame *hdr)
+{
+        if (ieee80211_has_a4(hdr))
+                return 30;
+        else
+                return 24;
 }
 
 static inline int ieee80211_has_protected(struct ieee80211_frame *hdr)
