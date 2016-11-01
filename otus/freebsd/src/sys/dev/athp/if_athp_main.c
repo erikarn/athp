@@ -85,6 +85,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
 #include "if_athp_mac2.h"
+#include "if_athp_hif.h"
 
 #include "if_athp_main.h"
 #include "if_athp_taskq.h"
@@ -1292,6 +1293,19 @@ athp_setup_channels(struct ath10k *ar)
 	}
 }
 
+static int
+athp_sysctl_reg_read(SYSCTL_HANDLER_ARGS)
+{
+	struct ath10k *ar = arg1;
+	int error, val;
+
+	val = ath10k_hif_read32(ar, ar->sc_dbg_regidx & 0x1ffff);
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || !req->newptr)
+		return (error);
+	return (0);
+}
+
 void
 athp_attach_sysctl(struct ath10k *ar)
 {
@@ -1305,6 +1319,11 @@ athp_attach_sysctl(struct ath10k *ar)
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "hwcrypt_mode",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_conf_crypt_mode, 0, "software/hardware crypt mode");
+
+	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "regidx",
+	    CTLFLAG_RW, &ar->sc_dbg_regidx, 0, "");
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "regval",
+	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_reg_read, "I", "");
 
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_msdu_invalid_len, "");

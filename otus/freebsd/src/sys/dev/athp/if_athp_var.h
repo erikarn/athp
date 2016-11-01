@@ -215,6 +215,8 @@ struct ath10k {
 	uint64_t			sc_debug;
 	int				sc_isrunning;
 
+	uint32_t			sc_dbg_regidx;
+
 	struct ath10k_stats		sc_stats;
 	int				sc_rx_wmi;
 	int				sc_rx_htt;
