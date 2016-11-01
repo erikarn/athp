@@ -909,11 +909,10 @@ ath10k_pci_init_irq(struct athp_pci_softc *psc)
 	 * For now, fix the race by repeating the write in below
 	 * synchronization checking. */
 #endif
-	psc->num_msi_intrs = 0;
-
-	athp_pci_write32(ar, SOC_CORE_BASE_ADDRESS(ar->sc_regofs) + PCIE_INTR_ENABLE_ADDRESS,
-			   PCIE_INTR_FIRMWARE_MASK(ar->sc_regofs) | PCIE_INTR_CE_MASK_ALL(ar->sc_regofs));
-
+	if (psc->num_msi_intrs == 0) {
+		athp_pci_write32(ar, SOC_CORE_BASE_ADDRESS(ar->sc_regofs) + PCIE_INTR_ENABLE_ADDRESS,
+		    PCIE_INTR_FIRMWARE_MASK(ar->sc_regofs) | PCIE_INTR_CE_MASK_ALL(ar->sc_regofs));
+	}
 	return 0;
 }
 
@@ -929,7 +928,7 @@ ath10k_pci_deinit_irq_legacy(struct athp_pci_softc *psc)
 int
 ath10k_pci_deinit_irq(struct athp_pci_softc *psc)
 {
-	struct ath10k *ar = &psc->sc_sc;
+	//struct ath10k *ar = &psc->sc_sc;
 
 	switch(psc->num_msi_intrs) {
 	case 0:
@@ -938,8 +937,8 @@ ath10k_pci_deinit_irq(struct athp_pci_softc *psc)
 	case 1:
 	case MSI_NUM_REQUEST:
 	default:
-		device_printf(ar->sc_dev, "%s: TODO: MSI deinit_irq\n",
-		    __func__);
+		/* We deallocate MSI interrupts in the bus layer */
+		break;
 	}
 	return -EINVAL;
 }

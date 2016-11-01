@@ -182,9 +182,9 @@ athp_pci_intr(void *arg)
 	}
 
 	/*
-	 * XXX for now, this is purely for non-MSI interrupts.
+	 * Check for shared interrupts if we're not doing MSI.
 	 */
-	if (! ath10k_pci_irq_pending(psc))
+	if ((psc->num_msi_intrs == 0) && (! ath10k_pci_irq_pending(psc)))
 		return;
 
 	/*
@@ -198,7 +198,10 @@ athp_pci_intr(void *arg)
 	if (psc->num_msi_intrs == 0) {
 		ath10k_pci_disable_and_clear_legacy_irq(psc);
 	}
+
+	/* Do the actual interrupt handling */
 	ath10k_ce_per_engine_service_any(ar);
+
 	if (psc->num_msi_intrs == 0)
 		ath10k_pci_enable_legacy_irq(psc);
 }
@@ -390,6 +393,7 @@ athp_attach_preinit(void *arg)
 	athp_pci_free_bufs(psc);
 	bus_teardown_intr(ar->sc_dev, psc->sc_irq, psc->sc_ih);
 	bus_release_resource(ar->sc_dev, SYS_RES_IRQ, 0, psc->sc_irq);
+	pci_release_msi(ar->sc_dev);
 	bus_release_resource(ar->sc_dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmaster? */
@@ -412,7 +416,7 @@ athp_pci_attach(device_t dev)
 {
 	struct athp_pci_softc *psc = device_get_softc(dev);
 	struct ath10k *ar = &psc->sc_sc;
-	int rid;
+	int rid, i;
 	int err = 0;
 	int ret;
 
@@ -553,10 +557,28 @@ athp_pci_attach(device_t dev)
 	 *
 	 * XXX TODO: implement MSIX; we should be getting one MSI for
 	 * (almost) each CE ring.
+	 *
+	 * XXX TODO: this is effictively ath10k_pci_init_irq().
+	 * Refactor it out later.
+	 *
+	 * First - attempt MSI.  If we get it, then use it.
 	 */
 	rid = 0;
+	i = 1;
+	if (pci_alloc_msi(dev, &i) == 0) {
+		rid = 1;
+		device_printf(dev, "%s: 1 MSI interrupt\n", __func__);
+		psc->num_msi_intrs = 1;
+	}
+
+	/*
+	 * For now, just allocate a single interrupt - either legacy
+	 * (rid=0) or MSI (rid=1.)  Later on we will try to allocate
+	 * MSIx interrupts and assign per-CE/FW handlers.
+	 */
 	psc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
-	    RF_SHAREABLE|RF_ACTIVE);
+	    RF_ACTIVE | (rid != 0 ? 0 : RF_SHAREABLE));
+
 	if (psc->sc_irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		err = ENXIO;
@@ -676,6 +698,7 @@ bad4:
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 bad2:
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
+	pci_release_msi(dev);
 bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 bad:
@@ -750,8 +773,11 @@ athp_pci_detach(device_t dev)
 
 	/* Free bus resources */
 	bus_generic_detach(dev);
+
 	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
+	pci_release_msi(dev);
+
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmastering? */
