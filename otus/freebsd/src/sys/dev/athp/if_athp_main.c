@@ -158,6 +158,18 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct mbuf *m = NULL;
 	int is_wep, is_qos;
 
+
+
+	ATHP_HTT_TX_LOCK(&ar->htt);
+	if (ar->tx_paused & ATH10K_TX_PAUSE_WAIT) {
+		ATHP_HTT_TX_UNLOCK(&ar->htt);
+		ath10k_warn(ar, "%s: TX w/ WAIT set, dropping\n", __func__);
+		/* XXX counter */
+		m_freem(m0);
+		return (ENXIO);
+	}
+	ATHP_HTT_TX_UNLOCK(&ar->htt);
+
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 	is_qos = IEEE80211_IS_QOS(wh);
@@ -180,6 +192,13 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 			return (ENXIO);
 		}
 	}
+
+	if (arvif->is_dying == 1) {
+		ATHP_CONF_UNLOCK(ar);
+		m_freem(m0);
+		return (ENXIO);
+	}
+
 	ATHP_CONF_UNLOCK(ar);
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
@@ -328,17 +347,34 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	struct mbuf *m = NULL;
 	struct ieee80211_frame *wh;
 	int is_wep, is_qos;
+	uint32_t seqno;
+
+	/*
+	 * If the queue is paused, then no, don't queue anything else.
+	 * Otherwise we may end up queueing frames to a down vdev during
+	 * eg RUN -> x transition.
+	 *
+	 * This is very very racy - it could totally happen after this
+	 * check.  However, this isn't trying to perfect right now.
+	 * Hopefully(!) by setting this flag, then flushing the traffic
+	 * before downing the interface, we can ensure no new traffic
+	 * is queued.
+	 */
+	ATHP_HTT_TX_LOCK(&ar->htt);
+	if (ar->tx_paused & ATH10K_TX_PAUSE_WAIT) {
+		ATHP_HTT_TX_UNLOCK(&ar->htt);
+		ath10k_warn(ar, "%s: TX w/ WAIT set, dropping\n", __func__);
+		/* XXX counter */
+		return (ENXIO);
+	}
+	ATHP_HTT_TX_UNLOCK(&ar->htt);
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 	is_qos = !! IEEE80211_IS_QOS(wh);
+	seqno = le16_to_cpu(*(uint16_t *) &wh->i_seq[0]);
 
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
-	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p; ni.macaddr=%6D; iswep=%d, isqos=%d\n",
-	    __func__, ni, m0, ni->ni_macaddr, ":", is_wep,
-	    is_qos);
-
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
 
@@ -351,6 +387,12 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 			return (ENXIO);
 		}
 	}
+
+	if (arvif->is_dying == 1) {
+		ATHP_CONF_UNLOCK(ar);
+		return (ENXIO);
+	}
+
 	ATHP_CONF_UNLOCK(ar);
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
@@ -380,6 +422,10 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		return (ENOBUFS);
 	}
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; ni=%p, m=%p; pbuf=%p, ni.macaddr=%6D; iswep=%d, isqos=%d, seqno=0x%04x\n",
+	    __func__, ni, m, pbuf, ni->ni_macaddr, ":", is_wep, is_qos, seqno);
 
 	/* Put the mbuf into the given pbuf */
 	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
@@ -442,6 +488,12 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	int error = 0;
 	struct ieee80211_node *bss_ni;
 
+	/* XXX locking */
+	if (vif->is_setup == 0) {
+		ath10k_warn(ar, "%s: !is_setup; skipping!\n", __func__);
+		goto skip;
+	}
+
 	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
 	    ieee80211_state_name[ostate],
 	    ieee80211_state_name[nstate]);
@@ -490,10 +542,35 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 	/* Transitioning to SCAN from RUN - is fine, you don't need to delete anything */
 	case IEEE80211_S_SCAN:
+		if (vap->iv_opmode != IEEE80211_M_STA)
+			break;
+		if (ostate != IEEE80211_S_RUN)
+			break;
+
+		ath10k_warn(ar, "%s: pausing/flushing queues\n", __func__);
+
+		ATHP_HTT_TX_LOCK(&ar->htt);
+		ath10k_mac_tx_lock(ar, ATH10K_TX_PAUSE_WAIT);
+		ATHP_HTT_TX_UNLOCK(&ar->htt);
+
+		/* Wait for xmit to finish before continuing */
+		ath10k_tx_flush(ar, vap, 0, 1);
+
+		ATHP_HTT_TX_LOCK(&ar->htt);
+		ath10k_mac_tx_unlock(ar, ATH10K_TX_PAUSE_WAIT);
+		ATHP_HTT_TX_UNLOCK(&ar->htt);
+
 		break;
 
 	case IEEE80211_S_INIT:
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			ATHP_HTT_TX_LOCK(&ar->htt);
+			ath10k_mac_tx_lock(ar, ATH10K_TX_PAUSE_WAIT);
+			ATHP_HTT_TX_UNLOCK(&ar->htt);
+		}
+
 		ATHP_CONF_LOCK(ar);
+
 		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 			/* Monitor mode - explicit down */
 			ath10k_vif_bring_down(vap);
@@ -501,7 +578,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 
 			/* Wait for xmit to finish before continuing */
-			ath10k_tx_flush(ar, vap, 0, 1);
+			ath10k_tx_flush_locked(ar, vap, 0, 1);
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
@@ -509,6 +586,13 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			}
 		}
 		ATHP_CONF_UNLOCK(ar);
+
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			ATHP_HTT_TX_LOCK(&ar->htt);
+			ath10k_mac_tx_unlock(ar, ATH10K_TX_PAUSE_WAIT);
+			ATHP_HTT_TX_UNLOCK(&ar->htt);
+		}
+
 		break;
 
 	case IEEE80211_S_AUTH:
@@ -552,6 +636,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 	ieee80211_free_node(bss_ni);
 
+skip:
 	error = vif->av_newstate(vap, nstate, arg);
 	return (error);
 }
@@ -1014,6 +1099,20 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * XXX for now, we only support a single VAP.
 	 * Later on, we need to check if any other VAPs are left and if
 	 * not, we can power down.
+	 *
+	 * Note: this 'stop' will completely stop the NIC, including freeing
+	 * HTT (locks) and other things (via ath10k_core_stop().)
+	 *
+	 * For mac80211, I bet it doesn't call any further methods once it
+	 * calls the driver 'stop' method.
+	 *
+	 * However, for net80211, I wonder if during explicit teardown it
+	 * will schedule any other device callbacks after this point.
+	 *
+	 * Note: this /will/ stop the NIC, and free things - including
+	 * pending/stuck TX frames.  If this moves below vap_detach then
+	 * freeing those frames causes invalid node/ifnet references from
+	 * mgmt TX mbufs to be deref'ed and panic.
 	 */
 	ath10k_stop(ar);
 
