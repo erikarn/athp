@@ -364,6 +364,7 @@ ath10k_scan_state_str(enum ath10k_scan_state state)
 
 enum ath10k_tx_pause_reason {
 	ATH10K_TX_PAUSE_Q_FULL,
+	ATH10K_TX_PAUSE_WAIT,
 	ATH10K_TX_PAUSE_MAX,
 };
 
