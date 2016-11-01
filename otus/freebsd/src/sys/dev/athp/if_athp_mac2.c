@@ -4151,7 +4151,9 @@ ath10k_mgmt_over_wmi_tx_work(void *arg, int npending)
 		/*
 		 * XXX TODO: do I need to hold the data lock for wmi mgmt tx?
 		 */
+		ATHP_CONF_LOCK(ar);
 		ret = ath10k_wmi_mgmt_tx(ar, skb);
+		ATHP_CONF_UNLOCK(ar);
 		if (ret) {
 			ath10k_warn(ar, "failed to transmit management frame via WMI: %d\n",
 				    ret);
