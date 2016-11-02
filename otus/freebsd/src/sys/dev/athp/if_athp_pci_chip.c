@@ -194,11 +194,6 @@ __ath10k_pci_sleep(struct athp_pci_softc *psc)
 
 	ATHP_PCI_PS_LOCK_ASSERT(psc);
 
-	/*
-	 * XXX For now, don't put the NIC to sleep.
-	 * I don't yet trust how this sleep state stuff works;
-	 * so let it come up and then not .. ever go to sleep.
-	 */
 	ath10k_dbg(ar, ATH10K_DBG_PCI_PS,
 	    "pci ps sleep reg refcount %lu awake %d\n",
 	    psc->ps_wake_refcount, psc->ps_awake);
