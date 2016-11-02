@@ -215,6 +215,7 @@ struct ath10k {
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;
+	uint64_t			sc_trace_mask;
 
 	uint32_t			sc_dbg_regidx;
 
