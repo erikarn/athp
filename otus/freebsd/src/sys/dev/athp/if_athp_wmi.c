@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
 #include "if_athp_mac2.h"
+#include "if_athp_testmode.h"
 
 #include "if_athp_main.h"
 
@@ -4612,7 +4613,7 @@ static void ath10k_wmi_10_1_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	struct wmi_cmd_hdr *cmd_hdr;
 	enum wmi_10x_event_id id;
-//	bool consumed;
+	bool consumed;
 
 	cmd_hdr = (struct wmi_cmd_hdr *)mbuf_skb_data(pbuf->m);
 	id = MS(__le32_to_cpu(cmd_hdr->cmd_id), WMI_CMD_HDR_CMD_ID);
@@ -4624,7 +4625,6 @@ static void ath10k_wmi_10_1_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	trace_ath10k_wmi_event(ar, id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 #endif
 
-#if 0
 	consumed = ath10k_tm_event_wmi(ar, id, pbuf);
 
 	/* Ready event must be handled normally also in UTF mode so that we
@@ -4636,9 +4636,6 @@ static void ath10k_wmi_10_1_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 			   "wmi testmode consumed 0x%x\n", id);
 		goto out;
 	}
-#else
-	device_printf(ar->sc_dev, "%s: TODO: testmode\n", __func__);
-#endif
 
 	switch (id) {
 	case WMI_10X_MGMT_RX_EVENTID:

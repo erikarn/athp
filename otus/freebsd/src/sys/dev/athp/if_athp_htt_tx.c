@@ -137,7 +137,8 @@ int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct athp_buf *skb)
 	ret = idr_alloc(&htt->pending_tx, skb, 0,
 			htt->max_num_pending_tx, GFP_ATOMIC);
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx alloc msdu_id %d\n", ret);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx alloc msdu_id %d (of %d)\n",
+	    ret, htt->max_num_pending_tx);
 
 	return ret;
 }
@@ -201,6 +202,7 @@ free_tx_pool:
 	dma_pool_destroy(htt->tx_pool);
 free_idr_pending_tx:
 #endif
+	ath10k_warn(ar, "%s: tearing down HTT locks\n", __func__);
 	mtx_destroy(&htt->tx_lock);
 	mtx_destroy(&htt->tx_comp_lock);
 	idr_destroy(&htt->pending_tx);
@@ -226,6 +228,9 @@ static int ath10k_htt_tx_clean_up_pending(int msdu_id, void *pbuf, void *ctx)
 
 void ath10k_htt_tx_free(struct ath10k_htt *htt)
 {
+	struct ath10k *ar = htt->ar;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	if (htt->tx_is_init) {
 		idr_for_each(&htt->pending_tx, ath10k_htt_tx_clean_up_pending, htt->ar);
@@ -239,6 +244,7 @@ void ath10k_htt_tx_free(struct ath10k_htt *htt)
 		athp_descdma_free(htt->ar, &htt->frag_desc.dd);
 	}
 	if (htt->tx_is_init) {
+		ath10k_warn(ar, "%s: tearing down htt locks\n", __func__);
 		mtx_destroy(&htt->tx_lock);
 		mtx_destroy(&htt->tx_comp_lock);
 	}
@@ -685,6 +691,9 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 		/* pass through */
 	case ATH10K_HW_TXRX_ETHERNET:
 		if (ar->hw_params.continuous_frag_desc) {
+			ath10k_err(ar,
+			    "%s: TODO! This hasn't been checkd/tested yet!\n",
+			    __func__);
 			memset(&htt->frag_desc.vaddr[msdu_id], 0,
 			       sizeof(struct htt_msdu_ext_desc));
 			frags = (struct htt_data_tx_desc_frag *)
@@ -783,6 +792,12 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 		   "htt tx flags0 %u flags1 %u len %d id %hu frags_paddr %08x, msdu_paddr %08x vdev %hhu tid %hhu freq %hu\n",
 		   (unsigned) flags0, (unsigned) flags1, mbuf_skb_len(msdu->m), msdu_id, frags_paddr,
 		   (u32)msdu->mb.paddr, vdev_id, tid, skb_cb->htt.freq);
+	ath10k_dbg(ar, ATH10K_DBG_HTT,
+		    "htt tx frags[0] paddr/len 0x%08x/0x%08x frags[1] paddr/len 0x%08x/0x%08x\n",
+		    le32_to_cpu(frags[0].dword_addr.paddr),
+		    le32_to_cpu(frags[0].dword_addr.len),
+		    le32_to_cpu(frags[1].dword_addr.paddr),
+		    le32_to_cpu(frags[1].dword_addr.len));
 	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt tx msdu: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 #ifdef	ATHP_TRACE_DIAG
@@ -804,7 +819,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	sg_items[1].paddr = msdu->mb.paddr;
 	sg_items[1].len = prefetch_len;
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: paddr=%x, %x\n", __func__, sg_items[0].paddr, sg_items[1].paddr);
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: paddr=%x, %x (%d)\n", __func__, sg_items[0].paddr, sg_items[1].paddr, prefetch_len);
 
 	res = ath10k_hif_tx_sg(htt->ar,
 			       htt->ar->htc.endpoint[htt->eid].ul_pipe_id,

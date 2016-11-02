@@ -3555,6 +3555,22 @@ static void ath10k_reg_notifier(struct wiphy *wiphy,
 /* TX handlers */
 /***************/
 
+/*
+ * The mac tx lock / unlock routines are called by the HTT layer
+ * to provide backpressure to mac80211 for stopping and starting
+ * queues.  Otherwise (ie in the net80211 world!) we'd just keep
+ * being given frames that we'd have to toss, and we'd start
+ * seeing holes in the sequence number space and other fun oddities.
+ *
+ * Later on in mac80211/ath10k time they start supporting
+ * a per-peer/tid TX notification from the firmware so mac80211 can
+ * handle per-device queues. Drivers then just consume frames from
+ * those queues.  This is done for MU-MIMO support, but it helps in
+ * any situation where you have multiple slow and fast clients.
+ *
+ * For now this doesn't do anything for net80211 - it doesn't have
+ * the concept of queue management.
+ */
 void ath10k_mac_tx_lock(struct ath10k *ar, int reason)
 {
 	ATHP_HTT_TX_LOCK_ASSERT(&ar->htt);
@@ -3818,7 +3834,7 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ieee80211_frame *hdr;
 	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(skb);
-	u8 *qos_ctl;
+//	u8 *qos_ctl;
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
@@ -3826,13 +3842,36 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 		return;
 
 	/*
+	 * So, a bit of amusement.
+	 *
+	 * The 'more efficient' way of doing this is yes, to move the header
+	 * forward.  However, this puts the start of the buffer at 2 bytes
+	 * into the buffer.  If we're using VT-d and DMAR to debug device
+	 * access issues, this breaks the DWORD alignment constraint.
+	 *
+	 * Bounce buffers will just, well, copy it into a bounce buffer
+	 * to get around alignment issues.
+	 *
+	 * So, until a lot more of this stuff is ironed out (including
+	 * verifying if we can have TX buffers be byte aligned?)  let's
+	 * do the less efficient copy of the payload back /over/ the
+	 * original payload.
+	 */
+#if 0
+	/*
 	 * Move the data over the QoS header, effectively removing them.
 	 */
 	qos_ctl = ieee80211_get_qos_ctl(hdr);
 	memmove(mbuf_skb_data(skb->m) + IEEE80211_QOS_CTL_LEN,
 		mbuf_skb_data(skb->m), (char *)qos_ctl - (char *)mbuf_skb_data(skb->m));
 	mbuf_skb_pull(skb->m, IEEE80211_QOS_CTL_LEN);
-
+#else
+	/* move the post-QoS payload over the top of the QoS header; trim from the end */
+	memmove(mbuf_skb_data(skb->m) + ieee80211_get_qos_ctl_len(hdr),
+	    mbuf_skb_data(skb->m) + ieee80211_get_qos_ctl_len(hdr) + IEEE80211_QOS_CTL_LEN,
+	    mbuf_skb_len(skb->m) - ieee80211_get_qos_ctl_len(hdr) - IEEE80211_QOS_CTL_LEN);
+	mbuf_skb_trim(skb->m, mbuf_skb_len(skb->m) - IEEE80211_QOS_CTL_LEN);
+#endif
 	/* Some firmware revisions don't handle sending QoS NullFunc well.
 	 * These frames are mainly used for CQM purposes so it doesn't really
 	 * matter whether QoS NullFunc or NullFunc are sent.
@@ -3985,30 +4024,34 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	}
 }
 
-void ath10k_offchan_tx_purge(struct ath10k *ar)
+void
+ath10k_offchan_tx_purge(struct ath10k *ar)
 {
-#if 0
-	struct sk_buff *skb;
+	struct athp_buf *skb;
+
+	ATHP_DATA_LOCK_ASSERT(ar);
 
 	for (;;) {
-		skb = skb_dequeue(&ar->offchan_tx_queue);
-		if (!skb)
+		//ATHP_DATA_LOCK(ar);
+		skb = TAILQ_FIRST(&ar->offchan_tx_queue);
+		if (!skb) {
+			//ATHP_DATA_UNLOCK(ar);
 			break;
+		}
+		TAILQ_REMOVE(&ar->offchan_tx_queue, skb, next);
+		//ATHP_DATA_UNLOCK(ar);
 
-		ieee80211_free_txskb(ar->hw, skb);
+		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
-#else
-	ath10k_warn(ar, "%s: TODO\n", __func__);
-#endif
 }
 
-#if 0
-void ath10k_offchan_tx_work(struct work_struct *work)
+void
+ath10k_offchan_tx_work(void *arg, int npending)
 {
-	struct ath10k *ar = container_of(work, struct ath10k, offchan_tx_work);
+	struct ath10k *ar = arg;
 	struct ath10k_peer *peer;
-	struct ieee80211_hdr *hdr;
-	struct sk_buff *skb;
+	struct ieee80211_frame *hdr;
+	struct athp_buf *skb;
 	const u8 *peer_addr;
 	int vdev_id;
 	int ret;
@@ -4022,47 +4065,55 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 	 * present. However it may be in some rare cases so account for that.
 	 * Otherwise we might remove a legitimate peer and break stuff. */
 
+	ath10k_warn(ar, "%s: TODO: locking\n", __func__);
+
 	for (;;) {
-		skb = skb_dequeue(&ar->offchan_tx_queue);
-		if (!skb)
+		ATHP_DATA_LOCK(ar);
+		skb = TAILQ_FIRST(&ar->offchan_tx_queue);
+		if (!skb) {
+			ATHP_DATA_UNLOCK(ar);
 			break;
+		}
+		TAILQ_REMOVE(&ar->offchan_tx_queue, skb, next);
+		ATHP_DATA_UNLOCK(ar);
 
 		ATHP_CONF_LOCK(ar);
 
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac offchannel skb %p\n",
 			   skb);
 
-		hdr = (struct ieee80211_hdr *)skb->data;
+		hdr = mtod(skb->m, struct ieee80211_frame *);
 		peer_addr = ieee80211_get_DA(hdr);
 		vdev_id = ATH10K_SKB_CB(skb)->vdev_id;
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		peer = ath10k_peer_find(ar, vdev_id, peer_addr);
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 
 		if (peer)
 			/* FIXME: should this use ath10k_warn()? */
-			ath10k_dbg(ar, ATH10K_DBG_MAC, "peer %pM on vdev %d already present\n",
-				   peer_addr, vdev_id);
+			ath10k_dbg(ar, ATH10K_DBG_MAC, "peer %6D on vdev %d already present\n",
+				   peer_addr, ":", vdev_id);
 
 		if (!peer) {
 			ret = ath10k_peer_create(ar, vdev_id, peer_addr,
 						 WMI_PEER_TYPE_DEFAULT);
 			if (ret)
-				ath10k_warn(ar, "failed to create peer %pM on vdev %d: %d\n",
-					    peer_addr, vdev_id, ret);
+				ath10k_warn(ar, "failed to create peer %6D on vdev %d: %d\n",
+					    peer_addr, ":", vdev_id, ret);
 			tmp_peer_created = (ret == 0);
 		}
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		ath10k_compl_reinit(&ar->offchan_tx_completed);
-		ar->offchan_tx_skb = skb;
-		spin_unlock_bh(&ar->data_lock);
+		ar->offchan_tx_pbuf = skb;
+		ATHP_DATA_UNLOCK(ar);
 
 		ath10k_mac_tx(ar, skb);
 
 		time_left =
-		ath10k_compl_wait(&ar->offchan_tx_completed, "ofchn_tx", 3 * HZ);
+		ath10k_compl_wait(&ar->offchan_tx_completed, "ofchn_tx",
+		    &ar->sc_conf_mtx, 3);
 		if (time_left == 0)
 			ath10k_warn(ar, "timed out waiting for offchannel skb %p\n",
 				    skb);
@@ -4070,14 +4121,13 @@ void ath10k_offchan_tx_work(struct work_struct *work)
 		if (!peer && tmp_peer_created) {
 			ret = ath10k_peer_delete(ar, vdev_id, peer_addr);
 			if (ret)
-				ath10k_warn(ar, "failed to delete peer %pM on vdev %d: %d\n",
-					    peer_addr, vdev_id, ret);
+				ath10k_warn(ar, "failed to delete peer %6D on vdev %d: %d\n",
+					    peer_addr, ":", vdev_id, ret);
 		}
 
 		ATHP_CONF_UNLOCK(ar);
 	}
 }
-#endif
 
 static void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 {
@@ -4117,7 +4167,9 @@ ath10k_mgmt_over_wmi_tx_work(void *arg, int npending)
 		/*
 		 * XXX TODO: do I need to hold the data lock for wmi mgmt tx?
 		 */
+		ATHP_CONF_LOCK(ar);
 		ret = ath10k_wmi_mgmt_tx(ar, skb);
+		ATHP_CONF_UNLOCK(ar);
 		if (ret) {
 			ath10k_warn(ar, "failed to transmit management frame via WMI: %d\n",
 				    ret);
@@ -4394,11 +4446,7 @@ void ath10k_drain_tx(struct ath10k *ar)
 	ath10k_mgmt_over_wmi_tx_purge(ar);
 
 	ieee80211_draintask(ic, &ar->wmi_mgmt_tx_work);
-#if 0
-	cancel_work_sync(&ar->offchan_tx_work);
-#else
-	printf("%s: TODO: cancel work!\n", __func__);
-#endif
+	ieee80211_draintask(ic, &ar->offchan_tx_work);
 }
 
 void
@@ -4413,6 +4461,8 @@ ath10k_halt_drain(struct ath10k *ar)
 void ath10k_halt(struct ath10k *ar)
 {
 	struct ath10k_vif *arvif;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -4537,7 +4587,7 @@ int ath10k_start(struct ath10k *ar)
 	 */
 	ath10k_drain_tx(ar);
 
-	ath10k_warn(ar, "%s: called\n", __func__);
+	ath10k_warn(ar, "%s: called; state=%d\n", __func__, ar->state);
 
 	switch (ar->state) {
 	case ATH10K_STATE_RESTARTING:
@@ -6505,18 +6555,30 @@ void
 ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
     bool drop)
 {
+
+	ATHP_CONF_LOCK(ar);
+	ath10k_tx_flush_locked(ar, vif, queues, drop);
+	ATHP_CONF_UNLOCK(ar);
+}
+
+void
+ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
+    bool drop)
+{
 	bool skip;
 	long time_left;
 	int interval;
 
+#if 0
 	/* mac80211 doesn't care if we really xmit queued frames or not
 	 * we'll collect those frames either way if we stop/delete vdevs */
 	if (drop)
 		return;
+#endif
 
 	interval = ticks + ((ATH10K_FLUSH_TIMEOUT_HZ * hz) / 1000);
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	if (ar->state == ATH10K_STATE_WEDGED)
 		goto skip;
@@ -6545,7 +6607,7 @@ ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 			    skip, ar->state, time_left);
 
 skip:
-	ATHP_CONF_UNLOCK(ar);
+	return;
 }
 
 /* TODO: Implement this function properly

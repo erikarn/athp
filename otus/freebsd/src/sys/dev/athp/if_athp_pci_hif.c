@@ -358,7 +358,7 @@ done:
 	return ret;
 }
 
-static int
+int
 ath10k_pci_diag_read32(struct ath10k *ar, u32 address, u32 *value)
 {
 	__le32 val = 0;
@@ -965,11 +965,12 @@ ath10k_pci_hif_stop(struct ath10k *ar)
 	ath10k_pci_flush(ar);
 
 	ATHP_PCI_PS_LOCK(psc);
-	device_printf(ar->sc_dev,
-	    "%s: TODO: ensure we go to sleep; wake_refcount=%d\n",
-	    __func__,
-	    (int) psc->ps_wake_refcount);
-	WARN_ON(psc->ps_wake_refcount > 0);
+	if (psc->ps_wake_refcount > 0) {
+		ath10k_warn(ar,
+		    "%s: TODO: ensure we go to sleep; wake_refcount=%d\n",
+		    __func__,
+		    (int) psc->ps_wake_refcount);
+	}
 	ATHP_PCI_PS_UNLOCK(psc);
 }
 
@@ -1234,22 +1235,13 @@ ath10k_pci_hif_suspend(struct ath10k *ar)
 static int
 ath10k_pci_hif_resume(struct ath10k *ar)
 {
-#if 0
-	struct athp_pci_softc *psc = ar->sc_psc;
-//	struct pci_dev *pdev = ar_pci->pdev;
-	u32 val;
 
 	/* Suspend/Resume resets the PCI configuration space, so we have to
 	 * re-disable the RETRY_TIMEOUT register (0x41) to keep PCI Tx retries
 	 * from interfering with C3 CPU state. pci_restore_state won't help
 	 * here since it only restores the first 64 bytes pci config header.
 	 */
-	pci_read_config_dword(pdev, 0x40, &val);
-	if ((val & 0x0000ff00) != 0)
-		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
-#else
-	device_printf(ar->sc_dev, "%s: TODO: PCI RETRY_TIMEOUT\n", __func__);
-#endif
+	pci_write_config(ar->sc_dev, 0x41, 0, 1);
 	return 0;
 }
 
