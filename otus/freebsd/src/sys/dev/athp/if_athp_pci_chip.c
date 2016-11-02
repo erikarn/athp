@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci.h"
 #include "if_athp_regio.h"
 #include "if_athp_pci_chip.h"
+#include "if_athp_pci_hif.h"
 
 /*
  * This is the PCI chip support routines from ath10k pci.c.
@@ -117,8 +118,8 @@ enum ath10k_pci_reset_mode {
 
 #if 0
 static unsigned int ath10k_pci_irq_mode = ATH10K_PCI_IRQ_AUTO;
-static unsigned int ath10k_pci_reset_mode = ATH10K_PCI_RESET_AUTO;
 #endif
+static unsigned int ath10k_pci_reset_mode = ATH10K_PCI_RESET_AUTO;
 
 /* how long wait to wait for target to initialise, in ms */
 #define ATH10K_PCI_TARGET_WAIT 3000
@@ -654,11 +655,9 @@ ath10k_pci_warm_reset(struct athp_pci_softc *psc)
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot warm reset\n");
 
-#if 0
-	spin_lock_bh(&ar->data_lock);
-	ar->stats.fw_warm_reset_counter++;
-	spin_unlock_bh(&ar->data_lock);
-#endif
+	ATHP_DATA_LOCK(ar);
+	ar->sc_stats.fw_warm_reset_counter++;
+	ATHP_DATA_UNLOCK(ar);
 
 	ath10k_pci_irq_disable(psc);
 
@@ -707,13 +706,12 @@ static int
 ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
-//	int i;
+	int i;
 	int ret;
-//	u32 val;
+	u32 val;
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot 988x chip reset\n");
 
-#if 0
 	/* Some hardware revisions (e.g. CUS223v2) has issues with cold reset.
 	 * It is thus preferred to use warm reset which is safer but may not be
 	 * able to recover the device from all possible fail scenarios.
@@ -739,15 +737,17 @@ ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 		 * sufficient to verify if device is capable of booting
 		 * firmware blob.
 		 */
-		ret = ath10k_pci_init_pipes(psc);
+		ret = ath10k_pci_init_pipes(ar);
 		if (ret) {
 			ath10k_warn(ar, "failed to init copy engine: %d\n",
 				    ret);
 			continue;
 		}
 
-		ret = ath10k_pci_diag_read32(psc, QCA988X_HOST_INTEREST_ADDRESS,
+		ATHP_CONF_LOCK(ar);
+		ret = ath10k_pci_diag_read32(ar, QCA988X_HOST_INTEREST_ADDRESS,
 					     &val);
+		ATHP_CONF_UNLOCK(ar);
 		if (ret) {
 			ath10k_warn(ar, "failed to poke copy engine: %d\n",
 				    ret);
@@ -761,9 +761,6 @@ ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 		ath10k_warn(ar, "refusing cold reset as requested\n");
 		return -EPERM;
 	}
-#else
-	device_printf(ar->sc_dev, "%s: TODO: implement try-warm-reset\n", __func__);
-#endif
 
 	ret = ath10k_pci_cold_reset(psc);
 	if (ret) {

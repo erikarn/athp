@@ -188,6 +188,7 @@ struct ath10k_stats {
 	uint64_t xmit_fail_crypto_encap;
 	uint64_t xmit_fail_get_pbuf;
 	uint64_t xmit_fail_mbuf_defrag;
+	uint64_t fw_warm_reset_counter;
 };
 
 /*
