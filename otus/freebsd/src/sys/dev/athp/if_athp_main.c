@@ -159,8 +159,6 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct mbuf *m = NULL;
 	int is_wep, is_qos;
 
-
-
 	ATHP_HTT_TX_LOCK(&ar->htt);
 	if (ar->tx_paused & ATH10K_TX_PAUSE_WAIT) {
 		ATHP_HTT_TX_UNLOCK(&ar->htt);
