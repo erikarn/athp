@@ -3555,6 +3555,22 @@ static void ath10k_reg_notifier(struct wiphy *wiphy,
 /* TX handlers */
 /***************/
 
+/*
+ * The mac tx lock / unlock routines are called by the HTT layer
+ * to provide backpressure to mac80211 for stopping and starting
+ * queues.  Otherwise (ie in the net80211 world!) we'd just keep
+ * being given frames that we'd have to toss, and we'd start
+ * seeing holes in the sequence number space and other fun oddities.
+ *
+ * Later on in mac80211/ath10k time they start supporting
+ * a per-peer/tid TX notification from the firmware so mac80211 can
+ * handle per-device queues. Drivers then just consume frames from
+ * those queues.  This is done for MU-MIMO support, but it helps in
+ * any situation where you have multiple slow and fast clients.
+ *
+ * For now this doesn't do anything for net80211 - it doesn't have
+ * the concept of queue management.
+ */
 void ath10k_mac_tx_lock(struct ath10k *ar, int reason)
 {
 	ATHP_HTT_TX_LOCK_ASSERT(&ar->htt);
