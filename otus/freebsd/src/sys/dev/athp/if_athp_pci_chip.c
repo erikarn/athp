@@ -190,9 +190,7 @@ __ath10k_pci_wake(struct athp_pci_softc *psc)
 static void
 __ath10k_pci_sleep(struct athp_pci_softc *psc)
 {
-#if 0
 	struct ath10k *ar = &psc->sc_sc;
-#endif
 
 	ATHP_PCI_PS_LOCK_ASSERT(psc);
 
@@ -201,8 +199,6 @@ __ath10k_pci_sleep(struct athp_pci_softc *psc)
 	 * I don't yet trust how this sleep state stuff works;
 	 * so let it come up and then not .. ever go to sleep.
 	 */
-	return;
-#if 0
 	ath10k_dbg(ar, ATH10K_DBG_PCI_PS,
 	    "pci ps sleep reg refcount %lu awake %d\n",
 	    psc->ps_wake_refcount, psc->ps_awake);
@@ -211,7 +207,6 @@ __ath10k_pci_sleep(struct athp_pci_softc *psc)
 	  PCIE_LOCAL_BASE_ADDRESS(ar->sc_regofs) + PCIE_SOC_WAKE_ADDRESS,
 	    PCIE_SOC_WAKE_RESET);
 	psc->ps_awake = false;
-#endif
 }
 
 static int
@@ -328,15 +323,17 @@ skip:
 void
 ath10k_pci_sleep_sync(struct athp_pci_softc *psc)
 {
+	struct ath10k *ar = &psc->sc_sc;
 
 #if 0
 	del_timer_sync(&ar_pci->ps_timer);
 #endif
 
 	ATHP_PCI_PS_LOCK(psc);
-#if 0
-	WARN_ON(ar_pci->ps_wake_refcount > 0);
-#endif
+	if (psc->ps_wake_refcount > 0) {
+		ath10k_err(ar, "%s: wake_refcount=%d\n",
+		    __func__, (int) psc->ps_wake_refcount);
+	}
 	__ath10k_pci_sleep(psc);
 	ATHP_PCI_PS_UNLOCK(psc);
 }
