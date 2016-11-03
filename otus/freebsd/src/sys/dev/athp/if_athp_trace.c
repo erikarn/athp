@@ -160,7 +160,7 @@ ath10k_trace_queue(struct ath10k *ar, int id, const void *buf, int len,
 	}
 
 	th = (struct ath10k_trace_hdr *) ale->ae_data;
-	th->threadid = htobe64((uint64_t) curthread->td_tid);
+	th->threadid = htobe32((uint64_t) curthread->td_tid);
 	th->op = htobe32(id);
 	th->tstamp_sec = htobe32(tv.tv_sec);
 	th->tstamp_usec = htobe32(tv.tv_usec);
