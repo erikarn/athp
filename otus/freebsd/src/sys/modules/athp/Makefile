@@ -86,4 +86,7 @@ SRCS    += if_athp_fwlog.c
 # This is the internal task queue for things like keycache updates
 SRCS    += if_athp_taskq.c
 
+# This is for descriptor, command, etc tracing
+SRCS    += if_athp_trace.c
+
 .include <bsd.kmod.mk>
