@@ -200,6 +200,8 @@ struct ath10k_stats {
 struct athp_pci_softc;
 struct ath10k_hif_ops;
 struct athp_taskq_head;
+struct alq;
+
 struct ath10k {
 
 	/* FreeBSD specific bits up here */
@@ -215,7 +217,14 @@ struct ath10k {
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;
-	uint64_t			sc_trace_mask;
+
+	struct {
+		uint64_t		trace_mask;
+		struct alq *		alq;
+		uint64_t		num_sent;
+		uint64_t		num_lost;
+		int			active;
+	} sc_trace;
 
 	uint32_t			sc_dbg_regidx;
 

@@ -15,6 +15,15 @@
 #define	ATH10K_TRACE_EVENT_HTT_STATS		10
 #define	ATH10K_TRACE_EVENT_HTT_PKTLOG		11
 
+struct ath10k_trace_hdr {
+	uint32_t	tstamp_sec;
+	uint32_t	tstamp_usec;
+	uint32_t	threadid;
+	uint32_t	op;
+	uint32_t	flags;
+	uint32_t	len;
+};
+
 struct ath10k_trace_wmi_tx {
 	uint32_t msdu_id;
 	uint32_t msdu_len;
@@ -24,7 +33,9 @@ struct ath10k_trace_wmi_tx {
 
 struct ath10k_trace_txrx_tx_unref {
 	uint32_t msdu_id;
-}
+};
+
+struct ath10k;
 
 extern	void trace_ath10k_wmi_cmd(struct ath10k *ar, uint32_t id,
 	    const char *buf, int len, int ret);
@@ -45,5 +56,8 @@ extern	void trace_ath10k_htt_stats(struct ath10k *ar, uint32_t id,
 	    const char *buf, int len);
 extern	void trace_ath10k_htt_pktlog(struct ath10k *ar, uint32_t id,
 	    const char *buf, int len);
+
+extern	int athp_trace_open(struct ath10k *ar, const char *path);
+extern	void athp_trace_close(struct ath10k *ar);
 
 #endif

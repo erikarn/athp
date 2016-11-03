@@ -1316,7 +1316,7 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_debug, "debug control");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "trace_mask",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
-	    &ar->sc_trace_mask, "trace mask");
+	    &ar->sc_trace.trace_mask, "trace mask");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "hwcrypt_mode",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_conf_crypt_mode, 0, "software/hardware crypt mode");
@@ -1338,6 +1338,12 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_stats.xmit_fail_mbuf_defrag, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_get_pbuf", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_get_pbuf, "");
+
+	/* trace stats */
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_trace_sent_ok",
+	    CTLFLAG_RD, &ar->sc_trace.num_sent, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_trace_sent_lost",
+	    CTLFLAG_RD, &ar->sc_trace.num_lost, "");
 
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_wmi", CTLFLAG_RW,
 	    &ar->sc_rx_wmi, 0, "RX WMI frames");
