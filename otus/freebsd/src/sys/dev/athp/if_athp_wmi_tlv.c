@@ -93,6 +93,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac.h"
 
 #include "if_athp_main.h"
+#include "if_athp_trace.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -383,9 +384,7 @@ static int ath10k_wmi_tlv_event_diag(struct ath10k *ar,
 	len = ath10k_wmi_tlv_len(data);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv diag event len %d\n", len);
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_diag(ar, data, len);
-#endif
 
 	free(tb, M_ATHPDEV);
 	return 0;
@@ -512,9 +511,7 @@ static void ath10k_wmi_tlv_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	    __func__,
 	    id,
 	    mbuf_skb_len(pbuf->m));
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_event(ar, id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 
 	switch (id) {
 	case WMI_TLV_MGMT_RX_EVENTID:

@@ -114,6 +114,8 @@ athp_trace_open(struct ath10k *ar, const char *path)
 		    error);
 		return (error);
 	}
+
+	ath10k_warn(ar, "%s: tracing started\n", __func__);
 	ar->sc_trace.active = 1;
 
 	return (0);
@@ -125,13 +127,16 @@ athp_trace_close(struct ath10k *ar)
 	if (ar->sc_trace.active == 0)
 		return;
 
+	ath10k_warn(ar, "%s: tracing stopped\n", __func__);
+
 	ar->sc_trace.active = 0;
 	alq_close(ar->sc_trace.alq);
 	ar->sc_trace.alq = 0;
 }
 
 static int
-ath10k_trace_queue(struct ath10k *ar, int id, const char *buf, int len)
+ath10k_trace_queue(struct ath10k *ar, int id, const void *buf, int len,
+    uint32_t val1, uint32_t val2)
 {
 	struct timeval tv;
 	struct ale *ale;
@@ -156,11 +161,13 @@ ath10k_trace_queue(struct ath10k *ar, int id, const char *buf, int len)
 
 	th = (struct ath10k_trace_hdr *) ale->ae_data;
 	th->threadid = htobe64((uint64_t) curthread->td_tid);
-	th->op = id;
-	th->tstamp_sec = tv.tv_sec;
-	th->tstamp_usec = tv.tv_usec;
+	th->op = htobe32(id);
+	th->tstamp_sec = htobe32(tv.tv_sec);
+	th->tstamp_usec = htobe32(tv.tv_usec);
 	th->flags = 0;
-	th->len = len;
+	th->len = htobe32(len);
+	th->val1 = htobe32(val1);
+	th->val2 = htobe32(val2);
 
 	if (buf != NULL) {
 		memcpy(((char *) th) + sizeof(struct ath10k_trace_hdr),
@@ -178,28 +185,27 @@ ath10k_trace_queue(struct ath10k *ar, int id, const char *buf, int len)
  * TODO: need to append the return value to this buffer when queued.
  */
 void
-trace_ath10k_wmi_cmd(struct ath10k *ar, uint32_t id, const char *buf,
-    int len, int ret)
+trace_ath10k_wmi_cmd(struct ath10k *ar, int cmd_id, const void *buf, int len,
+    int ret)
 {
-
-	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_CMD, buf, len);
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_CMD, buf, len,
+	    cmd_id, ret);
 }
 
 void
-trace_ath10k_wmi_event(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_wmi_event(struct ath10k *ar, uint32_t op, const void *buf, int len)
 {
 
-	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_EVENT, buf, len);
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_EVENT, buf,
+	    len, op, 0);
 }
 
 void
-trace_ath10k_wmi_dbglog(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_wmi_dbglog(struct ath10k *ar, const void *buf, int len)
 {
 
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_DBGLOG,
-	    buf, len);
+	    buf, len, 0, 0);
 }
 
 void
@@ -214,32 +220,33 @@ trace_ath10k_htt_tx(struct ath10k *ar, uint32_t msdu_id, uint32_t msdu_len,
 	tx.tid = htobe32(tid);
 
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_TX,
-	    (void *) &tx, sizeof(tx));
+	    (void *) &tx, sizeof(tx), 0, 0);
 }
 
 void
-trace_ath10k_tx_hdr(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_tx_hdr(struct ath10k *ar, const void *buf, int len)
 {
 
-	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TX_HDR, buf, len);
+	/* XXX TODO: only log wifi header */
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TX_HDR, buf, len,
+	    0, 0);
 }
 
 void
-trace_ath10k_tx_payload(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_tx_payload(struct ath10k *ar, const void *buf, int len)
 {
 
-	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TX_PAYLOAD, buf, len);
+	/* XXX TODO: only log wifi payload */
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TX_PAYLOAD, buf, len,
+	    0, 0);
 }
 
 void
-trace_ath10k_htt_rx_desc(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_htt_rx_desc(struct ath10k *ar, const void *buf, int len)
 {
 
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_RX_DESC,
-	    buf, len);
+	    buf, len, 0, 0);
 }
 
 void
@@ -250,21 +257,29 @@ trace_ath10k_txrx_tx_unref(struct ath10k *ar, uint32_t msdu_id)
 	tx.msdu_id = htobe32(msdu_id);
 
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TXRX_TX_UNREF,
-	    (void *) &tx, sizeof(tx));
+	    (void *) &tx, sizeof(tx), 0, 0);
 }
 
 void
-trace_ath10k_htt_stats(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_htt_stats(struct ath10k *ar, const void *buf, int len)
 {
 
-	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_STATS, buf, len);
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_STATS, buf, len,
+	    0, 0);
 }
 
 void
-trace_ath10k_htt_pktlog(struct ath10k *ar, uint32_t id, const char *buf,
-    int len)
+trace_ath10k_htt_pktlog(struct ath10k *ar, const void *buf, int len)
 {
 
-	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_PKTLOG, buf, len);
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_PKTLOG, buf, len,
+	    0, 0);
+}
+
+void
+trace_ath10k_wmi_diag(struct ath10k *ar, const void *buf, int len)
+{
+
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_DIAG, buf, len,
+	    0, 0);
 }

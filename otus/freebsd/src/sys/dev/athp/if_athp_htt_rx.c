@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
 #include "if_athp_txrx.h"
+#include "if_athp_trace.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -562,10 +563,8 @@ static int ath10k_htt_rx_amsdu_pop(struct ath10k_htt *htt,
 		last_msdu = __le32_to_cpu(rx_desc->msdu_end.common.info0) &
 				RX_MSDU_END_INFO0_LAST_MSDU;
 
-#ifdef	ATHP_TRACE_DIAG
 		trace_ath10k_htt_rx_desc(ar, &rx_desc->attention,
 					 sizeof(*rx_desc) - sizeof(u32));
-#endif
 
 		if (last_msdu)
 			break;
@@ -664,9 +663,7 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 		if (!is_offload) {
 			rxd = (void *)msdu->data;
 
-#ifdef	ATHP_TRACE_DIAG
 			trace_ath10k_htt_rx_desc(ar, rxd, sizeof(*rxd));
-#endif
 			skb_put(msdu, sizeof(*rxd));
 			skb_pull(msdu, sizeof(*rxd));
 			skb_put(msdu, __le16_to_cpu(msdu_desc->msdu_len));
@@ -2632,9 +2629,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 	case HTT_T2H_MSG_TYPE_TEST:
 		break;
 	case HTT_T2H_MSG_TYPE_STATS_CONF:
-#ifdef	ATHP_TRACE_DIAG
 		trace_ath10k_htt_stats(ar, mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
-#endif
 		device_printf(ar->sc_dev, "%s: got HTT_T2H_MSG_TYPE_STATS_CONF\n", __func__);
 		break;
 	case HTT_T2H_MSG_TYPE_TX_INSPECT_IND:
@@ -2652,14 +2647,12 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		ath10k_htt_rx_delba(ar, resp);
 		break;
 	case HTT_T2H_MSG_TYPE_PKTLOG: {
-#ifdef	ATHP_TRACE_DIAG
 		struct ath10k_pktlog_hdr *hdr =
 			(struct ath10k_pktlog_hdr *)resp->pktlog_msg.payload;
 
 		trace_ath10k_htt_pktlog(ar, resp->pktlog_msg.payload,
 					sizeof(*hdr) +
 					__le16_to_cpu(hdr->size));
-#endif
 		device_printf(ar->sc_dev, "%s: got HTT_T2H_MSG_TYPE_PKTLOG\n", __func__);
 		break;
 	}

@@ -89,6 +89,7 @@ __FBSDID("$FreeBSD$");
 
 #include "if_athp_main.h"
 #include "if_athp_taskq.h"
+#include "if_athp_trace.h"
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
@@ -1304,6 +1305,26 @@ athp_sysctl_reg_read(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
+static int
+athp_sysctl_trace_enable(SYSCTL_HANDLER_ARGS)
+{
+	struct ath10k *ar = arg1;
+	int error, val;
+
+	val = (ar->sc_trace.active);
+
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || !req->newptr) {
+		return (error);
+	} else if (val == 1) {
+		athp_trace_open(ar, "/tmp/athp-alq.log");
+	} else if (val == 0) {
+		athp_trace_close(ar);
+	}
+	return (0);
+}
+
+
 void
 athp_attach_sysctl(struct ath10k *ar)
 {
@@ -1314,9 +1335,6 @@ athp_attach_sysctl(struct ath10k *ar)
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "debug",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_debug, "debug control");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "trace_mask",
-	    CTLFLAG_RW | CTLFLAG_RWTUN,
-	    &ar->sc_trace.trace_mask, "trace mask");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "hwcrypt_mode",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_conf_crypt_mode, 0, "software/hardware crypt mode");
@@ -1344,6 +1362,11 @@ athp_attach_sysctl(struct ath10k *ar)
 	    CTLFLAG_RD, &ar->sc_trace.num_sent, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_trace_sent_lost",
 	    CTLFLAG_RD, &ar->sc_trace.num_lost, "");
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "trace_enable",
+	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_trace_enable, "I", "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "trace_mask",
+	    CTLFLAG_RW | CTLFLAG_RWTUN,
+	    &ar->sc_trace.trace_mask, "trace mask");
 
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_wmi", CTLFLAG_RW,
 	    &ar->sc_rx_wmi, 0, "RX WMI frames");

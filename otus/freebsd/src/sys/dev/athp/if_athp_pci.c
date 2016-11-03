@@ -90,6 +90,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_chip.h"
 #include "if_athp_pci_hif.h"
 #include "if_athp_buf.h"
+#include "if_athp_trace.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -789,6 +790,8 @@ athp_pci_detach(device_t dev)
 	/* Free BMI buffers */
 	athp_descdma_free(ar, &psc->sc_bmi_txbuf);
 	athp_descdma_free(ar, &psc->sc_bmi_rxbuf);
+
+	athp_trace_close(ar);
 
 	/* Free locks */
 	mtx_destroy(&psc->ps_mtx);
