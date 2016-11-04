@@ -1915,7 +1915,7 @@ ath10k_core_init(struct ath10k *ar)
 	if (ret)
 		goto err_free_aux_wq;
 #endif
-	device_printf(ar->sc_dev, "%s: TODO: scan/offchan/mgmt/etc add init!\n", __func__);
+	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_create() init!\n", __func__);
 
 	return 0;
 
