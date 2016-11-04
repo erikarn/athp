@@ -6907,8 +6907,6 @@ static const struct wmi_ops wmi_10_4_ops = {
 int ath10k_wmi_attach(struct ath10k *ar)
 {
 
-	ath10k_warn(ar, "%s: wmi.op_version=%d\n", __func__, ar->wmi.op_version);
-
 	switch (ar->wmi.op_version) {
 	case ATH10K_FW_WMI_OP_VERSION_10_4:
 		ar->wmi.ops = &wmi_10_4_ops;
