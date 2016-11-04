@@ -139,12 +139,7 @@ typedef uint64_t	__be64;
 #undef	le32_to_cpup
 #define	le32_to_cpup(v)		le32toh(*(v))
 
-static inline int
-IS_ALIGNED(unsigned long ptr, int a)
-{
-
-	return (ptr % a == 0);
-}
+#define	IS_ALIGNED(ptr, a)	((ptr) % (a) == 0)
 
 #define	IEEE80211_HAS_PROT(a)		ieee80211_is_protected(a)
 #define	IEEE80211_IS_ACTION(a)		ieee80211_is_action(a)
