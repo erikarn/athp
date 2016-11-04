@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_pci_hif.h"
 #include "if_athp_buf.h"
 #include "if_athp_trace.h"
+#include "if_athp_ioctl.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -386,9 +387,15 @@ athp_attach_preinit(void *arg)
 
 	config_intrhook_disestablish(&ar->sc_preinit_hook);
 
+	/* Setup ioctl handler */
+	athp_ioctl_setup(ar);
+
 	ret = ath10k_core_register(ar);
 	if (ret == 0)
 		return;
+
+	/* Shutdown ioctl handler */
+	athp_ioctl_teardown(ar);
 
 	/* XXX TODO: refactor this stuff out */
 	athp_pci_free_bufs(psc);
@@ -721,6 +728,10 @@ bad:
 		taskqueue_drain_all(psc->pipe_taskq);
 		taskqueue_free(psc->pipe_taskq);
 	}
+
+	/* Shutdown ioctl handler */
+	athp_ioctl_teardown(ar);
+
 	ath10k_core_destroy(ar);
 bad0:
 	return (err);
@@ -738,6 +749,9 @@ athp_pci_detach(device_t dev)
 	ATHP_LOCK(ar);
 	ar->sc_invalid = 1;
 	ATHP_UNLOCK(ar);
+
+	/* Shutdown ioctl handler */
+	athp_ioctl_teardown(ar);
 
 	/* XXX TODO: synchronise with running things first */
 

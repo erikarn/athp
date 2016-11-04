@@ -89,4 +89,7 @@ SRCS    += if_athp_taskq.c
 # This is for descriptor, command, etc tracing
 SRCS    += if_athp_trace.c
 
+# This is for debugging/statistics ioctls
+SRCS    += if_athp_ioctl.c
+
 .include <bsd.kmod.mk>

@@ -226,6 +226,8 @@ struct ath10k {
 		int			active;
 	} sc_trace;
 
+	struct cdev			*sc_cdev;
+
 	uint32_t			sc_dbg_regidx;
 
 	struct ath10k_stats		sc_stats;
