@@ -81,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_core.h"
 #include "if_athp_htc.h"
 #include "if_athp_var.h"
+#include "if_athp_wmi_ops.h"
 #include "if_athp_pci_ce.h"
 #include "if_athp_pci_pipe.h"
 #include "if_athp_hif.h"
@@ -170,8 +171,46 @@ ath10k_debug_unregister(struct ath10k *ar)
 
 }
 
+int
+ath10k_debug_start(struct ath10k *ar)
+{
+	int ret;
+
+	ret = ath10k_wmi_dbglog_cfg(ar, ar->sc_dbglog_module,
+	    ar->sc_dbglog_level);
+	if (ret != 0) {
+		ath10k_err(ar, "%s: failed dbglog_cfg; ret=%d\n",
+		    __func__,
+		    ret);
+		return (ret);
+	}
+
+	ret = ath10k_wmi_pdev_pktlog_disable(ar);
+	if (ret != 0) {
+		ath10k_err(ar, "%s: failed pktlog_disable; ret=%d\n",
+		    __func__,
+		    ret);
+		return (ret);
+	}
+
+	return (0);
+}
+
 void
 ath10k_debug_stop(struct ath10k *ar)
+{
+
+}
+
+int
+ath10k_debug_create(struct ath10k *ar)
+{
+
+	return (0);
+}
+
+void
+ath10k_debug_destroy(struct ath10k *ar)
 {
 
 }

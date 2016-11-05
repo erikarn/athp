@@ -92,4 +92,7 @@ SRCS    += if_athp_trace.c
 # This is for debugging/statistics ioctls
 SRCS    += if_athp_ioctl.c
 
+# Spectral scan support
+SRCS    += if_athp_spectral.c
+
 .include <bsd.kmod.mk>

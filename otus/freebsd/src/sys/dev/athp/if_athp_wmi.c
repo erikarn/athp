@@ -98,9 +98,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac.h"
 #include "if_athp_mac2.h"
 #include "if_athp_testmode.h"
-
 #include "if_athp_main.h"
-
+#include "if_athp_spectral.h"
 #include "if_athp_fwlog.h"
 #include "if_athp_trace.h"
 
@@ -3737,9 +3736,8 @@ void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 				    struct wmi_phyerr_ev_arg *phyerr,
 				    u64 tsf)
 {
-#if 0
 	int buf_len, tlv_len, res, i = 0;
-	struct phyerr_tlv *tlv;
+	const struct phyerr_tlv *tlv;
 	const void *tlv_buf;
 	const struct phyerr_fft_report *fftr;
 	size_t fftr_len;
@@ -3753,7 +3751,7 @@ void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 			return;
 		}
 
-		tlv = (struct phyerr_tlv *)&phyerr->buf[i];
+		tlv = (const struct phyerr_tlv *)&phyerr->buf[i];
 		tlv_len = __le16_to_cpu(tlv->len);
 		tlv_buf = &phyerr->buf[i + sizeof(*tlv)];
 
@@ -3786,9 +3784,6 @@ void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 
 		i += sizeof(*tlv) + tlv_len;
 	}
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 }
 
 static int ath10k_wmi_op_pull_phyerr_ev_hdr(struct ath10k *ar,
