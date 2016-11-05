@@ -4024,6 +4024,11 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	}
 }
 
+/*
+ * This is called from the scan path which holds the data lock.
+ * So both the scan and drain path need to hold the data lock
+ * whilst calling this.
+ */
 void
 ath10k_offchan_tx_purge(struct ath10k *ar)
 {
@@ -4133,15 +4138,17 @@ static void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 {
 	struct athp_buf *skb;
 
+	ATHP_DATA_LOCK_ASSERT(ar);
+
 	for (;;) {
-		ATHP_DATA_LOCK(ar);
+		//ATHP_DATA_LOCK(ar);
 		skb = TAILQ_FIRST(&ar->wmi_mgmt_tx_queue);
 		if (!skb) {
-			ATHP_DATA_UNLOCK(ar);
+			//ATHP_DATA_UNLOCK(ar);
 			break;
 		}
 		TAILQ_REMOVE(&ar->wmi_mgmt_tx_queue, skb, next);
-		ATHP_DATA_UNLOCK(ar);
+		//ATHP_DATA_UNLOCK(ar);
 
 		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
@@ -4442,8 +4449,10 @@ void ath10k_drain_tx(struct ath10k *ar)
 	synchronize_net();
 #endif
 
+	ATHP_DATA_LOCK(ar);
 	ath10k_offchan_tx_purge(ar);
 	ath10k_mgmt_over_wmi_tx_purge(ar);
+	ATHP_DATA_UNLOCK(ar);
 
 	ieee80211_draintask(ic, &ar->wmi_mgmt_tx_work);
 	ieee80211_draintask(ic, &ar->offchan_tx_work);
