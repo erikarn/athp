@@ -2215,19 +2215,21 @@ void ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
 #endif
 }
 
-#if 0
-static void ath10k_mac_vif_sta_connection_loss_work(struct work_struct *work)
+static void
+ath10k_mac_vif_sta_connection_loss_work(void *arg)
 {
-	struct ath10k_vif *arvif = container_of(work, struct ath10k_vif,
-						connection_loss_work.work);
-	struct ieee80211_vif *vif = arvif->vif;
+	struct ath10k_vif *arvif = arg;
+	struct ath10k *ar = arvif->ar;
+//	struct ieee80211vap *vif = arvif->vif;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	if (!arvif->is_up)
 		return;
 
-	ieee80211_connection_loss(vif);
+	ath10k_warn(ar, "%s: called!\n", __func__);
+//	ieee80211_connection_loss(vif);
 }
-#endif
 
 /**********************/
 /* Station management */
@@ -3140,11 +3142,7 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
 #endif
 	arvif->is_up = false;
 
-#if 0
-	cancel_delayed_work_sync(&arvif->connection_loss_work);
-#else
-	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
-#endif
+	callout_drain(&arvif->connection_loss_work);
 }
 
 /*
@@ -4948,11 +4946,8 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 
 #if 0
 	INIT_WORK(&arvif->ap_csa_work, ath10k_mac_vif_ap_csa_work);
-	INIT_DELAYED_WORK(&arvif->connection_loss_work,
-			  ath10k_mac_vif_sta_connection_loss_work);
-#else
-	ath10k_warn(ar, "%s: TODO: add tasks!\n", __func__);
 #endif
+	callout_init_mtx(&arvif->connection_loss_work, &ar->sc_conf_mtx, 0);
 
 #if 0
 	for (i = 0; i < ARRAY_SIZE(arvif->bitrate_mask.control); i++) {
@@ -5263,14 +5258,11 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
+	ATHP_CONF_LOCK_ASSERT(ar);
 #if 0
 	cancel_work_sync(&arvif->ap_csa_work);
-	cancel_delayed_work_sync(&arvif->connection_loss_work);
-#else
-	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
 #endif
-
-	ATHP_CONF_LOCK_ASSERT(ar);
+	callout_drain(&arvif->connection_loss_work);
 
 	ATHP_DATA_LOCK(ar);
 	ath10k_mac_vif_beacon_cleanup(arvif);
