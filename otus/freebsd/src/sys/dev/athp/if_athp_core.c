@@ -1709,7 +1709,6 @@ ath10k_core_register_work(void *arg, int npending)
 		ath10k_err(ar, "failed to initialize spectral\n");
 		goto err_debug_destroy;
 	}
-#if 0
 
 	status = ath10k_thermal_register(ar);
 	if (status) {
@@ -1717,18 +1716,11 @@ ath10k_core_register_work(void *arg, int npending)
 			   status);
 		goto err_spectral_destroy;
 	}
-#else
-	device_printf(ar->sc_dev,
-	    "%s: TODO: debug/spectral/thermal register\n",
-	    __func__);
-#endif
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags);
 	return;
 
-#if 0
 err_spectral_destroy:
 	ath10k_spectral_destroy(ar);
-#endif
 err_debug_destroy:
 	ath10k_debug_destroy(ar);
 err_unregister_mac:
@@ -1767,9 +1759,7 @@ ath10k_core_unregister(struct ath10k *ar)
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags))
 		return;
 
-#if 0
 	ath10k_thermal_unregister(ar);
-#endif
 	/* Stop spectral before unregistering from mac80211 to remove the
 	 * relayfs debugfs file cleanly. Otherwise the parent debugfs tree
 	 * would be already be free'd recursively, leading to a double free.
@@ -1780,7 +1770,6 @@ ath10k_core_unregister(struct ath10k *ar)
 	 * Otherwise we will fail to submit commands to FW and mac80211 will be
 	 * unhappy about callback failures. */
 	ath10k_mac_unregister(ar);
-
 	ath10k_fwlog_unregister(ar);
 
 #if 0

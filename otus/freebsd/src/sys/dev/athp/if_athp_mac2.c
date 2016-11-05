@@ -93,6 +93,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_main.h"
 #include "if_athp_txrx.h"
 #include "if_athp_taskq.h"
+#include "if_athp_spectral.h"
+#include "if_athp_thermal.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -4703,17 +4705,8 @@ int ath10k_start(struct ath10k *ar)
 	ar->num_started_vdevs = 0;
 	ath10k_regd_update(ar, ic->ic_nchans, ic->ic_channels);
 
-#if 0
 	ath10k_spectral_start(ar);
 	ath10k_thermal_set_throttling(ar);
-#else
-	ath10k_warn(ar, "%s: TODO: call spectral_start / set_throttling\n", __func__);
-	/* XXX temporary; just set default quiet time */
-	ret = ath10k_wmi_pdev_set_quiet_mode(ar, ATH10K_QUIET_PERIOD_DEFAULT, 0, ATH10K_QUIET_START_OFFSET, 0);
-	if (ret != 0) {
-		ath10k_warn(ar, "%s: failed to call set_quiet_mode: %d\n", __func__, ret);
-	}
-#endif
 
 	ATHP_CONF_UNLOCK(ar);
 
