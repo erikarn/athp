@@ -107,6 +107,9 @@ ath10k_thermal_unregister(struct ath10k *ar)
 void
 ath10k_thermal_event_temperature(struct ath10k *ar, int temperature)
 {
+
+	ath10k_warn(ar, "%s: called; temperature=%d\n", __func__,
+	    temperature);
 }
 
 void
