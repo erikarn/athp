@@ -87,16 +87,8 @@ extern	void athp_debug_dump(struct ath10k *ar, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);
 extern	void ath10k_print_driver_info(struct ath10k *ar);
 
-static inline void athp_debug_stop(struct ath10k *ar)
-{
-}
-
-static inline void athp_debug_register(struct ath10k *ar)
-{
-}
-
-static inline void athp_debug_unregister(struct ath10k *ar)
-{
-}
+extern	void ath10k_debug_stop(struct ath10k *ar);
+extern	int ath10k_debug_register(struct ath10k *ar);
+extern	void ath10k_debug_unregister(struct ath10k *ar);
 
 #endif	/* __ATH10K_DEBUG_H__ */

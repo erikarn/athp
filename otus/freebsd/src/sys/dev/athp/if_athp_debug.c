@@ -156,3 +156,22 @@ ath10k_print_driver_info(struct ath10k *ar)
 		    config_enabled(CONFIG_NL80211_TESTMODE));
 #endif
 }
+
+int
+ath10k_debug_register(struct ath10k *ar)
+{
+
+	return (0);
+}
+
+void
+ath10k_debug_unregister(struct ath10k *ar)
+{
+
+}
+
+void
+ath10k_debug_stop(struct ath10k *ar)
+{
+
+}
