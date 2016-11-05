@@ -98,6 +98,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac.h"
 #include "if_athp_mac2.h"
 #include "if_athp_fwlog.h"
+#include "if_athp_spectral.h"
 
 /*
  * This is the "core" interface part of ath10k (core.c.)
@@ -1331,7 +1332,6 @@ int
 ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 {
 	int status;
-	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -1486,25 +1486,9 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		}
 	}
 
-#if 0
 	status = ath10k_debug_start(ar);
 	if (status)
 		goto err_hif_stop;
-#else
-	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_start\n", __func__);
-#if 1
-	ret = ath10k_wmi_dbglog_cfg(ar, ar->sc_dbglog_module,
-	    ar->sc_dbglog_level);
-	if (ret != 0) {
-		ath10k_err(ar, "%s: failed dbglog_cfg; ret=%d\n",
-		    __func__, ret);
-	}
-#endif
-	ret = ath10k_wmi_pdev_pktlog_disable(ar);
-	if (ret != 0) {
-		ath10k_err(ar, "%s: failed pktlog_disable; ret=%d\n", __func__, ret);
-	}
-#endif
 
 	ar->free_vdev_map = (1LL << ar->max_num_vdevs) - 1;
 
@@ -1579,7 +1563,7 @@ ath10k_core_stop(struct ath10k *ar)
 {
 
 	ATHP_CONF_LOCK_ASSERT(ar);
-	athp_debug_stop(ar);
+	ath10k_debug_stop(ar);
 
 	/* try to suspend target */
 	if (ar->state != ATH10K_STATE_RESTARTING &&
@@ -1714,7 +1698,6 @@ ath10k_core_register_work(void *arg, int npending)
 
 	ath10k_fwlog_register(ar);
 
-#if 0
 	status = ath10k_debug_register(ar);
 	if (status) {
 		ath10k_err(ar, "unable to initialize debugfs\n");
@@ -1733,23 +1716,16 @@ ath10k_core_register_work(void *arg, int npending)
 			   status);
 		goto err_spectral_destroy;
 	}
-#else
-	device_printf(ar->sc_dev,
-	    "%s: TODO: debug/spectral/thermal register\n",
-	    __func__);
-#endif
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags);
 	return;
 
-#if 0
 err_spectral_destroy:
 	ath10k_spectral_destroy(ar);
 err_debug_destroy:
 	ath10k_debug_destroy(ar);
 err_unregister_mac:
 	ath10k_mac_unregister(ar);
-	ath10k_fwlog_unregister(ar):
-#endif
+	ath10k_fwlog_unregister(ar);
 err_release_fw:
 	ath10k_core_free_firmware_files(ar);
 err:
@@ -1783,20 +1759,17 @@ ath10k_core_unregister(struct ath10k *ar)
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags))
 		return;
 
-#if 0
 	ath10k_thermal_unregister(ar);
 	/* Stop spectral before unregistering from mac80211 to remove the
 	 * relayfs debugfs file cleanly. Otherwise the parent debugfs tree
 	 * would be already be free'd recursively, leading to a double free.
 	 */
 	ath10k_spectral_destroy(ar);
-#endif
 
 	/* We must unregister from mac80211 before we stop HTC and HIF.
 	 * Otherwise we will fail to submit commands to FW and mac80211 will be
 	 * unhappy about callback failures. */
 	ath10k_mac_unregister(ar);
-
 	ath10k_fwlog_unregister(ar);
 
 #if 0
@@ -1804,7 +1777,7 @@ ath10k_core_unregister(struct ath10k *ar)
 #endif
 	ath10k_core_free_firmware_files(ar);
 
-	athp_debug_unregister(ar);
+	ath10k_debug_unregister(ar);
 }
 
 #if 0
@@ -1915,7 +1888,7 @@ ath10k_core_init(struct ath10k *ar)
 	if (ret)
 		goto err_free_aux_wq;
 #endif
-	device_printf(ar->sc_dev, "%s: TODO: scan/offchan/mgmt/etc add init!\n", __func__);
+	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_create() init!\n", __func__);
 
 	return 0;
 

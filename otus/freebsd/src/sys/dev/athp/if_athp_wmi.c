@@ -98,10 +98,10 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac.h"
 #include "if_athp_mac2.h"
 #include "if_athp_testmode.h"
-
 #include "if_athp_main.h"
-
+#include "if_athp_spectral.h"
 #include "if_athp_fwlog.h"
+#include "if_athp_trace.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -1721,9 +1721,7 @@ int ath10k_wmi_cmd_send_nowait(struct ath10k *ar, struct athp_buf *pbuf,
 	memset(skb_cb, 0, sizeof(*skb_cb));
 
 	ret = ath10k_htc_send(&ar->htc, ar->wmi.eid, pbuf);
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_cmd(ar, cmd_id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m), ret);
-#endif
 
 	if (ret)
 		goto err_pull;
@@ -1909,10 +1907,8 @@ ath10k_wmi_op_gen_mgmt_tx(struct ath10k *ar, struct athp_buf *msdu)
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi mgmt tx skb %p len %d ftype %02x stype %02x\n",
 		   msdu, mbuf_skb_len(pbuf->m), fc & IEEE80211_FCTL_FTYPE,
 		   fc & IEEE80211_FCTL_STYPE);
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_tx_hdr(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 	trace_ath10k_tx_payload(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 	return pbuf;
 }
 
@@ -2653,9 +2649,7 @@ int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf)
 		   mbuf_skb_len(pbuf->m));
 #endif
 
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_dbglog(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 	ath10k_handle_fwlog_msg(ar, pbuf);
 	/* Now it's owned by the fwlog layer */
 
@@ -3513,10 +3507,8 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 		arvif->beacon = bcn;
 		arvif->beacon_state = ATH10K_BEACON_SCHEDULED;
 
-#ifdef	ATHP_TRACE_DIAG
 		trace_ath10k_tx_hdr(ar, bcn->data, bcn->len);
 		trace_ath10k_tx_payload(ar, bcn->data, bcn->len);
-#endif
 
 skip:
 		ATHP_DATA_UNLOCK(ar);
@@ -3744,9 +3736,8 @@ void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 				    struct wmi_phyerr_ev_arg *phyerr,
 				    u64 tsf)
 {
-#if 0
 	int buf_len, tlv_len, res, i = 0;
-	struct phyerr_tlv *tlv;
+	const struct phyerr_tlv *tlv;
 	const void *tlv_buf;
 	const struct phyerr_fft_report *fftr;
 	size_t fftr_len;
@@ -3760,7 +3751,7 @@ void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 			return;
 		}
 
-		tlv = (struct phyerr_tlv *)&phyerr->buf[i];
+		tlv = (const struct phyerr_tlv *)&phyerr->buf[i];
 		tlv_len = __le16_to_cpu(tlv->len);
 		tlv_buf = &phyerr->buf[i + sizeof(*tlv)];
 
@@ -3793,9 +3784,6 @@ void ath10k_wmi_event_spectral_scan(struct ath10k *ar,
 
 		i += sizeof(*tlv) + tlv_len;
 	}
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 }
 
 static int ath10k_wmi_op_pull_phyerr_ev_hdr(struct ath10k *ar,
@@ -4500,9 +4488,7 @@ static void ath10k_wmi_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
 
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_event(ar, id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 
 	switch (id) {
 	case WMI_MGMT_RX_EVENTID:
@@ -4621,9 +4607,7 @@ static void ath10k_wmi_10_1_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
 
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_event(ar, id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 
 	consumed = ath10k_tm_event_wmi(ar, id, pbuf);
 
@@ -4753,9 +4737,7 @@ static void ath10k_wmi_10_2_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
 
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_event(ar, id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 
 	switch (id) {
 	case WMI_10_2_MGMT_RX_EVENTID:
@@ -4877,9 +4859,7 @@ static void ath10k_wmi_10_4_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (!mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)))
 		goto out;
 
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_wmi_event(ar, id, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
-#endif
 
 	switch (id) {
 	case WMI_10_4_MGMT_RX_EVENTID:
@@ -6921,8 +6901,6 @@ static const struct wmi_ops wmi_10_4_ops = {
 
 int ath10k_wmi_attach(struct ath10k *ar)
 {
-
-	ath10k_warn(ar, "%s: wmi.op_version=%d\n", __func__, ar->wmi.op_version);
 
 	switch (ar->wmi.op_version) {
 	case ATH10K_FW_WMI_OP_VERSION_10_4:

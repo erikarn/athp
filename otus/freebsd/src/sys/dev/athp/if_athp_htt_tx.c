@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_bmi.h"
 #include "if_athp_mac.h"
 #include "if_athp_txrx.h"
+#include "if_athp_trace.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 void __ath10k_htt_tx_dec_pending(struct ath10k_htt *htt)
@@ -386,11 +387,8 @@ int ath10k_htt_send_rx_ring_cfg_ll(struct ath10k_htt *htt)
 	 * the HW expects the buffer to be an integral number of 4-byte
 	 * "words"
 	 */
-#if 0
 	BUILD_BUG_ON(!IS_ALIGNED(HTT_RX_BUF_SIZE, 4));
 	BUILD_BUG_ON((HTT_RX_BUF_SIZE & HTT_MAX_CACHE_LINE_SIZE_MASK) != 0);
-#endif
-	device_printf(ar->sc_dev, "%s: TODO: BUILD_BUG_ON!\n", __func__);
 
 	len = sizeof(cmd->hdr) + sizeof(cmd->rx_setup.hdr)
 	    + (sizeof(*ring) * num_rx_ring);
@@ -785,9 +783,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	skb_cb->htt.txbuf->cmd_tx.peerid = __cpu_to_le16(HTT_INVALID_PEERID);
 	skb_cb->htt.txbuf->cmd_tx.freq = __cpu_to_le16(skb_cb->htt.freq);
 
-#ifdef	ATHP_TRACE_DIAG
-	trace_ath10k_htt_tx(ar, msdu_id, msdu->len, vdev_id, tid);
-#endif
+	trace_ath10k_htt_tx(ar, msdu_id, mbuf_skb_len(msdu->m), vdev_id, tid);
 	ath10k_dbg(ar, ATH10K_DBG_HTT,
 		   "htt tx flags0 %u flags1 %u len %d id %hu frags_paddr %08x, msdu_paddr %08x vdev %hhu tid %hhu freq %hu\n",
 		   (unsigned) flags0, (unsigned) flags1, mbuf_skb_len(msdu->m), msdu_id, frags_paddr,
@@ -800,10 +796,8 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 		    le32_to_cpu(frags[1].dword_addr.len));
 	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt tx msdu: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
-#ifdef	ATHP_TRACE_DIAG
-	trace_ath10k_tx_hdr(ar, msdu->data, msdu->len);
-	trace_ath10k_tx_payload(ar, msdu->data, msdu->len);
-#endif
+	trace_ath10k_tx_hdr(ar, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
+	trace_ath10k_tx_payload(ar, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 	sg_items[0].transfer_id = 0;
 	sg_items[0].transfer_context = NULL;
 	sg_items[0].vaddr = &skb_cb->htt.txbuf->htc_hdr;

@@ -93,6 +93,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac.h"
 
 #include "if_athp_txrx.h"
+#include "if_athp_trace.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -177,9 +178,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	memset(&info->status, 0, sizeof(info->status));
 #endif
 
-#ifdef	ATHP_TRACE_DIAG
 	trace_ath10k_txrx_tx_unref(ar, tx_done->msdu_id);
-#endif
 
 	if (tx_done->discard) {
 		ath10k_tx_free_pbuf(ar, msdu, 1);	/* default to being ok */

@@ -93,6 +93,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_main.h"
 #include "if_athp_txrx.h"
 #include "if_athp_taskq.h"
+#include "if_athp_spectral.h"
+#include "if_athp_thermal.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -2213,19 +2215,21 @@ void ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
 #endif
 }
 
-#if 0
-static void ath10k_mac_vif_sta_connection_loss_work(struct work_struct *work)
+static void
+ath10k_mac_vif_sta_connection_loss_work(void *arg)
 {
-	struct ath10k_vif *arvif = container_of(work, struct ath10k_vif,
-						connection_loss_work.work);
-	struct ieee80211_vif *vif = arvif->vif;
+	struct ath10k_vif *arvif = arg;
+	struct ath10k *ar = arvif->ar;
+//	struct ieee80211vap *vif = arvif->vif;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	if (!arvif->is_up)
 		return;
 
-	ieee80211_connection_loss(vif);
+	ath10k_warn(ar, "%s: called!\n", __func__);
+//	ieee80211_connection_loss(vif);
 }
-#endif
 
 /**********************/
 /* Station management */
@@ -3138,11 +3142,7 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
 #endif
 	arvif->is_up = false;
 
-#if 0
-	cancel_delayed_work_sync(&arvif->connection_loss_work);
-#else
-	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
-#endif
+	callout_drain(&arvif->connection_loss_work);
 }
 
 /*
@@ -4024,6 +4024,11 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	}
 }
 
+/*
+ * This is called from the scan path which holds the data lock.
+ * So both the scan and drain path need to hold the data lock
+ * whilst calling this.
+ */
 void
 ath10k_offchan_tx_purge(struct ath10k *ar)
 {
@@ -4133,15 +4138,17 @@ static void ath10k_mgmt_over_wmi_tx_purge(struct ath10k *ar)
 {
 	struct athp_buf *skb;
 
+	ATHP_DATA_LOCK_ASSERT(ar);
+
 	for (;;) {
-		ATHP_DATA_LOCK(ar);
+		//ATHP_DATA_LOCK(ar);
 		skb = TAILQ_FIRST(&ar->wmi_mgmt_tx_queue);
 		if (!skb) {
-			ATHP_DATA_UNLOCK(ar);
+			//ATHP_DATA_UNLOCK(ar);
 			break;
 		}
 		TAILQ_REMOVE(&ar->wmi_mgmt_tx_queue, skb, next);
-		ATHP_DATA_UNLOCK(ar);
+		//ATHP_DATA_UNLOCK(ar);
 
 		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
@@ -4442,8 +4449,10 @@ void ath10k_drain_tx(struct ath10k *ar)
 	synchronize_net();
 #endif
 
+	ATHP_DATA_LOCK(ar);
 	ath10k_offchan_tx_purge(ar);
 	ath10k_mgmt_over_wmi_tx_purge(ar);
+	ATHP_DATA_UNLOCK(ar);
 
 	ieee80211_draintask(ic, &ar->wmi_mgmt_tx_work);
 	ieee80211_draintask(ic, &ar->offchan_tx_work);
@@ -4694,17 +4703,8 @@ int ath10k_start(struct ath10k *ar)
 	ar->num_started_vdevs = 0;
 	ath10k_regd_update(ar, ic->ic_nchans, ic->ic_channels);
 
-#if 0
 	ath10k_spectral_start(ar);
 	ath10k_thermal_set_throttling(ar);
-#else
-	ath10k_warn(ar, "%s: TODO: call spectral_start / set_throttling\n", __func__);
-	/* XXX temporary; just set default quiet time */
-	ret = ath10k_wmi_pdev_set_quiet_mode(ar, ATH10K_QUIET_PERIOD_DEFAULT, 0, ATH10K_QUIET_START_OFFSET, 0);
-	if (ret != 0) {
-		ath10k_warn(ar, "%s: failed to call set_quiet_mode: %d\n", __func__, ret);
-	}
-#endif
 
 	ATHP_CONF_UNLOCK(ar);
 
@@ -4946,11 +4946,8 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 
 #if 0
 	INIT_WORK(&arvif->ap_csa_work, ath10k_mac_vif_ap_csa_work);
-	INIT_DELAYED_WORK(&arvif->connection_loss_work,
-			  ath10k_mac_vif_sta_connection_loss_work);
-#else
-	ath10k_warn(ar, "%s: TODO: add tasks!\n", __func__);
 #endif
+	callout_init_mtx(&arvif->connection_loss_work, &ar->sc_conf_mtx, 0);
 
 #if 0
 	for (i = 0; i < ARRAY_SIZE(arvif->bitrate_mask.control); i++) {
@@ -5261,14 +5258,11 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
+	ATHP_CONF_LOCK_ASSERT(ar);
 #if 0
 	cancel_work_sync(&arvif->ap_csa_work);
-	cancel_delayed_work_sync(&arvif->connection_loss_work);
-#else
-	ath10k_warn(ar, "%s: TODO: cancel tasks\n", __func__);
 #endif
-
-	ATHP_CONF_LOCK_ASSERT(ar);
+	callout_drain(&arvif->connection_loss_work);
 
 	ATHP_DATA_LOCK(ar);
 	ath10k_mac_vif_beacon_cleanup(arvif);
