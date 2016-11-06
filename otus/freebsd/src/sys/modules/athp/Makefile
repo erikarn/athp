@@ -95,4 +95,7 @@ SRCS    += if_athp_ioctl.c
 # Spectral scan support
 SRCS    += if_athp_spectral.c
 
+# Thermal support
+SRCS    += if_athp_thermal.c
+
 .include <bsd.kmod.mk>
