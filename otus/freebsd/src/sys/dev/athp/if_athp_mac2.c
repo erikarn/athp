@@ -2881,16 +2881,7 @@ ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
 	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	enum wmi_phy_mode phymode = MODE_UNKNOWN;
 
-	/* Just handle b, g, a for now */
-	if (IEEE80211_IS_CHAN_B(c)) {
-		phymode = MODE_11B;
-	} else if (IEEE80211_IS_CHAN_G(c)) {
-		phymode = MODE_11B;	/* ofdm-only is MODE_11G? */
-	} else if (IEEE80211_IS_CHAN_A(c)) {
-		phymode = MODE_11A;
-	} else {
-		ath10k_err(ar, "%s: TODO: unhandled channel type!\n", __func__);
-	}
+	phymode = chan_to_phymode(c);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %6D phymode %s\n",
 	    ni->ni_macaddr, ":", ath10k_wmi_phymode_str(phymode));
