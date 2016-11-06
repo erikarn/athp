@@ -690,7 +690,7 @@ chan_to_phymode(const struct cfg80211_chan_def *chandef)
 }
 #endif
 
-#if 0
+#if 1
 static u8 ath10k_parse_mpdudensity(u8 mpdudensity)
 {
 /*
@@ -725,7 +725,9 @@ static u8 ath10k_parse_mpdudensity(u8 mpdudensity)
 		return 0;
 	}
 }
+#endif
 
+#if 0
 int ath10k_mac_vif_chan(struct ieee80211_vif *vif,
 			struct cfg80211_chan_def *def)
 {
@@ -2452,55 +2454,73 @@ ath10k_peer_assoc_h_vht_masked(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 }
 #endif
 
-#if 0
+#define	MS(_v, _f) (((_v) & _f) >> _f##_S)
+
+#if 1
 static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
-				   struct ieee80211_vif *vif,
-				   struct ieee80211_sta *sta,
+				   struct ieee80211vap *vif,
+				   struct ieee80211_node *sta,
 				   struct wmi_peer_assoc_complete_arg *arg)
 {
-	const struct ieee80211_sta_ht_cap *ht_cap = &sta->ht_cap;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct cfg80211_chan_def def;
-	enum ieee80211_band band;
-	const u8 *ht_mcs_mask;
-	const u16 *vht_mcs_mask;
+	//const struct ieee80211_sta_ht_cap *ht_cap = &sta->ht_cap;
+	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	//struct cfg80211_chan_def def;
+	//enum ieee80211_band band;
+	//const u8 *ht_mcs_mask;
+	//const u16 *vht_mcs_mask;
 	int i, n, max_nss;
-	u32 stbc;
+//	u32 stbc;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+#if 0
 	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
 		return;
+#endif
 
-	if (!ht_cap->ht_supported)
+	if (! sta->ni_flags & IEEE80211_NODE_HT)
 		return;
 
+	ath10k_warn(ar, "%s: called; HT node\n", __func__);
+
+#if 0
 	band = def.chan->band;
 	ht_mcs_mask = arvif->bitrate_mask.control[band].ht_mcs;
 	vht_mcs_mask = arvif->bitrate_mask.control[band].vht_mcs;
+#endif
 
+#if 0
 	if (ath10k_peer_assoc_h_ht_masked(ht_mcs_mask) &&
 	    ath10k_peer_assoc_h_vht_masked(vht_mcs_mask))
 		return;
+#endif
 
 	arg->peer_flags |= WMI_PEER_HT;
-	arg->peer_max_mpdu = (1 << (IEEE80211_HT_MAX_AMPDU_FACTOR +
-				    ht_cap->ampdu_factor)) - 1;
-
+	arg->peer_max_mpdu = (1 << (13 +
+				    (MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU)))) - 1;
 	arg->peer_mpdu_density =
-		ath10k_parse_mpdudensity(ht_cap->ampdu_density);
+		ath10k_parse_mpdudensity(MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY));
 
-	arg->peer_ht_caps = ht_cap->cap;
+	/* XXX TODO: check endian of the net80211 htcap field */
+	arg->peer_ht_caps = sta->ni_htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
 
+	/* XXX TODO: LDPC */
+#if 0
 	if (ht_cap->cap & IEEE80211_HT_CAP_LDPC_CODING)
 		arg->peer_flags |= WMI_PEER_LDPC;
+#endif
 
+	/* XXX TODO: 40MHz operation */
+#if 0
 	if (sta->bandwidth >= IEEE80211_STA_RX_BW_40) {
 		arg->peer_flags |= WMI_PEER_40MHZ;
 		arg->peer_rate_caps |= WMI_RC_CW40_FLAG;
 	}
+#endif
 
+	/* XXX TODO: sgi/lgi */
+#if 0
 	if (arvif->bitrate_mask.control[band].gi != NL80211_TXRATE_FORCE_LGI) {
 		if (ht_cap->cap & IEEE80211_HT_CAP_SGI_20)
 			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
@@ -2508,12 +2528,16 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		if (ht_cap->cap & IEEE80211_HT_CAP_SGI_40)
 			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
 	}
+#endif
 
+#if 0
 	if (ht_cap->cap & IEEE80211_HT_CAP_TX_STBC) {
 		arg->peer_rate_caps |= WMI_RC_TX_STBC_FLAG;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
+#endif
 
+#if 0
 	if (ht_cap->cap & IEEE80211_HT_CAP_RX_STBC) {
 		stbc = ht_cap->cap & IEEE80211_HT_CAP_RX_STBC;
 		stbc = stbc >> IEEE80211_HT_CAP_RX_STBC_SHIFT;
@@ -2521,7 +2545,14 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		arg->peer_rate_caps |= stbc;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
+#endif
 
+	/*
+	 * Set TS_FLAG if we're 3x3; set DS flag only if we're
+	 * 2x2.  Don't set both.
+	 */
+
+#if 0
 	if (ht_cap->mcs.rx_mask[1] && ht_cap->mcs.rx_mask[2])
 		arg->peer_rate_caps |= WMI_RC_TS_FLAG;
 	else if (ht_cap->mcs.rx_mask[1])
@@ -2533,6 +2564,19 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 			max_nss = (i / 8) + 1;
 			arg->peer_ht_rates.rates[n++] = i;
 		}
+#else
+	for (i = 0, n = 0, max_nss = 0; i < sta->ni_htrates.rs_nrates; i++) {
+		ath10k_warn(ar, "%s: i=%d, rate=0x%02x\n",
+		    __func__, i, sta->ni_htrates.rs_rates[i]);
+		arg->peer_ht_rates.rates[n++] = i;
+		max_nss = (i / 8) + 1;
+	}
+#endif
+
+	if (max_nss == 3)
+		arg->peer_rate_caps |= WMI_RC_TS_FLAG;
+	else if (max_nss == 2)
+		arg->peer_rate_caps |= WMI_RC_DS_FLAG;
 
 	/*
 	 * This is a workaround for HT-enabled STAs which break the spec
@@ -2543,22 +2587,27 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	 *
 	 * Firmware asserts if such situation occurs.
 	 */
-	if (n == 0) {
+	if (sta->ni_htrates.rs_nrates == 0) {
+		ath10k_warn(ar, "%s: peer does 11n but no MCS rates, override\n", __func__);
 		arg->peer_ht_rates.num_rates = 8;
 		for (i = 0; i < arg->peer_ht_rates.num_rates; i++)
 			arg->peer_ht_rates.rates[i] = i;
-	} else {
+	}
+	else {
 		arg->peer_ht_rates.num_rates = n;
 		arg->peer_num_spatial_streams = max_nss;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
+	//ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
+	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d\n",
 		   arg->addr,
 		   ":",
 		   arg->peer_ht_rates.num_rates,
 		   arg->peer_num_spatial_streams);
+	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
 }
 #endif
+#undef MS
 
 #if 0
 static int ath10k_peer_assoc_qos_ap(struct ath10k *ar,
@@ -2903,7 +2952,7 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	ath10k_peer_assoc_h_basic(ar, vif, ni, arg, is_run);
 	ath10k_peer_assoc_h_crypto(ar, vif, ni, arg, is_run);
 	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
-	//ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
 	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
