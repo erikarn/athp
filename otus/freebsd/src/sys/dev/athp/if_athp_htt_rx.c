@@ -2205,7 +2205,6 @@ static void ath10k_htt_rx_frm_tx_compl(struct ath10k *ar,
 
 static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 {
-#if 0
 	struct htt_rx_addba *ev = &resp->rx_addba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
@@ -2236,24 +2235,24 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 		return;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		   "htt rx start rx ba session sta %pM tid %hu size %hhu\n",
-		   peer->addr, tid, ev->window_size);
+	//ath10k_dbg(ar, ATH10K_DBG_HTT,
+	ath10k_warn(ar,
+		   "htt rx start rx ba session sta %6D tid %d size %d\n",
+		   peer->addr, ":", (int) tid, (int) ev->window_size);
 
+
+	/* net80211 requires: node, tid, seq, baw */
+	/* ieee80211_ampdu_rx_start_ext(ni, tid, seq, baw); */
 #if 0
 	ieee80211_start_rx_ba_session_offl(arvif->vif, peer->addr, tid);
 #else
 	device_printf(ar->sc_dev, "%s: rx_ba_session_offl todo!\n", __func__);
 #endif
 	ATHP_DATA_UNLOCK(ar);
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 }
 
 static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 {
-#if 0
 	struct htt_rx_delba *ev = &resp->rx_delba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
@@ -2284,9 +2283,12 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 		return;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		   "htt rx stop rx ba session sta %pM tid %hu\n",
-		   peer->addr, tid);
+	//ath10k_dbg(ar, ATH10K_DBG_HTT,
+	ath10k_warn(ar,
+		   "htt rx stop rx ba session sta %6D tid %d\n",
+		   peer->addr, ":", (int) tid);
+
+	/* XXX TODO: there's no net80211 method to manually tear down an A-MPDU session? */
 
 #if 0
 	ieee80211_stop_rx_ba_session_offl(arvif->vif, peer->addr, tid);
@@ -2294,9 +2296,6 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 	device_printf(ar->sc_dev, "%s: todo: stop_rx_ba_session_offl\n", __func__);
 #endif
 	ATHP_DATA_UNLOCK(ar);
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 }
 
 static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
