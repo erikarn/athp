@@ -112,6 +112,7 @@ ath10k_mac_destroy(struct ath10k *ar)
 }
 #endif
 
+#if 0
 int
 ath10k_mac_register(struct ath10k *ar)
 {
@@ -191,3 +192,4 @@ ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 	//ieee80211_tx_complete(ni, m, ! tx_ok);
 	ieee80211_tx_complete(ni, m, 0);
 }
+#endif

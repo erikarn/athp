@@ -7959,38 +7959,57 @@ static struct ieee80211_sta_ht_cap ath10k_get_ht_cap(struct ath10k *ar)
 
 	return ht_cap;
 }
+#endif
 
-static void ath10k_get_arvif_iter(void *data, u8 *mac,
-				  struct ieee80211_vif *vif)
+/*
+ * There's no refcounting on ath10k_vif's, beware!
+ */
+struct ath10k_vif *
+ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 {
-	struct ath10k_vif_iter *arvif_iter = data;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	struct ath10k_vif *vif;
 
-	if (arvif->vdev_id == arvif_iter->vdev_id)
-		arvif_iter->arvif = arvif;
-}
-
-struct ath10k_vif *ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
-{
-	struct ath10k_vif_iter arvif_iter;
-	u32 flags;
-
-	memset(&arvif_iter, 0, sizeof(struct ath10k_vif_iter));
-	arvif_iter.vdev_id = vdev_id;
-
-	flags = IEEE80211_IFACE_ITER_RESUME_ALL;
-	ieee80211_iterate_active_interfaces_atomic(ar->hw,
-						   flags,
-						   ath10k_get_arvif_iter,
-						   &arvif_iter);
-	if (!arvif_iter.arvif) {
-		ath10k_warn(ar, "No VIF found for vdev %d\n", vdev_id);
-		return NULL;
+	/* XXX for now; may need to use another lock, or create a new one */
+	ATHP_CONF_LOCK(ar);
+	TAILQ_FOREACH(vif, &ar->arvifs, next) {
+		if (vif->vdev_id == vdev_id) {
+			ATHP_CONF_UNLOCK(ar);
+			return vif;
+		}
 	}
+	ATHP_CONF_UNLOCK(ar);
 
-	return arvif_iter.arvif;
+	device_printf(ar->sc_dev, "%s: couldn't find vdev id %d\n",
+	    __func__, vdev_id);
+	return (NULL);
 }
 
+int
+ath10k_mac_register(struct ath10k *ar)
+{
+	int ret;
+
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
+
+	/* for now .. */
+//	TAILQ_INIT(&ar->arvifs);
+
+	ret = athp_attach_net80211(ar);
+	if (ret != 0)
+		return (ret);
+
+	return (0);
+}
+
+void
+ath10k_mac_unregister(struct ath10k *ar)
+{
+
+	device_printf(ar->sc_dev, "%s: called\n", __func__);
+	athp_detach_net80211(ar);
+}
+
+#if 0
 int ath10k_mac_register(struct ath10k *ar)
 {
 	static const u32 cipher_suites[] = {
@@ -8302,4 +8321,36 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		arvif->is_stabss_setup = 0;
 		ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 	}
+}
+
+void
+ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
+{
+	struct mbuf *m;
+	struct ieee80211_node *ni = NULL;
+	struct ath10k_skb_cb *cb = ATH10K_SKB_CB(pbuf);
+
+	m = athp_buf_take_mbuf(ar, &ar->buf_tx, pbuf);
+	if (cb->ni != NULL) {
+		ni = cb->ni;
+	}
+	cb->ni = NULL;
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT, "%s: pbuf=%p, m=%p, ni=%p, tx_ok=%d\n",
+	    __func__,
+	    pbuf,
+	    m,
+	    ni,
+	    tx_ok);
+	athp_freebuf(ar, &ar->buf_tx, pbuf);
+
+	/* mbuf free time - net80211 gets told about completion; frees refcount */
+	/*
+	 * Note: status=0 means "ok", status != 0 means "failed".
+	 * Getting this right matters for net80211; it calls the TX callback
+	 * for the mbuf if it's there which will sometimes kick the
+	 * VAP logic back to "scan".
+	 */
+	//ieee80211_tx_complete(ni, m, ! tx_ok);
+	ieee80211_tx_complete(ni, m, 0);
 }
