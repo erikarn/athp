@@ -2210,9 +2210,9 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 	struct htt_rx_addba *ev = &resp->rx_addba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
-	u16 info0, tid, peer_id;
 	struct ieee80211_node *ni;
 	struct ieee80211vap *vap;
+	u16 info0, tid, peer_id;
 
 	info0 = __le16_to_cpu(ev->info0);
 	tid = MS(info0, HTT_RX_BA_INFO0_TID);
@@ -2242,7 +2242,8 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 
 	ni = ieee80211_find_node(&vap->iv_ic->ic_sta, peer->addr);
 	if (ni == NULL) {
-		ath10k_warn(ar, "%s: received ADDBA, couldn't find node!\n", __func__);
+		ath10k_warn(ar, "%s: received ADDBA, couldn't find node!\n",
+		    __func__);
 		ATHP_DATA_UNLOCK(ar);
 		return;
 	}
@@ -2258,16 +2259,8 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 	 * Or, timeout.  Sigh.
 	 */
 	ieee80211_ampdu_rx_start_ext(ni, tid, 0, ev->window_size);
-
 	ieee80211_free_node(ni);
 
-	/* net80211 requires: node, tid, seq, baw */
-	/* ieee80211_ampdu_rx_start_ext(ni, tid, seq, baw); */
-#if 0
-	ieee80211_start_rx_ba_session_offl(arvif->vif, peer->addr, tid);
-#else
-	device_printf(ar->sc_dev, "%s: rx_ba_session_offl todo!\n", __func__);
-#endif
 	ATHP_DATA_UNLOCK(ar);
 }
 
@@ -2276,6 +2269,8 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 	struct htt_rx_delba *ev = &resp->rx_delba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
+	struct ieee80211_node *ni;
+	struct ieee80211vap *vap;
 	u16 info0, tid, peer_id;
 
 	info0 = __le16_to_cpu(ev->info0);
@@ -2308,13 +2303,19 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 		   "htt rx stop rx ba session sta %6D tid %d\n",
 		   peer->addr, ":", (int) tid);
 
-	/* XXX TODO: there's no net80211 method to manually tear down an A-MPDU session? */
+	vap = &arvif->av_vap;
 
-#if 0
-	ieee80211_stop_rx_ba_session_offl(arvif->vif, peer->addr, tid);
-#else
-	device_printf(ar->sc_dev, "%s: todo: stop_rx_ba_session_offl\n", __func__);
-#endif
+	ni = ieee80211_find_node(&vap->iv_ic->ic_sta, peer->addr);
+	if (ni == NULL) {
+		ath10k_warn(ar, "%s: received DELBA, couldn't find node!\n",
+		    __func__);
+		ATHP_DATA_UNLOCK(ar);
+		return;
+	}
+
+	ieee80211_ampdu_rx_stop_ext(ni, tid);
+	ieee80211_free_node(ni);
+
 	ATHP_DATA_UNLOCK(ar);
 }
 
