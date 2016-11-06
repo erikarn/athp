@@ -70,9 +70,8 @@ SRCS    += if_athp_wmi.c
 
 # This is the MAC layer - in FreeBSD, this is the MAC/VIF abstraction
 # layer and I'll break out the command handling and net80211 bits
-# into separate source files
+# into separate source files (if_athp_main.c.)
 SRCS    += if_athp_mac.c
-SRCS    += if_athp_mac2.c
 
 # This is the transport layer for transmit/receive MSDUs.
 SRCS    += if_athp_htt.c
