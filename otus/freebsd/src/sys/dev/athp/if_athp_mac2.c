@@ -2548,31 +2548,19 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 #endif
 
 	/*
-	 * Set TS_FLAG if we're 3x3; set DS flag only if we're
-	 * 2x2.  Don't set both.
+	 * This code assumes the htrates array from net80211
+	 * is sorted in lowest to highest MCS.
 	 */
-
-#if 0
-	if (ht_cap->mcs.rx_mask[1] && ht_cap->mcs.rx_mask[2])
-		arg->peer_rate_caps |= WMI_RC_TS_FLAG;
-	else if (ht_cap->mcs.rx_mask[1])
-		arg->peer_rate_caps |= WMI_RC_DS_FLAG;
-
-	for (i = 0, n = 0, max_nss = 0; i < IEEE80211_HT_MCS_MASK_LEN * 8; i++)
-		if ((ht_cap->mcs.rx_mask[i / 8] & BIT(i % 8)) &&
-		    (ht_mcs_mask[i / 8] & BIT(i % 8))) {
-			max_nss = (i / 8) + 1;
-			arg->peer_ht_rates.rates[n++] = i;
-		}
-#else
 	for (i = 0, n = 0, max_nss = 0; i < sta->ni_htrates.rs_nrates; i++) {
-		ath10k_warn(ar, "%s: i=%d, rate=0x%02x\n",
-		    __func__, i, sta->ni_htrates.rs_rates[i]);
+		/* Note: 0x80 isn't set here, no "I'm MCS!" flag */
 		arg->peer_ht_rates.rates[n++] = i;
 		max_nss = (i / 8) + 1;
 	}
-#endif
 
+	/*
+	 * Set TS_FLAG if we're 3x3; set DS flag only if we're
+	 * 2x2.  Don't set both.
+	 */
 	if (max_nss == 3)
 		arg->peer_rate_caps |= WMI_RC_TS_FLAG;
 	else if (max_nss == 2)
@@ -2588,7 +2576,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	 * Firmware asserts if such situation occurs.
 	 */
 	if (sta->ni_htrates.rs_nrates == 0) {
-		ath10k_warn(ar, "%s: peer does 11n but no MCS rates, override\n", __func__);
+		ath10k_warn(ar,
+		    "%s: peer does 11n but no MCS rates, override\n",
+		    __func__);
 		arg->peer_ht_rates.num_rates = 8;
 		for (i = 0; i < arg->peer_ht_rates.num_rates; i++)
 			arg->peer_ht_rates.rates[i] = i;
