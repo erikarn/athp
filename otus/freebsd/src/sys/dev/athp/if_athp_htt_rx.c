@@ -1293,6 +1293,8 @@ static void ath10k_process_rx(struct ath10k *ar,
 	/* RX path to net80211 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni != NULL) {
+		if (ni->ni_flags & IEEE80211_NODE_HT)
+			m->m_flags |= M_AMPDU;
 		ieee80211_input_mimo(ni, m);
 		ieee80211_free_node(ni);
 	} else {
@@ -2209,6 +2211,8 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
 	u16 info0, tid, peer_id;
+	struct ieee80211_node *ni;
+	struct ieee80211vap *vap;
 
 	info0 = __le16_to_cpu(ev->info0);
 	tid = MS(info0, HTT_RX_BA_INFO0_TID);
@@ -2234,12 +2238,28 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 		ATHP_DATA_UNLOCK(ar);
 		return;
 	}
+	vap = &arvif->av_vap;
+
+	ni = ieee80211_find_node(&vap->iv_ic->ic_sta, peer->addr);
+	if (ni == NULL) {
+		ath10k_warn(ar, "%s: received ADDBA, couldn't find node!\n", __func__);
+		ATHP_DATA_UNLOCK(ar);
+		return;
+	}
 
 	//ath10k_dbg(ar, ATH10K_DBG_HTT,
 	ath10k_warn(ar,
 		   "htt rx start rx ba session sta %6D tid %d size %d\n",
 		   peer->addr, ":", (int) tid, (int) ev->window_size);
 
+	/*
+	 * XXX TODO: we don't know the start seqno; so just use 0 and
+	 * have the next received frame hopefully (!) slide the RX window along.
+	 * Or, timeout.  Sigh.
+	 */
+	ieee80211_ampdu_rx_start_ext(ni, tid, 0, ev->window_size);
+
+	ieee80211_free_node(ni);
 
 	/* net80211 requires: node, tid, seq, baw */
 	/* ieee80211_ampdu_rx_start_ext(ni, tid, seq, baw); */
