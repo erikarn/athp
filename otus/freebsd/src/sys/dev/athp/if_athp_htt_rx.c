@@ -2207,6 +2207,7 @@ static void ath10k_htt_rx_frm_tx_compl(struct ath10k *ar,
 
 static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 {
+#define	SEQNO(a)	((a) >> IEEE80211_SEQ_SEQ_SHIFT)
 	struct htt_rx_addba *ev = &resp->rx_addba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
@@ -2250,18 +2251,33 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 
 	//ath10k_dbg(ar, ATH10K_DBG_HTT,
 	ath10k_warn(ar,
-		   "htt rx start rx ba session sta %6D tid %d size %d\n",
-		   peer->addr, ":", (int) tid, (int) ev->window_size);
+		   "htt rx start rx ba session sta %6D tid %d size %d, ni_rxseq %d\n",
+		   peer->addr, ":", (int) tid, (int) ev->window_size,
+		   (int) SEQNO(ni->ni_rxseqs[tid]));
 
 	/*
 	 * XXX TODO: we don't know the start seqno; so just use 0 and
 	 * have the next received frame hopefully (!) slide the RX window along.
 	 * Or, timeout.  Sigh.
+	 *
+	 * XXX TODO: yes, this is wrong - turns out we need to actually
+	 * /use/ the start point that the firmware gives us.
+	 * What's mac80211 do here? Just treat the first received frame
+	 * as the relevant BA window?
+	 *
+	 * XXX TODO: why is this still starting at tid=0, rxseq=0?
+	 * check if this is all "right"
+	 *
+	 * XXX TODO: are we seeing per-TID traffic correctly tagged?
+	 * (ie, the nwifi rx path; is it correctly setting the TID
+	 * field in RX'ed frames?)
 	 */
-	ieee80211_ampdu_rx_start_ext(ni, tid, 0, ev->window_size);
+	ieee80211_ampdu_rx_start_ext(ni, tid, SEQNO(ni->ni_rxseqs[tid]),
+	    ev->window_size);
 	ieee80211_free_node(ni);
 
 	ATHP_DATA_UNLOCK(ar);
+#undef	SEQNO
 }
 
 static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
