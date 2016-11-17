@@ -2507,19 +2507,16 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	arg->peer_ht_caps = sta->ni_htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
 
-	/* XXX TODO: LDPC */
-#if 0
-	if (ht_cap->cap & IEEE80211_HT_CAP_LDPC_CODING)
+	/* LDPC - only if both sides do it */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_LDPC) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_LDPC))
 		arg->peer_flags |= WMI_PEER_LDPC;
-#endif
 
-	/* XXX TODO: 40MHz operation */
-#if 0
-	if (sta->bandwidth >= IEEE80211_STA_RX_BW_40) {
+	/* 40MHz operation */
+	if (IEEE80211_IS_CHAN_HT40(sta->ni_chan)) {
 		arg->peer_flags |= WMI_PEER_40MHZ;
 		arg->peer_rate_caps |= WMI_RC_CW40_FLAG;
 	}
-#endif
 
 	/* XXX TODO: sgi/lgi */
 #if 0
@@ -2532,6 +2529,7 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	}
 #endif
 
+	/* XXX TODO: TX STBC */
 #if 0
 	if (ht_cap->cap & IEEE80211_HT_CAP_TX_STBC) {
 		arg->peer_rate_caps |= WMI_RC_TX_STBC_FLAG;
@@ -2539,6 +2537,7 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	}
 #endif
 
+	/* XXX TODO: RX STBC */
 #if 0
 	if (ht_cap->cap & IEEE80211_HT_CAP_RX_STBC) {
 		stbc = ht_cap->cap & IEEE80211_HT_CAP_RX_STBC;
@@ -2591,12 +2590,16 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	}
 
 	//ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
-	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d\n",
+	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d maxnss %d\n",
 		   arg->addr,
 		   ":",
 		   arg->peer_ht_rates.num_rates,
-		   arg->peer_num_spatial_streams);
+		   arg->peer_num_spatial_streams,
+		   max_nss);
 	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
+	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
+		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
+	}
 }
 #endif
 #undef MS
