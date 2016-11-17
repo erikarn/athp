@@ -1002,6 +1002,10 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 		return (NULL);
 	vap = (void *) uvp;
 
+	/* A-MPDU density/maximum size */
+	vap->iv_ampdu_density = IEEE80211_HTCAP_MPDUDENSITY_8;
+	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
+
 	if (ieee80211_vap_setup(ic, vap, name, unit, opmode,
 	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
 		free(uvp, M_80211_VAP);
@@ -1280,12 +1284,16 @@ athp_setup_channels(struct ath10k *ar)
 	if (ar->phy_capability & WHAL_WLAN_11G_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11B);
 		setbit(bands, IEEE80211_MODE_11G);
+		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
+			setbit(bands, IEEE80211_MODE_11NG);
 		ieee80211_add_channel_list_2ghz(chans, IEEE80211_CHAN_MAX,
 		    nchans, chan_list_2ghz, nitems(chan_list_2ghz),
 		    bands, ht40);
 	}
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11A);
+		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
+			setbit(bands, IEEE80211_MODE_11NA);
 		ieee80211_add_channel_list_5ghz(chans, IEEE80211_CHAN_MAX,
 		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
 		    bands, ht40);
@@ -1412,6 +1420,40 @@ athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
 	return (0);
 }
 
+static void
+athp_attach_11n(struct ath10k *ar)
+{
+	struct ieee80211com *ic = &ar->sc_ic;
+
+	ic->ic_htcaps =
+	    IEEE80211_HTC_HT
+	    | IEEE80211_HTC_AMPDU
+	    | IEEE80211_HTC_AMSDU
+	    | IEEE80211_HTCAP_MAXAMSDU_3839
+	    | IEEE80211_HTCAP_SMPS_OFF;
+
+	if (ar->ht_cap_info & WMI_HT_CAP_HT20_SGI)
+		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
+
+	/*
+	 * XXX TODO: enable HT40 once the channel setup code
+	 * knows how to correctly do it.
+	 */
+	/* XXX TODO: STBC */
+
+	/* XXX TODO: LDPC */
+
+	/* XXX TODO: max ampdu size / density; but is per-vap */
+
+	/* Streams */
+	ic->ic_txstream = ar->num_rf_chains;
+	ic->ic_rxstream = ar->num_rf_chains;
+	device_printf(ar->sc_dev, "%s: %d tx streams, %d rx streams\n",
+	    __func__,
+	    ic->ic_txstream,
+	    ic->ic_rxstream);
+}
+
 /*
  * Attach time setup.
  *
@@ -1496,6 +1538,12 @@ athp_attach_net80211(struct ath10k *ar)
 	/* 11n methods */
 	ic->ic_update_chw = athp_update_chw;
 	ic->ic_ampdu_enable = athp_ampdu_enable;
+
+	/* TODO: Initial 11n state; capabilities */
+	ath10k_warn(ar, "%s: ht_cap_info: 0x%08x\n", __func__, ar->ht_cap_info);
+	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
+		athp_attach_11n(ar);
+	}
 
 	/* radiotap attach */
 	ieee80211_radiotap_attach(ic,

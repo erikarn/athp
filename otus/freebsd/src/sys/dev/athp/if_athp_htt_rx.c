@@ -1293,6 +1293,8 @@ static void ath10k_process_rx(struct ath10k *ar,
 	/* RX path to net80211 */
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni != NULL) {
+		if (ni->ni_flags & IEEE80211_NODE_HT)
+			m->m_flags |= M_AMPDU;
 		ieee80211_input_mimo(ni, m);
 		ieee80211_free_node(ni);
 	} else {
@@ -2205,10 +2207,12 @@ static void ath10k_htt_rx_frm_tx_compl(struct ath10k *ar,
 
 static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 {
-#if 0
+#define	SEQNO(a)	((a) >> IEEE80211_SEQ_SEQ_SHIFT)
 	struct htt_rx_addba *ev = &resp->rx_addba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
+	struct ieee80211_node *ni;
+	struct ieee80211vap *vap;
 	u16 info0, tid, peer_id;
 
 	info0 = __le16_to_cpu(ev->info0);
@@ -2235,28 +2239,47 @@ static void ath10k_htt_rx_addba(struct ath10k *ar, struct htt_resp *resp)
 		ATHP_DATA_UNLOCK(ar);
 		return;
 	}
+	vap = &arvif->av_vap;
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		   "htt rx start rx ba session sta %pM tid %hu size %hhu\n",
-		   peer->addr, tid, ev->window_size);
+	ni = ieee80211_find_node(&vap->iv_ic->ic_sta, peer->addr);
+	if (ni == NULL) {
+		ath10k_warn(ar, "%s: received ADDBA, couldn't find node!\n",
+		    __func__);
+		ATHP_DATA_UNLOCK(ar);
+		return;
+	}
 
-#if 0
-	ieee80211_start_rx_ba_session_offl(arvif->vif, peer->addr, tid);
-#else
-	device_printf(ar->sc_dev, "%s: rx_ba_session_offl todo!\n", __func__);
-#endif
+	//ath10k_dbg(ar, ATH10K_DBG_HTT,
+	ath10k_warn(ar,
+		   "htt rx start rx ba session sta %6D tid %d size %d, ni_rxseq %d\n",
+		   peer->addr, ":", (int) tid, (int) ev->window_size,
+		   (int) SEQNO(ni->ni_rxseqs[tid]));
+
+	/*
+	 * Yes, this is wrong - turns out the firmware doesn't seem to give us
+	 * the starting point?
+	 *
+	 * What's mac80211 do here? Just treat the first received frame
+	 * as the relevant BA window?
+	 *
+	 * XXX TODO: are we seeing per-TID traffic correctly tagged?
+	 * (ie, the nwifi rx path; is it correctly setting the TID
+	 * field in RX'ed frames?)
+	 */
+	ieee80211_ampdu_rx_start_ext(ni, tid, -1, ev->window_size);
+	ieee80211_free_node(ni);
+
 	ATHP_DATA_UNLOCK(ar);
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
+#undef	SEQNO
 }
 
 static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 {
-#if 0
 	struct htt_rx_delba *ev = &resp->rx_delba;
 	struct ath10k_peer *peer;
 	struct ath10k_vif *arvif;
+	struct ieee80211_node *ni;
+	struct ieee80211vap *vap;
 	u16 info0, tid, peer_id;
 
 	info0 = __le16_to_cpu(ev->info0);
@@ -2284,19 +2307,25 @@ static void ath10k_htt_rx_delba(struct ath10k *ar, struct htt_resp *resp)
 		return;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		   "htt rx stop rx ba session sta %pM tid %hu\n",
-		   peer->addr, tid);
+	//ath10k_dbg(ar, ATH10K_DBG_HTT,
+	ath10k_warn(ar,
+		   "htt rx stop rx ba session sta %6D tid %d\n",
+		   peer->addr, ":", (int) tid);
 
-#if 0
-	ieee80211_stop_rx_ba_session_offl(arvif->vif, peer->addr, tid);
-#else
-	device_printf(ar->sc_dev, "%s: todo: stop_rx_ba_session_offl\n", __func__);
-#endif
+	vap = &arvif->av_vap;
+
+	ni = ieee80211_find_node(&vap->iv_ic->ic_sta, peer->addr);
+	if (ni == NULL) {
+		ath10k_warn(ar, "%s: received DELBA, couldn't find node!\n",
+		    __func__);
+		ATHP_DATA_UNLOCK(ar);
+		return;
+	}
+
+	ieee80211_ampdu_rx_stop_ext(ni, tid);
+	ieee80211_free_node(ni);
+
 	ATHP_DATA_UNLOCK(ar);
-#else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 }
 
 static int ath10k_htt_rx_extract_amsdu(athp_buf_head *list,
