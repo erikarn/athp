@@ -2478,7 +2478,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		return;
 #endif
 
-	if (! sta->ni_flags & IEEE80211_NODE_HT)
+	if ((sta->ni_flags & IEEE80211_NODE_HT) == 0)
+		return;
+	if (! IEEE80211_IS_CHAN_HT(sta->ni_chan))
 		return;
 
 	ath10k_warn(ar, "%s: called; HT node\n", __func__);
