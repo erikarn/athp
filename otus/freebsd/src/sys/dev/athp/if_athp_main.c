@@ -138,6 +138,38 @@ athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni,
 
 	return (1);
 }
+
+static void
+athp_tx_disable(struct ath10k *ar, struct ieee80211vap *vap)
+{
+
+}
+
+static void
+athp_tx_enable(struct ath10k *ar, struct ieee80211vap *vap)
+{
+
+}
+
+static int
+athp_tx_disabled(struct ath10k *ar)
+{
+	return (0);
+
+}
+
+static void
+athp_tx_enter(struct ath10k *ar)
+{
+
+}
+
+static void
+athp_tx_exit(struct ath10k *ar)
+{
+
+}
+
 /*
  * Raw frame transmission - this is "always" 802.11.
  *
@@ -160,15 +192,17 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct mbuf *m = NULL;
 	int is_wep, is_qos;
 
-	ATHP_HTT_TX_LOCK(&ar->htt);
-	if (ar->tx_paused & ATH10K_TX_PAUSE_WAIT) {
-		ATHP_HTT_TX_UNLOCK(&ar->htt);
-		ath10k_warn(ar, "%s: TX w/ WAIT set, dropping\n", __func__);
-		/* XXX counter */
+	/*
+	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
+	 * does with the reset, xmit refcounts.  Otherwise we end up
+	 * queuing frames during a transition down, which causes panics.
+	 */
+	athp_tx_enter(ar);
+	if (athp_tx_disabled(ar)) {
+		athp_tx_exit(ar);
 		m_freem(m0);
 		return (ENXIO);
 	}
-	ATHP_HTT_TX_UNLOCK(&ar->htt);
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
@@ -189,6 +223,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 			    "%s: stabss not setup; don't xmit\n",
 			    __func__);
 			m_freem(m0);
+			athp_tx_exit(ar);
 			return (ENXIO);
 		}
 	}
@@ -196,6 +231,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	if (arvif->is_dying == 1) {
 		ATHP_CONF_UNLOCK(ar);
 		m_freem(m0);
+		athp_tx_exit(ar);
 		return (ENXIO);
 	}
 
@@ -204,6 +240,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
 		m_freem(m0);
+		athp_tx_exit(ar);
 		return (ENXIO);
 	}
 
@@ -219,6 +256,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		m_freem(m0);
+		athp_tx_exit(ar);
 		return (ENOBUFS);
 	}
 	m0 = NULL;
@@ -229,6 +267,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		ar->sc_stats.xmit_fail_get_pbuf++;
 		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		m_freem(m);
+		athp_tx_exit(ar);
 		return (ENOBUFS);
 	}
 
@@ -248,6 +287,8 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 
 	/* Transmit */
 	ath10k_tx(ar, ni, pbuf);
+
+	athp_tx_exit(ar);
 
 	return (0);
 }
@@ -349,26 +390,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	int is_wep, is_qos;
 	uint32_t seqno;
 
-	/*
-	 * If the queue is paused, then no, don't queue anything else.
-	 * Otherwise we may end up queueing frames to a down vdev during
-	 * eg RUN -> x transition.
-	 *
-	 * This is very very racy - it could totally happen after this
-	 * check.  However, this isn't trying to perfect right now.
-	 * Hopefully(!) by setting this flag, then flushing the traffic
-	 * before downing the interface, we can ensure no new traffic
-	 * is queued.
-	 */
-	ATHP_HTT_TX_LOCK(&ar->htt);
-	if (ar->tx_paused & ATH10K_TX_PAUSE_WAIT) {
-		ATHP_HTT_TX_UNLOCK(&ar->htt);
-		ath10k_warn(ar, "%s: TX w/ WAIT set, dropping\n", __func__);
-		/* XXX counter */
-		return (ENXIO);
-	}
-	ATHP_HTT_TX_UNLOCK(&ar->htt);
-
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 	is_qos = !! IEEE80211_IS_QOS(wh);
@@ -378,18 +399,31 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
 
+	/*
+	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
+	 * does with the reset, xmit refcounts.  Otherwise we end up
+	 * queuing frames during a transition down, which causes panics.
+	 */
+	athp_tx_enter(ar);
+	if (athp_tx_disabled(ar)) {
+		athp_tx_exit(ar);
+		return (ENXIO);
+	}
+
 	ATHP_CONF_LOCK(ar);
 	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
 	if (vap->iv_opmode == IEEE80211_M_STA) {
 		if (arvif->is_stabss_setup == 0) {
 			ATHP_CONF_UNLOCK(ar);
 			ath10k_warn(ar, "%s: stabss not setup; don't xmit\n", __func__);
+			athp_tx_exit(ar);
 			return (ENXIO);
 		}
 	}
 
 	if (arvif->is_dying == 1) {
 		ATHP_CONF_UNLOCK(ar);
+		athp_tx_exit(ar);
 		return (ENXIO);
 	}
 
@@ -397,6 +431,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
+		athp_tx_exit(ar);
 		return (ENXIO);
 	}
 
@@ -411,6 +446,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (m == NULL) {
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+		athp_tx_exit(ar);
 		return (ENOBUFS);
 	}
 	m0 = NULL;
@@ -420,6 +456,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (pbuf == NULL) {
 		ar->sc_stats.xmit_fail_get_pbuf++;
 		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+		athp_tx_exit(ar);
 		return (ENOBUFS);
 	}
 
@@ -445,6 +482,8 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 
 	/* Transmit */
 	ath10k_tx(ar, ni, pbuf);
+
+	athp_tx_exit(ar);
 
 	return (0);
 }
@@ -549,24 +588,18 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 		ath10k_warn(ar, "%s: pausing/flushing queues\n", __func__);
 
-		ATHP_HTT_TX_LOCK(&ar->htt);
-		ath10k_mac_tx_lock(ar, ATH10K_TX_PAUSE_WAIT);
-		ATHP_HTT_TX_UNLOCK(&ar->htt);
+		athp_tx_disable(ar, vap);
 
 		/* Wait for xmit to finish before continuing */
 		ath10k_tx_flush(ar, vap, 0, 1);
 
-		ATHP_HTT_TX_LOCK(&ar->htt);
-		ath10k_mac_tx_unlock(ar, ATH10K_TX_PAUSE_WAIT);
-		ATHP_HTT_TX_UNLOCK(&ar->htt);
+		athp_tx_enable(ar, vap);
 
 		break;
 
 	case IEEE80211_S_INIT:
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			ATHP_HTT_TX_LOCK(&ar->htt);
-			ath10k_mac_tx_lock(ar, ATH10K_TX_PAUSE_WAIT);
-			ATHP_HTT_TX_UNLOCK(&ar->htt);
+			athp_tx_disable(ar, vap);
 		}
 
 		ATHP_CONF_LOCK(ar);
@@ -588,9 +621,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		ATHP_CONF_UNLOCK(ar);
 
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			ATHP_HTT_TX_LOCK(&ar->htt);
-			ath10k_mac_tx_unlock(ar, ATH10K_TX_PAUSE_WAIT);
-			ATHP_HTT_TX_UNLOCK(&ar->htt);
+			athp_tx_enable(ar, vap);
 		}
 
 		break;
