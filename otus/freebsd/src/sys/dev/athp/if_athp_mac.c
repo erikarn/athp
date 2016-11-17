@@ -3440,17 +3440,18 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 
 		/*
 		 * XXX TODO: we can't allow ht/vht on JP channel 14
+		 *
 		 * XXX TODO: need to figure out ht40plus flag -
 		 * unfortunately our method for iterating through
 		 * channels makes it hard to determine if we can
 		 * or can't do HT40 (or HT40+? Not sure!) here.
 		 * So, worry about HT40 later on.
 		 */
-
 		ch->allow_ht = true;
 		ch->allow_vht = true;
 		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
-		ch->ht40plus = true;
+//		ch->ht40plus = true;
+		ch->ht40plus = false;
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
@@ -5303,14 +5304,10 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ath10k_mac_vif_beacon_cleanup(arvif);
 	ATHP_DATA_UNLOCK(ar);
 
-#if 0
 	ret = ath10k_spectral_vif_stop(arvif);
 	if (ret)
 		ath10k_warn(ar, "failed to stop spectral for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
-#else
-	ath10k_warn(ar, "%s: TODO: call ath10k_spectral_vif_stop\n", __func__);
-#endif
 
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
