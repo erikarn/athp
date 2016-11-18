@@ -1470,9 +1470,15 @@ athp_attach_11n(struct ath10k *ar)
 	 * XXX TODO: enable HT40 once the channel setup code
 	 * knows how to correctly do it.
 	 */
-	/* XXX TODO: STBC */
+	ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
+	ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI40;
 
-	/* XXX TODO: LDPC */
+	/* STBC - 1x for now */
+	ic->ic_htcaps |= IEEE80211_HTCAP_RXSTBC_1STREAM;
+	ic->ic_htcaps |= IEEE80211_HTCAP_TXSTBC;
+
+	/* LDPC */
+	ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
 
 	/* XXX TODO: max ampdu size / density; but is per-vap */
 
