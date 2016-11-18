@@ -2469,7 +2469,7 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	//const u8 *ht_mcs_mask;
 	//const u16 *vht_mcs_mask;
 	int i, n, max_nss;
-//	u32 stbc;
+	u32 stbc;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2518,35 +2518,41 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		arg->peer_rate_caps |= WMI_RC_CW40_FLAG;
 	}
 
-	/* XXX TODO: sgi/lgi */
-#if 0
-	if (arvif->bitrate_mask.control[band].gi != NL80211_TXRATE_FORCE_LGI) {
-		if (ht_cap->cap & IEEE80211_HT_CAP_SGI_20)
-			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
-
-		if (ht_cap->cap & IEEE80211_HT_CAP_SGI_40)
+	/* sgi/lgi */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_SHORTGI20) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_SHORTGI20)) {
 			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
 	}
-#endif
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_SHORTGI40) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_SHORTGI40)) {
+			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
+	}
 
-	/* XXX TODO: TX STBC */
-#if 0
-	if (ht_cap->cap & IEEE80211_HT_CAP_TX_STBC) {
+	/*
+	 * XXX TODO: I don't .. entirely trust how TX/RX STBC is
+	 * configured here.
+	 *
+	 * Note: TXSTBC is a flag; RXSTBC is a bitmask of 1..3
+	 * streams.
+	 */
+
+	/* TX STBC - we can receive, they can transmit */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) &&
+	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_TXSTBC)) {
 		arg->peer_rate_caps |= WMI_RC_TX_STBC_FLAG;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
-#endif
 
-	/* XXX TODO: RX STBC */
-#if 0
-	if (ht_cap->cap & IEEE80211_HT_CAP_RX_STBC) {
-		stbc = ht_cap->cap & IEEE80211_HT_CAP_RX_STBC;
-		stbc = stbc >> IEEE80211_HT_CAP_RX_STBC_SHIFT;
+	/* RX STBC - see if ANY RX STBC is enabled */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_RXSTBC)) {
+		stbc = sta->ni_htcap & IEEE80211_HTCAP_RXSTBC;
+		stbc = stbc >> IEEE80211_HTCAP_RXSTBC_S;
 		stbc = stbc << WMI_RC_RX_STBC_FLAG_S;
 		arg->peer_rate_caps |= stbc;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
-#endif
 
 	/*
 	 * This code assumes the htrates array from net80211
