@@ -2470,6 +2470,8 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	//const u16 *vht_mcs_mask;
 	int i, n, max_nss;
 	u32 stbc;
+	int mpdu_density, mpdu_size;
+	uint16_t htcap, htcap_filt, htcap_mask;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2498,18 +2500,104 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 #endif
 
 	arg->peer_flags |= WMI_PEER_HT;
-	arg->peer_max_mpdu = (1 << (13 +
-				    (MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU)))) - 1;
-	arg->peer_mpdu_density =
-		ath10k_parse_mpdudensity(MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY));
 
-	/* XXX TODO: check endian of the net80211 htcap field */
-	arg->peer_ht_caps = sta->ni_htcap;
+	/*
+	 * Set capabilities based on what we negotiate.
+	 *
+	 * XXX TODO: this is wrong - we can't just do this.
+	 *
+	 * Linux mac80211 seems to set this field up after
+	 * overriding things appropriately.
+	 *
+	 * FreeBSD just sets ni_htcap up to be the decoded
+	 * htcap field from the peer.  This isn't the
+	 * correctly negotiated set!
+	 *
+	 * Instead, we need to override some of the subfields
+	 * (density, maxsize, rx stbc, etc) based on our
+	 * VAP htcaps and our local configuration.
+	 *
+	 * Look at what Linux does in
+	 * mac80211/ht.c:ieee80211_ht_cap_ie_to_sta_ht_cap().
+	 */
+
+	/*
+	 * Max MPDU/density - use lowest value of max mpdu;
+	 * highest value for density.
+	 */
+	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
+	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
+	ath10k_warn(ar, "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
+	    __func__,
+	    mpdu_density,
+	    mpdu_size,
+	    vif->iv_ampdu_density,
+	    vif->iv_ampdu_limit);
+
+	if (vif->iv_ampdu_density > mpdu_density)
+		mpdu_density = vif->iv_ampdu_density;
+	if (vif->iv_ampdu_rxmax < mpdu_size)
+		mpdu_size = vif->iv_ampdu_limit;
+	arg->peer_max_mpdu = (1 << (13 + mpdu_size));
+	arg->peer_mpdu_density = ath10k_parse_mpdudensity(mpdu_density);
+
+	/*
+	 * htcap - filter the received station information
+	 * based on the VAP configuration.
+	 *
+	 * XXX TODO For now, just use HTCAP; filter on vap config later!
+	 */
+
+	/*
+	 * These are the straight flags. Just filter based on them.
+	 */
+	htcap_mask =
+	    IEEE80211_HTCAP_LDPC
+	    | IEEE80211_HTCAP_GREENFIELD
+	    | IEEE80211_HTCAP_SHORTGI20
+	    | IEEE80211_HTCAP_SHORTGI40
+	    | IEEE80211_HTCAP_DELBA
+	    | IEEE80211_HTCAP_MAXAMSDU_7935
+	    | IEEE80211_HTCAP_DSSSCCK40
+	    | IEEE80211_HTCAP_PSMP
+	    | IEEE80211_HTCAP_40INTOLERANT
+	    | IEEE80211_HTCAP_LSIGTXOPPROT
+	    ;
+
+	htcap_filt = vif->iv_htcaps & htcap_mask;
+
+	ath10k_warn(ar, "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
+	    __func__,
+	    htcap_filt,
+	    vif->iv_htcaps,
+	    htcap_mask);
+
+	htcap = (sta->ni_htcap & ~(htcap_mask)) | htcap_filt;
+
+	/* CHWIDTH40 - only enable it if we're on a HT40 channel */
+	htcap &= ~(IEEE80211_HTCAP_CHWIDTH40);
+	if ((sta->ni_htcap & IEEE80211_HTCAP_CHWIDTH40) &&
+	    (sta->ni_chan != IEEE80211_CHAN_ANYC) &&
+	    (IEEE80211_IS_CHAN_HT40(sta->ni_chan)))
+		htcap |= IEEE80211_HTCAP_CHWIDTH40;
+
+	/* SMPS - for now, set to 0x4 (disabled) */
+	htcap |= IEEE80211_HTCAP_SMPS_OFF;
+
+	ath10k_warn(ar, "%s: TODO: actually handle TX/RX STBC negotiation!\n", __func__);
+
+	/* TXSTBC - enable it only if the peer announces RXSTBC */
+	htcap &= ~(IEEE80211_HTCAP_TXSTBC);
+
+	/* RXSTBC - enable it only if the peer announces TXSTBC */
+	htcap &= ~(IEEE80211_HTCAP_RXSTBC);
+
+	arg->peer_ht_caps = htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
 
 	/* LDPC - only if both sides do it */
 	if ((vif->iv_htcaps & IEEE80211_HTCAP_LDPC) &&
-	    (sta->ni_htcap & IEEE80211_HTCAP_LDPC))
+	    (htcap & IEEE80211_HTCAP_LDPC))
 		arg->peer_flags |= WMI_PEER_LDPC;
 
 	/* 40MHz operation */
@@ -2520,11 +2608,11 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	/* sgi/lgi */
 	if ((vif->iv_htcaps & IEEE80211_HTCAP_SHORTGI20) &&
-	    (sta->ni_htcap & IEEE80211_HTCAP_SHORTGI20)) {
+	    (htcap & IEEE80211_HTCAP_SHORTGI20)) {
 			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
 	}
 	if ((vif->iv_htcaps & IEEE80211_HTCAP_SHORTGI40) &&
-	    (sta->ni_htcap & IEEE80211_HTCAP_SHORTGI40)) {
+	    (htcap & IEEE80211_HTCAP_SHORTGI40)) {
 			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
 	}
 
@@ -2539,15 +2627,15 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	/* TX STBC - we can receive, they can transmit */
 	if ((vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) &&
 	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX) &&
-	    (sta->ni_htcap & IEEE80211_HTCAP_TXSTBC)) {
+	    (htcap & IEEE80211_HTCAP_TXSTBC)) {
 		arg->peer_rate_caps |= WMI_RC_TX_STBC_FLAG;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
 
 	/* RX STBC - see if ANY RX STBC is enabled */
 	if ((vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) &&
-	    (sta->ni_htcap & IEEE80211_HTCAP_RXSTBC)) {
-		stbc = sta->ni_htcap & IEEE80211_HTCAP_RXSTBC;
+	    (htcap & IEEE80211_HTCAP_RXSTBC)) {
+		stbc = htcap & IEEE80211_HTCAP_RXSTBC;
 		stbc = stbc >> IEEE80211_HTCAP_RXSTBC_S;
 		stbc = stbc << WMI_RC_RX_STBC_FLAG_S;
 		arg->peer_rate_caps |= stbc;
@@ -2606,6 +2694,11 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
 		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
 	}
+	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
+	    arg->peer_ht_caps,
+	    arg->peer_rate_caps,
+	    sta->ni_htcap,
+	    vif->iv_htcaps);
 }
 #endif
 #undef MS
@@ -3120,7 +3213,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 		   "mac vdev %d up (associated) bssid %6D aid %d\n",
-		   arvif->vdev_id, ni->ni_macaddr, ":", ni->ni_associd);
+		   arvif->vdev_id, ni->ni_macaddr, ":", IEEE80211_AID(ni->ni_associd));
 
 	WARN_ON(arvif->is_up);
 
