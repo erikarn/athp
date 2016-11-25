@@ -1033,15 +1033,15 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 		return (NULL);
 	vap = (void *) uvp;
 
-	/* A-MPDU density/maximum size */
-	vap->iv_ampdu_density = IEEE80211_HTCAP_MPDUDENSITY_8;
-	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
-
 	if (ieee80211_vap_setup(ic, vap, name, unit, opmode,
 	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
 		free(uvp, M_80211_VAP);
 		return (NULL);
 	}
+
+	/* A-MPDU density/maximum size */
+	vap->iv_ampdu_density = IEEE80211_HTCAP_MPDUDENSITY_8;
+	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
 
 	/* Override vap methods */
 	uvp->av_newstate = vap->iv_newstate;
@@ -1465,20 +1465,22 @@ athp_attach_11n(struct ath10k *ar)
 
 	if (ar->ht_cap_info & WMI_HT_CAP_HT20_SGI)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
+	if (ar->ht_cap_info & WMI_HT_CAP_HT40_SGI)
+		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI40;
 
 	/*
 	 * XXX TODO: enable HT40 once the channel setup code
 	 * knows how to correctly do it.
 	 */
-	ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
-	ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI40;
 
+#if 0
 	/* STBC - 1x for now */
 	ic->ic_htcaps |= IEEE80211_HTCAP_RXSTBC_1STREAM;
 	ic->ic_htcaps |= IEEE80211_HTCAP_TXSTBC;
 
 	/* LDPC */
 	ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
+#endif
 
 	/* XXX TODO: max ampdu size / density; but is per-vap */
 
