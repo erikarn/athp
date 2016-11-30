@@ -1242,8 +1242,16 @@ athp_node_free(struct ieee80211_node *ni)
 	/* XXX TODO: delete peer */
 	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
 		device_printf(ar->sc_dev,
-		    "%s: TODO: add peer for MAC %6D\n",
+		    "%s: TODO: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
+
+		/*
+		 * Note: when deleting a peer, we need to make sure that no
+		 * frames have been scheduled to said peer.  net80211
+		 * shouldn't delete nodes until the last transmit reference
+		 * is gone.  But, we should likely wait until the transmit
+		 * queue is emptied here just to be sure.
+		 */
 	}
 
 	ar->sc_node_free(ni);
