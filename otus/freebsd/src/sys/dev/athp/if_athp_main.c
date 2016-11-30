@@ -1209,8 +1209,15 @@ athp_node_alloc(struct ieee80211vap *vap,
 	/* XXX TODO: Create peer if it's not our MAC address */
 	if (memcmp(mac, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
 		device_printf(ar->sc_dev,
-		    "%s: TODO: add peer for MAC %6D\n",
+		    "%s: add peer for MAC %6D\n",
 		    __func__, mac, ":");
+
+		if (athp_peer_create(vap, mac) != 0) {
+			device_printf(ar->sc_dev, "%s: failed to create peer\n",
+			    __func__);
+			free(an, M_80211_NODE);
+			return (NULL);
+		}
 	}
 
 	return (&an->ni);
@@ -1242,7 +1249,7 @@ athp_node_free(struct ieee80211_node *ni)
 	/* XXX TODO: delete peer */
 	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
 		device_printf(ar->sc_dev,
-		    "%s: TODO: delete peer for MAC %6D\n",
+		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
 		/*
@@ -1252,6 +1259,7 @@ athp_node_free(struct ieee80211_node *ni)
 		 * is gone.  But, we should likely wait until the transmit
 		 * queue is emptied here just to be sure.
 		 */
+		athp_peer_free(ni->ni_vap, ni);
 	}
 
 	ar->sc_node_free(ni);

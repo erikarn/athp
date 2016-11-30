@@ -8395,13 +8395,13 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+#if 0
 	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d\n",
 	    __func__,
 	    vap,
 	    ni,
 	    is_assoc);
-
-	/* XXX TODO: move the peer creation out! */
+#endif
 
 	if (is_assoc) {
 		/* Workaround: Make sure monitor vdev is not running
@@ -8417,15 +8417,6 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 */
 		ath10k_bss_disassoc(ar, vap, is_run);
 
-		ATHP_DATA_LOCK(ar);
-		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
-			ATHP_DATA_UNLOCK(ar);
-			(void) ath10k_peer_create(ar, arvif->vdev_id,
-			    ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
-		} else {
-			ATHP_DATA_UNLOCK(ar);
-		}
-
 		/* Recalculate TX power - this is in dBm */
 		arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
 		ret = ath10k_mac_txpower_recalc(ar);
@@ -8440,7 +8431,6 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 	} else {
 		ath10k_bss_disassoc(ar, vap, is_run);
 		arvif->is_stabss_setup = 0;
-		ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 	}
 }
 
@@ -8474,4 +8464,38 @@ ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 	 */
 	//ieee80211_tx_complete(ni, m, ! tx_ok);
 	ieee80211_tx_complete(ni, m, 0);
+}
+
+/*
+ * TODO: TDLS, etc.
+ */
+int
+athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
+
+	ATHP_CONF_LOCK(ar);
+	ret = ath10k_peer_create(ar, arvif->vdev_id, mac,
+	    WMI_PEER_TYPE_DEFAULT);
+//	ath10k_mac_inc_num_stations(arvif, sta);
+	ATHP_CONF_UNLOCK(ar);
+
+	return (ret);
+}
+
+int
+athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
+
+	ATHP_CONF_LOCK(ar);
+	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
+//	ath10k_mac_dec_num_stations(arvif, sta);
+	ATHP_CONF_UNLOCK(ar);
+
+	return (ret);
 }
