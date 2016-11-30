@@ -2618,7 +2618,17 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	/*
 	 * XXX TODO: I don't .. entirely trust how TX/RX STBC is
-	 * configured here.
+	 * configured here.  I think what's put into htcap
+	 * is what to tell the firmware our current HT behaviour
+	 * should be.  So, for STBC, I think it should be:
+	 *
+	 * + enable RXSTBC with the lowest STBC value only if
+	 *   the sender has TX STBC enabled, based on their RX
+	 *   STBC and our configured RX STBC.
+	 *
+	 * + Enable TXSTBC with the lowest STBC value only if
+	 *   the sender has RX STBC enabled, based on their RX
+	 *   STBC and our configured RX STBC.
 	 *
 	 * Note: TXSTBC is a flag; RXSTBC is a bitmask of 1..3
 	 * streams.
@@ -2691,9 +2701,11 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		   arg->peer_num_spatial_streams,
 		   max_nss);
 	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
+#if 0
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
 		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
 	}
+#endif
 	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
 	    arg->peer_ht_caps,
 	    arg->peer_rate_caps,
