@@ -8485,6 +8485,15 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
 	return (ret);
 }
 
+/*
+ * Note: this is called with net80211 locks held, sigh.
+ * This makes the whole "manage this from the node create/destroy path"
+ * invalid.
+ *
+ * Also - note that node free is called before we get the DELBA deletion
+ * commands from the firmware, which generates some log warnings.
+ * We then don't find the net80211 node..
+ */
 int
 athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 {
@@ -8493,6 +8502,7 @@ athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
+	(void) ath10k_tx_flush_locked(ar, vap, 0, 0);
 	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
 //	ath10k_mac_dec_num_stations(arvif, sta);
 	ATHP_CONF_UNLOCK(ar);
