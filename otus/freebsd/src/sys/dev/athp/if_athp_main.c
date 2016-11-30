@@ -1521,7 +1521,8 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_WME |
 	    IEEE80211_C_SHSLOT |
 	    IEEE80211_C_MONITOR |
-	    IEEE80211_C_WPA;
+	    IEEE80211_C_WPA |
+	    IEEE80211_C_TXPMGT;
 
 	/* XXX crypto capabilities */
 	if (ar->sc_conf_crypt_mode == ATH10K_CRYPT_MODE_HW) {
