@@ -276,14 +276,15 @@ int
 athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm, struct mbuf *m)
 {
-#if 0
 	bus_dma_segment_t segs[ATHP_RXBUF_MAX_SCATTER];
 	int ret;
 	int nsegs;
 
 	nsegs = 0;
+	ATHP_DMA_LOCK(ar);
 	ret = bus_dmamap_load_mbuf_sg(dh->tag, dm->map, m, segs,
 	    &nsegs, BUS_DMA_NOWAIT);
+	ATHP_DMA_UNLOCK(ar);
 	if (ret != 0)
 		return (ret);
 	if (nsegs != 1) {
@@ -296,43 +297,11 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	/* XXX Yes, we only support a single address for now */
 	dm->paddr = segs[0].ds_addr;
 
-	return (0);
-#else
-	/* XXX until I figure out why load_mbuf_sg doesn't work.. */
-	bus_addr_t paddr;
-	int ret;
-
-	/* Sanity check - once this is fixed, the above may work */
-	if (m->m_pkthdr.len == 0) {
-		device_printf(ar->sc_dev, "%s: ERROR: mbuf pkthdr.len=0!\n",
-		    __func__);
-		return ENOMEM;
-	}
-
-	ATHP_DMA_LOCK(ar);
-	ret = bus_dmamap_load(dh->tag, dm->map, mtod(m, void *), m->m_pkthdr.len,
-	    athp_load_cb, &paddr, BUS_DMA_NOWAIT);
-	ATHP_DMA_UNLOCK(ar);
-	if (ret != 0) {
-		device_printf(ar->sc_dev, "%s: failed; ret=%d\n", __func__, ret);
-		return (ENOMEM);
-	}
-	if (paddr == 0) {
-		device_printf(ar->sc_dev, "%s: callback returned paddr=0; bufsize=%d, ml=%d, len=%d, pkthdr.len=%d\n",
-		    __func__,
-		    dh->buf_size,
-		    M_SIZE(m),
-		    m->m_len,
-		    m->m_pkthdr.len);
-		return (ENOMEM);
-	}
-	dm->paddr = paddr;
-
 	ath10k_dbg(ar, ATH10K_DBG_BUSDMA,
 	    "%s: MAP: dm=%p, m=%p, d=%p, paddr=0x%lx\n",
-	    __func__, dm, m, mtod(m, void *), paddr);
+	    __func__, dm, m, mtod(m, void *), segs[0].ds_addr);
+
 	return (0);
-#endif
 }
 
 void
@@ -381,8 +350,10 @@ athp_dma_mbuf_pre_xmit(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
+	ATHP_DMA_LOCK(ar);
 	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_PREREAD |
 	    BUS_DMASYNC_PREWRITE);
+	ATHP_DMA_UNLOCK(ar);
 }
 
 void
@@ -390,8 +361,10 @@ athp_dma_mbuf_post_xmit(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
+	ATHP_DMA_LOCK(ar);
 	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_PREREAD |
 	    BUS_DMASYNC_POSTWRITE);
+	ATHP_DMA_UNLOCK(ar);
 }
 
 void
@@ -399,8 +372,10 @@ athp_dma_mbuf_pre_recv(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
+	ATHP_DMA_LOCK(ar);
 	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_PREREAD |
 	    BUS_DMASYNC_PREWRITE);
+	ATHP_DMA_UNLOCK(ar);
 }
 
 void
@@ -408,6 +383,8 @@ athp_dma_mbuf_post_recv(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 
+	ATHP_DMA_LOCK(ar);
 	bus_dmamap_sync(dh->tag, dm->map, BUS_DMASYNC_POSTREAD |
 	    BUS_DMASYNC_POSTWRITE);
+	ATHP_DMA_UNLOCK(ar);
 }
