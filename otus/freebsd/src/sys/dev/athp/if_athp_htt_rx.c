@@ -221,6 +221,11 @@ static int __ath10k_htt_rx_ring_fill_n(struct ath10k_htt *htt, int num)
 		htt->rx_ring.paddrs_ring[idx] = __cpu_to_le32(skb->mb.paddr);
 		htt->rx_ring.fill_cnt++;
 
+		trace_ath10k_htt_rx_push(ar, idx,
+		    htt->rx_ring.fill_cnt,
+		    htt->rx_ring.paddrs_ring[idx],
+		    htt->rx_ring.netbufs_ring[idx]);
+
 		if (htt->rx_ring.in_ord_rx) {
 #if 0
 			hash_add(htt->rx_ring.skb_table,
@@ -381,6 +386,12 @@ static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
 	idx = htt->rx_ring.sw_rd_idx.msdu_payld;
 	idx_old = idx;
 	msdu = htt->rx_ring.netbufs_ring[idx];
+
+	trace_ath10k_htt_rx_pop(ar, idx,
+	    htt->rx_ring.fill_cnt,
+	    htt->rx_ring.paddrs_ring[idx],
+	    htt->rx_ring.netbufs_ring[idx]);
+
 	htt->rx_ring.netbufs_ring[idx] = NULL;
 	htt->rx_ring.paddrs_ring[idx] = 0;
 
@@ -696,6 +707,12 @@ ath10k_htt_rx_alloc_desc(struct ath10k *ar, struct ath10k_htt *htt)
 	htt->rx_ring.size = HTT_RX_RING_SIZE;
 	htt->rx_ring.size_mask = htt->rx_ring.size - 1;
 	htt->rx_ring.fill_level = HTT_RX_RING_FILL_LEVEL;
+
+	ath10k_warn(ar, "%s: size=%d, mask=%d, fill=%d\n",
+	    __func__,
+	    htt->rx_ring.size,
+	    htt->rx_ring.size_mask,
+	    htt->rx_ring.fill_level);
 
 	if (!is_power_of_2(htt->rx_ring.size)) {
 		ath10k_warn(ar, "htt rx ring size is not power of 2\n");

@@ -283,3 +283,33 @@ trace_ath10k_wmi_diag(struct ath10k *ar, const void *buf, int len)
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_WMI_DIAG, buf, len,
 	    0, 0);
 }
+
+void
+trace_ath10k_htt_rx_push(struct ath10k *ar, uint32_t idx, uint32_t fillcnt,
+    uint32_t paddr, void *vaddr)
+{
+	struct ath10k_trace_htt_rx_push htt;
+
+	htt.vaddr = htobe64((intptr_t) vaddr);
+	htt.paddr = htobe32(paddr);
+	htt.idx = htobe32(idx);
+	htt.fillcnt = htobe32(fillcnt);
+
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_RX_PUSH,
+	    (void *) &htt, sizeof(htt), 0, 0);
+}
+
+void
+trace_ath10k_htt_rx_pop(struct ath10k *ar, uint32_t idx, uint32_t fillcnt,
+    uint32_t paddr, void *vaddr)
+{
+	struct ath10k_trace_htt_rx_pop htt;
+
+	htt.vaddr = htobe64((intptr_t) vaddr);
+	htt.paddr = htobe32(paddr);
+	htt.idx = htobe32(idx);
+	htt.fillcnt = htobe32(fillcnt);
+
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_RX_POP,
+	    (void *) &htt, sizeof(htt), 0, 0);
+}
