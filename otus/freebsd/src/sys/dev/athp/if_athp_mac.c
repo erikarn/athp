@@ -4922,6 +4922,9 @@ static int ath10k_config_ps(struct ath10k *ar)
 }
 #endif
 
+/*
+ * Note: assumes txpower is in dBm
+ */
 static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 {
 	int ret;
@@ -5338,12 +5341,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		goto err_peer_delete;
 	}
 
-#if 0
-	arvif->txpower = vif->bss_conf.txpower;
-#else
-	ath10k_warn(ar, "%s: TODO: initialise txpower to something sensible\n", __func__);
-	arvif->txpower = 15;	/* 15dBm? 30dBm? It's just a hard-default for now */
-#endif
+	arvif->txpower = 30;	/* 30dBm? It's just a hard-default for now; fix later */
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
@@ -8393,6 +8391,7 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
     struct ieee80211_node *ni, int is_assoc, int is_run)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -8426,9 +8425,18 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		} else {
 			ATHP_DATA_UNLOCK(ar);
 		}
+
+		/* Recalculate TX power - this is in dBm */
+		arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
+		ret = ath10k_mac_txpower_recalc(ar);
+		if (ret)
+			ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
+
+		/* Now associate */
 		ath10k_bss_assoc(ar, ni, is_run);
 		arvif->is_stabss_setup = 1;
 		ath10k_monitor_recalc(ar);
+
 	} else {
 		ath10k_bss_disassoc(ar, vap, is_run);
 		arvif->is_stabss_setup = 0;
