@@ -159,6 +159,40 @@ athp_decode_wmi_diag(const struct ath10k_trace_hdr *a)
 	    be32toh(a->len));
 }
 
+static void
+athp_decode_htt_rx_push(const struct ath10k_trace_hdr *a)
+{
+	struct ath10k_trace_htt_rx_push *htt;
+
+	htt = (void *) ((char *) a) + sizeof(struct ath10k_trace_hdr);
+
+	printf("[%d.%06d] [%u] HTT_RX_PUSH: idx=%d, fillcnt=%d, paddr=0x%08x, vaddr=0x%16llx\n",
+	    be32toh(a->tstamp_sec),
+	    be32toh(a->tstamp_usec),
+	    (uint32_t) be32toh(a->threadid),
+	    be32toh(htt->idx),
+	    be32toh(htt->fillcnt),
+	    be32toh(htt->paddr),
+	    (long long) be64toh(htt->vaddr));
+}
+
+static void
+athp_decode_htt_rx_pop(const struct ath10k_trace_hdr *a)
+{
+	struct ath10k_trace_htt_rx_pop *htt;
+
+	htt = (void *) ((char *) a) + sizeof(struct ath10k_trace_hdr);
+
+	printf("[%d.%06d] [%u] HTT_RX_POP: idx=%d, fillcnt=%d, paddr=0x%08x, vaddr=0x%16llx\n",
+	    be32toh(a->tstamp_sec),
+	    be32toh(a->tstamp_usec),
+	    (uint32_t) be32toh(a->threadid),
+	    be32toh(htt->idx),
+	    be32toh(htt->fillcnt),
+	    be32toh(htt->paddr),
+	    (long long) be64toh(htt->vaddr));
+}
+
 int
 main(int argc, const char *argv[])
 {
@@ -240,6 +274,12 @@ main(int argc, const char *argv[])
 			break;
 		case ATH10K_TRACE_EVENT_WMI_DIAG:
 			athp_decode_wmi_diag(a);
+			break;
+		case ATH10K_TRACE_EVENT_HTT_RX_PUSH:
+			athp_decode_htt_rx_push(a);
+			break;
+		case ATH10K_TRACE_EVENT_HTT_RX_POP:
+			athp_decode_htt_rx_pop(a);
 			break;
 		default:
 			printf("[%d.%06d] [%u] op: %d; len %d\n",
