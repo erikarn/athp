@@ -1489,11 +1489,9 @@ athp_attach_11n(struct ath10k *ar)
 	 * knows how to correctly do it.
 	 */
 
-#if 0
 	/* STBC - 1x for now */
 	ic->ic_htcaps |= IEEE80211_HTCAP_RXSTBC_1STREAM;
 	ic->ic_htcaps |= IEEE80211_HTCAP_TXSTBC;
-#endif
 
 	/* LDPC */
 	ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;

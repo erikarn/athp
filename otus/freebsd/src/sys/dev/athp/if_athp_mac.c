@@ -2472,6 +2472,7 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	u32 stbc;
 	int mpdu_density, mpdu_size;
 	uint16_t htcap, htcap_filt, htcap_mask;
+	int stbc_lcl, stbc_rem;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2588,9 +2589,27 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	/* TXSTBC - enable it only if the peer announces RXSTBC */
 	htcap &= ~(IEEE80211_HTCAP_TXSTBC);
+	if ((sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) &&
+	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX))
+		htcap |= IEEE80211_HTCAP_TXSTBC;
 
 	/* RXSTBC - enable it only if the peer announces TXSTBC */
 	htcap &= ~(IEEE80211_HTCAP_RXSTBC);
+	stbc_lcl = 0;
+	stbc_rem = 0;
+	if ((sta->ni_htcap & IEEE80211_HTCAP_TXSTBC) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) &&
+	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX)) {
+		/* Pick the lowest STBC of both */
+		stbc_lcl = (vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) >> IEEE80211_HTCAP_RXSTBC_S;
+		stbc_rem = (sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) >> IEEE80211_HTCAP_RXSTBC_S;
+		stbc = stbc_lcl;
+		if (stbc_rem < stbc)
+			stbc = stbc_rem;
+		htcap |= (stbc << IEEE80211_HTCAP_RXSTBC_S) & IEEE80211_HTCAP_RXSTBC;
+
+	}
+	ath10k_warn(ar, "%s: RX STBC: lcl stbc=%d, rem stbc=%d\n", __func__, stbc_lcl, stbc_rem);
 
 	arg->peer_ht_caps = htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
@@ -2694,12 +2713,13 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	}
 
 	//ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
-	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d maxnss %d\n",
+	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d maxnss %d htcap 0x%08x\n",
 		   arg->addr,
 		   ":",
 		   arg->peer_ht_rates.num_rates,
 		   arg->peer_num_spatial_streams,
-		   max_nss);
+		   max_nss,
+		   htcap);
 	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
 #if 0
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
