@@ -1868,7 +1868,6 @@ static int
 ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 {
 	struct athp_buf *pbuf, *np, *first;
-	char *s;
 	int total_len = 0;
 
 	/*
@@ -1899,6 +1898,9 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	 * Step 2 - allocate a new mbuf/pbuf, big enough
 	 * to hold the descriptor from the first msdu,
 	 * then just the payloads from all msdus.
+	 *
+	 * NOTE: this may return a >1 mbuf chain; we
+	 * must keep that in mind!
 	 */
 	np = athp_getbuf(ar, &ar->buf_rx, total_len);
 	if (np == NULL) {
@@ -1914,63 +1916,40 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	 * do the relevant hijinx to move things around.
 	 *
 	 * The len of that first mbuf is the msdu len;
-	 * m_data points to the bginning of the msdu;
+	 * m_data points to the beginning of the msdu;
 	 * but we need to take that header htt bit into
 	 * account when copying.
-	 *
-	 * So:
-	 * + When allocating the target mbuf above,
-	 *   add the htt rx descriptor to the length being
-	 *   allocated;
-	 * + Then copy the rtt header into it;
-	 * + Then set the start of the data part to the
-	 *   beginning of the to-be MSDU payload part,
-	 *   and set the length of the mbuf to 0,
-	 * + Then append normally below; it'll start
-	 *   appending at the correct offset.
 	 */
 
 	/*
-	 * Step 3 - copy the first MSDU HTT RX descriptor into
+	 * Step 2 - copy the first MSDU HTT RX descriptor into
 	 * the target descriptor.
 	 */
 	first = TAILQ_FIRST(amsdu);
-
-	/* Set length offset to 0 */
-	mbuf_skb_trim(np->m, 0);
-
-	/* Allocate headroom for htt_rx_desc; sets m_data to start of msdu */
-	s = mbuf_skb_data(np->m);
-	mbuf_skb_reserve(np->m, sizeof(struct htt_rx_desc));
-
-	/* Copy header from first mbuf into our headroom (htt_rx_desc) */
-	memcpy(s,
-	    mbuf_skb_data(first->m) - sizeof(struct htt_rx_desc),
-	    sizeof(struct htt_rx_desc));
+	m_append(np->m,
+	    sizeof(struct htt_rx_desc),
+	    mbuf_skb_data(first->m) - sizeof(struct htt_rx_desc));
 
 	/*
-	 * Step 4 - set the m_data pointer of the new mbuf
-	 * to the end of the HTT RX descriptor; set len to 0;
-	 * so all the MSDU payloads are just appended after the
-	 * HTT RX descriptor.
-	 */
-	mbuf_skb_trim(np->m, 0);
-
-	/*
-	 * Step 5 - append the rest of the skbs into the original one.
+	 * Step 4 - append the rest of the skbs into the original one.
 	 * Copy the payload, not headroom - we already have the
 	 * HTT RX descriptor.
 	 */
 	TAILQ_FOREACH(pbuf, amsdu, next) {
 		/* XXX mbuf_skb_put is not setting the data pointer along */
-		s = mbuf_skb_put(np->m, mbuf_skb_len(pbuf->m));
-		printf("%s: copying %d bytes to offset %d\n", __func__,
-		    mbuf_skb_len(pbuf->m),
-		    (int) (s - M_START(np->m)));
-		memcpy(s,
-		    mbuf_skb_data(pbuf->m),
+		printf("%s: copying %d bytes..\n",
+		    __func__,
 		    mbuf_skb_len(pbuf->m));
+		m_append(np->m,
+		    mbuf_skb_len(pbuf->m),
+		    mbuf_skb_data(pbuf->m));
 	}
+
+	/*
+	 * Finally, fix up the header value of the first mbuf to start
+	 * m_data at just after the rx htt header.
+	 */
+	mbuf_skb_pull(np->m, sizeof(struct htt_rx_desc));
 
 	/*
 	 * Ok, now free the whole list.
