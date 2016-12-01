@@ -198,13 +198,13 @@ void
 athp_descdma_free(struct ath10k *ar, struct athp_descdma *dd)
 {
 
-	ATHP_DMA_LOCK(ar);
 	if (dd->dd_dmamap != 0) {
+		ATHP_DMA_LOCK(ar);
 		bus_dmamap_unload(dd->dd_dmat, dd->dd_dmamap);
+		ATHP_DMA_UNLOCK(ar);
 		bus_dmamem_free(dd->dd_dmat, dd->dd_desc, dd->dd_dmamap);
 		bus_dma_tag_destroy(dd->dd_dmat);
 	}
-	ATHP_DMA_UNLOCK(ar);
 
 	memset(dd, 0, sizeof(*dd));
 }
@@ -290,7 +290,9 @@ athp_dma_mbuf_load(struct ath10k *ar, struct athp_dma_head *dh,
 	if (nsegs != 1) {
 		device_printf(ar->sc_dev, "%s: nsegs > 1 (%d), tag=%p, map=%p, m=%p, len=%d, dmasize=%d\n",
 		    __func__, nsegs, dh->tag, dm->map, m, M_SIZE(m), dh->buf_size);
+		ATHP_DMA_LOCK(ar);
 		bus_dmamap_unload(dh->tag, dm->map);
+		ATHP_DMA_UNLOCK(ar);
 		return (ENOMEM);
 	}
 
