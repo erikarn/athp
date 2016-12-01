@@ -313,3 +313,10 @@ trace_ath10k_htt_rx_pop(struct ath10k *ar, uint32_t idx, uint32_t fillcnt,
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_HTT_RX_POP,
 	    (void *) &htt, sizeof(htt), 0, 0);
 }
+
+void
+trace_ath10k_transmit(struct ath10k *ar, int transmit, int ok)
+{
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TRANSMIT, NULL, 0,
+	    transmit, ok);
+}

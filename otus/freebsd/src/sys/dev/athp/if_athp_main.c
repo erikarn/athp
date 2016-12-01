@@ -399,6 +399,8 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
 
+	trace_ath10k_transmit(ar, 1, 0);
+
 	/*
 	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
 	 * does with the reset, xmit refcounts.  Otherwise we end up
@@ -407,6 +409,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	athp_tx_enter(ar);
 	if (athp_tx_disabled(ar)) {
 		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
 
@@ -417,6 +420,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 			ATHP_CONF_UNLOCK(ar);
 			ath10k_warn(ar, "%s: stabss not setup; don't xmit\n", __func__);
 			athp_tx_exit(ar);
+			trace_ath10k_transmit(ar, 0, 0);
 			return (ENXIO);
 		}
 	}
@@ -424,6 +428,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (arvif->is_dying == 1) {
 		ATHP_CONF_UNLOCK(ar);
 		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
 
@@ -432,6 +437,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
 		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
 
@@ -447,6 +453,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
 		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
 		return (ENOBUFS);
 	}
 	m0 = NULL;
@@ -457,6 +464,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ar->sc_stats.xmit_fail_get_pbuf++;
 		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
 		return (ENOBUFS);
 	}
 
@@ -484,6 +492,8 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	ath10k_tx(ar, ni, pbuf);
 
 	athp_tx_exit(ar);
+
+	trace_ath10k_transmit(ar, 0, 1);
 
 	return (0);
 }
@@ -1415,6 +1425,8 @@ athp_attach_sysctl(struct ath10k *ar)
 	    &ar->sc_stats.xmit_fail_mbuf_defrag, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_get_pbuf", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_get_pbuf, "");
+	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_htt_xmit", CTLFLAG_RD,
+	    &ar->sc_stats.xmit_fail_htt_xmit, "");
 
 	/* trace stats */
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_trace_sent_ok",
