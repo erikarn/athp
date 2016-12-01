@@ -193,6 +193,18 @@ athp_decode_htt_rx_pop(const struct ath10k_trace_hdr *a)
 	    (long long) be64toh(htt->vaddr));
 }
 
+static void
+athp_decode_transmit(const struct ath10k_trace_hdr *a)
+{
+	printf("[%d.%06d] [%u] TRANSMIT: start=%d, ok=%d\n",
+	    be32toh(a->tstamp_sec),
+	    be32toh(a->tstamp_usec),
+	    (uint32_t) be32toh(a->threadid),
+	    be32toh(a->val1),
+	    be32toh(a->val2));
+}
+
+
 int
 main(int argc, const char *argv[])
 {
@@ -280,6 +292,9 @@ main(int argc, const char *argv[])
 			break;
 		case ATH10K_TRACE_EVENT_HTT_RX_POP:
 			athp_decode_htt_rx_pop(a);
+			break;
+		case ATH10K_TRACE_EVENT_TRANSMIT:
+			athp_decode_transmit(a);
 			break;
 		default:
 			printf("[%d.%06d] [%u] op: %d; len %d\n",
