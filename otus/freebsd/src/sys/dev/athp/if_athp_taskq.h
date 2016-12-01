@@ -19,6 +19,7 @@ struct athp_taskq_head {
 	int is_running;
 	struct task run_task;
 	struct mtx m;
+	char m_buf[16];
 };
 
 extern	int athp_taskq_init(struct ath10k *);

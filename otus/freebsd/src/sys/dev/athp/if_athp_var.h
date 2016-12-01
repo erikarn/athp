@@ -211,10 +211,15 @@ struct ath10k {
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
+	char				sc_mtx_buf[16];
 	struct mtx			sc_buf_mtx;
+	char				sc_buf_mtx_buf[16];
 	struct mtx			sc_dma_mtx;
+	char				sc_dma_mtx_buf[16];
 	struct mtx			sc_conf_mtx;
+	char				sc_conf_mtx_buf[16];
 	struct mtx			sc_data_mtx;
+	char				sc_data_mtx_buf[16];
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;

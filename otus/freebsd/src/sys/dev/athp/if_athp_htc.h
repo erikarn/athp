@@ -77,6 +77,7 @@ struct ath10k_htc {
 
 	/* protects endpoints */
 	struct mtx tx_lock;
+	char tx_lock_buf[16];
 	int is_init;
 
 	struct ath10k_htc_ops htc_ops;
@@ -91,8 +92,13 @@ struct ath10k_htc {
 	int target_credit_size;
 };
 
-#define	ATHP_HTC_TX_LOCK_INIT(ht)	mtx_init(&ht->tx_lock,		\
-	    device_get_nameunit(htc->ar->sc_dev), "athp htc tx", MTX_DEF)
+#define	ATHP_HTC_TX_LOCK_INIT(ht) \
+	do { \
+		snprintf(ht->tx_lock_buf, 16, \
+		    "%s:htc_tx", device_get_nameunit(htc->ar->sc_dev)); \
+		mtx_init(&ht->tx_lock, ht->tx_lock_buf, \
+		    "athp htc tx", MTX_DEF); \
+	} while (0)
 #define	ATHP_HTC_TX_LOCK_FREE(ht)	mtx_destroy(&ht->tx_lock)
 #define	ATHP_HTC_TX_LOCK(ht)		mtx_lock(&ht->tx_lock)
 #define	ATHP_HTC_TX_UNLOCK(ht)		mtx_unlock(&ht->tx_lock)
