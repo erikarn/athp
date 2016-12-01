@@ -1328,6 +1328,9 @@ athp_setup_channels(struct ath10k *ar)
 
 	memset(bands, 0, sizeof(bands));
 
+	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
+		ht40 = 1;
+
 	if (ar->phy_capability & WHAL_WLAN_11G_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11B);
 		setbit(bands, IEEE80211_MODE_11G);
@@ -1337,6 +1340,7 @@ athp_setup_channels(struct ath10k *ar)
 		    nchans, chan_list_2ghz, nitems(chan_list_2ghz),
 		    bands, ht40);
 	}
+
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11A);
 		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
@@ -1476,6 +1480,7 @@ athp_attach_11n(struct ath10k *ar)
 	    IEEE80211_HTC_HT
 	    | IEEE80211_HTC_AMPDU
 	    | IEEE80211_HTC_AMSDU
+	    | IEEE80211_HTCAP_CHWIDTH40
 	    | IEEE80211_HTCAP_MAXAMSDU_3839
 	    | IEEE80211_HTCAP_SMPS_OFF;
 
@@ -1483,11 +1488,6 @@ athp_attach_11n(struct ath10k *ar)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
 	if (ar->ht_cap_info & WMI_HT_CAP_HT40_SGI)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI40;
-
-	/*
-	 * XXX TODO: enable HT40 once the channel setup code
-	 * knows how to correctly do it.
-	 */
 
 	/* STBC - 1x for now */
 	ic->ic_htcaps |= IEEE80211_HTCAP_RXSTBC_1STREAM;

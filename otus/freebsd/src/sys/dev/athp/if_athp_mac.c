@@ -1135,8 +1135,8 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 	channel = ar->sc_ic.ic_curchan;
 
 	arg.vdev_id = vdev_id;
-	arg.channel.freq = channel->ic_freq;
-	arg.channel.band_center_freq1 = channel->ic_freq;
+	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
+	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
 	arg.channel.chan_radar = !! IEEE80211_IS_CHAN_RADAR(channel);
 	arg.channel.passive = IEEE80211_IS_CHAN_PASSIVE(channel);
@@ -1565,9 +1565,8 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.dtim_period = arvif->dtim_period;
 	arg.bcn_intval = arvif->beacon_interval;
 
-	arg.channel.freq = channel->ic_freq;
-	/* XXX TODO: NOTE: need this for vht40/vht80/etc operation */
-	arg.channel.band_center_freq1 = channel->ic_freq;
+	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
+	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
 	arg.channel.min_power = channel->ic_minpower;
 	arg.channel.max_power = channel->ic_maxpower;
@@ -2585,8 +2584,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	/* SMPS - for now, set to 0x4 (disabled) */
 	htcap |= IEEE80211_HTCAP_SMPS_OFF;
 
-	ath10k_warn(ar, "%s: TODO: actually handle TX/RX STBC negotiation!\n", __func__);
-
 	/* TXSTBC - enable it only if the peer announces RXSTBC */
 	htcap &= ~(IEEE80211_HTCAP_TXSTBC);
 	if ((sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) &&
@@ -2609,7 +2606,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		htcap |= (stbc << IEEE80211_HTCAP_RXSTBC_S) & IEEE80211_HTCAP_RXSTBC;
 
 	}
-	ath10k_warn(ar, "%s: RX STBC: lcl stbc=%d, rem stbc=%d\n", __func__, stbc_lcl, stbc_rem);
 
 	arg->peer_ht_caps = htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
@@ -2726,9 +2722,10 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
 	}
 #endif
-	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
+	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, peer_flags=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
 	    arg->peer_ht_caps,
 	    arg->peer_rate_caps,
+	    arg->peer_flags,
 	    sta->ni_htcap,
 	    vif->iv_htcaps);
 }
@@ -3527,7 +3524,7 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
     struct ieee80211_channel *chans)
 {
 	uint8_t reported[IEEE80211_CHAN_BYTES];
-//	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct ieee80211_channel *c;
 	struct wmi_scan_chan_list_arg arg = {0};
 	struct wmi_channel_arg *ch;
@@ -3569,26 +3566,17 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 			continue;
 		setbit(reported, c->ic_ieee);
 
-		/*
-		 * XXX TODO: we can't allow ht/vht on JP channel 14
-		 *
-		 * XXX TODO: need to figure out ht40plus flag -
-		 * unfortunately our method for iterating through
-		 * channels makes it hard to determine if we can
-		 * or can't do HT40 (or HT40+? Not sure!) here.
-		 * So, worry about HT40 later on.
-		 */
 		ch->allow_ht = true;
 		ch->allow_vht = true;
 		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
-//		ch->ht40plus = true;
-		ch->ht40plus = false;
+		ch->ht40plus = (ieee80211_find_channel(ic, c->ic_freq,
+		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40U) != NULL);
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
-		ch->freq = c->ic_freq;
-		ch->band_center_freq1 = c->ic_freq;
-		/* XXX center freq2 */
+
+		ch->freq = ieee80211_get_channel_center_freq(c);
+		ch->band_center_freq1 = ieee80211_get_channel_center_freq(c);
 		ch->min_power = c->ic_minpower; /* already in 1/2dBm */
 		ch->max_power = c->ic_maxpower; /* already in 1/2dBm */
 		ch->max_reg_power = c->ic_maxregpower * 2;
@@ -3602,10 +3590,11 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 			continue;
 		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
 		   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d"
-		   " antenna %d mode %d\n",
+		   " antenna %d mode %d ht40plus %d\n",
 		    __func__, j, arg.n_channels,
 		   ch->freq, ch->max_power, ch->max_reg_power,
-		   ch->max_antenna_gain, ch->mode);
+		   ch->max_antenna_gain, ch->mode,
+		   ch->ht40plus);
 
 		ch++; j++;
 	}
