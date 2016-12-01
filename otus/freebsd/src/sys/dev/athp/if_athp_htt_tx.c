@@ -164,9 +164,12 @@ int ath10k_htt_tx_alloc(struct ath10k_htt *htt)
 		   htt->max_num_pending_tx);
 
 	if (! htt->tx_is_init) {
-		mtx_init(&htt->tx_lock, device_get_nameunit(ar->sc_dev),
-		    "athp htt tx", MTX_DEF);
-		mtx_init(&htt->tx_comp_lock, device_get_nameunit(ar->sc_dev),
+		snprintf(htt->tx_lock_buf, 16, "%s:htt_tx",
+		    device_get_nameunit(ar->sc_dev));
+		mtx_init(&htt->tx_lock, htt->tx_lock_buf, "athp htt tx", MTX_DEF);
+		snprintf(htt->tx_comp_lock_buf, 16, "%s:htt_comp_tx",
+		    device_get_nameunit(ar->sc_dev));
+		mtx_init(&htt->tx_comp_lock, htt->tx_comp_lock_buf,
 		    "athp htt comp tx", MTX_DEF);
 
 		idr_init(&htt->pending_tx);
