@@ -1135,8 +1135,8 @@ static int ath10k_monitor_vdev_start_freebsd(struct ath10k *ar, int vdev_id)
 	channel = ar->sc_ic.ic_curchan;
 
 	arg.vdev_id = vdev_id;
-	arg.channel.freq = channel->ic_freq;
-	arg.channel.band_center_freq1 = channel->ic_freq;
+	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
+	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
 	arg.channel.chan_radar = !! IEEE80211_IS_CHAN_RADAR(channel);
 	arg.channel.passive = IEEE80211_IS_CHAN_PASSIVE(channel);
@@ -1565,9 +1565,8 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.dtim_period = arvif->dtim_period;
 	arg.bcn_intval = arvif->beacon_interval;
 
-	arg.channel.freq = channel->ic_freq;
-	/* XXX TODO: NOTE: need this for vht40/vht80/etc operation */
-	arg.channel.band_center_freq1 = channel->ic_freq;
+	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
+	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
 	arg.channel.min_power = channel->ic_minpower;
 	arg.channel.max_power = channel->ic_maxpower;
@@ -2469,7 +2468,10 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	//const u8 *ht_mcs_mask;
 	//const u16 *vht_mcs_mask;
 	int i, n, max_nss;
-//	u32 stbc;
+	u32 stbc;
+	int mpdu_density, mpdu_size;
+	uint16_t htcap, htcap_filt, htcap_mask;
+	int stbc_lcl, stbc_rem;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2478,7 +2480,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		return;
 #endif
 
-	if (! sta->ni_flags & IEEE80211_NODE_HT)
+	if ((sta->ni_flags & IEEE80211_NODE_HT) == 0)
+		return;
+	if (! IEEE80211_IS_CHAN_HT(sta->ni_chan))
 		return;
 
 	ath10k_warn(ar, "%s: called; HT node\n", __func__);
@@ -2496,56 +2500,172 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 #endif
 
 	arg->peer_flags |= WMI_PEER_HT;
-	arg->peer_max_mpdu = (1 << (13 +
-				    (MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU)))) - 1;
-	arg->peer_mpdu_density =
-		ath10k_parse_mpdudensity(MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY));
 
-	/* XXX TODO: check endian of the net80211 htcap field */
-	arg->peer_ht_caps = sta->ni_htcap;
+	/*
+	 * Set capabilities based on what we negotiate.
+	 *
+	 * XXX TODO: this is wrong - we can't just do this.
+	 *
+	 * Linux mac80211 seems to set this field up after
+	 * overriding things appropriately.
+	 *
+	 * FreeBSD just sets ni_htcap up to be the decoded
+	 * htcap field from the peer.  This isn't the
+	 * correctly negotiated set!
+	 *
+	 * Instead, we need to override some of the subfields
+	 * (density, maxsize, rx stbc, etc) based on our
+	 * VAP htcaps and our local configuration.
+	 *
+	 * Look at what Linux does in
+	 * mac80211/ht.c:ieee80211_ht_cap_ie_to_sta_ht_cap().
+	 */
+
+	/*
+	 * Max MPDU/density - use lowest value of max mpdu;
+	 * highest value for density.
+	 */
+	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
+	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
+	ath10k_warn(ar, "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
+	    __func__,
+	    mpdu_density,
+	    mpdu_size,
+	    vif->iv_ampdu_density,
+	    vif->iv_ampdu_limit);
+
+	if (vif->iv_ampdu_density > mpdu_density)
+		mpdu_density = vif->iv_ampdu_density;
+	if (vif->iv_ampdu_rxmax < mpdu_size)
+		mpdu_size = vif->iv_ampdu_limit;
+	arg->peer_max_mpdu = (1 << (13 + mpdu_size));
+	arg->peer_mpdu_density = ath10k_parse_mpdudensity(mpdu_density);
+
+	/*
+	 * htcap - filter the received station information
+	 * based on the VAP configuration.
+	 *
+	 * XXX TODO For now, just use HTCAP; filter on vap config later!
+	 */
+
+	/*
+	 * These are the straight flags. Just filter based on them.
+	 */
+	htcap_mask =
+	    IEEE80211_HTCAP_LDPC
+	    | IEEE80211_HTCAP_GREENFIELD
+	    | IEEE80211_HTCAP_SHORTGI20
+	    | IEEE80211_HTCAP_SHORTGI40
+	    | IEEE80211_HTCAP_DELBA
+	    | IEEE80211_HTCAP_MAXAMSDU_7935
+	    | IEEE80211_HTCAP_DSSSCCK40
+	    | IEEE80211_HTCAP_PSMP
+	    | IEEE80211_HTCAP_40INTOLERANT
+	    | IEEE80211_HTCAP_LSIGTXOPPROT
+	    ;
+
+	htcap_filt = vif->iv_htcaps & htcap_mask;
+
+	ath10k_warn(ar, "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
+	    __func__,
+	    htcap_filt,
+	    vif->iv_htcaps,
+	    htcap_mask);
+
+	htcap = (sta->ni_htcap & ~(htcap_mask)) | htcap_filt;
+
+	/* CHWIDTH40 - only enable it if we're on a HT40 channel */
+	htcap &= ~(IEEE80211_HTCAP_CHWIDTH40);
+	if ((sta->ni_htcap & IEEE80211_HTCAP_CHWIDTH40) &&
+	    (sta->ni_chan != IEEE80211_CHAN_ANYC) &&
+	    (IEEE80211_IS_CHAN_HT40(sta->ni_chan)))
+		htcap |= IEEE80211_HTCAP_CHWIDTH40;
+
+	/* SMPS - for now, set to 0x4 (disabled) */
+	htcap |= IEEE80211_HTCAP_SMPS_OFF;
+
+	/* TXSTBC - enable it only if the peer announces RXSTBC */
+	htcap &= ~(IEEE80211_HTCAP_TXSTBC);
+	if ((sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) &&
+	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX))
+		htcap |= IEEE80211_HTCAP_TXSTBC;
+
+	/* RXSTBC - enable it only if the peer announces TXSTBC */
+	htcap &= ~(IEEE80211_HTCAP_RXSTBC);
+	stbc_lcl = 0;
+	stbc_rem = 0;
+	if ((sta->ni_htcap & IEEE80211_HTCAP_TXSTBC) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) &&
+	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX)) {
+		/* Pick the lowest STBC of both */
+		stbc_lcl = (vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) >> IEEE80211_HTCAP_RXSTBC_S;
+		stbc_rem = (sta->ni_htcap & IEEE80211_HTCAP_RXSTBC) >> IEEE80211_HTCAP_RXSTBC_S;
+		stbc = stbc_lcl;
+		if (stbc_rem < stbc)
+			stbc = stbc_rem;
+		htcap |= (stbc << IEEE80211_HTCAP_RXSTBC_S) & IEEE80211_HTCAP_RXSTBC;
+
+	}
+
+	arg->peer_ht_caps = htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
 
-	/* XXX TODO: LDPC */
-#if 0
-	if (ht_cap->cap & IEEE80211_HT_CAP_LDPC_CODING)
+	/* LDPC - only if both sides do it */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_LDPC) &&
+	    (htcap & IEEE80211_HTCAP_LDPC))
 		arg->peer_flags |= WMI_PEER_LDPC;
-#endif
 
-	/* XXX TODO: 40MHz operation */
-#if 0
-	if (sta->bandwidth >= IEEE80211_STA_RX_BW_40) {
+	/* 40MHz operation */
+	if (IEEE80211_IS_CHAN_HT40(sta->ni_chan)) {
 		arg->peer_flags |= WMI_PEER_40MHZ;
 		arg->peer_rate_caps |= WMI_RC_CW40_FLAG;
 	}
-#endif
 
-	/* XXX TODO: sgi/lgi */
-#if 0
-	if (arvif->bitrate_mask.control[band].gi != NL80211_TXRATE_FORCE_LGI) {
-		if (ht_cap->cap & IEEE80211_HT_CAP_SGI_20)
-			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
-
-		if (ht_cap->cap & IEEE80211_HT_CAP_SGI_40)
+	/* sgi/lgi */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_SHORTGI20) &&
+	    (htcap & IEEE80211_HTCAP_SHORTGI20)) {
 			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
 	}
-#endif
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_SHORTGI40) &&
+	    (htcap & IEEE80211_HTCAP_SHORTGI40)) {
+			arg->peer_rate_caps |= WMI_RC_SGI_FLAG;
+	}
 
-#if 0
-	if (ht_cap->cap & IEEE80211_HT_CAP_TX_STBC) {
+	/*
+	 * XXX TODO: I don't .. entirely trust how TX/RX STBC is
+	 * configured here.  I think what's put into htcap
+	 * is what to tell the firmware our current HT behaviour
+	 * should be.  So, for STBC, I think it should be:
+	 *
+	 * + enable RXSTBC with the lowest STBC value only if
+	 *   the sender has TX STBC enabled, based on their RX
+	 *   STBC and our configured RX STBC.
+	 *
+	 * + Enable TXSTBC with the lowest STBC value only if
+	 *   the sender has RX STBC enabled, based on their RX
+	 *   STBC and our configured RX STBC.
+	 *
+	 * Note: TXSTBC is a flag; RXSTBC is a bitmask of 1..3
+	 * streams.
+	 */
+
+	/* TX STBC - we can receive, they can transmit */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) &&
+	    (vif->iv_flags_ht & IEEE80211_FHT_STBC_TX) &&
+	    (htcap & IEEE80211_HTCAP_TXSTBC)) {
 		arg->peer_rate_caps |= WMI_RC_TX_STBC_FLAG;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
-#endif
 
-#if 0
-	if (ht_cap->cap & IEEE80211_HT_CAP_RX_STBC) {
-		stbc = ht_cap->cap & IEEE80211_HT_CAP_RX_STBC;
-		stbc = stbc >> IEEE80211_HT_CAP_RX_STBC_SHIFT;
+	/* RX STBC - see if ANY RX STBC is enabled */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_RXSTBC) &&
+	    (htcap & IEEE80211_HTCAP_RXSTBC)) {
+		stbc = htcap & IEEE80211_HTCAP_RXSTBC;
+		stbc = stbc >> IEEE80211_HTCAP_RXSTBC_S;
 		stbc = stbc << WMI_RC_RX_STBC_FLAG_S;
 		arg->peer_rate_caps |= stbc;
 		arg->peer_flags |= WMI_PEER_STBC;
 	}
-#endif
 
 	/*
 	 * This code assumes the htrates array from net80211
@@ -2589,12 +2709,25 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	}
 
 	//ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
-	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d\n",
+	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d maxnss %d htcap 0x%08x\n",
 		   arg->addr,
 		   ":",
 		   arg->peer_ht_rates.num_rates,
-		   arg->peer_num_spatial_streams);
+		   arg->peer_num_spatial_streams,
+		   max_nss,
+		   htcap);
 	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
+#if 0
+	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
+		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
+	}
+#endif
+	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, peer_flags=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
+	    arg->peer_ht_caps,
+	    arg->peer_rate_caps,
+	    arg->peer_flags,
+	    sta->ni_htcap,
+	    vif->iv_htcaps);
 }
 #endif
 #undef MS
@@ -3109,7 +3242,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 		   "mac vdev %d up (associated) bssid %6D aid %d\n",
-		   arvif->vdev_id, ni->ni_macaddr, ":", ni->ni_associd);
+		   arvif->vdev_id, ni->ni_macaddr, ":", IEEE80211_AID(ni->ni_associd));
 
 	WARN_ON(arvif->is_up);
 
@@ -3391,7 +3524,7 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
     struct ieee80211_channel *chans)
 {
 	uint8_t reported[IEEE80211_CHAN_BYTES];
-//	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211com *ic = &ar->sc_ic;
 	struct ieee80211_channel *c;
 	struct wmi_scan_chan_list_arg arg = {0};
 	struct wmi_channel_arg *ch;
@@ -3433,25 +3566,17 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 			continue;
 		setbit(reported, c->ic_ieee);
 
-		/*
-		 * XXX TODO: we can't allow ht/vht on JP channel 14
-		 * XXX TODO: need to figure out ht40plus flag -
-		 * unfortunately our method for iterating through
-		 * channels makes it hard to determine if we can
-		 * or can't do HT40 (or HT40+? Not sure!) here.
-		 * So, worry about HT40 later on.
-		 */
-
 		ch->allow_ht = true;
 		ch->allow_vht = true;
 		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
-		ch->ht40plus = true;
+		ch->ht40plus = (ieee80211_find_channel(ic, c->ic_freq,
+		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40U) != NULL);
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
-		ch->freq = c->ic_freq;
-		ch->band_center_freq1 = c->ic_freq;
-		/* XXX center freq2 */
+
+		ch->freq = ieee80211_get_channel_center_freq(c);
+		ch->band_center_freq1 = ieee80211_get_channel_center_freq(c);
 		ch->min_power = c->ic_minpower; /* already in 1/2dBm */
 		ch->max_power = c->ic_maxpower; /* already in 1/2dBm */
 		ch->max_reg_power = c->ic_maxregpower * 2;
@@ -3465,10 +3590,11 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 			continue;
 		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
 		   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d"
-		   " antenna %d mode %d\n",
+		   " antenna %d mode %d ht40plus %d\n",
 		    __func__, j, arg.n_channels,
 		   ch->freq, ch->max_power, ch->max_reg_power,
-		   ch->max_antenna_gain, ch->mode);
+		   ch->max_antenna_gain, ch->mode,
+		   ch->ht40plus);
 
 		ch++; j++;
 	}
@@ -4048,9 +4174,10 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	}
 
 	if (ret) {
-		ath10k_warn(ar, "failed to transmit packet, dropping: %d\n",
-			    ret);
+//		ath10k_warn(ar, "failed to transmit packet, dropping: %d\n",
+//			    ret);
 		ath10k_tx_free_pbuf(ar, skb, 0);
+		ar->sc_stats.xmit_fail_htt_xmit++;
 	}
 }
 
@@ -4805,6 +4932,9 @@ static int ath10k_config_ps(struct ath10k *ar)
 }
 #endif
 
+/*
+ * Note: assumes txpower is in dBm
+ */
 static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 {
 	int ret;
@@ -5221,12 +5351,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		goto err_peer_delete;
 	}
 
-#if 0
-	arvif->txpower = vif->bss_conf.txpower;
-#else
-	ath10k_warn(ar, "%s: TODO: initialise txpower to something sensible\n", __func__);
-	arvif->txpower = 15;	/* 15dBm? 30dBm? It's just a hard-default for now */
-#endif
+	arvif->txpower = 30;	/* 30dBm? It's just a hard-default for now; fix later */
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
@@ -5298,14 +5423,10 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ath10k_mac_vif_beacon_cleanup(arvif);
 	ATHP_DATA_UNLOCK(ar);
 
-#if 0
 	ret = ath10k_spectral_vif_stop(arvif);
 	if (ret)
 		ath10k_warn(ar, "failed to stop spectral for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
-#else
-	ath10k_warn(ar, "%s: TODO: call ath10k_spectral_vif_stop\n", __func__);
-#endif
 
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
@@ -8280,16 +8401,17 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
     struct ieee80211_node *ni, int is_assoc, int is_run)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+#if 0
 	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d\n",
 	    __func__,
 	    vap,
 	    ni,
 	    is_assoc);
-
-	/* XXX TODO: move the peer creation out! */
+#endif
 
 	if (is_assoc) {
 		/* Workaround: Make sure monitor vdev is not running
@@ -8305,21 +8427,20 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 */
 		ath10k_bss_disassoc(ar, vap, is_run);
 
-		ATHP_DATA_LOCK(ar);
-		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
-			ATHP_DATA_UNLOCK(ar);
-			(void) ath10k_peer_create(ar, arvif->vdev_id,
-			    ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
-		} else {
-			ATHP_DATA_UNLOCK(ar);
-		}
+		/* Recalculate TX power - this is in dBm */
+		arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
+		ret = ath10k_mac_txpower_recalc(ar);
+		if (ret)
+			ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
+
+		/* Now associate */
 		ath10k_bss_assoc(ar, ni, is_run);
 		arvif->is_stabss_setup = 1;
 		ath10k_monitor_recalc(ar);
+
 	} else {
 		ath10k_bss_disassoc(ar, vap, is_run);
 		arvif->is_stabss_setup = 0;
-		ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 	}
 }
 
@@ -8353,4 +8474,48 @@ ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok)
 	 */
 	//ieee80211_tx_complete(ni, m, ! tx_ok);
 	ieee80211_tx_complete(ni, m, 0);
+}
+
+/*
+ * TODO: TDLS, etc.
+ */
+int
+athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
+
+	ATHP_CONF_LOCK(ar);
+	ret = ath10k_peer_create(ar, arvif->vdev_id, mac,
+	    WMI_PEER_TYPE_DEFAULT);
+//	ath10k_mac_inc_num_stations(arvif, sta);
+	ATHP_CONF_UNLOCK(ar);
+
+	return (ret);
+}
+
+/*
+ * Note: this is called with net80211 locks held, sigh.
+ * This makes the whole "manage this from the node create/destroy path"
+ * invalid.
+ *
+ * Also - note that node free is called before we get the DELBA deletion
+ * commands from the firmware, which generates some log warnings.
+ * We then don't find the net80211 node..
+ */
+int
+athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret;
+
+	ATHP_CONF_LOCK(ar);
+	(void) ath10k_tx_flush_locked(ar, vap, 0, 0);
+	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
+//	ath10k_mac_dec_num_stations(arvif, sta);
+	ATHP_CONF_UNLOCK(ar);
+
+	return (ret);
 }

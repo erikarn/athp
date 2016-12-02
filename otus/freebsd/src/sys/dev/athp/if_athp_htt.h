@@ -156,12 +156,14 @@ struct ath10k_htt {
 
 		/* Protects access to all rx ring buffer state variables */
 		struct mtx lock;
+		char lock_buf[16];
 	} rx_ring;
 
 	unsigned int prefetch_len;
 
 	/* Protects access to pending_tx, num_pending_tx */
 	struct mtx tx_lock;
+	char tx_lock_buf[16];
 	int max_num_pending_tx;
 	int num_pending_tx;
 	struct idr pending_tx;
@@ -180,6 +182,7 @@ struct ath10k_htt {
 
 	/* protects access to the tx completion queue */
 	struct mtx tx_comp_lock;
+	char tx_comp_lock_buf[16];
 	athp_buf_head tx_compl_q;
 
 	/* protected by htt rx lock */

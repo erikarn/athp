@@ -45,11 +45,13 @@ struct athp_pci_softc {
 
 	/* Power management state */
 	struct mtx		ps_mtx;
+	char			ps_mtx_buf[16];
 	bool			ps_awake;
 	unsigned long		ps_wake_refcount;
 
 	/* Copy engine state */
 	struct mtx		ce_mtx;
+	char			ce_mtx_buf[16];
 	struct ath10k_ce_pipe	*ce_diag;
 	struct ath10k_ce_pipe	ce_states[CE_COUNT_MAX];
 

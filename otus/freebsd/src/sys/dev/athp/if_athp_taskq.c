@@ -163,8 +163,8 @@ athp_taskq_init(struct ath10k *ar)
 		    __func__);
 		return (ENOMEM);
 	}
-	mtx_init(&h->m, device_get_nameunit(ar->sc_dev), "athp taskq",
-	    MTX_DEF);
+	snprintf(h->m_buf, 16, "%s:taskq", device_get_nameunit(ar->sc_dev));
+	mtx_init(&h->m, h->m_buf, "athp taskq", MTX_DEF);
 
 	TASK_INIT(&h->run_task, 0, athp_taskq_task, ar);
 	TAILQ_INIT(&h->list);

@@ -15,6 +15,9 @@
 #define	ATH10K_TRACE_EVENT_HTT_STATS		10
 #define	ATH10K_TRACE_EVENT_HTT_PKTLOG		11
 #define	ATH10K_TRACE_EVENT_WMI_DIAG		12
+#define	ATH10K_TRACE_EVENT_HTT_RX_PUSH		13
+#define	ATH10K_TRACE_EVENT_HTT_RX_POP		14
+#define	ATH10K_TRACE_EVENT_TRANSMIT		15
 
 struct ath10k_trace_hdr {
 	uint32_t	tstamp_sec;
@@ -36,6 +39,22 @@ struct ath10k_trace_wmi_tx {
 
 struct ath10k_trace_txrx_tx_unref {
 	uint32_t msdu_id;
+};
+
+struct ath10k_trace_htt_rx_push {
+	uint64_t vaddr;
+	uint32_t idx;
+	uint32_t paddr;
+	uint32_t fillcnt;
+	uint32_t pad0;
+};
+
+struct ath10k_trace_htt_rx_pop {
+	uint32_t idx;
+	uint32_t paddr;
+	uint64_t vaddr;
+	uint32_t fillcnt;
+	uint32_t pad0;
 };
 
 struct ath10k;
@@ -61,6 +80,13 @@ extern	void trace_ath10k_htt_pktlog(struct ath10k *ar,
 	    const void *buf, int len);
 extern	void trace_ath10k_wmi_diag(struct ath10k *ar,
 	    const void *buf, int len);
+
+extern	void trace_ath10k_htt_rx_push(struct ath10k *ar,
+	    uint32_t idx, uint32_t fillcnt, uint32_t paddr, void *vaddr);
+extern	void trace_ath10k_htt_rx_pop(struct ath10k *ar,
+	    uint32_t idx, uint32_t fillcnt, uint32_t paddr, void *vaddr);
+
+extern	void trace_ath10k_transmit(struct ath10k *ar, int is_start, int is_ok);
 
 extern	int athp_trace_open(struct ath10k *ar, const char *path);
 extern	void athp_trace_close(struct ath10k *ar);

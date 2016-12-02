@@ -310,6 +310,14 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
  * it isn't setting it up to the actual mbuf storage size.
  * Again, the caller should (!) request more space if it
  * wants to grow.
+ *
+ * XXX TODO: the linux mbuf/skb emulation code assumes that
+ * skb's have a single external buffer storage part.
+ * But there are going to be places where we allocate a larger
+ * buffer!  So, we will have to review things - maybe add an arg
+ * that says "enforce getting a single contig mbuf", and then
+ * slowly undo or re-implement the skb routines that do copying, etc.,
+ * to take into account chained mbufs (ie, using M_* / m_* routines.)
  */
 struct athp_buf *
 athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)

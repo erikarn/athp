@@ -464,19 +464,28 @@ athp_pci_attach(device_t dev)
 	/*
 	 * Initialise ath10k freebsd bits.
 	 */
-	mtx_init(&ar->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	sprintf(ar->sc_mtx_buf, "%s:def", device_get_nameunit(dev));
+	mtx_init(&ar->sc_mtx, ar->sc_mtx_buf, MTX_NETWORK_LOCK,
 	    MTX_DEF);
-	mtx_init(&ar->sc_buf_mtx, device_get_nameunit(dev), "athp buf",
-	    MTX_DEF);
-	mtx_init(&ar->sc_dma_mtx, device_get_nameunit(dev), "athp dma",
-	    MTX_DEF);
-	mtx_init(&ar->sc_conf_mtx, device_get_nameunit(dev), "athp conf",
+
+	sprintf(ar->sc_buf_mtx_buf, "%s:buf", device_get_nameunit(dev));
+	mtx_init(&ar->sc_buf_mtx, ar->sc_buf_mtx_buf, "athp buf", MTX_DEF);
+
+	sprintf(ar->sc_dma_mtx_buf, "%s:dma", device_get_nameunit(dev));
+	mtx_init(&ar->sc_dma_mtx, ar->sc_dma_mtx_buf, "athp dma", MTX_DEF);
+
+	sprintf(ar->sc_conf_mtx_buf, "%s:conf", device_get_nameunit(dev));
+	mtx_init(&ar->sc_conf_mtx, ar->sc_conf_mtx_buf, "athp conf",
 	    MTX_DEF | MTX_RECURSE);
-	mtx_init(&psc->ps_mtx, device_get_nameunit(dev), "athp ps",
-	    MTX_DEF);
-	mtx_init(&psc->ce_mtx, device_get_nameunit(dev), "athp ce",
-	    MTX_DEF);
-	mtx_init(&ar->sc_data_mtx, device_get_nameunit(dev), "athp data",
+
+	sprintf(psc->ps_mtx_buf, "%s:ps", device_get_nameunit(dev));
+	mtx_init(&psc->ps_mtx, psc->ps_mtx_buf, "athp ps", MTX_DEF);
+
+	sprintf(psc->ce_mtx_buf, "%s:ce", device_get_nameunit(dev));
+	mtx_init(&psc->ce_mtx, psc->ce_mtx_buf, "athp ce", MTX_DEF);
+
+	sprintf(ar->sc_data_mtx_buf, "%s:data", device_get_nameunit(dev));
+	mtx_init(&ar->sc_data_mtx, ar->sc_data_mtx_buf, "athp data",
 	    MTX_DEF);
 
 	/*

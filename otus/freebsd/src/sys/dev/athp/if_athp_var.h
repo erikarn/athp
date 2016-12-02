@@ -189,6 +189,7 @@ struct ath10k_stats {
 	uint64_t xmit_fail_get_pbuf;
 	uint64_t xmit_fail_mbuf_defrag;
 	uint64_t fw_warm_reset_counter;
+	uint64_t xmit_fail_htt_xmit;
 };
 
 /*
@@ -210,10 +211,15 @@ struct ath10k {
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
+	char				sc_mtx_buf[16];
 	struct mtx			sc_buf_mtx;
+	char				sc_buf_mtx_buf[16];
 	struct mtx			sc_dma_mtx;
+	char				sc_dma_mtx_buf[16];
 	struct mtx			sc_conf_mtx;
+	char				sc_conf_mtx_buf[16];
 	struct mtx			sc_data_mtx;
+	char				sc_data_mtx_buf[16];
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;
