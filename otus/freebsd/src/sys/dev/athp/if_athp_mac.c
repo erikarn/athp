@@ -4174,8 +4174,8 @@ ath10k_mac_tx(struct ath10k *ar, struct athp_buf *skb)
 	}
 
 	if (ret) {
-		ath10k_warn(ar, "failed to transmit packet, dropping: %d\n",
-			    ret);
+//		ath10k_warn(ar, "failed to transmit packet, dropping: %d\n",
+//			    ret);
 		ath10k_tx_free_pbuf(ar, skb, 0);
 		ar->sc_stats.xmit_fail_htt_xmit++;
 	}

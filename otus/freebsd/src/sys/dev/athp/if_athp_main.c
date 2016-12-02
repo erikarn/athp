@@ -254,7 +254,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	m = m_defrag(m0, M_NOWAIT);
 	if (m == NULL) {
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
-		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+//		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		m_freem(m0);
 		athp_tx_exit(ar);
 		return (ENOBUFS);
@@ -265,7 +265,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
 		ar->sc_stats.xmit_fail_get_pbuf++;
-		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		m_freem(m);
 		athp_tx_exit(ar);
 		return (ENOBUFS);
@@ -451,7 +451,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	m = m_defrag(m0, M_NOWAIT);
 	if (m == NULL) {
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
-		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
+//		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENOBUFS);
@@ -462,7 +462,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
 	if (pbuf == NULL) {
 		ar->sc_stats.xmit_fail_get_pbuf++;
-		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENOBUFS);
