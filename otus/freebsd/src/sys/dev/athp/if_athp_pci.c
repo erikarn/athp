@@ -327,18 +327,36 @@ static int ath10k_pci_request_irq(struct ath10k *ar)
 	ath10k_warn(ar, "unknown irq configuration upon request\n");
 	return -EINVAL;
 }
+#endif
 
-static void ath10k_pci_free_irq(struct ath10k *ar)
+static void ath10k_pci_free_irq(struct athp_pci_softc *psc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct ath10k *ar = &psc->sc_sc;
+	device_t dev = ar->sc_dev;
 	int i;
 
-	/* There's at least one interrupt irregardless whether its legacy INTR
-	 * or MSI or MSI-X */
-	for (i = 0; i < max(1, ar_pci->num_msi_intrs); i++)
-		free_irq(ar_pci->pdev->irq + i, ar);
+	if (psc->num_msi_intrs >= 1) {
+		/* MSI/MSIX */
+		for (i = 0; i < psc->num_msi_intrs; i++) {
+			if (psc->sc_ih[i] != NULL)
+				bus_teardown_intr(dev, psc->sc_irq[i],
+				    psc->sc_ih[i]);
+			if (psc->sc_irq[i] != NULL)
+				bus_release_resource(dev, SYS_RES_IRQ, i + 1,
+				    psc->sc_irq[i]);
+		}
+		pci_release_msi(dev);
+	} else {
+		/* Legacy */
+		if (psc->sc_ih[0] != NULL)
+			bus_teardown_intr(dev, psc->sc_irq[0], psc->sc_ih[0]);
+		if (psc->sc_irq[0] != NULL)
+			bus_release_resource(dev, SYS_RES_IRQ, 0,
+			    psc->sc_irq[0]);
+	}
 }
 
+#if 0
 static void ath10k_pci_init_irq_tasklets(struct ath10k *ar)
 {
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
@@ -402,10 +420,6 @@ athp_pci_intr(void *arg)
 }
 
 #define	BS_BAR	0x10
-
-/* XXX */
-#define MSI_NUM_REQUEST_LOG2	3
-#define MSI_NUM_REQUEST		(1<<MSI_NUM_REQUEST_LOG2)
 
 /*
  * Register space methods.  This is pretty simple; it's just
@@ -592,9 +606,9 @@ athp_attach_preinit(void *arg)
 
 	/* XXX TODO: refactor this stuff out */
 	athp_pci_free_bufs(psc);
-	bus_teardown_intr(ar->sc_dev, psc->sc_irq, psc->sc_ih);
-	bus_release_resource(ar->sc_dev, SYS_RES_IRQ, 0, psc->sc_irq);
-	pci_release_msi(ar->sc_dev);
+
+	ath10k_pci_free_irq(psc);
+
 	bus_release_resource(ar->sc_dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
 	/* XXX disable busmaster? */
@@ -786,16 +800,16 @@ athp_pci_attach(device_t dev)
 	 * (rid=0) or MSI (rid=1.)  Later on we will try to allocate
 	 * MSIx interrupts and assign per-CE/FW handlers.
 	 */
-	psc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+	psc->sc_irq[0] = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_ACTIVE | (rid != 0 ? 0 : RF_SHAREABLE));
 
-	if (psc->sc_irq == NULL) {
+	if (psc->sc_irq[0] == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		err = ENXIO;
 		goto bad1;
 	}
-	if (bus_setup_intr(dev, psc->sc_irq, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, athp_pci_intr, ar, &psc->sc_ih)) {
+	if (bus_setup_intr(dev, psc->sc_irq[0], INTR_TYPE_NET | INTR_MPSAFE,
+	    NULL, athp_pci_intr, ar, &psc->sc_ih[0])) {
 		device_printf(dev, "could not establish interrupt\n");
 		err = ENXIO;
 		goto bad2;
@@ -904,11 +918,8 @@ athp_pci_attach(device_t dev)
 	/* Fallthrough for setup failure */
 bad4:
 	athp_pci_free_bufs(psc);
-//bad3:
-	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
 bad2:
-	bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
-	pci_release_msi(dev);
+	ath10k_pci_free_irq(psc);
 bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 bad:
@@ -991,13 +1002,8 @@ athp_pci_detach(device_t dev)
 	/* Free bus resources */
 	bus_generic_detach(dev);
 
-	bus_teardown_intr(dev, psc->sc_irq, psc->sc_ih);
-	if (psc->num_msi_intrs == 1) {
-		bus_release_resource(dev, SYS_RES_IRQ, 1, psc->sc_irq);
-		pci_release_msi(dev);
-	} else {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, psc->sc_irq);
-	}
+	/* Tear down interrupt */
+	ath10k_pci_free_irq(psc);
 
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
 
