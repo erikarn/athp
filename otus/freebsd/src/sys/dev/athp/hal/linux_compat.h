@@ -89,9 +89,6 @@ typedef uint64_t	__be64;
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-/* for linuxkpi, this is M_NOWAIT | M_USE_RESERVE */
-#define	GFP_ATOMIC		(M_NOWAIT)
-
 /* compile/runtime warnings */
 #define	__ath10k_stringify(x)		# x
 
@@ -184,32 +181,9 @@ typedef uint64_t	__be64;
 #define IEEE80211_GCMP_MIC_LEN          16
 #define IEEE80211_GCMP_PN_LEN           6
 
-#if 0
-/* They store it as 16 bit value, not two 8 bit values.. */
-#define IEEE80211_FCTL_VERS             0x0003
-#endif
 /* XXX TODO: get rid of these; so far they're just used for debugging echos */
 #define IEEE80211_FCTL_FTYPE            0x000c
 #define IEEE80211_FCTL_STYPE            0x00f0
-#if 0
-#define IEEE80211_FCTL_TODS             0x0100
-#define IEEE80211_FCTL_FROMDS           0x0200
-#define IEEE80211_FCTL_MOREFRAGS        0x0400
-#define IEEE80211_FCTL_RETRY            0x0800
-#define IEEE80211_FCTL_PM               0x1000
-#define IEEE80211_FCTL_MOREDATA         0x2000
-#define IEEE80211_FCTL_PROTECTED        0x4000
-#define IEEE80211_FCTL_ORDER            0x8000
-#define IEEE80211_FCTL_CTL_EXT          0x0f00
-
-#define IEEE80211_SCTL_FRAG             0x000F
-#define IEEE80211_SCTL_SEQ              0xFFF0
-
-#define IEEE80211_FTYPE_MGMT            0x0000
-#define IEEE80211_FTYPE_CTL             0x0004
-#define IEEE80211_FTYPE_DATA            0x0008
-#define IEEE80211_FTYPE_EXT             0x000c
-#endif
 
 /*
  * mac80211 style routines, but they take an ieee80211_frame pointer.

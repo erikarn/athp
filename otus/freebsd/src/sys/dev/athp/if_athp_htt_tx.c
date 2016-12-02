@@ -136,7 +136,7 @@ int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct athp_buf *skb)
 	ATHP_HTT_TX_LOCK_ASSERT(htt);
 
 	ret = idr_alloc(&htt->pending_tx, skb, 0,
-			htt->max_num_pending_tx, GFP_ATOMIC);
+			htt->max_num_pending_tx, M_NOWAIT);
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx alloc msdu_id %d (of %d)\n",
 	    ret, htt->max_num_pending_tx);
