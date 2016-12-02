@@ -783,7 +783,10 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	*htt->rx_ring.alloc_idx.vaddr = 0;
 
 	if (! htt->rx_is_init) {
-		mtx_init(&htt->rx_ring.lock, device_get_nameunit(ar->sc_dev), "athp rx htt", MTX_DEF);
+		snprintf(htt->rx_ring.lock_buf, 16, "%s:htt_rx",
+		    device_get_nameunit(ar->sc_dev));
+		mtx_init(&htt->rx_ring.lock, htt->rx_ring.lock_buf,
+		    "athp rx htt", MTX_DEF);
 
 		/* Initialize the Rx refill retry timer */
 		callout_init_mtx(timer, &htt->rx_ring.lock, 0);
