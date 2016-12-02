@@ -144,22 +144,215 @@ athp_pci_probe(device_t dev)
 }
 
 #if 0
-static void
-ath10k_msi_err_tasklet(void *arg, int npending)
+static void ath10k_pci_ce_tasklet(unsigned long ptr)
 {
-	struct athp_pci_softc *psc = arg;
-	struct ath10k *ar = &psc->sc_sc;
+	struct ath10k_pci_pipe *pipe = (struct ath10k_pci_pipe *)ptr;
+	struct ath10k_pci *ar_pci = pipe->ar_pci;
 
-	if (! ath10k_pci_fw_has_crashed(psc)) {
-		ATP_WARN(ar, "%s: received unsolicited fw crash interrupt\n",
-		    __func__);
+	ath10k_ce_per_engine_service(ar_pci->ar, pipe->pipe_num);
+}
+
+static void ath10k_msi_err_tasklet(unsigned long data)
+{
+	struct ath10k *ar = (struct ath10k *)data;
+
+	if (!ath10k_pci_has_fw_crashed(ar)) {
+		ath10k_warn(ar, "received unsolicited fw crash interrupt\n");
 		return;
 	}
 
-	device_printf(ar->sc_dev, "%s: firmware crash\n", __func__);
-	ath10k_pci_irq_disable(psc);
-	ath10k_pci_fw_crashed_clear(psc);
-	ath10k_pci_fw_crashed_dump(psc);
+	ath10k_pci_irq_disable(ar);
+	ath10k_pci_fw_crashed_clear(ar);
+	ath10k_pci_fw_crashed_dump(ar);
+}
+
+/*
+ * Handler for a per-engine interrupt on a PARTICULAR CE.
+ * This is used in cases where each CE has a private MSI interrupt.
+ */
+static irqreturn_t ath10k_pci_per_engine_handler(int irq, void *arg)
+{
+	struct ath10k *ar = arg;
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	int ce_id = irq - ar_pci->pdev->irq - MSI_ASSIGN_CE_INITIAL;
+
+	if (ce_id < 0 || ce_id >= ARRAY_SIZE(ar_pci->pipe_info)) {
+		ath10k_warn(ar, "unexpected/invalid irq %d ce_id %d\n", irq,
+			    ce_id);
+		return IRQ_HANDLED;
+	}
+
+	/*
+	 * NOTE: We are able to derive ce_id from irq because we
+	 * use a one-to-one mapping for CE's 0..5.
+	 * CE's 6 & 7 do not use interrupts at all.
+	 *
+	 * This mapping must be kept in sync with the mapping
+	 * used by firmware.
+	 */
+	tasklet_schedule(&ar_pci->pipe_info[ce_id].intr);
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t ath10k_pci_msi_fw_handler(int irq, void *arg)
+{
+	struct ath10k *ar = arg;
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+
+	tasklet_schedule(&ar_pci->msi_fw_err);
+	return IRQ_HANDLED;
+}
+
+/*
+ * Top-level interrupt handler for all PCI interrupts from a Target.
+ * When a block of MSI interrupts is allocated, this top-level handler
+ * is not used; instead, we directly call the correct sub-handler.
+ */
+static irqreturn_t ath10k_pci_interrupt_handler(int irq, void *arg)
+{
+	struct ath10k *ar = arg;
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+
+	if (ar_pci->num_msi_intrs == 0) {
+		if (!ath10k_pci_irq_pending(ar))
+			return IRQ_NONE;
+
+		ath10k_pci_disable_and_clear_legacy_irq(ar);
+	}
+
+	tasklet_schedule(&ar_pci->intr_tq);
+
+	return IRQ_HANDLED;
+}
+
+static void ath10k_pci_tasklet(unsigned long data)
+{
+	struct ath10k *ar = (struct ath10k *)data;
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+
+	if (ath10k_pci_has_fw_crashed(ar)) {
+		ath10k_pci_irq_disable(ar);
+		ath10k_pci_fw_crashed_clear(ar);
+		ath10k_pci_fw_crashed_dump(ar);
+		return;
+	}
+
+	ath10k_ce_per_engine_service_any(ar);
+
+	/* Re-enable legacy irq that was disabled in the irq handler */
+	if (ar_pci->num_msi_intrs == 0)
+		ath10k_pci_enable_legacy_irq(ar);
+}
+
+static int ath10k_pci_request_irq_msix(struct ath10k *ar)
+{
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	int ret, i;
+
+	ret = request_irq(ar_pci->pdev->irq + MSI_ASSIGN_FW,
+			  ath10k_pci_msi_fw_handler,
+			  IRQF_SHARED, "ath10k_pci", ar);
+	if (ret) {
+		ath10k_warn(ar, "failed to request MSI-X fw irq %d: %d\n",
+			    ar_pci->pdev->irq + MSI_ASSIGN_FW, ret);
+		return ret;
+	}
+
+	for (i = MSI_ASSIGN_CE_INITIAL; i <= MSI_ASSIGN_CE_MAX; i++) {
+		ret = request_irq(ar_pci->pdev->irq + i,
+				  ath10k_pci_per_engine_handler,
+				  IRQF_SHARED, "ath10k_pci", ar);
+		if (ret) {
+			ath10k_warn(ar, "failed to request MSI-X ce irq %d: %d\n",
+				    ar_pci->pdev->irq + i, ret);
+
+			for (i--; i >= MSI_ASSIGN_CE_INITIAL; i--)
+				free_irq(ar_pci->pdev->irq + i, ar);
+
+			free_irq(ar_pci->pdev->irq + MSI_ASSIGN_FW, ar);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int ath10k_pci_request_irq_msi(struct ath10k *ar)
+{
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	int ret;
+
+	ret = request_irq(ar_pci->pdev->irq,
+			  ath10k_pci_interrupt_handler,
+			  IRQF_SHARED, "ath10k_pci", ar);
+	if (ret) {
+		ath10k_warn(ar, "failed to request MSI irq %d: %d\n",
+			    ar_pci->pdev->irq, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int ath10k_pci_request_irq_legacy(struct ath10k *ar)
+{
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	int ret;
+
+	ret = request_irq(ar_pci->pdev->irq,
+			  ath10k_pci_interrupt_handler,
+			  IRQF_SHARED, "ath10k_pci", ar);
+	if (ret) {
+		ath10k_warn(ar, "failed to request legacy irq %d: %d\n",
+			    ar_pci->pdev->irq, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int ath10k_pci_request_irq(struct ath10k *ar)
+{
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+
+	switch (ar_pci->num_msi_intrs) {
+	case 0:
+		return ath10k_pci_request_irq_legacy(ar);
+	case 1:
+		return ath10k_pci_request_irq_msi(ar);
+	case MSI_NUM_REQUEST:
+		return ath10k_pci_request_irq_msix(ar);
+	}
+
+	ath10k_warn(ar, "unknown irq configuration upon request\n");
+	return -EINVAL;
+}
+
+static void ath10k_pci_free_irq(struct ath10k *ar)
+{
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	int i;
+
+	/* There's at least one interrupt irregardless whether its legacy INTR
+	 * or MSI or MSI-X */
+	for (i = 0; i < max(1, ar_pci->num_msi_intrs); i++)
+		free_irq(ar_pci->pdev->irq + i, ar);
+}
+
+static void ath10k_pci_init_irq_tasklets(struct ath10k *ar)
+{
+	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	int i;
+
+	tasklet_init(&ar_pci->intr_tq, ath10k_pci_tasklet, (unsigned long)ar);
+	tasklet_init(&ar_pci->msi_fw_err, ath10k_msi_err_tasklet,
+		     (unsigned long)ar);
+
+	for (i = 0; i < CE_COUNT; i++) {
+		ar_pci->pipe_info[i].ar_pci = ar_pci;
+		tasklet_init(&ar_pci->pipe_info[i].intr, ath10k_pci_ce_tasklet,
+			     (unsigned long)&ar_pci->pipe_info[i]);
+	}
 }
 #endif
 
