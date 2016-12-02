@@ -1159,7 +1159,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * freeing those frames causes invalid node/ifnet references from
 	 * mgmt TX mbufs to be deref'ed and panic.
 	 */
-	ath10k_stop(ar);
 
 	/*
 	 * Detaching the VAP at this point may generate other events,
@@ -1173,6 +1172,11 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * Point of no return!
 	 */
 	free(uvp, M_80211_VAP);
+
+	/*
+	 * We're done!  Stop the NIC entirely if we're done.
+	 */
+	ath10k_stop(ar);
 
 	ath10k_warn(ar, "%s: finished!\n", __func__);
 }
