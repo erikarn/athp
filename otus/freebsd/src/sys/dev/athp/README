@@ -27,21 +27,21 @@ Notes:
 
 Bring-up order; more detail
 
-* probe/attach
-* pci bits (chip)
-* sleep/wake
-* ce bits
-* busdma bits for mbuf, etc
-* pipe bits, stubbed out
-* wire up interrupts, enable/disable interrupts, even if it's legacy interrupts
-* .. and add per-pipe interrupt task, schedule it appropriately
-* wire up the global rx retry taskqueue as a taskqueue_timer
-* .. and ensure the above gets cleaned up during shutdown
+* (done) probe/attach
+* (done) pci bits (chip)
+* (done) sleep/wake
+* (done) ce bits
+* (done) busdma bits for mbuf, etc
+* (done) pipe bits, stubbed out
+* (done) wire up interrupts, enable/disable interrupts, even if it's legacy interrupts
+* (done) .. and add per-pipe interrupt task, schedule it appropriately
+* (done) wire up the global rx retry taskqueue as a taskqueue_timer
+* (done) .. and ensure the above gets cleaned up during shutdown
 
 Then look at what calls init_pipes() - cold/warm reset, chip reset, etc.
 And hif_powerup().  The target is to complete hif_powerup / hif_powerdown.
 
-* then, just port / stub appropriately the hif layer, only implementing the
+* (done) then, just port / stub appropriately the hif layer, only implementing the
   pieces we need and printf() stubbing the rest.
 
 The mac80211 setup sequence ends up calling ath10k_core_probe_fw() which
@@ -58,9 +58,9 @@ up and stopped.
 
 Ie:
 
-* init pipes, incl. replenishing rx mbufs, etc
-* init config
-* wake target cpu
+* (done) init pipes, incl. replenishing rx mbufs, etc
+* (done) init config
+* (done) wake target cpu
 
 This requires pci_diag_read32(), pci_diag_write32(), pci_diag_writemem()
 to work.  And /these/ require the CE bits to work, DMA map/unmap to work, etc.
@@ -77,9 +77,9 @@ HIF wait for message routine.
 
 net80211 bringup:
 
-* mac.c - has the commands to send, the tx/rx path into mac80211, and the
+* (done) mac.c - has the commands to send, the tx/rx path into mac80211, and the
   command path
-* thermal.c - thermal control
+* (done) thermal.c - thermal control
 * p2p.c - p2p support
 * debug*.c - debugfs support (yes, for debugging)
 
@@ -114,27 +114,30 @@ MSI:
 * (done) add single MSI support
 * do MSI-X support
 
-* need to teach net80211 about never doing 802.11 fragmentation, as the
+802.11 fragmentation:
+
+* TODO: need to teach net80211 about never doing 802.11 fragmentation, as the
   firmware does it for us.  Otherwise firmware will transmit the frames with
   the fragment bit cleared (which it does), leading to garbage.
+* TODO: if in raw mode then net80211 does fragmentation; else don't and let
+  the firmware do it.
+* TODO: teach the athp_transmit() API about fragments and at least warn/print
+  about it for now!
 
 ===
 
 * Re-revisit all of the regulatory stuff - hardcoded txpower lists are bad.
   Hard-coded EEPROM regulatory code is bad.  Etc, etc.
 
-* Add busdma ops to all the places where we do descdma operations - especiall
+* (done) Add busdma ops to all the places where we do descdma operations - especiall
   ath10k_htt_tx() and the completion path (wherever txbuf_paddr is referenced -
   find where it first checks the txbuf and go from there.)
 
-* Sending frames require a peer.  If there's no peer, then we can't actually
+* (done) Sending frames require a peer.  If there's no peer, then we can't actually
   transmit it - it'll just get stuck in the transmit queue.  Figure this out?
 
-* Tidy up tx power handling - when creating an interface, set the arvif txpower
+* (done) Tidy up tx power handling - when creating an interface, set the arvif txpower
   to a suitable value.  When scanning, etc, also do the same.
-
-
-== Done bits
 
 * (done) Extend net80211 rx_stats struct to include MAC timestamp, PHY timestamp,
   RX duration, RX phy/rate, etc, etc.  Then, teach the htt_r routines
@@ -159,5 +162,4 @@ MSI:
 
   (done) Go find ath10k_regd_update() and ensure we call it as part of dev/vif up or
   firmware will panic upon scan!
-
 
