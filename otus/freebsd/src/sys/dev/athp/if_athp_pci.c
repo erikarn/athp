@@ -586,6 +586,9 @@ athp_attach_preinit(void *arg)
 	/* XXX TODO: refactor this stuff out */
 	athp_pci_free_bufs(psc);
 
+	/* Ensure we disable interrupts from the device */
+	ath10k_pci_deinit_irq(psc);
+
 	ath10k_pci_free_irq(psc);
 
 	bus_release_resource(ar->sc_dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
@@ -898,6 +901,8 @@ athp_pci_attach(device_t dev)
 bad4:
 	athp_pci_free_bufs(psc);
 bad2:
+	/* Ensure we disable interrupts from the device */
+	ath10k_pci_deinit_irq(psc);
 	ath10k_pci_free_irq(psc);
 bad1:
 	bus_release_resource(dev, SYS_RES_MEMORY, BS_BAR, psc->sc_sr);
@@ -957,7 +962,7 @@ athp_pci_detach(device_t dev)
 
 	/* kill tasklet(s) */
 
-	/* deinit irq */
+	/* deinit irq - stop getting more interrupts */
 	ath10k_pci_deinit_irq(psc);
 
 	/* ce deinit */
