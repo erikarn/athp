@@ -708,12 +708,6 @@ ath10k_htt_rx_alloc_desc(struct ath10k *ar, struct ath10k_htt *htt)
 	htt->rx_ring.size_mask = htt->rx_ring.size - 1;
 	htt->rx_ring.fill_level = HTT_RX_RING_FILL_LEVEL;
 
-	ath10k_warn(ar, "%s: size=%d, mask=%d, fill=%d\n",
-	    __func__,
-	    htt->rx_ring.size,
-	    htt->rx_ring.size_mask,
-	    htt->rx_ring.fill_level);
-
 	if (!is_power_of_2(htt->rx_ring.size)) {
 		ath10k_warn(ar, "htt rx ring size is not power of 2\n");
 		return -EINVAL;
