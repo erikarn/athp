@@ -124,17 +124,11 @@ typedef uint64_t	__be64;
 #endif
 
 /* Bits not implemented by our linuxkpi layer so far */
-#define	__cpu_to_le32(a)	htole32(a)
-#define	__cpu_to_le16(a)	htole16(a)
-#define	__le32_to_cpu(a)	le32toh(a)
-#define	__le16_to_cpu(a)	le16toh(a)
 #define	might_sleep()
 #define scnprintf(...) snprintf(__VA_ARGS__)
 #define	__ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)
 #define	__ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 #define	ALIGN_LINUX(x, a) __ALIGN_KERNEL((x), (a))
-#undef	le32_to_cpup
-#define	le32_to_cpup(v)		le32toh(*(v))
 
 #define	IS_ALIGNED(ptr, a)	((ptr) % (a) == 0)
 
