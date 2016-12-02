@@ -1609,20 +1609,22 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_update_chw = athp_update_chw;
 	ic->ic_ampdu_enable = athp_ampdu_enable;
 
-	/* TODO: Initial 11n state; capabilities */
-	ath10k_warn(ar, "%s: ht_cap_info: 0x%08x\n", __func__, ar->ht_cap_info);
+	/* Initial 11n state; capabilities */
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
 		athp_attach_11n(ar);
 	}
 
 	/* radiotap attach */
 	ieee80211_radiotap_attach(ic,
-	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu), ATH10K_TX_RADIOTAP_PRESENT,
-	    &ar->sc_rxtapu.th.wr_ihdr, sizeof(ar->sc_rxtapu), ATH10K_RX_RADIOTAP_PRESENT);
+	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu),
+	    ATH10K_TX_RADIOTAP_PRESENT,
+	    &ar->sc_rxtapu.th.wr_ihdr, sizeof(ar->sc_rxtapu),
+	    ATH10K_RX_RADIOTAP_PRESENT);
 
 	// if (bootverbose)
 		ieee80211_announce(ic);
 
+	/* Deferring work (eg crypto key updates) into net80211 taskqueue */
 	(void) athp_taskq_init(ar);
 
 	return (0);
