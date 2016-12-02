@@ -202,47 +202,58 @@ static irqreturn_t ath10k_pci_msi_fw_handler(int irq, void *arg)
 	tasklet_schedule(&ar_pci->msi_fw_err);
 	return IRQ_HANDLED;
 }
+#endif
 
-/*
- * Top-level interrupt handler for all PCI interrupts from a Target.
- * When a block of MSI interrupts is allocated, this top-level handler
- * is not used; instead, we directly call the correct sub-handler.
- */
-static irqreturn_t ath10k_pci_interrupt_handler(int irq, void *arg)
+static int
+ath10k_pci_interrupt_handler(void *arg)
 {
-	struct ath10k *ar = arg;
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = arg;
+	struct ath10k *ar = &psc->sc_sc;
 
-	if (ar_pci->num_msi_intrs == 0) {
-		if (!ath10k_pci_irq_pending(ar))
-			return IRQ_NONE;
+	if (ar->sc_invalid)
+		return (FILTER_STRAY);
 
-		ath10k_pci_disable_and_clear_legacy_irq(ar);
-	}
+	/*
+	 * Check for shared interrupts if we're not doing MSI.
+	 */
+	if ((psc->num_msi_intrs == 0) && (! ath10k_pci_irq_pending(psc)))
+		return (FILTER_STRAY);
 
-	tasklet_schedule(&ar_pci->intr_tq);
+	if (psc->num_msi_intrs == 0)
+		ath10k_pci_disable_and_clear_legacy_irq(psc);
 
-	return IRQ_HANDLED;
+	return (FILTER_SCHEDULE_THREAD);
 }
 
-static void ath10k_pci_tasklet(unsigned long data)
+/*
+ * This is the single, shared interrupt task.
+ * Linux runs it as a tasklet; we run it as an ithread.
+ */
+static void ath10k_pci_tasklet(void *arg)
 {
-	struct ath10k *ar = (struct ath10k *)data;
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = arg;
+	struct ath10k *ar = &psc->sc_sc;
 
-	if (ath10k_pci_has_fw_crashed(ar)) {
-		ath10k_pci_irq_disable(ar);
-		ath10k_pci_fw_crashed_clear(ar);
-		ath10k_pci_fw_crashed_dump(ar);
+	if (ar->sc_invalid)
+		return;
+
+	if (ath10k_pci_has_fw_crashed(psc)) {
+		ath10k_err(ar, "%s: FIRMWARE CRASH\n", __func__);
+		ath10k_pci_irq_disable(psc);
+		ath10k_pci_fw_crashed_clear(psc);
+		ath10k_pci_fw_crashed_dump(psc);
 		return;
 	}
 
+	/* Do the actual interrupt handling */
 	ath10k_ce_per_engine_service_any(ar);
 
-	/* Re-enable legacy irq that was disabled in the irq handler */
-	if (ar_pci->num_msi_intrs == 0)
-		ath10k_pci_enable_legacy_irq(ar);
+	/* Re-enable interrupts if required */
+	if (psc->num_msi_intrs == 0)
+		ath10k_pci_enable_legacy_irq(psc);
 }
+
+#if 0
 
 static int ath10k_pci_request_irq_msix(struct ath10k *ar)
 {
@@ -356,6 +367,19 @@ static void ath10k_pci_free_irq(struct athp_pci_softc *psc)
 	}
 }
 
+/*
+ * Note: ath10k deferred a lot of work into the tasklets and left
+ * the main interrupt handler(s) to just check to see if the work
+ * was required.
+ *
+ * These are setup no matter whether we're running in legacy, MSI
+ * or MSIX mode.  For legacy and MSI only the pci_tasklet would be
+ * scheduled.  For MSI-X, any of them could be scheduled.
+ *
+ * FreeBSD doesn't actually do this - we're currently doing things
+ * using filters and ithreads, not tasklets.  The semantics are
+ * kind of the same and kind of not the same.
+ */
 #if 0
 static void ath10k_pci_init_irq_tasklets(struct ath10k *ar)
 {
@@ -373,51 +397,6 @@ static void ath10k_pci_init_irq_tasklets(struct ath10k *ar)
 	}
 }
 #endif
-
-/*
- * This is the single, shared interrupt task.
- */
-static void
-athp_pci_intr(void *arg)
-{
-	struct athp_pci_softc *psc = arg;
-	struct ath10k *ar = &psc->sc_sc;
-
-	if (ar->sc_invalid)
-		return;
-
-	if (ath10k_pci_has_fw_crashed(psc)) {
-		ath10k_err(ar, "%s: FIRMWARE CRASH\n", __func__);
-		ath10k_pci_irq_disable(psc);
-		ath10k_pci_fw_crashed_clear(psc);
-		ath10k_pci_fw_crashed_dump(psc);
-		return;
-	}
-
-	/*
-	 * Check for shared interrupts if we're not doing MSI.
-	 */
-	if ((psc->num_msi_intrs == 0) && (! ath10k_pci_irq_pending(psc)))
-		return;
-
-	/*
-	 * If this was a filter interrupt then we'd schedule locally.
-	 * (See ath10k_pci_tasklet() versus ath10_pci_interrupt_handler()).
-	 *
-	 * This takes the copy engine lock, updates things, releases the
-	 * lock and calls the callback.  It's going to make consistent and
-	 * predictable locking tricky.
-	 */
-	if (psc->num_msi_intrs == 0) {
-		ath10k_pci_disable_and_clear_legacy_irq(psc);
-	}
-
-	/* Do the actual interrupt handling */
-	ath10k_ce_per_engine_service_any(ar);
-
-	if (psc->num_msi_intrs == 0)
-		ath10k_pci_enable_legacy_irq(psc);
-}
 
 #define	BS_BAR	0x10
 
@@ -809,7 +788,7 @@ athp_pci_attach(device_t dev)
 		goto bad1;
 	}
 	if (bus_setup_intr(dev, psc->sc_irq[0], INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, athp_pci_intr, ar, &psc->sc_ih[0])) {
+	    ath10k_pci_interrupt_handler, ath10k_pci_tasklet, ar, &psc->sc_ih[0])) {
 		device_printf(dev, "could not establish interrupt\n");
 		err = ENXIO;
 		goto bad2;
