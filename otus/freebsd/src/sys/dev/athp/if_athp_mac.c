@@ -2287,22 +2287,16 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	arg->peer_listen_intval = ath10k_peer_assoc_h_listen_intval(ar, vif);
 	arg->peer_num_spatial_streams = 1;
 
-	/*
-	 * XXX TODO: is this in host-order, or 802.11 order?
-	 *
-	 * FreeBSD assigns capinfo from the assoc/reassoc response
-	 * by converting it to host endian; I'm unsure about mac80211.
-	 */
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
 
-#if 1
 	/* If is_run=0, then clear the privacy capinfo */
 	if (is_run == 0)
 		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
-#endif
 
-	ath10k_warn(ar, "%s: capinfo=0x%08x, peer_caps=0x%08x\n", __func__, ni->ni_capinfo, arg->peer_caps);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "%s: capinfo=0x%08x, peer_caps=0x%08x\n",
+	    __func__, ni->ni_capinfo, arg->peer_caps);
 }
 
 /*
@@ -2328,7 +2322,7 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 //	int ret;
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI,
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
 	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
 	    " ni rsn=%p, wpa=%p; deftxidx=%d\n",
 	    __func__,
@@ -2350,12 +2344,12 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 
 	/* FIXME: base on RSN IE/WPA IE is a correct idea? */
 	if (bss->ni_ies.rsn_ie || bss->ni_ies.wpa_ie) {
-		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: rsn ie found\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: rsn ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_PTK_4_WAY;
 	}
 
 	if (bss->ni_ies.wpa_ie) {
-		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
 }
@@ -2485,8 +2479,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	if (! IEEE80211_IS_CHAN_HT(sta->ni_chan))
 		return;
 
-	ath10k_warn(ar, "%s: called; HT node\n", __func__);
-
 #if 0
 	band = def.chan->band;
 	ht_mcs_mask = arvif->bitrate_mask.control[band].ht_mcs;
@@ -2503,8 +2495,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	/*
 	 * Set capabilities based on what we negotiate.
-	 *
-	 * XXX TODO: this is wrong - we can't just do this.
 	 *
 	 * Linux mac80211 seems to set this field up after
 	 * overriding things appropriately.
@@ -2527,7 +2517,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	 */
 	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
 	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
-	ath10k_warn(ar, "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, "
+	    "iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
 	    __func__,
 	    mpdu_density,
 	    mpdu_size,
@@ -2566,7 +2558,8 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	htcap_filt = vif->iv_htcaps & htcap_mask;
 
-	ath10k_warn(ar, "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
 	    __func__,
 	    htcap_filt,
 	    vif->iv_htcaps,
@@ -2708,21 +2701,25 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		arg->peer_num_spatial_streams = max_nss;
 	}
 
-	//ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
-	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d maxnss %d htcap 0x%08x\n",
-		   arg->addr,
-		   ":",
-		   arg->peer_ht_rates.num_rates,
-		   arg->peer_num_spatial_streams,
-		   max_nss,
-		   htcap);
-	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac ht peer %6D mcs cnt %d nss %d maxnss %d htcap 0x%08x\n",
+	    arg->addr,
+	    ":",
+	    arg->peer_ht_rates.num_rates,
+	    arg->peer_num_spatial_streams,
+	    max_nss,
+	    htcap);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac ht density=%d, rxmax=%d\n",
+	    arg->peer_mpdu_density, arg->peer_max_mpdu);
 #if 0
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
 		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
 	}
 #endif
-	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, peer_flags=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac ht peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, "
+	    "peer_flags=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
 	    arg->peer_ht_caps,
 	    arg->peer_rate_caps,
 	    arg->peer_flags,
@@ -3079,7 +3076,7 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
-	ath10k_warn(ar, "%s: TODO: finish crypto, ht, vht!\n", __func__);
+	ath10k_warn(ar, "%s: TODO: finish WEP crypto, vht!\n", __func__);
 	return 0;
 }
 
