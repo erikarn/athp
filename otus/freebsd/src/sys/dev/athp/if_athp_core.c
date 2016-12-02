@@ -1915,8 +1915,6 @@ ath10k_core_destroy(struct ath10k *ar)
 	taskqueue_drain_all(ar->attach_workqueue);
 	taskqueue_free(ar->attach_workqueue);
 
-#if 0
 	ath10k_debug_destroy(ar);
 	ath10k_mac_destroy(ar);
-#endif
 }

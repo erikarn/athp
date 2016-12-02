@@ -7789,6 +7789,9 @@ static const struct ieee80211_channel ath10k_5ghz_channels[] = {
 	CHAN5G(165, 5825, 0),
 };
 
+/*
+ * Note: FreeBSD does this in the bus attach glue, not here */
+ */
 struct ath10k *ath10k_mac_create(size_t priv_size)
 {
 	struct ieee80211_hw *hw;
@@ -7803,12 +7806,17 @@ struct ath10k *ath10k_mac_create(size_t priv_size)
 
 	return ar;
 }
+#endif
 
+#if 1
 void ath10k_mac_destroy(struct ath10k *ar)
 {
-	ieee80211_free_hw(ar->hw);
+	/* FreeBSD does this in mac_unregister for now */
+//	ieee80211_free_hw(ar->hw);
 }
+#endif
 
+#if 0
 static const struct ieee80211_iface_limit ath10k_if_limits[] = {
 	{
 	.max	= 8,

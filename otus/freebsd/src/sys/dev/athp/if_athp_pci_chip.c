@@ -648,7 +648,7 @@ ath10k_pci_warm_reset(struct athp_pci_softc *psc)
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot warm reset\n");
 
 	ATHP_DATA_LOCK(ar);
-	ar->sc_stats.fw_warm_reset_counter++;
+	ar->stats.fw_warm_reset_counter++;
 	ATHP_DATA_UNLOCK(ar);
 
 	ath10k_pci_irq_disable(psc);
@@ -1004,11 +1004,9 @@ ath10k_pci_cold_reset(struct athp_pci_softc *psc)
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot cold reset\n");
 
-#if 0
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	ar->stats.fw_cold_reset_counter++;
-	spin_unlock_bh(&ar->data_lock);
-#endif
+	ATHP_DATA_UNLOCK(ar);
 
 	/* Put Target, including PCIe, into RESET. */
 	val = athp_pci_reg_read32(ar, SOC_GLOBAL_RESET_ADDRESS);

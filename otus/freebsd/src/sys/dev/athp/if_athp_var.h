@@ -188,7 +188,6 @@ struct ath10k_stats {
 	uint64_t xmit_fail_crypto_encap;
 	uint64_t xmit_fail_get_pbuf;
 	uint64_t xmit_fail_mbuf_defrag;
-	uint64_t fw_warm_reset_counter;
 	uint64_t xmit_fail_htt_xmit;
 };
 
@@ -282,24 +281,6 @@ struct ath10k {
 	/* TX/RX rings for athp buffers */
 	struct athp_buf_ring buf_rx;
 	struct athp_buf_ring buf_tx;
-
-	/* Taskqueues for work */
-#if 0
-	struct taskqueue		*sc_taskq;
-	struct taskqueue		*sc_aux_taskq;
-#endif
-
-	/* stuff from the driver i based this on; not needed */
-#if 0
-	int				sc_running:1,
-					sc_calibrating:1,
-					sc_scanning:1;
-
-	struct task			tx_task;
-	struct task			wme_update_task;
-	struct timeout_task		scan_to;
-	struct timeout_task		calib_to;
-#endif
 
 	/* Hardware revision, chip-id, etc */
 	char			fw_version_str[ATHP_FW_VER_STR];
