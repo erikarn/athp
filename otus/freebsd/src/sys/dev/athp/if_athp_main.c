@@ -1137,27 +1137,29 @@ athp_vap_delete(struct ieee80211vap *vap)
 
 	/*
 	 * At this point the ath10k VAP no longer exists, so we can't
-	 * queue things to the vdev anymore.
+	 * queue things to the vdev anymore.  However, when we call
+	 * ieee80211_vap_detach() it'll generate net80211 callbacks
+	 * to tear down state; and there may already be frames in
+	 * the transmit queue (eg if it's stuck) / receive queue (just
+	 * because!) for the vap that we're deleting.
+	 *
+	 * Now, RX'ed frames are a pain but we can work around.
+	 *
+	 * However, TX'ed frames could be stuck in the queue and we need
+	 * flush those out before we delete the VAP.  The mbufs have
+	 * a node reference / vap reference that needs to be dealt with.
+	 * Sigh.  Will have to stop TX, walk the TX list and free nodes
+	 * that are for the matching node/vap/vdev, before optionally
+	 * starting it again.
+	 *
+	 * If we don't stop the NIC, then we don't ever flush frames
+	 * for the VAP we're about to free, and that's a problem.
 	 */
 
 	/*
 	 * XXX for now, we only support a single VAP.
 	 * Later on, we need to check if any other VAPs are left and if
 	 * not, we can power down.
-	 *
-	 * Note: this 'stop' will completely stop the NIC, including freeing
-	 * HTT (locks) and other things (via ath10k_core_stop().)
-	 *
-	 * For mac80211, I bet it doesn't call any further methods once it
-	 * calls the driver 'stop' method.
-	 *
-	 * However, for net80211, I wonder if during explicit teardown it
-	 * will schedule any other device callbacks after this point.
-	 *
-	 * Note: this /will/ stop the NIC, and free things - including
-	 * pending/stuck TX frames.  If this moves below vap_detach then
-	 * freeing those frames causes invalid node/ifnet references from
-	 * mgmt TX mbufs to be deref'ed and panic.
 	 */
 
 	/*
@@ -1173,9 +1175,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	free(uvp, M_80211_VAP);
 
-	/*
-	 * We're done!  Stop the NIC entirely if we're done.
-	 */
 	ath10k_stop(ar);
 
 	ath10k_warn(ar, "%s: finished!\n", __func__);
