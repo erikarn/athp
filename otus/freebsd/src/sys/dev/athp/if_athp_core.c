@@ -1585,6 +1585,7 @@ ath10k_core_stop_done(struct ath10k *ar)
 #if 0
 	taskqueue_unblock(ar->workqueue);
 #endif
+	ath10k_warn(ar, "%s: TODO: taskqueue_unblock\n", __func__);
 }
 
 /* mac80211 manages fw/hw initialization through start/stop hooks. However in
