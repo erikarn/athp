@@ -1114,7 +1114,7 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	if (uvp->is_setup) {
 
-		/* Wait for xmit to finish before continuing */
+		/* Wait for active xmit to finish before continuing */
 		ath10k_tx_flush(ar, vap, 0, 1);
 
 		/*
@@ -1134,6 +1134,16 @@ athp_vap_delete(struct ieee80211vap *vap)
 		uvp->is_setup = 0;
 		ATHP_CONF_UNLOCK(ar);
 	}
+
+	/*
+	 * If this is a firmware panic or we had some highly confused
+	 * driver state (eg transmitting to things with no peers)
+	 * there may be frames stuck in the transmit queue that
+	 * won't have been deleted.
+	 *
+	 * Now, I don't know how to stop HTT TX in the firmware;
+	 * HTT TX is implemented as HTC submissions with descriptors.
+	 */
 
 	/*
 	 * At this point the ath10k VAP no longer exists, so we can't
@@ -1157,12 +1167,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 
 	/*
-	 * XXX for now, we only support a single VAP.
-	 * Later on, we need to check if any other VAPs are left and if
-	 * not, we can power down.
-	 */
-
-	/*
 	 * Detaching the VAP at this point may generate other events,
 	 * such as key deletions, sending last second frames, etc.
 	 * So we have to make sure that any callbacks that occur
@@ -1175,6 +1179,11 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	free(uvp, M_80211_VAP);
 
+	/*
+	 * Once the above is all done, stop the chip.  At this point
+	 * buffers will get freed, so hopefully (!) buffers for this
+	 * vap have been freed above.
+	 */
 	ath10k_stop(ar);
 
 	ath10k_warn(ar, "%s: finished!\n", __func__);
