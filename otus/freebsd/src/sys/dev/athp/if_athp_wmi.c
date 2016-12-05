@@ -1833,11 +1833,6 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
-#if 0
-	ath10k_dbg(ar, ATH10K_DBG_WMI,
-	    "%s: setup: cmdid=0x%08x, ticks=%u, interval=%u\n",
-	    __func__, cmd_id, ticks, interval);
-#endif
 
 	while (! ieee80211_time_after(ticks, interval)) {
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq",
@@ -1927,10 +1922,11 @@ static void ath10k_wmi_event_scan_started(struct ath10k *ar)
 	case ATH10K_SCAN_STARTING:
 		ar->scan.state = ATH10K_SCAN_RUNNING;
 
-		device_printf(ar->sc_dev, "%s: TODO: ready_on_channel\n", __func__);
 #if 0
 		if (ar->scan.is_roc)
 			ieee80211_ready_on_channel(ar->hw);
+#else
+		device_printf(ar->sc_dev, "%s: TODO: ready_on_channel\n", __func__);
 #endif
 
 		ath10k_compl_wakeup_one(&ar->scan.started);
@@ -2355,30 +2351,6 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (rx_status & WMI_RX_STATUS_ERR_MIC)
 		stat.c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
 
-#if 0
-	/* Hardware can Rx CCK rates on 5GHz. In that case phy_mode is set to
-	 * MODE_11B. This means phy_mode is not a reliable source for the band
-	 * of mgmt rx.
-	 */
-	if (channel >= 1 && channel <= 14) {
-		status->band = IEEE80211_BAND_2GHZ;
-	} else if (channel >= 36 && channel <= 165) {
-		status->band = IEEE80211_BAND_5GHZ;
-	} else {
-		/* Shouldn't happen unless list of advertised channels to
-		 * mac80211 has been changed.
-		 */
-		WARN_ON_ONCE(1);
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
-	if (phy_mode == MODE_11B && status->band == IEEE80211_BAND_5GHZ)
-		ath10k_dbg(ar, ATH10K_DBG_MGMT, "wmi mgmt rx 11b (CCK) on 5GHz\n");
-
-	sband = &ar->mac.sbands[status->band];
-#endif
-
 	if (channel <= 14)
 		band = IEEE80211_CHAN_2GHZ;
 	else
@@ -2392,6 +2364,11 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	stat.c_freq = ieee80211_ieee2mhz(channel, band);
 	stat.c_rssi = snr;
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
+
+	/*
+	 * XXX TODO: yes, it'd be nice to communicate the rate
+	 * up to net80211
+	 */
 
 	hdr = mtod(pbuf->m, struct ieee80211_frame *);
 	ath10k_wmi_handle_wep_reauth(ar, pbuf, &stat);
@@ -2644,10 +2621,6 @@ void ath10k_wmi_event_echo(struct ath10k *ar, struct athp_buf *pbuf)
 
 int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf)
 {
-#if 0
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event debug mesg len %d\n",
-		   mbuf_skb_len(pbuf->m));
-#endif
 
 	trace_ath10k_wmi_dbglog(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 	ath10k_handle_fwlog_msg(ar, pbuf);
@@ -3104,7 +3077,6 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event peer sta kickout %6D\n",
 		   arg.mac_addr, ":");
 
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 #if 0
 	rcu_read_lock();
 
@@ -3119,6 +3091,8 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 
 exit:
 	rcu_read_unlock();
+#else
+	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 #endif
 }
 
@@ -4302,10 +4276,8 @@ static void ath10k_wmi_event_service_ready_work(void *targ, int npending)
 	    __le32_to_cpu(arg.eeprom_rd));
 #endif
 
-#if 0
-	ath10k_dbg_dump(ar, ATH10K_DBG_WMI, NULL, "wmi svc: ",
+	athp_debug_dump(ar, ATH10K_DBG_WMI, NULL, "wmi svc: ",
 			arg.service_map, arg.service_map_len);
-#endif
 
 	/* only manually set fw features when not using FW IE format */
 	if (ar->fw_api == 1 && ar->fw_version_build > 636)
