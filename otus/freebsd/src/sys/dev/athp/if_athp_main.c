@@ -1164,7 +1164,12 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 *
 	 * If we don't stop the NIC, then we don't ever flush frames
 	 * for the VAP we're about to free, and that's a problem.
+	 *
+	 * So, stop the NIC here.  Any entry points in from net80211
+	 * will have to check that we're running and error out as
+	 * appropriate.
 	 */
+	ath10k_stop(ar);
 
 	/*
 	 * Detaching the VAP at this point may generate other events,
@@ -1178,13 +1183,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * Point of no return!
 	 */
 	free(uvp, M_80211_VAP);
-
-	/*
-	 * Once the above is all done, stop the chip.  At this point
-	 * buffers will get freed, so hopefully (!) buffers for this
-	 * vap have been freed above.
-	 */
-	ath10k_stop(ar);
 
 	ath10k_warn(ar, "%s: finished!\n", __func__);
 }

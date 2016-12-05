@@ -8492,6 +8492,15 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
+
+	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags) ||
+	    ((ar->state != ATH10K_STATE_ON) &&
+	    (ar->state != ATH10K_STATE_RESTARTED))) {
+		ath10k_warn(ar, "%s: skipping; firmware restart\n", __func__);
+		ATHP_CONF_UNLOCK(ar);
+		return -ESHUTDOWN;
+	}
+
 	ret = ath10k_peer_create(ar, arvif->vdev_id, mac,
 	    WMI_PEER_TYPE_DEFAULT);
 //	ath10k_mac_inc_num_stations(arvif, sta);
@@ -8517,6 +8526,15 @@ athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
+
+	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags) ||
+	    ((ar->state != ATH10K_STATE_ON) &&
+	    (ar->state != ATH10K_STATE_RESTARTED))) {
+		ath10k_warn(ar, "%s: skipping; firmware restart\n", __func__);
+		ATHP_CONF_UNLOCK(ar);
+		return -ESHUTDOWN;
+	}
+
 	(void) ath10k_tx_flush_locked(ar, vap, 0, 0);
 	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
 //	ath10k_mac_dec_num_stations(arvif, sta);
