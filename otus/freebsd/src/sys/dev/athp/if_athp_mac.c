@@ -8517,6 +8517,14 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
  * Also - note that node free is called before we get the DELBA deletion
  * commands from the firmware, which generates some log warnings.
  * We then don't find the net80211 node..
+ *
+ * Also note - this causes a recursion error on the conf lock during the
+ * shutdown phase - notably, if we purge a frame during firmware teardown
+ * that causes a peer to be flushed from the node table.
+ *
+ * We can't hold a recursed lock through a call to mtx_sleep().
+ *
+ * So - not sure what the fix would be for this!
  */
 int
 athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)

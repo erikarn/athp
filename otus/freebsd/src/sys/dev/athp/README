@@ -163,3 +163,20 @@ MSI:
   (done) Go find ath10k_regd_update() and ensure we call it as part of dev/vif up or
   firmware will panic upon scan!
 
+
+Panics / locking issues that need addressing
+============================================
+
+* There's a problem with the frame cleanup path:
+  - ath10k_halt()
+  - holds CONF lock whilst it does its shutdown parts
+  - goes through htt_tx free
+  - frees the TX buffers
+  - one of them has a node reference
+  - node reference is the last node reference
+  - that triggers a node delete
+  - that re-enters the driver and calls athp_peer_free()
+  - athp_peer_free() grabs the lock and goes to mtx_sleep()
+  - .. and it's sleeping on a recursed lock.
+
+* peer deletion sleeps on a net80211 lock in some instances - fix!
