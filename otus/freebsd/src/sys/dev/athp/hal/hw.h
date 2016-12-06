@@ -435,7 +435,7 @@ enum ath10k_hw_rate_cck {
 
 /* MSIs for Copy Engines */
 #define MSI_ASSIGN_CE_INITIAL	1
-#define MSI_ASSIGN_CE_MAX	ar->hw_values->msi_assign_ce_max
+#define MSI_ASSIGN_CE_MAX(ar)	(ar)->msi_assign_ce_max
 
 /* as of IP3.7.1 */
 #define RTC_STATE_V_ON(a)			(a)->rtc_state_val_on

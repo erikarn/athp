@@ -68,7 +68,7 @@ struct athp_pci_softc {
 	/* Shared interrupt handler; deferred */
 //	struct task		intr_task;
 	/* msi firmware task */
-//	struct task		msi_fw_error;
+	//struct task		msi_fw_err;
 	/* rx post timeout retry task */
 	struct callout		rx_post_retry;
 };

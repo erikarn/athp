@@ -143,38 +143,38 @@ athp_pci_probe(device_t dev)
 	return (ENXIO);
 }
 
-#if 0
-static void ath10k_pci_ce_tasklet(unsigned long ptr)
+static void ath10k_pci_ce_tasklet(void *arg)
 {
-	struct ath10k_pci_pipe *pipe = (struct ath10k_pci_pipe *)ptr;
+	struct ath10k_pci_pipe *pipe = (struct ath10k_pci_pipe *) arg;
 
 	ath10k_ce_per_engine_service(pipe->ar, pipe->pipe_num);
 }
 
-static void ath10k_msi_err_tasklet(unsigned long data)
+static void ath10k_msi_err_tasklet(void *arg)
 {
-	struct ath10k *ar = (struct ath10k *)data;
+	struct athp_pci_softc *psc = arg;
+	struct ath10k *ar = &psc->sc_sc;
 
-	if (!ath10k_pci_has_fw_crashed(ar)) {
+	if (!ath10k_pci_has_fw_crashed(psc)) {
 		ath10k_warn(ar, "received unsolicited fw crash interrupt\n");
 		return;
 	}
 
-	ath10k_pci_irq_disable(ar);
-	ath10k_pci_fw_crashed_clear(ar);
-	ath10k_pci_fw_crashed_dump(ar);
+	ath10k_pci_irq_disable(psc);
+	ath10k_pci_fw_crashed_clear(psc);
+	ath10k_pci_fw_crashed_dump(psc);
 }
 
 /*
  * Handler for a per-engine interrupt on a PARTICULAR CE.
  * This is used in cases where each CE has a private MSI interrupt.
  *
- * XXX TODO: this takes the same ptr as pci_ce_tasklet; make both of them take a pipe ptr */
+ * XXX TODO: this takes the same ptr as pci_ce_tasklet; make both of them take a pipe ptr
  */
-static irqreturn_t ath10k_pci_per_engine_handler(int irq, void *arg)
+static int ath10k_pci_per_engine_handler(void *arg)
 {
 	struct ath10k_pci_pipe *pipe = arg;
-	struct ath10k_pci *psc = pipe->psc;
+//	struct athp_pci_softc *psc = pipe->psc;
 	struct ath10k *ar = pipe->ar;
 
 	if (ar->sc_invalid)
@@ -199,21 +199,19 @@ static irqreturn_t ath10k_pci_per_engine_handler(int irq, void *arg)
 	 */
 	tasklet_schedule(&ar_pci->pipe_info[ce_id].intr);
 #endif
-	return IRQ_HANDLED;
+	return (FILTER_SCHEDULE_THREAD);
 }
 
-static irqreturn_t ath10k_pci_msi_fw_handler(int irq, void *arg)
+static int ath10k_pci_msi_fw_handler(void *arg)
 {
-	struct ath10k *ar = arg;
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct athp_pci_softc *psc = arg;
+	struct ath10k *ar = &psc->sc_sc;
 
 	if (ar->sc_invalid)
 		return (FILTER_STRAY);
 
-	tasklet_schedule(&ar_pci->msi_fw_err);
-	return IRQ_HANDLED;
+	return (FILTER_SCHEDULE_THREAD);
 }
-#endif
 
 static int
 ath10k_pci_interrupt_handler(void *arg)
@@ -264,37 +262,13 @@ static void ath10k_pci_tasklet(void *arg)
 		ath10k_pci_enable_legacy_irq(psc);
 }
 
-#if 0
+static void ath10k_pci_free_irq(struct athp_pci_softc *psc);
 
-static int ath10k_pci_request_irq_msix(struct ath10k *ar)
+static int ath10k_pci_request_irq_msix(struct athp_pci_softc *psc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
-	int ret, i;
-
-	ret = request_irq(ar_pci->pdev->irq + MSI_ASSIGN_FW,
-			  ath10k_pci_msi_fw_handler,
-			  IRQF_SHARED, "ath10k_pci", ar);
-	if (ret) {
-		ath10k_warn(ar, "failed to request MSI-X fw irq %d: %d\n",
-			    ar_pci->pdev->irq + MSI_ASSIGN_FW, ret);
-		return ret;
-	}
-
-	for (i = MSI_ASSIGN_CE_INITIAL; i <= MSI_ASSIGN_CE_MAX; i++) {
-		ret = request_irq(ar_pci->pdev->irq + i,
-				  ath10k_pci_per_engine_handler,
-				  IRQF_SHARED, "ath10k_pci", ar);
-		if (ret) {
-			ath10k_warn(ar, "failed to request MSI-X ce irq %d: %d\n",
-				    ar_pci->pdev->irq + i, ret);
-
-			for (i--; i >= MSI_ASSIGN_CE_INITIAL; i--)
-				free_irq(ar_pci->pdev->irq + i, ar);
-
-			free_irq(ar_pci->pdev->irq + MSI_ASSIGN_FW, ar);
-			return ret;
-		}
-	}
+	struct ath10k *ar = &psc->sc_sc;
+	device_t dev = ar->sc_dev;
+	int err, i, rid;
 
 	/* MSI-X - rid 1 is MSI FW; 2..7 are CEs */
 	rid = 1;
@@ -303,24 +277,24 @@ static int ath10k_pci_request_irq_msix(struct ath10k *ar)
 	if (psc->sc_irq[0] == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		err = ENXIO;
-		goto bad1;
+		goto bad;
 	}
 	if (bus_setup_intr(dev, psc->sc_irq[0], INTR_TYPE_NET | INTR_MPSAFE,
-	    ath10k_pci_msi_fw_handler, ath10k_msi_err_tasklet, ar, &psc->sc_ih[0])) {
+	    ath10k_pci_msi_fw_handler, ath10k_msi_err_tasklet, psc, &psc->sc_ih[0])) {
 		device_printf(dev, "could not establish interrupt\n");
 		err = ENXIO;
-		goto bad2;
+		goto bad;
 	}
 
 	/* Loop over; do the CEs */
-	for (i = MSI_ASSIGN_CE_INITIAL; i <= MSI_ASSIGN_CE_MAX; i++) {
+	for (i = MSI_ASSIGN_CE_INITIAL; i <= MSI_ASSIGN_CE_MAX(ar->sc_regvals); i++) {
 		rid = 1 + i;
 		psc->sc_irq[i] = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 		    RF_ACTIVE);
 		if (psc->sc_irq[i] == NULL) {
 			device_printf(dev, "could not map CE interrupt\n");
 			err = ENXIO;
-			goto bad1;
+			goto bad;
 		}
 
 		/*
@@ -332,19 +306,24 @@ static int ath10k_pci_request_irq_msix(struct ath10k *ar)
 		 */
 		if (bus_setup_intr(dev, psc->sc_irq[i], INTR_TYPE_NET | INTR_MPSAFE,
 		    ath10k_pci_per_engine_handler, ath10k_pci_ce_tasklet,
-		    &psc->pipe_info[i], &psc->sc_ih[i])) {
+		    &psc->pipe_info[i - MSI_ASSIGN_CE_INITIAL], &psc->sc_ih[i])) {
 			device_printf(dev, "could not establish CE interrupt\n");
 			err = ENXIO;
-			goto bad2;
+			goto bad;
 		}
-
 	}
 
 	return 0;
+bad:
+	ath10k_pci_free_irq(psc);
+	return (err);
 }
 
-static int ath10k_pci_request_irq_msi(struct ath10k *ar)
+static int ath10k_pci_request_irq_msi(struct athp_pci_softc *psc)
 {
+	struct ath10k *ar = &psc->sc_sc;
+	device_t dev = ar->sc_dev;
+	int rid, err;
 
 	/* MSI - rid 1 */
 	rid = 1;
@@ -354,20 +333,31 @@ static int ath10k_pci_request_irq_msi(struct ath10k *ar)
 	if (psc->sc_irq[0] == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		err = ENXIO;
-		goto bad1;
+		goto bad;
 	}
+
 	if (bus_setup_intr(dev, psc->sc_irq[0], INTR_TYPE_NET | INTR_MPSAFE,
-	    ath10k_pci_interrupt_handler, ath10k_pci_tasklet, ar, &psc->sc_ih[0])) {
+	    ath10k_pci_interrupt_handler, ath10k_pci_tasklet, psc, &psc->sc_ih[0])) {
 		device_printf(dev, "could not establish interrupt\n");
 		err = ENXIO;
-		goto bad2;
+		goto bad;
 	}
 
-	return 0;
+	return (0);
+bad:
+	if (psc->sc_ih[0] != NULL)
+		bus_teardown_intr(dev, psc->sc_irq[0], psc->sc_ih[0]);
+	if (psc->sc_irq[0] != NULL)
+		bus_release_resource(dev, SYS_RES_IRQ, 1,
+		    psc->sc_irq[0]);
+	return (err);
 }
 
-static int ath10k_pci_request_irq_legacy(struct ath10k *ar)
+static int ath10k_pci_request_irq_legacy(struct athp_pci_softc *psc)
 {
+	struct ath10k *ar = &psc->sc_sc;
+	device_t dev = ar->sc_dev;
+	int rid, err = 0;
 
 	/* Legacy interrupt - rid 0 */
 	rid = 0;
@@ -377,35 +367,41 @@ static int ath10k_pci_request_irq_legacy(struct ath10k *ar)
 	if (psc->sc_irq[0] == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		err = ENXIO;
-		goto bad1;
+		goto bad;
 	}
 	if (bus_setup_intr(dev, psc->sc_irq[0], INTR_TYPE_NET | INTR_MPSAFE,
-	    ath10k_pci_interrupt_handler, ath10k_pci_tasklet, ar, &psc->sc_ih[0])) {
+	    ath10k_pci_interrupt_handler, ath10k_pci_tasklet, psc, &psc->sc_ih[0])) {
 		device_printf(dev, "could not establish interrupt\n");
 		err = ENXIO;
-		goto bad2;
+		goto bad;
 	}
 
 	return 0;
+bad:
+	if (psc->sc_ih[0] != NULL)
+		bus_teardown_intr(dev, psc->sc_irq[0], psc->sc_ih[0]);
+	if (psc->sc_irq[0] != NULL)
+		bus_release_resource(dev, SYS_RES_IRQ, 0,
+		    psc->sc_irq[0]);
+	return (err);
 }
 
-static int ath10k_pci_request_irq(struct ath10k *ar)
+static int ath10k_pci_request_irq(struct athp_pci_softc *psc)
 {
-	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
+	struct ath10k *ar = &psc->sc_sc;
 
-	switch (ar_pci->num_msi_intrs) {
+	switch (psc->num_msi_intrs) {
 	case 0:
-		return ath10k_pci_request_irq_legacy(ar);
+		return ath10k_pci_request_irq_legacy(psc);
 	case 1:
-		return ath10k_pci_request_irq_msi(ar);
+		return ath10k_pci_request_irq_msi(psc);
 	case MSI_NUM_REQUEST:
-		return ath10k_pci_request_irq_msix(ar);
+		return ath10k_pci_request_irq_msix(psc);
 	}
 
 	ath10k_warn(ar, "unknown irq configuration upon request\n");
 	return -EINVAL;
 }
-#endif
 
 static void ath10k_pci_free_irq(struct athp_pci_softc *psc)
 {
@@ -825,44 +821,36 @@ athp_pci_attach(device_t dev)
 	 */
 	ar->sc_invalid = 1;
 
+	printf("%s: msicount=%d, msixcount=%d\n",
+	    __func__,
+	    pci_msi_count(dev),
+	    pci_msix_count(dev));
+
 	/*
 	 * Arrange interrupt line.
-	 *
-	 * XXX TODO: implement MSIX; we should be getting one MSI for
-	 * (almost) each CE ring.
 	 *
 	 * XXX TODO: this is effictively ath10k_pci_init_irq().
 	 * Refactor it out later.
 	 *
 	 * First - attempt MSI.  If we get it, then use it.
 	 */
-	rid = 0;
-	i = 1;
+	i = MSI_NUM_REQUEST;
 	if (pci_alloc_msi(dev, &i) == 0) {
-		rid = 1;
-		device_printf(dev, "%s: 1 MSI interrupt\n", __func__);
-		psc->num_msi_intrs = 1;
+		device_printf(dev, "%s: %d MSI interrupts\n", __func__, i);
+		psc->num_msi_intrs = MSI_NUM_REQUEST;
+	} else {
+		i = 1;
+		if (pci_alloc_msi(dev, &i) == 0) {
+			device_printf(dev, "%s: 1 MSI interrupt\n", __func__);
+			psc->num_msi_intrs = 1;
+		} else {
+			device_printf(dev, "%s: legacy interrupts\n", __func__);
+			psc->num_msi_intrs = 0;
+		}
 	}
-
-	/*
-	 * For now, just allocate a single interrupt - either legacy
-	 * (rid=0) or MSI (rid=1.)  Later on we will try to allocate
-	 * MSIx interrupts and assign per-CE/FW handlers.
-	 */
-	psc->sc_irq[0] = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
-	    RF_ACTIVE | (rid != 0 ? 0 : RF_SHAREABLE));
-
-	if (psc->sc_irq[0] == NULL) {
-		device_printf(dev, "could not map interrupt\n");
-		err = ENXIO;
+	err = ath10k_pci_request_irq(psc);
+	if (err != 0)
 		goto bad1;
-	}
-	if (bus_setup_intr(dev, psc->sc_irq[0], INTR_TYPE_NET | INTR_MPSAFE,
-	    ath10k_pci_interrupt_handler, ath10k_pci_tasklet, ar, &psc->sc_ih[0])) {
-		device_printf(dev, "could not establish interrupt\n");
-		err = ENXIO;
-		goto bad2;
-	}
 
 	/*
 	 * Attach register ops - needed for the caller to do register IO.
@@ -967,7 +955,6 @@ athp_pci_attach(device_t dev)
 	/* Fallthrough for setup failure */
 bad4:
 	athp_pci_free_bufs(psc);
-bad2:
 	/* Ensure we disable interrupts from the device */
 	ath10k_pci_deinit_irq(psc);
 	ath10k_pci_free_irq(psc);
