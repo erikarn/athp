@@ -164,12 +164,6 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	 * to queue for receive.
 	 */
 	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->mb.paddr);
-#if 0
-	device_printf(ar->sc_dev, "%s: m=%p, paddr=%08x\n",
-	    __func__,
-	    pbuf->m,
-	    (uint32_t) pbuf->mb.paddr);
-#endif
 	if (ret) {
 		ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
 		athp_freebuf(ar, &ar->buf_rx, pbuf);
