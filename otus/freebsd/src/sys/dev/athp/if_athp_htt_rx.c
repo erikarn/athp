@@ -412,7 +412,7 @@ static inline struct athp_buf *ath10k_htt_rx_netbuf_pop(struct ath10k_htt *htt)
 	    msdu,
 	    msdu->m,
 	    mbuf_skb_len(msdu->m));
-	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx netbuf pop: ",
+	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx netbuf pop: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 
 	return msdu;
@@ -632,7 +632,7 @@ static struct athp_buf *ath10k_htt_rx_pop_paddr(struct ath10k_htt *htt,
 
 	athp_dma_mbuf_post_recv(ar, &ar->buf_rx, &msdu->mb);
 
-	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx netbuf pop: ",
+	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx netbuf pop: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 
 	return msdu;
@@ -2075,7 +2075,7 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 			     HTT_RX_INDICATION_INFO1_NUM_MPDU_RANGES);
 	mpdu_ranges = htt_rx_ind_get_mpdu_ranges(rx);
 
-	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx ind: ",
+	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx ind: ",
 			rx, sizeof(*rx) +
 			(sizeof(struct htt_rx_indication_mpdu_range) *
 				num_mpdu_ranges));
@@ -2643,7 +2643,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_FRAG_IND: {
-		athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
+		ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
 				mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 		ath10k_htt_rx_frag_handler(htt, &resp->rx_frag_ind);
 		break;
@@ -2709,7 +2709,7 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 	default:
 		ath10k_warn(ar, "htt event (%d) not handled\n",
 			    resp->hdr.msg_type);
-		athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
+		ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt event: ",
 				mbuf_skb_data(skb->m), mbuf_skb_len(skb->m));
 		break;
 	};

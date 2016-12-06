@@ -4276,7 +4276,7 @@ static void ath10k_wmi_event_service_ready_work(void *targ, int npending)
 	    __le32_to_cpu(arg.eeprom_rd));
 #endif
 
-	athp_debug_dump(ar, ATH10K_DBG_WMI, NULL, "wmi svc: ",
+	ath10k_dbg_dump(ar, ATH10K_DBG_WMI, NULL, "wmi svc: ",
 			arg.service_map, arg.service_map_len);
 
 	/* only manually set fw features when not using FW IE format */

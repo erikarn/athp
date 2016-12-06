@@ -83,7 +83,7 @@ enum ath10k_pktlog_filter {
 	} while (0)
 
 struct ath10k;
-extern	void athp_debug_dump(struct ath10k *ar, uint64_t mask,
+extern	void ath10k_dbg_dump(struct ath10k *ar, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);
 extern	void ath10k_print_driver_info(struct ath10k *ar);
 

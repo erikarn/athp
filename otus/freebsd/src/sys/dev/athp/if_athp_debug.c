@@ -96,7 +96,7 @@ __FBSDID("$FreeBSD$");
  */
 
 void
-athp_debug_dump(struct ath10k *ar, uint64_t mask,
+ath10k_dbg_dump(struct ath10k *ar, uint64_t mask,
     const char *msg, const char *prefix,
     const void *b, size_t len)
 {

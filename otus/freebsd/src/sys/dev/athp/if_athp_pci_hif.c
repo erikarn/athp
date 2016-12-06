@@ -760,7 +760,7 @@ ath10k_pci_hif_tx_sg(struct ath10k *ar, u8 pipe_id,
 		ath10k_dbg(ar, ATH10K_DBG_PCI | ATH10K_DBG_CE,
 			   "pci tx item %d paddr 0x%08x len %d n_items %d\n",
 			   i, items[i].paddr, items[i].len, n_items);
-		athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
+		ath10k_dbg_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
 		    items[i].vaddr, items[i].len);
 
 		err = ath10k_ce_send_nolock(ce_pipe,
@@ -778,7 +778,7 @@ ath10k_pci_hif_tx_sg(struct ath10k *ar, u8 pipe_id,
 	ath10k_dbg(ar, ATH10K_DBG_PCI | ATH10K_DBG_CE,
 		   "pci tx item %d paddr 0x%08x len %d n_items %d\n",
 		   i, items[i].paddr, items[i].len, n_items);
-	athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
+	ath10k_dbg_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci tx data: ",
 			items[i].vaddr, items[i].len);
 
 	err = ath10k_ce_send_nolock(ce_pipe,

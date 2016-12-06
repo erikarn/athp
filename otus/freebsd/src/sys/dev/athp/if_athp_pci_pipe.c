@@ -322,7 +322,7 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		TAILQ_REMOVE(&br_list, pbuf, next);
 		ath10k_dbg(ar, ATH10K_DBG_PCI, "pci rx ce pipe %d len %d\n",
 			   ce_state->id, mbuf_skb_len(pbuf->m));
-		athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
+		ath10k_dbg_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
 			    mbuf_skb_data(pbuf->m),
 			    mbuf_skb_len(pbuf->m));
 		cb->rx_completion(ar, pbuf);

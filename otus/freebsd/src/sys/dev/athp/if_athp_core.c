@@ -878,7 +878,7 @@ ath10k_core_fetch_firmware_api_n(struct ath10k *ar, const char *name)
 				}
 			}
 
-			athp_debug_dump(ar, ATH10K_DBG_BOOT, "features", "",
+			ath10k_dbg_dump(ar, ATH10K_DBG_BOOT, "features", "",
 					ar->fw_features,
 					sizeof(ar->fw_features));
 			break;
