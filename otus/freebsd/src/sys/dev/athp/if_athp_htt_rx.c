@@ -862,8 +862,6 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 				  struct ieee80211_rx_stats *status,
 				  struct htt_rx_desc *rxd)
 {
-#if 0
-	struct ieee80211_supported_band *sband;
 	u8 cck, rate, bw, sgi, mcs, nss;
 	u8 preamble = 0;
 	u32 info1, info2, info3;
@@ -879,14 +877,19 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 		/* To get legacy rate index band is required. Since band can't
 		 * be undefined check if freq is non-zero.
 		 */
-		if (!status->freq)
+		if (!status->c_freq)
 			return;
 		cck = info1 & RX_PPDU_START_INFO1_L_SIG_RATE_SELECT;
 		rate = MS(info1, RX_PPDU_START_INFO1_L_SIG_RATE);
 		rate &= ~RX_PPDU_START_RATE_FLAG;
 
-		sband = &ar->mac.sbands[status->band];
-		status->rate_idx = ath10k_mac_hw_rate_to_idx(sband, rate);
+		status->c_rate = ath10k_mac_hw_rate_to_net80211_legacy_rate(ar,
+		    rate, cck);
+		status->c_phytype = IEEE80211_RX_FW_20MHZ;
+		if (cck)
+			status->c_pktflags |= IEEE80211_RX_F_CCK;
+		else
+			status->c_pktflags |= IEEE80211_RX_F_OFDM;
 		break;
 	case HTT_RX_HT:
 	case HTT_RX_HT_WITH_TXBF:
@@ -896,12 +899,16 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 		bw = (info2 >> 7) & 1;
 		sgi = (info3 >> 7) & 1;
 
-		status->rate_idx = mcs;
-		status->flag |= RX_FLAG_HT;
+		status->c_rate = mcs;
+		status->c_pktflags |= IEEE80211_RX_F_HT;
 		if (sgi)
-			status->flag |= RX_FLAG_SHORT_GI;
-		if (bw)
-			status->flag |= RX_FLAG_40MHZ;
+			status->c_pktflags |= IEEE80211_RX_F_SHORTGI;
+		if (bw) {
+			status->r_flags |= IEEE80211_R_C_HT40;
+			status->c_phytype = IEEE80211_RX_FW_40MHZ;
+		} else {
+			status->c_phytype = IEEE80211_RX_FW_20MHZ;
+		}
 		break;
 	case HTT_RX_VHT:
 	case HTT_RX_VHT_WITH_TXBF:
@@ -912,31 +919,32 @@ static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 		bw = info2 & 3;
 		sgi = info3 & 1;
 
-		status->rate_idx = mcs;
-		status->vht_nss = nss;
+		status->c_rate = mcs;
+		status->c_vhtnss = nss;
 
 		if (sgi)
-			status->flag |= RX_FLAG_SHORT_GI;
+			status->c_pktflags |= IEEE80211_RX_F_SHORTGI;
 
 		switch (bw) {
 		/* 20MHZ */
 		case 0:
+			status->c_phytype = IEEE80211_RX_FW_20MHZ;
 			break;
 		/* 40MHZ */
 		case 1:
-			status->flag |= RX_FLAG_40MHZ;
+			status->r_flags |= IEEE80211_R_C_HT40;
+			status->c_phytype = IEEE80211_RX_FW_40MHZ;
 			break;
 		/* 80MHZ */
 		case 2:
-			status->vht_flag |= RX_VHT_FLAG_80MHZ;
+			status->c_phytype = IEEE80211_RX_FW_80MHZ;
 		}
 
-		status->flag |= RX_FLAG_VHT;
+		status->c_pktflags |= IEEE80211_RX_F_VHT;
 		break;
 	default:
 		break;
 	}
-#endif
 }
 
 static uint32_t

@@ -170,6 +170,78 @@ static u8 ath10k_mac_bitrate_to_rate(int bitrate)
 	       (ath10k_mac_bitrate_is_cck(bitrate) ? BIT(7) : 0);
 }
 
+/*
+ * Map ath10k OFDM/CCK rate to legacy rate value (2*mbit).
+ */
+uint8_t
+ath10k_mac_hw_rate_to_net80211_legacy_rate(struct ath10k *ar, uint8_t hw_rate,
+    int is_cck)
+{
+
+	if (is_cck) {
+		switch (hw_rate) {
+		case ATH10K_HW_RATE_CCK_LP_1M:
+			return (1*2);
+
+		case ATH10K_HW_RATE_CCK_LP_2M:
+		case ATH10K_HW_RATE_CCK_SP_2M:
+			return (2*2);
+
+		case ATH10K_HW_RATE_CCK_LP_5_5M:
+		case ATH10K_HW_RATE_CCK_SP_5_5M:
+			return (11);
+
+		case ATH10K_HW_RATE_CCK_LP_11M:
+		case ATH10K_HW_RATE_CCK_SP_11M:
+			return (22);
+
+		default:
+			return (0);
+		}
+	}
+
+	switch (hw_rate) {
+	case ATH10K_HW_RATE_OFDM_6M:
+		return (6*2);
+	case ATH10K_HW_RATE_OFDM_9M:
+		return (9*2);
+	case ATH10K_HW_RATE_OFDM_12M:
+		return (12*2);
+	case ATH10K_HW_RATE_OFDM_18M:
+		return (18*2);
+	case ATH10K_HW_RATE_OFDM_24M:
+		return (24*2);
+	case ATH10K_HW_RATE_OFDM_36M:
+		return (36*2);
+	case ATH10K_HW_RATE_OFDM_48M:
+		return (48*2);
+	case ATH10K_HW_RATE_OFDM_54M:
+		return (54*2);
+	default:
+		return (0);
+	}
+}
+
+/*
+ * Return true if the frame is short-preamble CCK; false otherwise.
+ */
+int
+ath10k_mac_hw_rate_cck_is_short_preamble(struct ath10k *ar, u8 hw_rate,
+    int is_cck)
+{
+	if (! is_cck)
+		return (0);
+
+	switch (hw_rate) {
+	case ATH10K_HW_RATE_CCK_SP_2M:
+	case ATH10K_HW_RATE_CCK_SP_5_5M:
+	case ATH10K_HW_RATE_CCK_SP_11M:
+		return (1);
+	default:
+		return (0);
+	}
+}
+
 #if 0
 u8 ath10k_mac_hw_rate_to_idx(const struct ieee80211_supported_band *sband,
 			     u8 hw_rate)
