@@ -28,6 +28,7 @@ struct ath10k_skb_cb {
 		u32 txbuf_paddr;
 	} __packed htt;
 
+
 	struct {
 		bool dtim_zero;
 		bool deliver_cab;
@@ -56,6 +57,7 @@ struct athp_buf {
 	// RX state
 	struct {
 		int ip_summed;
+		uint32_t paddr;
 	} rx;
 
 	/* This is the (optional) HTC header for TX */
@@ -65,7 +67,7 @@ struct athp_buf {
 typedef TAILQ_HEAD(athp_buf_s, athp_buf) athp_buf_head;
 
 #define	ATH10K_SKB_CB(pbuf)	(&pbuf->tx)
-//#define	ATH10K_SKB_RXCB(pbuf)	(&pbuf->rx)
+#define	ATH10K_SKB_RXCB(pbuf)	(&pbuf->rx)
 
 struct athp_buf_ring {
 	struct athp_dma_head dh;
