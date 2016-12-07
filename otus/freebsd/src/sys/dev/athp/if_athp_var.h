@@ -259,6 +259,7 @@ struct ath10k {
 	struct task		fwlog_tx_work;
 	athp_buf_head		fwlog_tx_queue;
 	struct mtx		fwlog_mtx;
+	int			fwlog_tx_queue_len;
 
 	struct intr_config_hook		sc_preinit_hook;
 
