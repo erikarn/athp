@@ -105,43 +105,37 @@ static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb);
 static void ath10k_htt_txrx_compl_task(void *arg, int npending);
 static void ath10k_htt_rx_ring_refill_retry(void *arg);
 
-#if 0
+#define	SKB_RX_HASH(skb)		(((skb) >> 6) & ~(ATHP_RX_SKB_HASH_BUCKET_COUNT-1))
+
 static struct athp_buf *
 ath10k_htt_rx_find_skb_paddr(struct ath10k *ar, u32 paddr)
 {
-	struct ath10k_skb_rxcb *rxcb;
+	struct athp_buf *skb, *pn;
 
-	hash_for_each_possible(ar->htt.rx_ring.skb_table, rxcb, hlist, paddr)
-		if (rxcb->paddr == paddr)
-			return ATH10K_RXCB_SKB(rxcb);
+	TAILQ_FOREACH_SAFE(skb, &ar->htt.rx_ring.skb_table[SKB_RX_HASH(paddr)], next, pn) {
+		if (ATH10K_SKB_RXCB(skb)->paddr == paddr)
+			return (skb);
+	}
 
 	WARN_ON_ONCE(1);
 	return NULL;
 }
-#endif
 
 static void ath10k_htt_rx_ring_free(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
-	struct athp_buf *skb;
-//	struct ath10k_skb_rxcb *rxcb;
-//	struct hlist_node *n;
+	struct athp_buf *skb, *pn;
 	int i;
 
 	if (htt->rx_ring.in_ord_rx) {
-#if 0
-		hash_for_each_safe(htt->rx_ring.skb_table, i, n, rxcb, hlist) {
-			skb = ATH10K_RXCB_SKB(rxcb);
-			dma_unmap_single(htt->ar->dev, rxcb->paddr,
-					 mbuf_skb_len(skb->m) + skb_tailroom(skb),
-					 DMA_FROM_DEVICE);
-			hash_del(&rxcb->hlist);
-			athp_freebuf(ar, &ar->buf_rx, skb);
+		/* hash_free */
+		for (i = 0; i < ATHP_RX_SKB_HASH_BUCKET_COUNT; i++) {
+			TAILQ_FOREACH_SAFE(skb, &ar->htt.rx_ring.skb_table[i], next, pn) {
+				athp_dma_mbuf_unload(ar, &ar->buf_rx.dh, &skb->mb);
+				TAILQ_REMOVE(&ar->htt.rx_ring.skb_table[i], skb, next);
+				athp_freebuf(ar, &ar->buf_rx, skb);
+			}
 		}
-#else
-		device_printf(ar->sc_dev, "%s: TODO: in_ord_rx ring free!\n",
-		    __func__);
-#endif
 	} else {
 		for (i = 0; i < htt->rx_ring.size; i++) {
 			skb = htt->rx_ring.netbufs_ring[i];
@@ -152,9 +146,12 @@ static void ath10k_htt_rx_ring_free(struct ath10k_htt *htt)
 	}
 
 	htt->rx_ring.fill_cnt = 0;
-#if 0
-	hash_init(htt->rx_ring.skb_table);
-#endif
+
+	/* hash_init */
+	for (i = 0; i < ATHP_RX_SKB_HASH_BUCKET_COUNT; i++) {
+		TAILQ_INIT(&htt->rx_ring.skb_table[i]);
+	}
+
 	memset(htt->rx_ring.netbufs_ring, 0,
 	       htt->rx_ring.size * sizeof(htt->rx_ring.netbufs_ring[0]));
 }
@@ -227,13 +224,10 @@ static int __ath10k_htt_rx_ring_fill_n(struct ath10k_htt *htt, int num)
 		    htt->rx_ring.netbufs_ring[idx]);
 
 		if (htt->rx_ring.in_ord_rx) {
-#if 0
-			hash_add(htt->rx_ring.skb_table,
-				 &ATH10K_SKB_RXCB(skb)->hlist,
-				 (u32) skb->mb.paddr);
-#else
-			device_printf(ar->sc_dev, "%s: TODO: implement in_ord_rx\n", __func__);
-#endif
+				ATH10K_SKB_RXCB(skb)->paddr = skb->mb.paddr;
+				/* hash_add */
+				TAILQ_INSERT_TAIL(&htt->rx_ring.skb_table[SKB_RX_HASH(skb->mb.paddr)],
+				    skb, next);
 		}
 
 		num--;
@@ -615,10 +609,10 @@ static void ath10k_htt_rx_replenish_task(void *arg, int npending)
 static struct athp_buf *ath10k_htt_rx_pop_paddr(struct ath10k_htt *htt,
 					       u32 paddr)
 {
-#if 0
 	struct ath10k *ar = htt->ar;
-//	struct ath10k_skb_rxcb *rxcb;
 	struct athp_buf *msdu;
+
+	ath10k_warn(ar, "%s: TODO: untested path!\n", __func__);
 
 	ATHP_HTT_RX_LOCK_ASSERT(htt);
 
@@ -626,27 +620,22 @@ static struct athp_buf *ath10k_htt_rx_pop_paddr(struct ath10k_htt *htt,
 	if (!msdu)
 		return NULL;
 
-//	rxcb = ATH10K_SKB_RXCB(msdu);
-	hash_del(&rxcb->hlist);
+	/* hash_del */
+	TAILQ_REMOVE(&htt->rx_ring.skb_table[SKB_RX_HASH(paddr)], msdu, next);
 	htt->rx_ring.fill_cnt--;
 
-	athp_dma_mbuf_post_recv(ar, &ar->buf_rx, &msdu->mb);
+	athp_dma_mbuf_post_recv(ar, &ar->buf_rx.dh, &msdu->mb);
 
 	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt rx netbuf pop: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 
 	return msdu;
-#else
-	printf("%s: called; TODO!\n", __func__);
-	return NULL;
-#endif
 }
 
 static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 					struct htt_rx_in_ord_ind *ev,
 					athp_buf_head *list)
 {
-#if 0
 	struct ath10k *ar = htt->ar;
 	struct htt_rx_in_ord_msdu_desc *msdu_desc = ev->msdu_descs;
 	struct htt_rx_desc *rxd;
@@ -660,6 +649,8 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 	msdu_count = __le16_to_cpu(ev->msdu_count);
 	is_offload = !!(ev->info & HTT_RX_IN_ORD_IND_INFO_OFFLOAD_MASK);
 
+	ath10k_warn(ar, "%s: TODO: untested path!\n", __func__);
+
 	while (msdu_count--) {
 		paddr = __le32_to_cpu(msdu_desc->msdu_paddr);
 
@@ -672,12 +663,12 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 		TAILQ_INSERT_TAIL(list, msdu, next);
 
 		if (!is_offload) {
-			rxd = (void *)msdu->data;
+			rxd = (void *)mbuf_skb_data(msdu->m);
 
 			trace_ath10k_htt_rx_desc(ar, rxd, sizeof(*rxd));
-			skb_put(msdu, sizeof(*rxd));
-			skb_pull(msdu, sizeof(*rxd));
-			skb_put(msdu, __le16_to_cpu(msdu_desc->msdu_len));
+			mbuf_skb_put(msdu->m, sizeof(*rxd));
+			mbuf_skb_pull(msdu->m, sizeof(*rxd));
+			mbuf_skb_put(msdu->m, __le16_to_cpu(msdu_desc->msdu_len));
 
 			if (!(__le32_to_cpu(rxd->attention.flags) &
 			      RX_ATTENTION_FLAGS_MSDU_DONE)) {
@@ -690,10 +681,6 @@ static int ath10k_htt_rx_pop_paddr_list(struct ath10k_htt *htt,
 	}
 
 	return 0;
-#else
-	printf("%s: TODO!\n", __func__);
-	return -ENOENT;
-#endif
 }
 
 int
@@ -763,6 +750,7 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 {
 	struct ath10k *ar = htt->ar;
 	struct callout *timer = &htt->rx_ring.refill_retry_timer;
+	int i;
 
 	htt->rx_confused = false;
 
@@ -788,9 +776,11 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 
 	htt->rx_ring.fill_cnt = 0;
 	htt->rx_ring.sw_rd_idx.msdu_payld = 0;
-#if 0
-	hash_init(htt->rx_ring.skb_table);
-#endif
+	/* hash_init */
+	for (i = 0; i < ATHP_RX_SKB_HASH_BUCKET_COUNT; i++) {
+		TAILQ_INIT(&htt->rx_ring.skb_table[i]);
+	}
+
 
 	if (! htt->rx_is_init) {
 		TASK_INIT(&htt->rx_replenish_task, 0, ath10k_htt_rx_replenish_task, htt);

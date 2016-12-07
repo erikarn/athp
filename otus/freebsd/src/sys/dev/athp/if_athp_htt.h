@@ -60,6 +60,8 @@ struct ath10k_htt_txbuf {
 #define	ATHP_HTT_RX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_OWNED)
 #define	ATHP_HTT_RX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_NOTOWNED)
 
+#define	ATHP_RX_SKB_HASH_BUCKET_COUNT	32
+
 struct ath10k_htt {
 	struct ath10k *ar;
 	enum ath10k_htc_ep_id eid;
@@ -100,9 +102,7 @@ struct ath10k_htt {
 		 * of hash collisions for sk_buffs.
 		 */
 		bool in_ord_rx;
-#if 0
-		DECLARE_HASHTABLE(skb_table, 4);
-#endif
+		athp_buf_head skb_table[ATHP_RX_SKB_HASH_BUCKET_COUNT];
 
 		/*
 		 * Ring of buffer addresses -
