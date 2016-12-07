@@ -2362,9 +2362,10 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
     struct ieee80211_node *ni,
     struct wmi_peer_assoc_complete_arg *arg)
 {
-	struct ieee80211com *ic = &ar->sc_ic;
+//	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_rate_set_arg *rateset = &arg->peer_legacy_rates;
-	int i;
+	struct ieee80211_rateset *rs;
+	int i, nr;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2373,39 +2374,53 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
 	 * that all rates are available for the given phy mode;
 	 * later on we should look at what's negotiated.
 	 *
-	 * XXX yes, there's no per-vap channel, sigh.
+	 * XXX TODO: it may be IEEE80211_CHAN_ANYC, which we should
+	 *           treat here like a blank chanctx.
+	 * XXX TODO: ni->ni_chan instead?
+	 * XXX TODO: aim to totally remove ni_curchan from this driver
+	 *           and use vap/node channels.
 	 */
 
 	rateset->num_rates = 0;
 
-	if (IEEE80211_IS_CHAN_B(ic->ic_curchan)) {
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
-	} else if (IEEE80211_IS_CHAN_G(ic->ic_curchan)) {
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
+	/*
+	 * Walk the rateset, adding rates as appropriate.
+	 * We do it twice - once for CCK rates, and once for OFDM rates.
+	 */
+	rs = &ni->ni_rates;
+	nr = rs->rs_nrates;
 
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
-	} else if (IEEE80211_IS_CHAN_A(ic->ic_curchan)) {
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
-	} else {
-		ath10k_err(ar, "%s: TODO: channel isn't a, b, g!\n", __func__);
+	/* CCK rates */
+	for (i = 0; i < nr; i++) {
+		int bitrate;
+
+		/*
+		 * Map rate to bps for call to ath10k_mac_bitrate_to_rate(),
+		 * etc
+		 */
+		bitrate = (rs->rs_rates[i] & IEEE80211_RATE_VAL) * 5;
+
+		if (! ath10k_mac_bitrate_is_cck(bitrate))
+			continue;
+
+		rateset->rates[rateset->num_rates++] =
+		    ath10k_mac_bitrate_to_rate(bitrate);
+	}
+
+	/* OFDM rates */
+	for (i = 0; i < nr; i++) {
+		int bitrate;
+
+		/*
+		 * Map rate to bps for call to ath10k_mac_bitrate_to_rate(),
+		 * etc
+		 */
+		bitrate = (rs->rs_rates[i] & IEEE80211_RATE_VAL) * 5;
+		if (ath10k_mac_bitrate_is_cck(bitrate))
+			continue;
+
+		rateset->rates[rateset->num_rates++] =
+		    ath10k_mac_bitrate_to_rate(bitrate);
 	}
 
 	/* Debugging */
@@ -3034,10 +3049,6 @@ static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 
 /*
  * Configure the phymode for this node.
- *
- * This is very 11abg specific and doesn't at all handle 11n/11ac.
- * It isn't too hard though - look at the non-freebsd version
- * when the time comes.
  */
 static void
 ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
