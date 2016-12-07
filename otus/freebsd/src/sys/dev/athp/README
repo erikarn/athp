@@ -163,6 +163,8 @@ MSI:
   (done) Go find ath10k_regd_update() and ensure we call it as part of dev/vif up or
   firmware will panic upon scan!
 
+* add an iv_reset method to handle TX power changes on the fly, and turn that
+  into a suitable WMI command.
 
 Panics / locking issues that need addressing
 ============================================
