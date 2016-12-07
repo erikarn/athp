@@ -1778,9 +1778,7 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		 * XXX TODO: actually check if this is an AMSDU or
 		 * just MSDU/MPDU?
 		 */
-#if 0
-		status->c_pktflags |= IEEE80211_RX_F_AMSDU;
-#endif
+
 		if (TAILQ_EMPTY(amsdu))
 			status->c_pktflags &= ~IEEE80211_RX_F_AMSDU_MORE;
 		else
@@ -2683,15 +2681,10 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_IN_ORD_PADDR_IND: {
-#if 0
 		ATHP_HTT_RX_LOCK(htt);
 		TAILQ_INSERT_TAIL(&htt->rx_in_ord_compl_q, skb, next);
 		ATHP_HTT_RX_UNLOCK(htt);
 		taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
-#else
-		device_printf(ar->sc_dev, "%s: TODO: IN_ORD_PADDR_IND: unsupported!\n",
-		    __func__);
-#endif
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_TX_CREDIT_UPDATE_IND:
