@@ -99,6 +99,8 @@ MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
 /*
  * 2GHz channel list for ath10k.
+ *
+ * XXX This has to add up to ATH10K_NUM_CHANS .
  */
 static uint8_t chan_list_2ghz[] =
     { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };

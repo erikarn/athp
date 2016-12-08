@@ -462,13 +462,11 @@ struct ath10k {
 	struct task register_work;
 	struct task restart_work;
 
-#if 0
 	/* cycle count is reported twice for each visited channel during scan.
 	 * access protected by data_lock */
 	u32 survey_last_rx_clear_count;
 	u32 survey_last_cycle_count;
-	struct survey_info survey[ATH10K_NUM_CHANS];
-#endif
+	struct ieee80211_channel_survey survey[ATH10K_NUM_CHANS];
 
 	/* Channel info events are expected to come in pairs without and with
 	 * COMPLETE flag set respectively for each channel visit during scan.

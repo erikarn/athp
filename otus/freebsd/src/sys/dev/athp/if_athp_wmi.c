@@ -102,6 +102,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_spectral.h"
 #include "if_athp_fwlog.h"
 #include "if_athp_trace.h"
+#include "if_athp_regs.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -2472,26 +2473,35 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	return 0;
 }
 
-#if 0
+/*
+ * 2GHz channel list for ath10k.
+ *
+ * XXX duplicate with what's in if_athp_main.c.
+ */
+static uint8_t chan_list_2ghz[] =
+    { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+static uint8_t chan_list_5ghz[] =
+    { 36, 40, 44, 48, 52, 56, 60, 64, 100, 104,
+      108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
+      153, 157, 161, 165 };
+
 static int freq_to_idx(struct ath10k *ar, int freq)
 {
-	struct ieee80211_supported_band *sband;
-	int band, ch, idx = 0;
+	int ch, idx = 0;
 
-	for (band = IEEE80211_BAND_2GHZ; band < IEEE80211_NUM_BANDS; band++) {
-		sband = ar->hw->wiphy->bands[band];
-		if (!sband)
-			continue;
+	for (ch = 0; ch < nitems(chan_list_2ghz); ch++, idx++) {
+		if (ieee80211_ieee2mhz(chan_list_2ghz[ch], IEEE80211_CHAN_2GHZ) == freq)
+			goto exit;
+	}
 
-		for (ch = 0; ch < sband->n_channels; ch++, idx++)
-			if (sband->channels[ch].center_freq == freq)
-				goto exit;
+	for (ch = 0; ch < nitems(chan_list_5ghz); ch++, idx++) {
+		if (ieee80211_ieee2mhz(chan_list_5ghz[ch], IEEE80211_CHAN_5GHZ) == freq)
+			goto exit;
 	}
 
 exit:
 	return idx;
 }
-#endif
 
 static int ath10k_wmi_op_pull_ch_info_ev(struct ath10k *ar, struct athp_buf *pbuf,
 					 struct wmi_ch_info_ev_arg *arg)
@@ -2538,10 +2548,9 @@ static int ath10k_wmi_10_4_op_pull_ch_info_ev(struct ath10k *ar,
 void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	struct wmi_ch_info_ev_arg arg = {};
-//	struct survey_info *survey;
+	struct ieee80211_channel_survey *survey;
 	u32 err_code, freq, cmd_flags, noise_floor, rx_clear_count, cycle_count;
-//	int idx, ret;
-	int ret;
+	int idx, ret;
 
 	ret = ath10k_wmi_pull_ch_info(ar, pbuf, &arg);
 	if (ret) {
@@ -2578,7 +2587,6 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 	 * all the way up to net80211.
 	 */
 
-#if 0
 	idx = freq_to_idx(ar, freq);
 	if (idx >= ARRAY_SIZE(ar->survey)) {
 		ath10k_warn(ar, "chan info: invalid frequency %d (idx %d out of bounds)\n",
@@ -2589,8 +2597,8 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 	if (cmd_flags & WMI_CHAN_INFO_FLAG_COMPLETE) {
 		if (ar->ch_info_can_report_survey) {
 			survey = &ar->survey[idx];
-			survey->noise = noise_floor;
-			survey->filled = SURVEY_INFO_NOISE_DBM;
+			survey->s_noise = noise_floor;
+			survey->s_flags = IEEE80211_F_SURVEY_NOISE_DBM;
 
 			ath10k_hw_fill_survey_time(ar,
 						   survey,
@@ -2609,7 +2617,6 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 		ar->survey_last_rx_clear_count = rx_clear_count;
 		ar->survey_last_cycle_count = cycle_count;
 	}
-#endif
 exit:
 	ATHP_DATA_UNLOCK(ar);
 }
