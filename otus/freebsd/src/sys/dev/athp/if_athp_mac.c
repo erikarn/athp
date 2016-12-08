@@ -8633,3 +8633,29 @@ athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 
 	return (ret);
 }
+
+int
+athp_vif_update_txpower(struct ieee80211vap *vap)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ieee80211_node *ni;
+	int ret;
+
+	/* XXX lock */
+	if (vap->iv_bss == NULL)
+		return (0);
+
+	ni = ieee80211_ref_node(vap->iv_bss);
+
+	ATHP_CONF_LOCK(ar);
+	arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
+	ret = ath10k_mac_txpower_recalc(ar);
+	ATHP_CONF_UNLOCK(ar);
+
+	ieee80211_free_node(ni);
+
+	if (ret)
+		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
+	return (ret);
+}

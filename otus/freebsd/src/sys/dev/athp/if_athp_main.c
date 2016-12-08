@@ -995,6 +995,25 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	return (1);
 }
 
+static int
+athp_vap_reset(struct ieee80211vap *vap, u_long cmd)
+{
+#if 0
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+#endif
+
+	switch (cmd) {
+	case IEEE80211_IOC_TXPOWER:
+		(void) athp_vif_update_txpower(vap);
+		return (0);
+	}
+
+	/* For now, we don't have a reset hardware to running handler.. */
+	return (0);
+}
+
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     enum ieee80211_opmode opmode, int flags,
@@ -1061,6 +1080,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_key_alloc = athp_key_alloc;
 	vap->iv_key_set = athp_key_set;
 	vap->iv_key_delete = athp_key_delete;
+	vap->iv_reset = athp_vap_reset;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
