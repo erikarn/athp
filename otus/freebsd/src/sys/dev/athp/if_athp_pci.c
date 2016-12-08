@@ -109,7 +109,7 @@ static device_method_t athp_methods[] = {
 static driver_t athp_driver = {
 	.name = "athp",
 	.methods = athp_methods,
-	.size = sizeof(struct athp_pci_softc)
+	.size = sizeof(struct ath10k_pci)
 };
 
 static devclass_t athp_devclass;
@@ -152,7 +152,7 @@ static void ath10k_pci_ce_tasklet(void *arg)
 
 static void ath10k_msi_err_tasklet(void *arg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
 	if (!ath10k_pci_has_fw_crashed(psc)) {
@@ -174,7 +174,7 @@ static void ath10k_msi_err_tasklet(void *arg)
 static int ath10k_pci_per_engine_handler(void *arg)
 {
 	struct ath10k_pci_pipe *pipe = arg;
-//	struct athp_pci_softc *psc = pipe->psc;
+//	struct ath10k_pci *psc = pipe->psc;
 	struct ath10k *ar = pipe->ar;
 
 	if (ar->sc_invalid)
@@ -204,7 +204,7 @@ static int ath10k_pci_per_engine_handler(void *arg)
 
 static int ath10k_pci_msi_fw_handler(void *arg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
 	if (ar->sc_invalid)
@@ -216,7 +216,7 @@ static int ath10k_pci_msi_fw_handler(void *arg)
 static int
 ath10k_pci_interrupt_handler(void *arg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
 	if (ar->sc_invalid)
@@ -240,7 +240,7 @@ ath10k_pci_interrupt_handler(void *arg)
  */
 static void ath10k_pci_tasklet(void *arg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
 	if (ar->sc_invalid)
@@ -262,9 +262,9 @@ static void ath10k_pci_tasklet(void *arg)
 		ath10k_pci_enable_legacy_irq(psc);
 }
 
-static void ath10k_pci_free_irq(struct athp_pci_softc *psc);
+static void ath10k_pci_free_irq(struct ath10k_pci *psc);
 
-static int ath10k_pci_request_irq_msix(struct athp_pci_softc *psc)
+static int ath10k_pci_request_irq_msix(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	device_t dev = ar->sc_dev;
@@ -319,7 +319,7 @@ bad:
 	return (err);
 }
 
-static int ath10k_pci_request_irq_msi(struct athp_pci_softc *psc)
+static int ath10k_pci_request_irq_msi(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	device_t dev = ar->sc_dev;
@@ -353,7 +353,7 @@ bad:
 	return (err);
 }
 
-static int ath10k_pci_request_irq_legacy(struct athp_pci_softc *psc)
+static int ath10k_pci_request_irq_legacy(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	device_t dev = ar->sc_dev;
@@ -386,7 +386,7 @@ bad:
 	return (err);
 }
 
-static int ath10k_pci_request_irq(struct athp_pci_softc *psc)
+static int ath10k_pci_request_irq(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -403,7 +403,7 @@ static int ath10k_pci_request_irq(struct athp_pci_softc *psc)
 	return -EINVAL;
 }
 
-static void ath10k_pci_free_irq(struct athp_pci_softc *psc)
+static void ath10k_pci_free_irq(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	device_t dev = ar->sc_dev;
@@ -470,7 +470,7 @@ static void ath10k_pci_init_irq_tasklets(struct ath10k *ar)
 static uint32_t
 athp_pci_regio_read_reg(void *arg, uint32_t reg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
 
@@ -485,7 +485,7 @@ athp_pci_regio_read_reg(void *arg, uint32_t reg)
 static void
 athp_pci_regio_write_reg(void *arg, uint32_t reg, uint32_t val)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 
 	ath10k_dbg(ar, ATH10K_DBG_REGIO,
@@ -498,7 +498,7 @@ athp_pci_regio_write_reg(void *arg, uint32_t reg, uint32_t val)
 static uint32_t
 athp_pci_regio_s_read_reg(void *arg, uint32_t reg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val, tmp;
 
@@ -523,7 +523,7 @@ athp_pci_regio_s_read_reg(void *arg, uint32_t reg)
 static void
 athp_pci_regio_s_write_reg(void *arg, uint32_t reg, uint32_t val)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 	struct ath10k *ar = &psc->sc_sc;
 	int tmp;
 
@@ -546,7 +546,7 @@ athp_pci_regio_s_write_reg(void *arg, uint32_t reg, uint32_t val)
 static void
 athp_pci_regio_flush_reg(void *arg)
 {
-	struct athp_pci_softc *psc = arg;
+	struct ath10k_pci *psc = arg;
 
 	device_printf(psc->sc_sc.sc_dev, "%s: called\n", __func__);
 }
@@ -559,7 +559,7 @@ athp_pci_regio_flush_reg(void *arg)
  * we support.
  */
 static int
-athp_pci_hw_lookup(struct athp_pci_softc *psc)
+athp_pci_hw_lookup(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -587,7 +587,7 @@ athp_pci_hw_lookup(struct athp_pci_softc *psc)
 }
 
 static int
-athp_pci_setup_bufs(struct athp_pci_softc *psc)
+athp_pci_setup_bufs(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	int ret;
@@ -616,7 +616,7 @@ athp_pci_setup_bufs(struct athp_pci_softc *psc)
 }
 
 static void
-athp_pci_free_bufs(struct athp_pci_softc *psc)
+athp_pci_free_bufs(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -631,7 +631,7 @@ static void
 athp_attach_preinit(void *arg)
 {
 	struct ath10k *ar = arg;
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	int ret;
 
 	config_intrhook_disestablish(&ar->sc_preinit_hook);
@@ -674,7 +674,7 @@ athp_attach_preinit(void *arg)
 static int
 athp_pci_attach(device_t dev)
 {
-	struct athp_pci_softc *psc = device_get_softc(dev);
+	struct ath10k_pci *psc = device_get_softc(dev);
 	struct ath10k *ar = &psc->sc_sc;
 	int rid, i;
 	int err = 0;
@@ -991,7 +991,7 @@ bad0:
 static int
 athp_pci_detach(device_t dev)
 {
-	struct athp_pci_softc *psc = device_get_softc(dev);
+	struct ath10k_pci *psc = device_get_softc(dev);
 	struct ath10k *ar = &psc->sc_sc;
 
 	ath10k_warn(ar, "%s: called\n", __func__);

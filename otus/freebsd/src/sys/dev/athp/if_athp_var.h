@@ -197,7 +197,7 @@ struct ath10k_stats {
  * Since we may see SDIO or USB derived parts at some point, there
  * is a little mini-HAL for talking to the MMIO register space.
  */
-struct athp_pci_softc;
+struct ath10k_pci;
 struct ath10k_hif_ops;
 struct athp_taskq_head;
 struct alq;
@@ -266,7 +266,7 @@ struct ath10k {
 	void (*sc_node_free)(struct ieee80211_node *);
 
 	/* XXX TODO: Cheating, until all the layering is fixed */
-	struct athp_pci_softc		*sc_psc;
+	struct ath10k_pci	*sc_psc;
 
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;

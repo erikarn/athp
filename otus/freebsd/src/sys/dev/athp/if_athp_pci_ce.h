@@ -35,7 +35,7 @@
  */
 
 struct ath10k_ce_pipe;
-struct athp_pci_softc;
+struct ath10k_pci;
 struct ath10k;
 
 #define CE_DESC_FLAGS_GATHER         (1 << 0)
@@ -112,7 +112,7 @@ struct ath10k_ce_ring {
 
 struct ath10k_ce_pipe {
 	struct ath10k *ar;
-	struct athp_pci_softc *psc;
+	struct ath10k_pci *psc;
 
 	unsigned int id;
 

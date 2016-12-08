@@ -223,7 +223,7 @@ static int
 ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
     int nbytes)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	int ret = 0;
 	u32 buf;
 	unsigned int completed_nbytes, orig_nbytes, remaining_bytes;
@@ -399,7 +399,7 @@ __ath10k_pci_diag_read_hi(struct ath10k *ar, void *dest, u32 src, u32 len)
 	__ath10k_pci_diag_read_hi(ar, dest, HI_ITEM(src), len)
 
 static void
-ath10k_pci_dump_registers(struct athp_pci_softc *psc,
+ath10k_pci_dump_registers(struct ath10k_pci *psc,
     struct ath10k_fw_crash_data *crash_data)
 {
 	struct ath10k *ar = &psc->sc_sc;
@@ -433,7 +433,7 @@ ath10k_pci_dump_registers(struct athp_pci_softc *psc,
 }
 
 void
-ath10k_pci_fw_crashed_dump(struct athp_pci_softc *psc)
+ath10k_pci_fw_crashed_dump(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -452,7 +452,7 @@ static int
 ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
     const void *data, int nbytes)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	int ret = 0;
 	u32 buf;
 	unsigned int completed_nbytes, orig_nbytes, remaining_bytes;
@@ -589,7 +589,7 @@ ath10k_pci_diag_write32(struct ath10k *ar, u32 address, u32 value)
 static int
 ath10k_pci_init_config(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	u32 interconnect_targ_addr;
 	u32 pcie_state_targ_addr = 0;
 	u32 pipe_cfg_targ_addr = 0;
@@ -735,7 +735,7 @@ static int
 ath10k_pci_hif_tx_sg(struct ath10k *ar, u8 pipe_id,
     struct ath10k_hif_sg_item *items, int n_items)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	struct ath10k_pci_pipe *pci_pipe = &psc->pipe_info[pipe_id];
 	struct ath10k_ce_pipe *ce_pipe = pci_pipe->ce_hdl;
 	struct ath10k_ce_ring *src_ring = ce_pipe->src_ring;
@@ -811,7 +811,7 @@ ath10k_pci_hif_diag_read(struct ath10k *ar, u32 address, void *buf,
 static u16
 ath10k_pci_hif_get_free_queue_number(struct ath10k *ar, u8 pipe)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 
 	ath10k_dbg(ar, ATH10K_DBG_PCI, "pci hif get free queue number\n");
 
@@ -848,7 +848,7 @@ static void
 ath10k_pci_hif_set_callbacks(struct ath10k *ar,
     struct ath10k_hif_cb *callbacks)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 
 	ath10k_dbg(ar, ATH10K_DBG_PCI, "pci hif set callbacks\n");
 
@@ -927,7 +927,7 @@ static void ath10k_pci_hif_get_default_pipe(struct ath10k *ar,
 static int
 ath10k_pci_hif_start(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot hif start\n");
 
@@ -943,7 +943,7 @@ ath10k_pci_hif_start(struct ath10k *ar)
 static void
 ath10k_pci_hif_stop(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot hif stop\n");
 
@@ -1044,7 +1044,7 @@ static int
 ath10k_pci_hif_exchange_bmi_msg(struct ath10k *ar,
     void *req, u32 req_len, void *resp, u32 *resp_len)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	struct ath10k_pci_pipe *pci_tx = &psc->pipe_info[BMI_CE_NUM_TO_TARG];
 	struct ath10k_pci_pipe *pci_rx = &psc->pipe_info[BMI_CE_NUM_TO_HOST];
 	struct ath10k_ce_pipe *ce_tx = pci_tx->ce_hdl;
@@ -1148,7 +1148,7 @@ err_resp:
 static int
 ath10k_pci_hif_power_up(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 	int ret;
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "boot hif power up\n");
@@ -1220,7 +1220,7 @@ ath10k_pci_hif_power_down(struct ath10k *ar)
 static int
 ath10k_pci_hif_suspend(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *psc = ar->sc_psc;
 
 	/* The grace timer can still be counting down and ar->ps_awake be true.
 	 * It is known that the device may be asleep after resuming regardless

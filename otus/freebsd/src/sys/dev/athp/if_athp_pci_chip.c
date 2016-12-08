@@ -153,15 +153,15 @@ static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 	{ QCA99X0_2_0_DEVICE_ID, QCA99X0_HW_2_0_CHIP_ID_REV },
 };
 
-static void ath10k_pci_buffer_cleanup(struct athp_pci_softc *ar);
-static int ath10k_pci_cold_reset(struct athp_pci_softc *ar);
-static int ath10k_pci_wait_for_target_init(struct athp_pci_softc *ar);
-static int ath10k_pci_request_irq(struct athp_pci_softc *ar);
-static void ath10k_pci_free_irq(struct athp_pci_softc *ar);
-static int ath10k_pci_qca99x0_chip_reset(struct athp_pci_softc *ar);
+static void ath10k_pci_buffer_cleanup(struct ath10k_pci *ar);
+static int ath10k_pci_cold_reset(struct ath10k_pci *ar);
+static int ath10k_pci_wait_for_target_init(struct ath10k_pci *ar);
+static int ath10k_pci_request_irq(struct ath10k_pci *ar);
+static void ath10k_pci_free_irq(struct ath10k_pci *ar);
+static int ath10k_pci_qca99x0_chip_reset(struct ath10k_pci *ar);
 
 static bool
-ath10k_pci_is_awake(struct athp_pci_softc *psc)
+ath10k_pci_is_awake(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -172,7 +172,7 @@ ath10k_pci_is_awake(struct athp_pci_softc *psc)
 }
 
 static void
-__ath10k_pci_wake(struct athp_pci_softc *psc)
+__ath10k_pci_wake(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -188,7 +188,7 @@ __ath10k_pci_wake(struct athp_pci_softc *psc)
 }
 
 static void
-__ath10k_pci_sleep(struct athp_pci_softc *psc)
+__ath10k_pci_sleep(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -205,7 +205,7 @@ __ath10k_pci_sleep(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_wake_wait(struct athp_pci_softc *psc)
+ath10k_pci_wake_wait(struct ath10k_pci *psc)
 {
 	int tot_delay = 0;
 	int curr_delay = 5;
@@ -225,7 +225,7 @@ ath10k_pci_wake_wait(struct athp_pci_softc *psc)
 }
 
 int
-ath10k_pci_wake(struct athp_pci_softc *psc)
+ath10k_pci_wake(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 //	unsigned long flags;
@@ -264,7 +264,7 @@ ath10k_pci_wake(struct athp_pci_softc *psc)
  * XXX TODO: actually potentially put the thing to sleep; do timer work; etc.
  */
 void
-ath10k_pci_sleep(struct athp_pci_softc *psc)
+ath10k_pci_sleep(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -296,7 +296,7 @@ skip:
 static void
 ath10k_pci_ps_timer(unsigned long ptr)
 {
-	struct athp_pci_softc *ar = (void *)ptr;
+	struct ath10k_pci *ar = (void *)ptr;
 	struct ath10k_pci *ar_pci = ath10k_pci_priv(ar);
 	unsigned long flags;
 
@@ -316,7 +316,7 @@ skip:
 #endif
 
 void
-ath10k_pci_sleep_sync(struct athp_pci_softc *psc)
+ath10k_pci_sleep_sync(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -334,7 +334,7 @@ ath10k_pci_sleep_sync(struct athp_pci_softc *psc)
 }
 
 bool
-ath10k_pci_irq_pending(struct athp_pci_softc *psc)
+ath10k_pci_irq_pending(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t cause;
@@ -349,7 +349,7 @@ ath10k_pci_irq_pending(struct athp_pci_softc *psc)
 }
 
 void
-ath10k_pci_disable_and_clear_legacy_irq(struct athp_pci_softc *psc)
+ath10k_pci_disable_and_clear_legacy_irq(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -372,7 +372,7 @@ ath10k_pci_disable_and_clear_legacy_irq(struct athp_pci_softc *psc)
 }
 
 void
-ath10k_pci_enable_legacy_irq(struct athp_pci_softc *psc)
+ath10k_pci_enable_legacy_irq(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -390,7 +390,7 @@ ath10k_pci_enable_legacy_irq(struct athp_pci_softc *psc)
 }
 
 static inline const char *
-ath10k_pci_get_irq_method(struct athp_pci_softc *psc)
+ath10k_pci_get_irq_method(struct ath10k_pci *psc)
 {
 
 	if (psc->num_msi_intrs > 1)
@@ -403,7 +403,7 @@ ath10k_pci_get_irq_method(struct athp_pci_softc *psc)
 }
 
 static uint32_t
-ath10k_pci_targ_cpu_to_ce_addr(struct athp_pci_softc *psc, uint32_t addr)
+ath10k_pci_targ_cpu_to_ce_addr(struct ath10k_pci *psc, uint32_t addr)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val = 0;
@@ -425,7 +425,7 @@ ath10k_pci_targ_cpu_to_ce_addr(struct athp_pci_softc *psc, uint32_t addr)
 }
 
 static void
-ath10k_pci_irq_msi_fw_mask(struct athp_pci_softc *psc)
+ath10k_pci_irq_msi_fw_mask(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -448,7 +448,7 @@ ath10k_pci_irq_msi_fw_mask(struct athp_pci_softc *psc)
 }
 
 static void
-ath10k_pci_irq_msi_fw_unmask(struct athp_pci_softc *psc)
+ath10k_pci_irq_msi_fw_unmask(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -471,7 +471,7 @@ ath10k_pci_irq_msi_fw_unmask(struct athp_pci_softc *psc)
 }
 
 int
-ath10k_pci_irq_disable(struct athp_pci_softc *psc)
+ath10k_pci_irq_disable(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -482,7 +482,7 @@ ath10k_pci_irq_disable(struct athp_pci_softc *psc)
 }
 
 void
-ath10k_pci_irq_sync(struct athp_pci_softc *psc)
+ath10k_pci_irq_sync(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -496,7 +496,7 @@ ath10k_pci_irq_sync(struct athp_pci_softc *psc)
 }
 
 void
-ath10k_pci_irq_enable(struct athp_pci_softc *psc)
+ath10k_pci_irq_enable(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -510,7 +510,7 @@ ath10k_pci_irq_enable(struct athp_pci_softc *psc)
  * so it has an opportunity to notice any changed state.
  */
 int
-ath10k_pci_wake_target_cpu(struct athp_pci_softc *psc)
+ath10k_pci_wake_target_cpu(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t addr, val;
@@ -524,7 +524,7 @@ ath10k_pci_wake_target_cpu(struct athp_pci_softc *psc)
 }
 
 int
-ath10k_pci_get_num_banks(struct athp_pci_softc *psc)
+ath10k_pci_get_num_banks(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -555,7 +555,7 @@ ath10k_pci_get_num_banks(struct athp_pci_softc *psc)
 }
 
 bool
-ath10k_pci_has_fw_crashed(struct athp_pci_softc *psc)
+ath10k_pci_has_fw_crashed(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -564,7 +564,7 @@ ath10k_pci_has_fw_crashed(struct athp_pci_softc *psc)
 }
 
 void
-ath10k_pci_fw_crashed_clear(struct athp_pci_softc *psc)
+ath10k_pci_fw_crashed_clear(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -576,7 +576,7 @@ ath10k_pci_fw_crashed_clear(struct athp_pci_softc *psc)
 
 /* this function effectively clears target memory controller assert line */
 static void
-ath10k_pci_warm_reset_si0(struct athp_pci_softc *psc)
+ath10k_pci_warm_reset_si0(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -597,7 +597,7 @@ ath10k_pci_warm_reset_si0(struct athp_pci_softc *psc)
 }
 
 static void
-ath10k_pci_warm_reset_cpu(struct athp_pci_softc *psc)
+ath10k_pci_warm_reset_cpu(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -611,7 +611,7 @@ ath10k_pci_warm_reset_cpu(struct athp_pci_softc *psc)
 }
 
 static void
-ath10k_pci_warm_reset_ce(struct athp_pci_softc *psc)
+ath10k_pci_warm_reset_ce(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -627,7 +627,7 @@ ath10k_pci_warm_reset_ce(struct athp_pci_softc *psc)
 }
 
 static void
-ath10k_pci_warm_reset_clear_lf(struct athp_pci_softc *psc)
+ath10k_pci_warm_reset_clear_lf(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -640,7 +640,7 @@ ath10k_pci_warm_reset_clear_lf(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_warm_reset(struct athp_pci_softc *psc)
+ath10k_pci_warm_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	int ret;
@@ -680,7 +680,7 @@ ath10k_pci_warm_reset(struct athp_pci_softc *psc)
 }
 
 int
-ath10k_pci_safe_chip_reset(struct athp_pci_softc *psc)
+ath10k_pci_safe_chip_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -695,7 +695,7 @@ ath10k_pci_safe_chip_reset(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
+ath10k_pci_qca988x_chip_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	int i;
@@ -773,7 +773,7 @@ ath10k_pci_qca988x_chip_reset(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_qca6174_chip_reset(struct athp_pci_softc *psc)
+ath10k_pci_qca6174_chip_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	int ret;
@@ -807,7 +807,7 @@ ath10k_pci_qca6174_chip_reset(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_qca99x0_chip_reset(struct athp_pci_softc *psc)
+ath10k_pci_qca99x0_chip_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	int ret;
@@ -833,7 +833,7 @@ ath10k_pci_qca99x0_chip_reset(struct athp_pci_softc *psc)
 }
 
 int
-ath10k_pci_chip_reset(struct athp_pci_softc *psc)
+ath10k_pci_chip_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -855,7 +855,7 @@ ath10k_pci_chip_reset(struct athp_pci_softc *psc)
  * until we get MSI working.
  */
 int
-ath10k_pci_init_irq(struct athp_pci_softc *psc)
+ath10k_pci_init_irq(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 #if 0
@@ -906,7 +906,7 @@ ath10k_pci_init_irq(struct athp_pci_softc *psc)
 }
 
 static void
-ath10k_pci_deinit_irq_legacy(struct athp_pci_softc *psc)
+ath10k_pci_deinit_irq_legacy(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 
@@ -915,7 +915,7 @@ ath10k_pci_deinit_irq_legacy(struct athp_pci_softc *psc)
 }
 
 int
-ath10k_pci_deinit_irq(struct athp_pci_softc *psc)
+ath10k_pci_deinit_irq(struct ath10k_pci *psc)
 {
 	//struct ath10k *ar = &psc->sc_sc;
 
@@ -933,7 +933,7 @@ ath10k_pci_deinit_irq(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
+ath10k_pci_wait_for_target_init(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	uint32_t val;
@@ -997,7 +997,7 @@ ath10k_pci_wait_for_target_init(struct athp_pci_softc *psc)
 }
 
 static int
-ath10k_pci_cold_reset(struct athp_pci_softc *psc)
+ath10k_pci_cold_reset(struct ath10k_pci *psc)
 {
 	struct ath10k *ar = &psc->sc_sc;
 	u32 val;
@@ -1061,7 +1061,7 @@ static int ath10k_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *pci_dev)
 {
 	int ret = 0;
-	struct athp_pci_softc *ar;
+	struct ath10k_pci *ar;
 	struct ath10k_pci *ar_pci;
 	enum ath10k_hw_rev hw_rev;
 	u32 chip_id;
@@ -1196,7 +1196,7 @@ err_core_destroy:
 #if 0
 static void ath10k_pci_remove(struct pci_dev *pdev)
 {
-	struct athp_pci_softc *ar = pci_get_drvdata(pdev);
+	struct ath10k_pci *ar = pci_get_drvdata(pdev);
 	struct ath10k_pci *ar_pci;
 
 	ath10k_dbg(ar, ATH10K_DBG_PCI, "pci remove\n");
