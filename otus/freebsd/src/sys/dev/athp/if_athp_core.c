@@ -1125,12 +1125,12 @@ static void ath10k_core_restart(void *arg, int npending)
 	/* XXX lock? */
 	set_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags);
 
-#if 0
 	/* Place a barrier to make sure the compiler doesn't reorder
 	 * CRASH_FLUSH and calling other functions.
 	 */
-	barrier();
+	mb();
 
+#if 0
 	ieee80211_stop_queues(ar->hw);
 #else
 	ath10k_warn(ar, "%s: TODO: stop TX queues, ensure we can flush it\n",
@@ -1161,9 +1161,12 @@ static void ath10k_core_restart(void *arg, int npending)
 		ar->state = ATH10K_STATE_RESTARTING;
 		ath10k_hif_stop(ar);
 		ath10k_scan_finish(ar);
-//		ieee80211_restart_hw(ar->hw);
+#if 0
+		ieee80211_restart_hw(ar->hw);
+#else
 		ath10k_warn(ar, "%s: TODO: we don't have a 'restart-hw' net80211 method!\n",
 		    __func__);
+#endif
 		break;
 	case ATH10K_STATE_OFF:
 		/* this can happen if driver is being unloaded
