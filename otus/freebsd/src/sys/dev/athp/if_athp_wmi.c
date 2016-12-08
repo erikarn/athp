@@ -3369,7 +3369,7 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 	const struct wmi_p2p_noa_info *noa_info;
 	struct ath10k_vif *arvif;
 	struct athp_buf *bcn;
-	dma_addr_t paddr;
+	bus_addr_t paddr;
 	int ret, vdev_id = 0;
 
 	ret = ath10k_wmi_pull_swba(ar, pbuf, &arg);
