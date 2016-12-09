@@ -1879,7 +1879,7 @@ ath10k_core_init(struct ath10k *ar)
 	ath10k_wait_init(&ar->wmi.tx_credits_wq);
 
 	ath10k_compl_init(&ar->offchan_tx_completed);
-	TASK_INIT(&ar->offchan_tx_work, 0, ath10k_offchan_tx_work, 0);
+	TASK_INIT(&ar->offchan_tx_work, 0, ath10k_offchan_tx_work, ar);
 	TAILQ_INIT(&ar->offchan_tx_queue);
 
 	TASK_INIT(&ar->wmi_mgmt_tx_work, 0, ath10k_mgmt_over_wmi_tx_work, ar);
