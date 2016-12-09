@@ -20,7 +20,7 @@
 
 /* Per-pipe state. */
 struct ath10k;
-struct athp_pci_softc;
+struct ath10k_pci;
 struct ath10k_pci_pipe {
 	/* Handle of underlying Copy Engine */
 	struct ath10k_ce_pipe *ce_hdl;
@@ -30,7 +30,7 @@ struct ath10k_pci_pipe {
 
 	/* Convenience back pointer to hif_ce_state. */
 	struct ath10k *ar;
-	struct athp_pci_softc *psc;
+	struct ath10k_pci *psc;
 
 	/* XXX TODO: do we have different alignment constraints per pci pipe? */
 #if 0

@@ -797,7 +797,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 		    le32_to_cpu(frags[0].dword_addr.len),
 		    le32_to_cpu(frags[1].dword_addr.paddr),
 		    le32_to_cpu(frags[1].dword_addr.len));
-	athp_debug_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt tx msdu: ",
+	ath10k_dbg_dump(ar, ATH10K_DBG_HTT_DUMP, NULL, "htt tx msdu: ",
 			mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 	trace_ath10k_tx_hdr(ar, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 	trace_ath10k_tx_payload(ar, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));

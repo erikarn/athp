@@ -11,14 +11,16 @@
 #define	ATHP_PCI_CE_LOCK_ASSERT(psc)	mtx_assert(&(psc)->ce_mtx, MA_OWNED)
 #define	ATHP_PCI_CE_UNLOCK_ASSERT(psc)	mtx_assert(&(psc)->ce_mtx, MA_NOTOWNED)
 
+#define	ath10k_pci_priv(ar)		((ar)->sc_psc)
+
 /*
  * PCI specific glue for athp/ath10k.
  */
-struct athp_pci_softc {
+struct ath10k_pci {
 	struct ath10k		sc_sc;
 	struct resource		*sc_sr;         /* memory resource */
-	struct resource		*sc_irq;        /* irq resource */
-	void			*sc_ih;         /* interrupt handler */
+	struct resource		*sc_irq[MSI_NUM_REQUEST];     /* irq resource */
+	void			*sc_ih[MSI_NUM_REQUEST];      /* interrupt handler */
 
 	/* Local copy of device/vendor id */
 	int			sc_deviceid;
@@ -66,7 +68,7 @@ struct athp_pci_softc {
 	/* Shared interrupt handler; deferred */
 //	struct task		intr_task;
 	/* msi firmware task */
-//	struct task		msi_fw_error;
+	//struct task		msi_fw_err;
 	/* rx post timeout retry task */
 	struct callout		rx_post_retry;
 };

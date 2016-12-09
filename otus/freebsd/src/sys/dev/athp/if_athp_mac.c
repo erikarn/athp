@@ -170,6 +170,78 @@ static u8 ath10k_mac_bitrate_to_rate(int bitrate)
 	       (ath10k_mac_bitrate_is_cck(bitrate) ? BIT(7) : 0);
 }
 
+/*
+ * Map ath10k OFDM/CCK rate to legacy rate value (2*mbit).
+ */
+uint8_t
+ath10k_mac_hw_rate_to_net80211_legacy_rate(struct ath10k *ar, uint8_t hw_rate,
+    int is_cck)
+{
+
+	if (is_cck) {
+		switch (hw_rate) {
+		case ATH10K_HW_RATE_CCK_LP_1M:
+			return (1*2);
+
+		case ATH10K_HW_RATE_CCK_LP_2M:
+		case ATH10K_HW_RATE_CCK_SP_2M:
+			return (2*2);
+
+		case ATH10K_HW_RATE_CCK_LP_5_5M:
+		case ATH10K_HW_RATE_CCK_SP_5_5M:
+			return (11);
+
+		case ATH10K_HW_RATE_CCK_LP_11M:
+		case ATH10K_HW_RATE_CCK_SP_11M:
+			return (22);
+
+		default:
+			return (0);
+		}
+	}
+
+	switch (hw_rate) {
+	case ATH10K_HW_RATE_OFDM_6M:
+		return (6*2);
+	case ATH10K_HW_RATE_OFDM_9M:
+		return (9*2);
+	case ATH10K_HW_RATE_OFDM_12M:
+		return (12*2);
+	case ATH10K_HW_RATE_OFDM_18M:
+		return (18*2);
+	case ATH10K_HW_RATE_OFDM_24M:
+		return (24*2);
+	case ATH10K_HW_RATE_OFDM_36M:
+		return (36*2);
+	case ATH10K_HW_RATE_OFDM_48M:
+		return (48*2);
+	case ATH10K_HW_RATE_OFDM_54M:
+		return (54*2);
+	default:
+		return (0);
+	}
+}
+
+/*
+ * Return true if the frame is short-preamble CCK; false otherwise.
+ */
+int
+ath10k_mac_hw_rate_cck_is_short_preamble(struct ath10k *ar, u8 hw_rate,
+    int is_cck)
+{
+	if (! is_cck)
+		return (0);
+
+	switch (hw_rate) {
+	case ATH10K_HW_RATE_CCK_SP_2M:
+	case ATH10K_HW_RATE_CCK_SP_5_5M:
+	case ATH10K_HW_RATE_CCK_SP_11M:
+		return (1);
+	default:
+		return (0);
+	}
+}
+
 #if 0
 u8 ath10k_mac_hw_rate_to_idx(const struct ieee80211_supported_band *sband,
 			     u8 hw_rate)
@@ -2287,22 +2359,16 @@ static void ath10k_peer_assoc_h_basic(struct ath10k *ar,
 	arg->peer_listen_intval = ath10k_peer_assoc_h_listen_intval(ar, vif);
 	arg->peer_num_spatial_streams = 1;
 
-	/*
-	 * XXX TODO: is this in host-order, or 802.11 order?
-	 *
-	 * FreeBSD assigns capinfo from the assoc/reassoc response
-	 * by converting it to host endian; I'm unsure about mac80211.
-	 */
 	//arg->peer_caps = vif->bss_conf.assoc_capability;
 	arg->peer_caps = ni->ni_capinfo;
 
-#if 1
 	/* If is_run=0, then clear the privacy capinfo */
 	if (is_run == 0)
 		arg->peer_caps &= ~IEEE80211_CAPINFO_PRIVACY;
-#endif
 
-	ath10k_warn(ar, "%s: capinfo=0x%08x, peer_caps=0x%08x\n", __func__, ni->ni_capinfo, arg->peer_caps);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "%s: capinfo=0x%08x, peer_caps=0x%08x\n",
+	    __func__, ni->ni_capinfo, arg->peer_caps);
 }
 
 /*
@@ -2328,7 +2394,7 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 //	int ret;
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI,
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
 	    "%s: is_run=%d, privacy=%d, WPA=%d, WPA2=%d, vap rsn=%p, wpa=%p,"
 	    " ni rsn=%p, wpa=%p; deftxidx=%d\n",
 	    __func__,
@@ -2350,12 +2416,12 @@ ath10k_peer_assoc_h_crypto(struct ath10k *ar, struct ieee80211vap *vap,
 
 	/* FIXME: base on RSN IE/WPA IE is a correct idea? */
 	if (bss->ni_ies.rsn_ie || bss->ni_ies.wpa_ie) {
-		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: rsn ie found\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: rsn ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_PTK_4_WAY;
 	}
 
 	if (bss->ni_ies.wpa_ie) {
-		ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: wpa ie found\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: wpa ie found\n", __func__);
 		arg->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 	}
 }
@@ -2368,9 +2434,10 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
     struct ieee80211_node *ni,
     struct wmi_peer_assoc_complete_arg *arg)
 {
-	struct ieee80211com *ic = &ar->sc_ic;
+//	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_rate_set_arg *rateset = &arg->peer_legacy_rates;
-	int i;
+	struct ieee80211_rateset *rs;
+	int i, nr;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -2379,39 +2446,53 @@ static void ath10k_peer_assoc_h_rates(struct ath10k *ar,
 	 * that all rates are available for the given phy mode;
 	 * later on we should look at what's negotiated.
 	 *
-	 * XXX yes, there's no per-vap channel, sigh.
+	 * XXX TODO: it may be IEEE80211_CHAN_ANYC, which we should
+	 *           treat here like a blank chanctx.
+	 * XXX TODO: ni->ni_chan instead?
+	 * XXX TODO: aim to totally remove ni_curchan from this driver
+	 *           and use vap/node channels.
 	 */
 
 	rateset->num_rates = 0;
 
-	if (IEEE80211_IS_CHAN_B(ic->ic_curchan)) {
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
-	} else if (IEEE80211_IS_CHAN_G(ic->ic_curchan)) {
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(10);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(20);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(55);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(110);
+	/*
+	 * Walk the rateset, adding rates as appropriate.
+	 * We do it twice - once for CCK rates, and once for OFDM rates.
+	 */
+	rs = &ni->ni_rates;
+	nr = rs->rs_nrates;
 
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
-	} else if (IEEE80211_IS_CHAN_A(ic->ic_curchan)) {
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(60);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(120);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(180);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(240);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(360);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(480);
-		rateset->rates[rateset->num_rates++] = ath10k_mac_bitrate_to_rate(540);
-	} else {
-		ath10k_err(ar, "%s: TODO: channel isn't a, b, g!\n", __func__);
+	/* CCK rates */
+	for (i = 0; i < nr; i++) {
+		int bitrate;
+
+		/*
+		 * Map rate to bps for call to ath10k_mac_bitrate_to_rate(),
+		 * etc
+		 */
+		bitrate = (rs->rs_rates[i] & IEEE80211_RATE_VAL) * 5;
+
+		if (! ath10k_mac_bitrate_is_cck(bitrate))
+			continue;
+
+		rateset->rates[rateset->num_rates++] =
+		    ath10k_mac_bitrate_to_rate(bitrate);
+	}
+
+	/* OFDM rates */
+	for (i = 0; i < nr; i++) {
+		int bitrate;
+
+		/*
+		 * Map rate to bps for call to ath10k_mac_bitrate_to_rate(),
+		 * etc
+		 */
+		bitrate = (rs->rs_rates[i] & IEEE80211_RATE_VAL) * 5;
+		if (ath10k_mac_bitrate_is_cck(bitrate))
+			continue;
+
+		rateset->rates[rateset->num_rates++] =
+		    ath10k_mac_bitrate_to_rate(bitrate);
 	}
 
 	/* Debugging */
@@ -2485,8 +2566,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	if (! IEEE80211_IS_CHAN_HT(sta->ni_chan))
 		return;
 
-	ath10k_warn(ar, "%s: called; HT node\n", __func__);
-
 #if 0
 	band = def.chan->band;
 	ht_mcs_mask = arvif->bitrate_mask.control[band].ht_mcs;
@@ -2503,8 +2582,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	/*
 	 * Set capabilities based on what we negotiate.
-	 *
-	 * XXX TODO: this is wrong - we can't just do this.
 	 *
 	 * Linux mac80211 seems to set this field up after
 	 * overriding things appropriately.
@@ -2527,7 +2604,9 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	 */
 	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
 	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
-	ath10k_warn(ar, "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, "
+	    "iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
 	    __func__,
 	    mpdu_density,
 	    mpdu_size,
@@ -2566,7 +2645,8 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 
 	htcap_filt = vif->iv_htcaps & htcap_mask;
 
-	ath10k_warn(ar, "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
 	    __func__,
 	    htcap_filt,
 	    vif->iv_htcaps,
@@ -2708,21 +2788,25 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		arg->peer_num_spatial_streams = max_nss;
 	}
 
-	//ath10k_dbg(ar, ATH10K_DBG_MAC, "mac ht peer %6D mcs cnt %d nss %d\n",
-	ath10k_warn(ar, "mac ht peer %6D mcs cnt %d nss %d maxnss %d htcap 0x%08x\n",
-		   arg->addr,
-		   ":",
-		   arg->peer_ht_rates.num_rates,
-		   arg->peer_num_spatial_streams,
-		   max_nss,
-		   htcap);
-	ath10k_warn(ar, "density=%d, rxmax=%d\n", arg->peer_mpdu_density, arg->peer_max_mpdu);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac ht peer %6D mcs cnt %d nss %d maxnss %d htcap 0x%08x\n",
+	    arg->addr,
+	    ":",
+	    arg->peer_ht_rates.num_rates,
+	    arg->peer_num_spatial_streams,
+	    max_nss,
+	    htcap);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac ht density=%d, rxmax=%d\n",
+	    arg->peer_mpdu_density, arg->peer_max_mpdu);
 #if 0
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
 		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
 	}
 #endif
-	ath10k_warn(ar, "peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, peer_flags=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac ht peer_ht_caps=0x%08x, peer_rate_caps=0x%08x, "
+	    "peer_flags=0x%08x, ni_htcap=0x%08x, iv_htcaps=0x%08x\n",
 	    arg->peer_ht_caps,
 	    arg->peer_rate_caps,
 	    arg->peer_flags,
@@ -3037,10 +3121,6 @@ static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 
 /*
  * Configure the phymode for this node.
- *
- * This is very 11abg specific and doesn't at all handle 11n/11ac.
- * It isn't too hard though - look at the non-freebsd version
- * when the time comes.
  */
 static void
 ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
@@ -3079,7 +3159,7 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
-	ath10k_warn(ar, "%s: TODO: finish crypto, ht, vht!\n", __func__);
+	ath10k_warn(ar, "%s: TODO: finish WEP crypto, vht!\n", __func__);
 	return 0;
 }
 
@@ -7789,6 +7869,9 @@ static const struct ieee80211_channel ath10k_5ghz_channels[] = {
 	CHAN5G(165, 5825, 0),
 };
 
+/*
+ * Note: FreeBSD does this in the bus attach glue, not here */
+ */
 struct ath10k *ath10k_mac_create(size_t priv_size)
 {
 	struct ieee80211_hw *hw;
@@ -7803,12 +7886,17 @@ struct ath10k *ath10k_mac_create(size_t priv_size)
 
 	return ar;
 }
+#endif
 
+#if 1
 void ath10k_mac_destroy(struct ath10k *ar)
 {
-	ieee80211_free_hw(ar->hw);
+	/* FreeBSD does this in mac_unregister for now */
+//	ieee80211_free_hw(ar->hw);
 }
+#endif
 
+#if 0
 static const struct ieee80211_iface_limit ath10k_if_limits[] = {
 	{
 	.max	= 8,
@@ -8487,6 +8575,15 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
+
+	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags) ||
+	    ((ar->state != ATH10K_STATE_ON) &&
+	    (ar->state != ATH10K_STATE_RESTARTED))) {
+		ath10k_warn(ar, "%s: skipping; firmware restart\n", __func__);
+		ATHP_CONF_UNLOCK(ar);
+		return -ESHUTDOWN;
+	}
+
 	ret = ath10k_peer_create(ar, arvif->vdev_id, mac,
 	    WMI_PEER_TYPE_DEFAULT);
 //	ath10k_mac_inc_num_stations(arvif, sta);
@@ -8503,6 +8600,14 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
  * Also - note that node free is called before we get the DELBA deletion
  * commands from the firmware, which generates some log warnings.
  * We then don't find the net80211 node..
+ *
+ * Also note - this causes a recursion error on the conf lock during the
+ * shutdown phase - notably, if we purge a frame during firmware teardown
+ * that causes a peer to be flushed from the node table.
+ *
+ * We can't hold a recursed lock through a call to mtx_sleep().
+ *
+ * So - not sure what the fix would be for this!
  */
 int
 athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
@@ -8512,10 +8617,45 @@ athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
+
+	if (test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags) ||
+	    ((ar->state != ATH10K_STATE_ON) &&
+	    (ar->state != ATH10K_STATE_RESTARTED))) {
+		ath10k_warn(ar, "%s: skipping; firmware restart\n", __func__);
+		ATHP_CONF_UNLOCK(ar);
+		return -ESHUTDOWN;
+	}
+
 	(void) ath10k_tx_flush_locked(ar, vap, 0, 0);
 	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
 //	ath10k_mac_dec_num_stations(arvif, sta);
 	ATHP_CONF_UNLOCK(ar);
 
+	return (ret);
+}
+
+int
+athp_vif_update_txpower(struct ieee80211vap *vap)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ieee80211_node *ni;
+	int ret;
+
+	/* XXX lock */
+	if (vap->iv_bss == NULL)
+		return (0);
+
+	ni = ieee80211_ref_node(vap->iv_bss);
+
+	ATHP_CONF_LOCK(ar);
+	arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
+	ret = ath10k_mac_txpower_recalc(ar);
+	ATHP_CONF_UNLOCK(ar);
+
+	ieee80211_free_node(ni);
+
+	if (ret)
+		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
 	return (ret);
 }

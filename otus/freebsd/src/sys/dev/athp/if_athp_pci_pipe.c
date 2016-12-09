@@ -119,7 +119,7 @@ __FBSDID("$FreeBSD$");
  */
 
 /*
- * XXX TODO: make the functions take athp_pci_softc * as the top-level
+ * XXX TODO: make the functions take ath10k_pci * as the top-level
  * state, instead of athp_softc * ?
  */
 
@@ -127,12 +127,12 @@ static int
 __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 {
 	struct ath10k *ar = pipe->ar;
-	struct athp_pci_softc *psc = pipe->psc;
+	struct ath10k_pci *ar_pci = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	struct athp_buf *pbuf;
 	int ret;
 
-	ATHP_PCI_CE_LOCK_ASSERT(psc);
+	ATHP_PCI_CE_LOCK_ASSERT(ar_pci);
 
 	pbuf = athp_getbuf(ar, &ar->buf_rx, pipe->buf_sz);
 	if (pbuf == NULL)
@@ -164,12 +164,6 @@ __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 	 * to queue for receive.
 	 */
 	ret = __ath10k_ce_rx_post_buf(ce_pipe, pbuf, pbuf->mb.paddr);
-#if 0
-	device_printf(ar->sc_dev, "%s: m=%p, paddr=%08x\n",
-	    __func__,
-	    pbuf->m,
-	    (uint32_t) pbuf->mb.paddr);
-#endif
 	if (ret) {
 		ath10k_warn(ar, "failed to post pci rx buf: %d\n", ret);
 		athp_freebuf(ar, &ar->buf_rx, pbuf);
@@ -183,11 +177,11 @@ static void
 __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
 	struct ath10k *ar = pipe->ar;
-	struct athp_pci_softc *psc = pipe->psc;
+	struct ath10k_pci *ar_pci = pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	int ret, num;
 
-	ATHP_PCI_CE_LOCK_ASSERT(psc);
+	ATHP_PCI_CE_LOCK_ASSERT(ar_pci);
 
 	if (pipe->buf_sz == 0)
 		return;
@@ -214,23 +208,23 @@ static void
 ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
 //	struct ath10k *ar = pipe->ar;
-	struct athp_pci_softc *psc = pipe->psc;
+	struct ath10k_pci *ar_pci = pipe->psc;
 
-	ATHP_PCI_CE_LOCK(psc);
+	ATHP_PCI_CE_LOCK(ar_pci);
 	__ath10k_pci_rx_post_pipe(pipe);
-	ATHP_PCI_CE_UNLOCK(psc);
+	ATHP_PCI_CE_UNLOCK(ar_pci);
 }
 
 void
 ath10k_pci_rx_post(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *ar_pci = ar->sc_psc;
 	int i;
 
-	ATHP_PCI_CE_LOCK(psc);
+	ATHP_PCI_CE_LOCK(ar_pci);
 	for (i = 0; i < CE_COUNT(ar); i++)
-		__ath10k_pci_rx_post_pipe(&psc->pipe_info[i]);
-	ATHP_PCI_CE_UNLOCK(psc);
+		__ath10k_pci_rx_post_pipe(&ar_pci->pipe_info[i]);
+	ATHP_PCI_CE_UNLOCK(ar_pci);
 }
 
 /*
@@ -255,8 +249,8 @@ static void
 ath10k_pci_ce_send_done(struct ath10k_ce_pipe *ce_state)
 {
 	struct ath10k *ar = ce_state->ar;
-	struct athp_pci_softc *psc = ce_state->psc;
-	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
+	struct ath10k_pci *ar_pci = ce_state->psc;
+	struct ath10k_hif_cb *cb = &ar_pci->msg_callbacks_current;
 	TAILQ_HEAD(, athp_buf) br_list;
 	struct athp_buf *pbuf;
 	uint32_t ce_data;
@@ -283,9 +277,9 @@ static void
 ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 {
 	struct ath10k *ar = ce_state->ar;
-	struct athp_pci_softc *psc = ce_state->psc;
-	struct ath10k_pci_pipe *pipe_info =  &psc->pipe_info[ce_state->id];
-	struct ath10k_hif_cb *cb = &psc->msg_callbacks_current;
+	struct ath10k_pci *ar_pci = ce_state->psc;
+	struct ath10k_pci_pipe *pipe_info =  &ar_pci->pipe_info[ce_state->id];
+	struct ath10k_hif_cb *cb = &ar_pci->msg_callbacks_current;
 	struct athp_buf *pbuf;
 	void *ctx;
 	uint32_t ce_data;
@@ -328,7 +322,7 @@ ath10k_pci_ce_recv_data(struct ath10k_ce_pipe *ce_state)
 		TAILQ_REMOVE(&br_list, pbuf, next);
 		ath10k_dbg(ar, ATH10K_DBG_PCI, "pci rx ce pipe %d len %d\n",
 			   ce_state->id, mbuf_skb_len(pbuf->m));
-		athp_debug_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
+		ath10k_dbg_dump(ar, ATH10K_DBG_PCI_DUMP, NULL, "pci rx: ",
 			    mbuf_skb_data(pbuf->m),
 			    mbuf_skb_len(pbuf->m));
 		cb->rx_completion(ar, pbuf);
@@ -392,7 +386,7 @@ ath10k_pci_rx_pipe_cleanup(struct ath10k_pci_pipe *pipe)
 static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 {
 	struct ath10k *ar = pci_pipe->ar;
-	struct athp_pci_softc *psc = pci_pipe->psc;
+	struct ath10k_pci *ar_pci = pci_pipe->psc;
 	struct ath10k_ce_pipe *ce_pipe;
 	struct ath10k_ce_ring *ce_ring;
 	struct ce_desc *ce_desc;
@@ -419,7 +413,7 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 
 		ce_ring->per_transfer_context[i] = NULL;
 
-		psc->msg_callbacks_current.tx_completion(ar, pbuf);
+		ar_pci->msg_callbacks_current.tx_completion(ar, pbuf);
 	}
 }
 
@@ -434,13 +428,13 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 static void
 ath10k_pci_buffer_cleanup(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *ar_pci = ar->sc_psc;
 	int pipe_num;
 
 	for (pipe_num = 0; pipe_num < CE_COUNT(ar); pipe_num++) {
 		struct ath10k_pci_pipe *pipe_info;
 
-		pipe_info = &psc->pipe_info[pipe_num];
+		pipe_info = &ar_pci->pipe_info[pipe_num];
 		ath10k_pci_rx_pipe_cleanup(pipe_info);
 		ath10k_pci_tx_pipe_cleanup(pipe_info);
 	}
@@ -465,17 +459,17 @@ ath10k_pci_flush(struct ath10k *ar)
 int
 ath10k_pci_alloc_pipes(struct ath10k *ar)
 {
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *ar_pci = ar->sc_psc;
 	struct ath10k_pci_pipe *pipe;
 	int i, ret;
 	int sz;
 
 	for (i = 0; i < CE_COUNT(ar); i++) {
-		pipe = &psc->pipe_info[i];
-		pipe->ce_hdl = &psc->ce_states[i];
+		pipe = &ar_pci->pipe_info[i];
+		pipe->ce_hdl = &ar_pci->ce_states[i];
 		pipe->pipe_num = i;
 		pipe->ar = ar;
-		pipe->psc = psc;
+		pipe->psc = ar_pci;
 
 		ret = ath10k_ce_alloc_pipe(ar, i, &host_ce_config_wlan[i],
 					   ath10k_pci_ce_send_done,
@@ -489,7 +483,7 @@ ath10k_pci_alloc_pipes(struct ath10k *ar)
 
 		/* Last CE is Diagnostic Window */
 		if (i == CE_DIAG_PIPE) {
-			psc->ce_diag = pipe->ce_hdl;
+			ar_pci->ce_diag = pipe->ce_hdl;
 			continue;
 		}
 
@@ -534,11 +528,11 @@ void
 ath10k_pci_free_pipes(struct ath10k *ar)
 {
 	int i;
-	struct athp_pci_softc *psc = ar->sc_psc;
+	struct ath10k_pci *ar_pci = ar->sc_psc;
 	struct ath10k_pci_pipe *pipe;
 
 	for (i = 0; i < CE_COUNT(ar); i++) {
-		pipe = &psc->pipe_info[i];
+		pipe = &ar_pci->pipe_info[i];
 		ath10k_ce_free_pipe(ar, i);
 #if 0
 		athp_dma_head_free(ar, &pipe->dmatag);

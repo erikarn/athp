@@ -400,7 +400,7 @@ static int ath10k_htc_process_trailer(struct ath10k_htc *htc,
 	}
 
 	if (status)
-		athp_debug_dump(ar, ATH10K_DBG_HTC, "htc rx bad trailer", "",
+		ath10k_dbg_dump(ar, ATH10K_DBG_HTC, "htc rx bad trailer", "",
 				orig_buffer, orig_length);
 
 	return status;
@@ -428,7 +428,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 
 	if (eid >= ATH10K_HTC_EP_COUNT) {
 		ath10k_warn(ar, "HTC Rx: invalid eid %d\n", eid);
-		athp_debug_dump(ar, ATH10K_DBG_HTC, "htc bad header", "",
+		ath10k_dbg_dump(ar, ATH10K_DBG_HTC, "htc bad header", "",
 				hdr, sizeof(*hdr));
 		status = -EINVAL;
 		goto out;
@@ -450,7 +450,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 	if (payload_len + sizeof(*hdr) > ATH10K_HTC_MAX_LEN) {
 		ath10k_warn(ar, "HTC rx frame too long, len: %zu\n",
 			    payload_len + sizeof(*hdr));
-		athp_debug_dump(ar, ATH10K_DBG_HTC, "htc bad rx pkt len", "",
+		ath10k_dbg_dump(ar, ATH10K_DBG_HTC, "htc bad rx pkt len", "",
 				hdr, sizeof(*hdr));
 		status = -EINVAL;
 		goto out;
@@ -460,7 +460,7 @@ static int ath10k_htc_rx_completion_handler(struct ath10k *ar,
 		ath10k_dbg(ar, ATH10K_DBG_HTC,
 			   "HTC Rx: insufficient length, got %d, expected %d\n",
 			   mbuf_skb_len(pbuf->m), payload_len);
-		athp_debug_dump(ar, ATH10K_DBG_HTC, "htc bad rx pkt len",
+		ath10k_dbg_dump(ar, ATH10K_DBG_HTC, "htc bad rx pkt len",
 				"", hdr, sizeof(*hdr));
 		status = -EINVAL;
 		goto out;

@@ -1533,6 +1533,7 @@ ath10k_fwlog_print_work(void *arg, int npending)
 	 * don't monopolise CPU cycles?
 	 */
 	TAILQ_REMOVE(&ar->fwlog_tx_queue, skb, next);
+	ar->fwlog_tx_queue_len--;
 	ATHP_FWLOG_UNLOCK(ar);
 
 	ath10k_fwlog_parse_msg(ar, mbuf_skb_data(skb->m),
@@ -1551,16 +1552,14 @@ ath10k_handle_fwlog_msg(struct ath10k *ar, struct athp_buf *skb)
 {
 	ATHP_FWLOG_LOCK(ar);
 
-	/* XXX TODO: keep track of count */
-#if 0
-	if (skb_queue_len(&ar->fwlog_tx_queue) >= ATH10K_FWLOG_MAX_EVT_QUEUE) {
-		ath10k_warn(ar, "reached fwlog  queue limit\n");
-		dev_kfree_skb(skb);
+	if (ar->fwlog_tx_queue_len > ATH10K_FWLOG_MAX_EVT_QUEUE) {
+		ath10k_warn(ar, "reached fwlog queue limit\n");
+		athp_freebuf(ar, &ar->buf_rx, skb);
 		return;
 	}
-#endif
 
 	TAILQ_INSERT_TAIL(&ar->fwlog_tx_queue, skb, next);
+	ar->fwlog_tx_queue_len++;
 	taskqueue_enqueue(ar->workqueue, &ar->fwlog_tx_work);
 	ATHP_FWLOG_UNLOCK(ar);
 }
@@ -1572,6 +1571,7 @@ void ath10k_fwlog_register(struct ath10k *ar)
 	    "athp fwlog", MTX_DEF);
 	TASK_INIT(&ar->fwlog_tx_work, 0, ath10k_fwlog_print_work, ar);
 	TAILQ_INIT(&ar->fwlog_tx_queue);
+	ar->fwlog_tx_queue_len = 0;
 }
 
 void ath10k_fwlog_unregister(struct ath10k *ar)
@@ -1588,6 +1588,7 @@ void ath10k_fwlog_unregister(struct ath10k *ar)
 		if (!skb)
 			break;
 		TAILQ_REMOVE(&ar->fwlog_tx_queue, skb, next);
+		ar->fwlog_tx_queue_len--;
 		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
 

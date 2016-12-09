@@ -188,7 +188,6 @@ struct ath10k_stats {
 	uint64_t xmit_fail_crypto_encap;
 	uint64_t xmit_fail_get_pbuf;
 	uint64_t xmit_fail_mbuf_defrag;
-	uint64_t fw_warm_reset_counter;
 	uint64_t xmit_fail_htt_xmit;
 };
 
@@ -198,7 +197,7 @@ struct ath10k_stats {
  * Since we may see SDIO or USB derived parts at some point, there
  * is a little mini-HAL for talking to the MMIO register space.
  */
-struct athp_pci_softc;
+struct ath10k_pci;
 struct ath10k_hif_ops;
 struct athp_taskq_head;
 struct alq;
@@ -260,13 +259,14 @@ struct ath10k {
 	struct task		fwlog_tx_work;
 	athp_buf_head		fwlog_tx_queue;
 	struct mtx		fwlog_mtx;
+	int			fwlog_tx_queue_len;
 
 	struct intr_config_hook		sc_preinit_hook;
 
 	void (*sc_node_free)(struct ieee80211_node *);
 
 	/* XXX TODO: Cheating, until all the layering is fixed */
-	struct athp_pci_softc		*sc_psc;
+	struct ath10k_pci	*sc_psc;
 
 	/* Register mapping */
 	const struct ath10k_hw_regs	*sc_regofs;
@@ -282,24 +282,6 @@ struct ath10k {
 	/* TX/RX rings for athp buffers */
 	struct athp_buf_ring buf_rx;
 	struct athp_buf_ring buf_tx;
-
-	/* Taskqueues for work */
-#if 0
-	struct taskqueue		*sc_taskq;
-	struct taskqueue		*sc_aux_taskq;
-#endif
-
-	/* stuff from the driver i based this on; not needed */
-#if 0
-	int				sc_running:1,
-					sc_calibrating:1,
-					sc_scanning:1;
-
-	struct task			tx_task;
-	struct task			wme_update_task;
-	struct timeout_task		scan_to;
-	struct timeout_task		calib_to;
-#endif
 
 	/* Hardware revision, chip-id, etc */
 	char			fw_version_str[ATHP_FW_VER_STR];
@@ -480,13 +462,11 @@ struct ath10k {
 	struct task register_work;
 	struct task restart_work;
 
-#if 0
 	/* cycle count is reported twice for each visited channel during scan.
 	 * access protected by data_lock */
 	u32 survey_last_rx_clear_count;
 	u32 survey_last_cycle_count;
-	struct survey_info survey[ATH10K_NUM_CHANS];
-#endif
+	struct ieee80211_channel_survey survey[ATH10K_NUM_CHANS];
 
 	/* Channel info events are expected to come in pairs without and with
 	 * COMPLETE flag set respectively for each channel visit during scan.

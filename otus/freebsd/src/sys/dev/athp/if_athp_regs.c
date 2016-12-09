@@ -14,10 +14,69 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include "opt_wlan.h"
+
+#include <sys/param.h>
+#include <sys/endian.h>
+#include <sys/sockio.h>
+#include <sys/mbuf.h>
+#include <sys/kernel.h>
+#include <sys/socket.h>
+#include <sys/systm.h>
+#include <sys/conf.h>
+#include <sys/bus.h>
+#include <sys/rman.h>
+#include <sys/firmware.h>
+#include <sys/module.h>
+#include <sys/taskqueue.h>
+#include <sys/condvar.h>
+
+#include <machine/bus.h>
+#include <machine/resource.h>
+
+#include <net/bpf.h>
+#include <net/if.h>
+#include <net/if_var.h>
+#include <net/if_arp.h>
+#include <net/if_dl.h>
+#include <net/if_media.h>
+#include <net/if_types.h>
+
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/in_var.h>
+#include <netinet/if_ether.h>
+#include <netinet/ip.h>
+
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_regdomain.h>
+#include <net80211/ieee80211_radiotap.h>
+#include <net80211/ieee80211_ratectl.h>
+#include <net80211/ieee80211_input.h>
+#ifdef	IEEE80211_SUPPORT_SUPERG
+#include <net80211/ieee80211_superg.h>
+#endif
 
 #include "hal/linux_compat.h"
 #include "hal/hw.h"
+#include "hal/htc.h"
+#include "hal/wmi.h"
+
+#include "if_athp_regs.h"
+#include "if_athp_regio.h"
+#include "if_athp_stats.h"
+#include "if_athp_desc.h"
+#include "if_athp_buf.h"
+#include "if_athp_core.h"
+#include "if_athp_htc.h"
+#include "if_athp_var.h"
+
 
 /*
  * Each family shifted the base register values around a bit.
@@ -142,24 +201,23 @@ const struct ath10k_hw_values qca99x0_values = {
 	.ce_desc_meta_data_lsb		= 4,
 };
 
-#if 0
-void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
-				u32 cc, u32 rcc, u32 cc_prev, u32 rcc_prev)
+void ath10k_hw_fill_survey_time(struct ath10k *ar,
+    struct ieee80211_channel_survey *survey,
+    u32 cc, u32 rcc, u32 cc_prev, u32 rcc_prev)
 {
 	u32 cc_fix = 0;
 
-	survey->filled |= SURVEY_INFO_TIME |
-			  SURVEY_INFO_TIME_BUSY;
+	survey->s_flags |= IEEE80211_F_SURVEY_TIME |
+			  IEEE80211_F_SURVEY_TIME_BUSY;
 
 	if (ar->hw_params.has_shifted_cc_wraparound && cc < cc_prev) {
 		cc_fix = 0x7fffffff;
-		survey->filled &= ~SURVEY_INFO_TIME_BUSY;
+		survey->s_flags &= ~IEEE80211_F_SURVEY_TIME_BUSY;
 	}
 
 	cc -= cc_prev - cc_fix;
 	rcc -= rcc_prev;
 
-	survey->time = CCNT_TO_MSEC(ar, cc);
-	survey->time_busy = CCNT_TO_MSEC(ar, rcc);
+	survey->s_time = CCNT_TO_MSEC(&ar->hw_params, cc);
+	survey->s_time_busy = CCNT_TO_MSEC(&ar->hw_params, rcc);
 }
-#endif

@@ -46,6 +46,11 @@ int ath10k_mac_register(struct ath10k *ar);
 void ath10k_mac_unregister(struct ath10k *ar);
 struct ath10k_vif *ath10k_get_arvif(struct ath10k *ar, u32 vdev_id);
 
+extern	uint8_t ath10k_mac_hw_rate_to_net80211_legacy_rate(struct ath10k *ar,
+	    uint8_t hw_rate, int is_cck);
+extern	int ath10k_mac_hw_rate_cck_is_short_preamble(struct ath10k *ar,
+	    uint8_t hw_rate, int is_cck);
+
 void ath10k_mac_handle_beacon(struct ath10k *ar, struct athp_buf *pbuf);
 void ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id);
 void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
@@ -92,5 +97,6 @@ extern	void ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx
 
 extern	int athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac);
 extern	int athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni);
+extern	int athp_vif_update_txpower(struct ieee80211vap *vap);
 
 #endif /* _MAC_H_ */

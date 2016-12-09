@@ -878,7 +878,7 @@ ath10k_core_fetch_firmware_api_n(struct ath10k *ar, const char *name)
 				}
 			}
 
-			athp_debug_dump(ar, ATH10K_DBG_BOOT, "features", "",
+			ath10k_dbg_dump(ar, ATH10K_DBG_BOOT, "features", "",
 					ar->fw_features,
 					sizeof(ar->fw_features));
 			break;
@@ -1125,14 +1125,21 @@ static void ath10k_core_restart(void *arg, int npending)
 	/* XXX lock? */
 	set_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags);
 
-#if 0
 	/* Place a barrier to make sure the compiler doesn't reorder
 	 * CRASH_FLUSH and calling other functions.
 	 */
-	barrier();
+	mb();
 
+#if 0
 	ieee80211_stop_queues(ar->hw);
+#else
+	ath10k_warn(ar, "%s: TODO: stop TX queues, ensure we can flush it\n",
+	    __func__);
 #endif
+	/*
+	 * This just drains the TX tasks; it doesn't actually drain
+	 * the pending TX MSDU list.
+	 */
 	ath10k_drain_tx(ar);
 
 	ath10k_compl_wakeup_all(&ar->scan.started);
@@ -1147,15 +1154,19 @@ static void ath10k_core_restart(void *arg, int npending)
 	ath10k_wait_wakeup_one(&ar->wmi.tx_credits_wq);
 	ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 
-#if 0
-	mutex_lock(&ar->conf_mutex);
+	ATHP_CONF_LOCK(ar);
 
 	switch (ar->state) {
 	case ATH10K_STATE_ON:
 		ar->state = ATH10K_STATE_RESTARTING;
 		ath10k_hif_stop(ar);
 		ath10k_scan_finish(ar);
+#if 0
 		ieee80211_restart_hw(ar->hw);
+#else
+		ath10k_warn(ar, "%s: TODO: we don't have a 'restart-hw' net80211 method!\n",
+		    __func__);
+#endif
 		break;
 	case ATH10K_STATE_OFF:
 		/* this can happen if driver is being unloaded
@@ -1176,10 +1187,7 @@ static void ath10k_core_restart(void *arg, int npending)
 		break;
 	}
 
-	mutex_unlock(&ar->conf_mutex);
-#else
-	device_printf(ar->sc_dev, "%s: TODO: called\n", __func__);
-#endif
+	ATHP_CONF_UNLOCK(ar);
 }
 
 static int
@@ -1581,10 +1589,7 @@ ath10k_core_stop_done(struct ath10k *ar)
 {
 	ATHP_CONF_UNLOCK_ASSERT(ar);
 
-	/* XXX TODO */
-#if 0
 	taskqueue_unblock(ar->workqueue);
-#endif
 }
 
 /* mac80211 manages fw/hw initialization through start/stop hooks. However in
@@ -1874,7 +1879,7 @@ ath10k_core_init(struct ath10k *ar)
 	ath10k_wait_init(&ar->wmi.tx_credits_wq);
 
 	ath10k_compl_init(&ar->offchan_tx_completed);
-	TASK_INIT(&ar->offchan_tx_work, 0, ath10k_offchan_tx_work, 0);
+	TASK_INIT(&ar->offchan_tx_work, 0, ath10k_offchan_tx_work, ar);
 	TAILQ_INIT(&ar->offchan_tx_queue);
 
 	TASK_INIT(&ar->wmi_mgmt_tx_work, 0, ath10k_mgmt_over_wmi_tx_work, ar);
@@ -1915,8 +1920,6 @@ ath10k_core_destroy(struct ath10k *ar)
 	taskqueue_drain_all(ar->attach_workqueue);
 	taskqueue_free(ar->attach_workqueue);
 
-#if 0
 	ath10k_debug_destroy(ar);
 	ath10k_mac_destroy(ar);
-#endif
 }

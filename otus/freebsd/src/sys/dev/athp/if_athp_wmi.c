@@ -102,6 +102,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_spectral.h"
 #include "if_athp_fwlog.h"
 #include "if_athp_trace.h"
+#include "if_athp_regs.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 
@@ -1833,11 +1834,6 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 	 * XXX TODO: this is in milliseconds, which likely needs to be more
 	 * frequent for this kind of thing.
 	 */
-#if 0
-	ath10k_dbg(ar, ATH10K_DBG_WMI,
-	    "%s: setup: cmdid=0x%08x, ticks=%u, interval=%u\n",
-	    __func__, cmd_id, ticks, interval);
-#endif
 
 	while (! ieee80211_time_after(ticks, interval)) {
 		ath10k_wait_wait(&ar->wmi.tx_credits_wq, "tx_credits_wq",
@@ -1927,10 +1923,11 @@ static void ath10k_wmi_event_scan_started(struct ath10k *ar)
 	case ATH10K_SCAN_STARTING:
 		ar->scan.state = ATH10K_SCAN_RUNNING;
 
-		device_printf(ar->sc_dev, "%s: TODO: ready_on_channel\n", __func__);
 #if 0
 		if (ar->scan.is_roc)
 			ieee80211_ready_on_channel(ar->hw);
+#else
+		device_printf(ar->sc_dev, "%s: TODO: ready_on_channel\n", __func__);
 #endif
 
 		ath10k_compl_wakeup_one(&ar->scan.started);
@@ -2355,30 +2352,6 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (rx_status & WMI_RX_STATUS_ERR_MIC)
 		stat.c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
 
-#if 0
-	/* Hardware can Rx CCK rates on 5GHz. In that case phy_mode is set to
-	 * MODE_11B. This means phy_mode is not a reliable source for the band
-	 * of mgmt rx.
-	 */
-	if (channel >= 1 && channel <= 14) {
-		status->band = IEEE80211_BAND_2GHZ;
-	} else if (channel >= 36 && channel <= 165) {
-		status->band = IEEE80211_BAND_5GHZ;
-	} else {
-		/* Shouldn't happen unless list of advertised channels to
-		 * mac80211 has been changed.
-		 */
-		WARN_ON_ONCE(1);
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
-	if (phy_mode == MODE_11B && status->band == IEEE80211_BAND_5GHZ)
-		ath10k_dbg(ar, ATH10K_DBG_MGMT, "wmi mgmt rx 11b (CCK) on 5GHz\n");
-
-	sband = &ar->mac.sbands[status->band];
-#endif
-
 	if (channel <= 14)
 		band = IEEE80211_CHAN_2GHZ;
 	else
@@ -2392,6 +2365,11 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	stat.c_freq = ieee80211_ieee2mhz(channel, band);
 	stat.c_rssi = snr;
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
+
+	/*
+	 * XXX TODO: yes, it'd be nice to communicate the rate
+	 * up to net80211
+	 */
 
 	hdr = mtod(pbuf->m, struct ieee80211_frame *);
 	ath10k_wmi_handle_wep_reauth(ar, pbuf, &stat);
@@ -2495,26 +2473,35 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	return 0;
 }
 
-#if 0
+/*
+ * 2GHz channel list for ath10k.
+ *
+ * XXX duplicate with what's in if_athp_main.c.
+ */
+static uint8_t chan_list_2ghz[] =
+    { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+static uint8_t chan_list_5ghz[] =
+    { 36, 40, 44, 48, 52, 56, 60, 64, 100, 104,
+      108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
+      153, 157, 161, 165 };
+
 static int freq_to_idx(struct ath10k *ar, int freq)
 {
-	struct ieee80211_supported_band *sband;
-	int band, ch, idx = 0;
+	int ch, idx = 0;
 
-	for (band = IEEE80211_BAND_2GHZ; band < IEEE80211_NUM_BANDS; band++) {
-		sband = ar->hw->wiphy->bands[band];
-		if (!sband)
-			continue;
+	for (ch = 0; ch < nitems(chan_list_2ghz); ch++, idx++) {
+		if (ieee80211_ieee2mhz(chan_list_2ghz[ch], IEEE80211_CHAN_2GHZ) == freq)
+			goto exit;
+	}
 
-		for (ch = 0; ch < sband->n_channels; ch++, idx++)
-			if (sband->channels[ch].center_freq == freq)
-				goto exit;
+	for (ch = 0; ch < nitems(chan_list_5ghz); ch++, idx++) {
+		if (ieee80211_ieee2mhz(chan_list_5ghz[ch], IEEE80211_CHAN_5GHZ) == freq)
+			goto exit;
 	}
 
 exit:
 	return idx;
 }
-#endif
 
 static int ath10k_wmi_op_pull_ch_info_ev(struct ath10k *ar, struct athp_buf *pbuf,
 					 struct wmi_ch_info_ev_arg *arg)
@@ -2561,10 +2548,9 @@ static int ath10k_wmi_10_4_op_pull_ch_info_ev(struct ath10k *ar,
 void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	struct wmi_ch_info_ev_arg arg = {};
-//	struct survey_info *survey;
+	struct ieee80211_channel_survey *survey;
 	u32 err_code, freq, cmd_flags, noise_floor, rx_clear_count, cycle_count;
-//	int idx, ret;
-	int ret;
+	int idx, ret;
 
 	ret = ath10k_wmi_pull_ch_info(ar, pbuf, &arg);
 	if (ret) {
@@ -2601,7 +2587,6 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 	 * all the way up to net80211.
 	 */
 
-#if 0
 	idx = freq_to_idx(ar, freq);
 	if (idx >= ARRAY_SIZE(ar->survey)) {
 		ath10k_warn(ar, "chan info: invalid frequency %d (idx %d out of bounds)\n",
@@ -2612,8 +2597,8 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 	if (cmd_flags & WMI_CHAN_INFO_FLAG_COMPLETE) {
 		if (ar->ch_info_can_report_survey) {
 			survey = &ar->survey[idx];
-			survey->noise = noise_floor;
-			survey->filled = SURVEY_INFO_NOISE_DBM;
+			survey->s_noise = noise_floor;
+			survey->s_flags = IEEE80211_F_SURVEY_NOISE_DBM;
 
 			ath10k_hw_fill_survey_time(ar,
 						   survey,
@@ -2632,7 +2617,6 @@ void ath10k_wmi_event_chan_info(struct ath10k *ar, struct athp_buf *pbuf)
 		ar->survey_last_rx_clear_count = rx_clear_count;
 		ar->survey_last_cycle_count = cycle_count;
 	}
-#endif
 exit:
 	ATHP_DATA_UNLOCK(ar);
 }
@@ -2644,10 +2628,6 @@ void ath10k_wmi_event_echo(struct ath10k *ar, struct athp_buf *pbuf)
 
 int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct athp_buf *pbuf)
 {
-#if 0
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event debug mesg len %d\n",
-		   mbuf_skb_len(pbuf->m));
-#endif
 
 	trace_ath10k_wmi_dbglog(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 	ath10k_handle_fwlog_msg(ar, pbuf);
@@ -3104,7 +3084,6 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi event peer sta kickout %6D\n",
 		   arg.mac_addr, ":");
 
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 #if 0
 	rcu_read_lock();
 
@@ -3119,6 +3098,8 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 
 exit:
 	rcu_read_unlock();
+#else
+	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
 #endif
 }
 
@@ -3388,7 +3369,7 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 	const struct wmi_p2p_noa_info *noa_info;
 	struct ath10k_vif *arvif;
 	struct athp_buf *bcn;
-	dma_addr_t paddr;
+	bus_addr_t paddr;
 	int ret, vdev_id = 0;
 
 	ret = ath10k_wmi_pull_swba(ar, pbuf, &arg);
@@ -4302,10 +4283,8 @@ static void ath10k_wmi_event_service_ready_work(void *targ, int npending)
 	    __le32_to_cpu(arg.eeprom_rd));
 #endif
 
-#if 0
 	ath10k_dbg_dump(ar, ATH10K_DBG_WMI, NULL, "wmi svc: ",
 			arg.service_map, arg.service_map_len);
-#endif
 
 	/* only manually set fw features when not using FW IE format */
 	if (ar->fw_api == 1 && ar->fw_version_build > 636)

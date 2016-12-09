@@ -99,6 +99,8 @@ MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
 /*
  * 2GHz channel list for ath10k.
+ *
+ * XXX This has to add up to ATH10K_NUM_CHANS .
  */
 static uint8_t chan_list_2ghz[] =
     { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
@@ -993,6 +995,25 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	return (1);
 }
 
+static int
+athp_vap_reset(struct ieee80211vap *vap, u_long cmd)
+{
+#if 0
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+#endif
+
+	switch (cmd) {
+	case IEEE80211_IOC_TXPOWER:
+		(void) athp_vif_update_txpower(vap);
+		return (0);
+	}
+
+	/* For now, we don't have a reset hardware to running handler.. */
+	return (0);
+}
+
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     enum ieee80211_opmode opmode, int flags,
@@ -1059,6 +1080,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_key_alloc = athp_key_alloc;
 	vap->iv_key_set = athp_key_set;
 	vap->iv_key_delete = athp_key_delete;
+	vap->iv_reset = athp_vap_reset;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -1114,7 +1136,7 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	if (uvp->is_setup) {
 
-		/* Wait for xmit to finish before continuing */
+		/* Wait for active xmit to finish before continuing */
 		ath10k_tx_flush(ar, vap, 0, 1);
 
 		/*
@@ -1136,28 +1158,38 @@ athp_vap_delete(struct ieee80211vap *vap)
 	}
 
 	/*
-	 * At this point the ath10k VAP no longer exists, so we can't
-	 * queue things to the vdev anymore.
+	 * If this is a firmware panic or we had some highly confused
+	 * driver state (eg transmitting to things with no peers)
+	 * there may be frames stuck in the transmit queue that
+	 * won't have been deleted.
+	 *
+	 * Now, I don't know how to stop HTT TX in the firmware;
+	 * HTT TX is implemented as HTC submissions with descriptors.
 	 */
 
 	/*
-	 * XXX for now, we only support a single VAP.
-	 * Later on, we need to check if any other VAPs are left and if
-	 * not, we can power down.
+	 * At this point the ath10k VAP no longer exists, so we can't
+	 * queue things to the vdev anymore.  However, when we call
+	 * ieee80211_vap_detach() it'll generate net80211 callbacks
+	 * to tear down state; and there may already be frames in
+	 * the transmit queue (eg if it's stuck) / receive queue (just
+	 * because!) for the vap that we're deleting.
 	 *
-	 * Note: this 'stop' will completely stop the NIC, including freeing
-	 * HTT (locks) and other things (via ath10k_core_stop().)
+	 * Now, RX'ed frames are a pain but we can work around.
 	 *
-	 * For mac80211, I bet it doesn't call any further methods once it
-	 * calls the driver 'stop' method.
+	 * However, TX'ed frames could be stuck in the queue and we need
+	 * flush those out before we delete the VAP.  The mbufs have
+	 * a node reference / vap reference that needs to be dealt with.
+	 * Sigh.  Will have to stop TX, walk the TX list and free nodes
+	 * that are for the matching node/vap/vdev, before optionally
+	 * starting it again.
 	 *
-	 * However, for net80211, I wonder if during explicit teardown it
-	 * will schedule any other device callbacks after this point.
+	 * If we don't stop the NIC, then we don't ever flush frames
+	 * for the VAP we're about to free, and that's a problem.
 	 *
-	 * Note: this /will/ stop the NIC, and free things - including
-	 * pending/stuck TX frames.  If this moves below vap_detach then
-	 * freeing those frames causes invalid node/ifnet references from
-	 * mgmt TX mbufs to be deref'ed and panic.
+	 * So, stop the NIC here.  Any entry points in from net80211
+	 * will have to check that we're running and error out as
+	 * appropriate.
 	 */
 	ath10k_stop(ar);
 
@@ -1605,20 +1637,22 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_update_chw = athp_update_chw;
 	ic->ic_ampdu_enable = athp_ampdu_enable;
 
-	/* TODO: Initial 11n state; capabilities */
-	ath10k_warn(ar, "%s: ht_cap_info: 0x%08x\n", __func__, ar->ht_cap_info);
+	/* Initial 11n state; capabilities */
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
 		athp_attach_11n(ar);
 	}
 
 	/* radiotap attach */
 	ieee80211_radiotap_attach(ic,
-	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu), ATH10K_TX_RADIOTAP_PRESENT,
-	    &ar->sc_rxtapu.th.wr_ihdr, sizeof(ar->sc_rxtapu), ATH10K_RX_RADIOTAP_PRESENT);
+	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu),
+	    ATH10K_TX_RADIOTAP_PRESENT,
+	    &ar->sc_rxtapu.th.wr_ihdr, sizeof(ar->sc_rxtapu),
+	    ATH10K_RX_RADIOTAP_PRESENT);
 
 	// if (bootverbose)
 		ieee80211_announce(ic);
 
+	/* Deferring work (eg crypto key updates) into net80211 taskqueue */
 	(void) athp_taskq_init(ar);
 
 	return (0);

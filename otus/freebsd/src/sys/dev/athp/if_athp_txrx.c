@@ -169,10 +169,6 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 
 	ath10k_report_offchan_tx(htt->ar, msdu);
 
-	/*
-	 * XXX TODO: it'd be nice to implement the trace methods
-	 * as ALQ stubs.
-	 */
 #if 0
 	info = IEEE80211_SKB_CB(msdu);
 	memset(&info->status, 0, sizeof(info->status));
