@@ -574,6 +574,23 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ATHP_CONF_UNLOCK(ar);
 		}
 
+		/*
+		 * Hostap - need to ensure we've set the SSID right first.
+		 */
+		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			ATHP_CONF_LOCK(ar);
+			(void) athp_vif_update_ap_ssid(vap, bss_ni);
+			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				ath10k_err(ar,
+				    "%s: ath10k_vdev_start failed; ret=%d\n",
+				    __func__, ret);
+				break;
+			}
+			ATHP_CONF_UNLOCK(ar);
+		}
+
 		/* For now, only start vdev on INIT->RUN */
 		/* This should be ok for monitor, but not for station */
 		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
@@ -657,7 +674,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			    __func__, ret);
 			break;
 		}
-		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
+		if (vap->iv_opmode == IEEE80211_M_STA)
+			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
 		ATHP_CONF_UNLOCK(ar);
 		break;
 	case IEEE80211_S_ASSOC:
@@ -1574,6 +1592,7 @@ athp_attach_net80211(struct ath10k *ar)
 	/* Setup device capabilities */
 	ic->ic_caps =
 	    IEEE80211_C_STA |
+	    IEEE80211_C_HOSTAP |
 	    IEEE80211_C_BGSCAN |
 	    IEEE80211_C_SHPREAMBLE |
 	    IEEE80211_C_WME |

@@ -5256,6 +5256,9 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	case IEEE80211_M_MONITOR:
 		arvif->vdev_type = WMI_VDEV_TYPE_MONITOR;
 		break;
+	case IEEE80211_M_HOSTAP:
+		arvif->vdev_type = WMI_VDEV_TYPE_AP;
+		break;
 	default:
 		ath10k_warn(ar, "%s: unsupported opmode (%d)\n", __func__, opmode);
 		ret = -EINVAL;
@@ -5431,6 +5434,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		goto err_peer_delete;
 	}
 
+	/* XXX TODO: txpower default? */
 	arvif->txpower = 30;	/* 30dBm? It's just a hard-default for now; fix later */
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {
@@ -8658,4 +8662,18 @@ athp_vif_update_txpower(struct ieee80211vap *vap)
 	if (ret)
 		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
 	return (ret);
+}
+
+int
+athp_vif_update_ap_ssid(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	memcpy(arvif->u.ap.ssid, ni->ni_essid, ni->ni_esslen);
+	arvif->u.ap.ssid_len = ni->ni_esslen;
+
+	return (0);
 }
