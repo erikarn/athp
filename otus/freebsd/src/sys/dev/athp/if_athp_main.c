@@ -1046,6 +1046,19 @@ athp_vap_reset(struct ieee80211vap *vap, u_long cmd)
 	return (0);
 }
 
+static void
+athp_beacon_update(struct ieee80211vap *vap, int item)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211_beacon_offsets *bo = &vap->iv_bcn_off;
+
+	/* Typically this is called when the TIM changes */
+
+	ath10k_warn(ar, "%s: called; item=%d\n", __func__, item);
+	setbit(bo->bo_flags, item);
+}
+
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     enum ieee80211_opmode opmode, int flags,
@@ -1113,6 +1126,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_key_set = athp_key_set;
 	vap->iv_key_delete = athp_key_delete;
 	vap->iv_reset = athp_vap_reset;
+	vap->iv_update_beacon = athp_beacon_update;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
