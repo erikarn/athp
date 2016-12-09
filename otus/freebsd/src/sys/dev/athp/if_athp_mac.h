@@ -101,5 +101,9 @@ extern	int athp_vif_update_txpower(struct ieee80211vap *vap);
 
 extern	int athp_vif_update_ap_ssid(struct ieee80211vap *vap,
 	    struct ieee80211_node *ni);
+extern	int athp_vif_ap_setup(struct ieee80211vap *vap,
+	    struct ieee80211_node *ni);
+extern	int athp_vif_ap_stop(struct ieee80211vap *vap,
+	    struct ieee80211_node *ni);
 
 #endif /* _MAC_H_ */

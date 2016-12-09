@@ -580,6 +580,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
 			ATHP_CONF_LOCK(ar);
 			(void) athp_vif_update_ap_ssid(vap, bss_ni);
+
+			/* Should we do vif_restart before ap_setup? */
 			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
@@ -588,6 +590,15 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				    __func__, ret);
 				break;
 			}
+			ret = athp_vif_ap_setup(vap, bss_ni);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				ath10k_err(ar,
+				    "%s: ath10k_vif_ap_setup failed; ret=%d\n",
+				    __func__, ret);
+				break;
+			}
+
 			ATHP_CONF_UNLOCK(ar);
 		}
 
@@ -627,9 +638,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		break;
 
 	case IEEE80211_S_INIT:
-		if (vap->iv_opmode == IEEE80211_M_STA) {
-			athp_tx_disable(ar, vap);
-		}
+
+		athp_tx_disable(ar, vap);
 
 		ATHP_CONF_LOCK(ar);
 
@@ -647,11 +657,15 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
 		}
+
+		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			ath10k_tx_flush_locked(ar, vap, 0, 1);
+			ret = athp_vif_ap_stop(vap, bss_ni);
+		}
+
 		ATHP_CONF_UNLOCK(ar);
 
-		if (vap->iv_opmode == IEEE80211_M_STA) {
-			athp_tx_enable(ar, vap);
-		}
+		athp_tx_enable(ar, vap);
 
 		break;
 
