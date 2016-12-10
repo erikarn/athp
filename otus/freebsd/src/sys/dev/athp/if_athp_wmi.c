@@ -1761,7 +1761,7 @@ static void ath10k_wmi_tx_beacon_nowait(struct ath10k_vif *arvif)
 		ret = ath10k_wmi_beacon_send_ref_nowait(arvif->ar,
 							arvif->vdev_id,
 							mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m),
-							bcn->mb.paddr,
+							cb->bcn.paddr,
 							cb->bcn.dtim_zero,
 							cb->bcn.deliver_cab);
 
@@ -3361,15 +3361,16 @@ static enum wmi_txbf_conf ath10k_wmi_10_4_txbf_conf_scheme(struct ath10k *ar)
 
 void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 {
-#if 0
 	struct wmi_swba_ev_arg arg = {};
 	u32 map;
 	int i = -1;
 	const struct wmi_tim_info_arg *tim_info;
 	const struct wmi_p2p_noa_info *noa_info;
 	struct ath10k_vif *arvif;
+	struct ieee80211vap *vap;
 	struct athp_buf *bcn;
-	bus_addr_t paddr;
+	struct mbuf *m;
+	struct ieee80211_node *ni;
 	int ret, vdev_id = 0;
 
 	ret = ath10k_wmi_pull_swba(ar, pbuf, &arg);
@@ -3419,7 +3420,9 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 				    vdev_id);
 			continue;
 		}
+		vap = &arvif->av_vap;
 
+#if 0
 		/* There are no completions for beacons so wait for next SWBA
 		 * before telling mac80211 to decrement CSA counter
 		 *
@@ -3430,17 +3433,32 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 			ieee80211_csa_finish(arvif->vif);
 			continue;
 		}
-
-		bcn = ieee80211_beacon_get(ar->hw, arvif->vif);
-		if (!bcn) {
-			ath10k_warn(ar, "could not get mac80211 beacon\n");
+#endif
+		ni = ieee80211_ref_node(vap->iv_bss);
+		m = ieee80211_beacon_alloc(ni);
+		if (m == NULL) {
+			ath10k_warn(ar, "%s: couldn't allocate beacon mbuf\n", __func__);
 			continue;
 		}
 
+		/* XXX TODO: need to set CAB bit if required */
+		(void) ieee80211_beacon_update(ni, m, 0);
+		ieee80211_free_node(ni);
 
+		bcn = athp_getbuf_tx(ar, &ar->buf_tx);
+		if (bcn == NULL) {
+			ath10k_warn(ar, "%s: couldn't allocate beacon pbuf\n", __func__);
+			m_freem(m);
+			continue;
+		}
+
+		athp_buf_give_mbuf(ar, &ar->buf_tx, bcn, m);
+
+#if 0
 		ath10k_tx_h_seq_no(arvif->vif, bcn);
 		ath10k_wmi_update_tim(ar, arvif, bcn, tim_info);
 		ath10k_wmi_update_noa(ar, arvif, bcn, noa_info);
+#endif
 
 		ATHP_DATA_LOCK(ar);
 
@@ -3455,14 +3473,15 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 			case ATH10K_BEACON_SENDING:
 				ath10k_warn(ar, "SWBA overrun on vdev %d, skipped new beacon\n",
 					    arvif->vdev_id);
-				dev_kfree_skb(bcn);
+				athp_freebuf(ar, &ar->buf_tx, bcn);
 				goto skip;
 			}
 
 			ath10k_mac_vif_beacon_free(arvif);
 		}
 
-		if (!arvif->beacon_buf) {
+		if (!arvif->beacon_buf.dd_desc) {
+#if 0
 			paddr = dma_map_single(arvif->ar->dev, bcn->data,
 					       bcn->len, DMA_TO_DEVICE);
 			ret = dma_mapping_error(arvif->ar->dev, paddr);
@@ -3475,31 +3494,32 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 			}
 
 			ATH10K_SKB_CB(bcn)->paddr = paddr;
+#else
+			ath10k_warn(ar, "%s: we should have a beacon buffer!\n", __func__);
+			athp_freebuf(ar, &ar->buf_tx, bcn);
+#endif
 		} else {
-			if (bcn->len > IEEE80211_MAX_FRAME_LEN) {
+			if (mbuf_skb_len(bcn->m) > 2048) {
 				ath10k_warn(ar, "trimming beacon %d -> %d bytes!\n",
-					    bcn->len, IEEE80211_MAX_FRAME_LEN);
-				skb_trim(bcn, IEEE80211_MAX_FRAME_LEN);
+					    mbuf_skb_len(bcn->m), 2048);
+				mbuf_skb_trim(bcn->m, 2048);
 			}
-			memcpy(arvif->beacon_buf, bcn->data, bcn->len);
-			ATH10K_SKB_CB(bcn)->paddr = arvif->beacon_paddr;
+			memcpy(arvif->beacon_buf.dd_desc, mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m));
+			/* XXX TODO: pre-write flush */
+			ATH10K_SKB_CB(bcn)->bcn.paddr = arvif->beacon_buf.dd_desc_paddr;
 		}
 
 		arvif->beacon = bcn;
 		arvif->beacon_state = ATH10K_BEACON_SCHEDULED;
 
-		trace_ath10k_tx_hdr(ar, bcn->data, bcn->len);
-		trace_ath10k_tx_payload(ar, bcn->data, bcn->len);
+		trace_ath10k_tx_hdr(ar, mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m));
+		trace_ath10k_tx_payload(ar, mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m));
 
 skip:
 		ATHP_DATA_UNLOCK(ar);
 	}
 
 	ath10k_wmi_tx_beacons_nowait(ar);
-
-#else
-	device_printf(ar->sc_dev, "%s: TODO: csa check! get beacon!\n", __func__);
-#endif
 }
 
 void ath10k_wmi_event_tbttoffset_update(struct ath10k *ar, struct athp_buf *pbuf)

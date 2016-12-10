@@ -28,10 +28,10 @@ struct ath10k_skb_cb {
 		u32 txbuf_paddr;
 	} __packed htt;
 
-
 	struct {
 		bool dtim_zero;
 		bool deliver_cab;
+		u32 paddr;
 	} bcn;
 };
 
