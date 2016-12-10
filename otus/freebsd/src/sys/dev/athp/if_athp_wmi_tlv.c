@@ -2629,7 +2629,7 @@ ath10k_wmi_tlv_op_gen_pktlog_disable(struct ath10k *ar)
 
 static struct athp_buf *
 ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
-			       u32 tim_ie_offset, struct athp_buf *bcn,
+			       u32 tim_ie_offset, struct mbuf *bcn,
 			       u32 prb_caps, u32 prb_erp, void *prb_ies,
 			       size_t prb_ies_len)
 {
@@ -2645,7 +2645,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
 	      sizeof(*tlv) + sizeof(*info) + prb_ies_len +
-	      sizeof(*tlv) + roundup(mbuf_skb_len(bcn->m), 4);
+	      sizeof(*tlv) + roundup(mbuf_skb_len(bcn), 4);
 	pbuf = ath10k_wmi_alloc_skb(ar, len);
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
@@ -2657,7 +2657,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 	cmd = (void *)tlv->value;
 	cmd->vdev_id = __cpu_to_le32(vdev_id);
 	cmd->tim_ie_offset = __cpu_to_le32(tim_ie_offset);
-	cmd->buf_len = __cpu_to_le32(mbuf_skb_len(bcn->m));
+	cmd->buf_len = __cpu_to_le32(mbuf_skb_len(bcn));
 
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
@@ -2681,8 +2681,8 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
-	tlv->len = __cpu_to_le16(roundup(mbuf_skb_len(bcn->m), 4));
-	memcpy(tlv->value, mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m));
+	tlv->len = __cpu_to_le16(roundup(mbuf_skb_len(bcn), 4));
+	memcpy(tlv->value, mbuf_skb_data(bcn), mbuf_skb_len(bcn));
 
 	/* FIXME: Adjust TSF? */
 
@@ -2693,7 +2693,7 @@ ath10k_wmi_tlv_op_gen_bcn_tmpl(struct ath10k *ar, u32 vdev_id,
 
 static struct athp_buf *
 ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
-			       struct athp_buf *prb)
+			       struct mbuf *prb)
 {
 	struct wmi_tlv_prb_tmpl_cmd *cmd;
 	struct wmi_tlv_bcn_prb_info *info;
@@ -2704,7 +2704,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	len = sizeof(*tlv) + sizeof(*cmd) +
 	      sizeof(*tlv) + sizeof(*info) +
-	      sizeof(*tlv) + roundup(mbuf_skb_len(prb->m), 4);
+	      sizeof(*tlv) + roundup(mbuf_skb_len(prb), 4);
 	pbuf = ath10k_wmi_alloc_skb(ar, len);
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
@@ -2715,7 +2715,7 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 	tlv->len = __cpu_to_le16(sizeof(*cmd));
 	cmd = (void *)tlv->value;
 	cmd->vdev_id = __cpu_to_le32(vdev_id);
-	cmd->buf_len = __cpu_to_le32(mbuf_skb_len(prb->m));
+	cmd->buf_len = __cpu_to_le32(mbuf_skb_len(prb));
 
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*cmd);
@@ -2732,8 +2732,8 @@ ath10k_wmi_tlv_op_gen_prb_tmpl(struct ath10k *ar, u32 vdev_id,
 
 	tlv = (void *)ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_BYTE);
-	tlv->len = __cpu_to_le16(roundup(mbuf_skb_len(prb->m), 4));
-	memcpy(tlv->value, mbuf_skb_data(prb->m), mbuf_skb_len(prb->m));
+	tlv->len = __cpu_to_le16(roundup(mbuf_skb_len(prb), 4));
+	memcpy(tlv->value, mbuf_skb_data(prb), mbuf_skb_len(prb));
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv prb tmpl vdev_id %i\n",
 		   vdev_id);

@@ -1810,7 +1810,66 @@ static int ath10k_mac_setup_bcn_tmpl(struct ath10k_vif *arvif)
 
 	return 0;
 }
+#endif
 
+static int
+ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
+{
+	struct ath10k *ar = arvif->ar;
+	struct ieee80211vap *vap = &arvif->av_vap;
+	struct ieee80211_beacon_offsets *bo = &vap->iv_bcn_off;
+	struct ieee80211_node *ni;
+	struct mbuf *m;
+	int tim_offset;
+	int ret;
+
+	if (!test_bit(WMI_SERVICE_BEACON_OFFLOAD, ar->wmi.svc_map))
+		return 0;
+
+	if (arvif->vdev_type != WMI_VDEV_TYPE_AP &&
+	    arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
+		return 0;
+
+	/*
+	 * Fetch a beacon from net80211.
+	 */
+	m = m_getm2(NULL, 2048, M_NOWAIT, MT_DATA, M_PKTHDR);
+	if (m == NULL) {
+		ath10k_warn(ar, "%s: failed to get mbuf for beacon template\n",
+		    __func__);
+		return (-EPERM);
+	}
+
+	/*
+	 * Ask net80211 to fill it in for us.
+	 */
+	ni = ieee80211_ref_node(vap->iv_bss);
+	(void) ieee80211_beacon_update(ni, m, 0);
+	ieee80211_free_node(ni);
+
+	/*
+	 * Note: we don't do p2p; so we don't need to delete the
+	 * IE from net80211.
+	 */
+	if (bo->bo_tim == NULL)
+		tim_offset = 0;
+	else
+		tim_offset = bo->bo_tim - mtod(m, uint8_t *);
+	ret = ath10k_wmi_bcn_tmpl(ar, arvif->vdev_id, tim_offset, m, 0,
+				  0, NULL, 0);
+	m_freem(m);
+
+	if (ret) {
+		ath10k_warn(ar, "failed to submit beacon template command: %d\n",
+			    ret);
+		return ret;
+	}
+
+	return 0;
+
+}
+
+#if 0
 static int ath10k_mac_setup_prb_tmpl(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -8714,13 +8773,15 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		ath10k_warn(ar, "failed to set beacon mode for vdev %d: %i\n",
 			    arvif->vdev_id, ret);
 
-	ath10k_warn(ar, "%s: TODO: beacon template setup\n", __func__);
-
 #if 0
-		ret = ath10k_mac_setup_bcn_tmpl(arvif);
-		if (ret)
-			ath10k_warn(ar, "failed to update beacon template: %d\n",
-				    ret);
+	/*
+	 * Beacon template - this is for the WMI TLV firmware that
+	 * is doing more firmware offload style operations.
+	 */
+	ret = ath10k_mac_setup_bcn_tmpl_freebsd(arvif);
+	if (ret)
+		ath10k_warn(ar, "failed to update beacon template: %d\n",
+		    ret);
 #else
 	ath10k_warn(ar, "%s: TODO: beacon template setup\n", __func__);
 #endif
