@@ -1047,9 +1047,9 @@ void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif)
 	if (!arvif->beacon)
 		return;
 
-	if (arvif->beacon_buf.dd_desc != NULL) {
-		athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &arvif->beacon->mb);
-	}
+	/*
+	 * Note: athp_freebuf will unmap the mbuf for us.
+	 */
 
 	if (WARN_ON(arvif->beacon_state != ATH10K_BEACON_SCHEDULED &&
 		    arvif->beacon_state != ATH10K_BEACON_SENT))
@@ -1069,15 +1069,7 @@ static void ath10k_mac_vif_beacon_cleanup(struct ath10k_vif *arvif)
 
 	ath10k_mac_vif_beacon_free(arvif);
 
-#if 0
-	if (arvif->beacon_buf) {
-		dma_free_coherent(ar->dev, IEEE80211_MAX_FRAME_LEN,
-				  arvif->beacon_buf, arvif->beacon_paddr);
-		arvif->beacon_buf = NULL;
-	}
-#else
 	athp_descdma_free(ar, &arvif->beacon_buf);
-#endif
 }
 
 static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
@@ -5304,20 +5296,13 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	 */
 	if (opmode == IEEE80211_M_IBSS ||
 	    opmode == IEEE80211_M_HOSTAP) {
-#if 0
-		arvif->beacon_buf = dma_zalloc_coherent(ar->dev,
-							IEEE80211_MAX_FRAME_LEN,
-							&arvif->beacon_paddr,
-							GFP_ATOMIC);
-		if (!arvif->beacon_buf) {
-			ret = -ENOMEM;
-			ath10k_warn(ar, "failed to allocate beacon buffer: %d\n",
-				    ret);
+		ret = athp_descdma_alloc(ar, &arvif->beacon_buf,
+		    "beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+		if (ret != 0) {
+			ath10k_warn(ar,
+			    "%s: TODO: beacon_buf failed to allocate\n", __func__);
 			goto err;
 		}
-#else
-		ath10k_warn(ar, "%s: TODO: beacon_buf for IBSS/AP mode\n", __func__);
-#endif
 	}
 	if (test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags))
 		arvif->nohwcrypt = true;
