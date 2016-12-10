@@ -1830,10 +1830,11 @@ ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
 	    arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
 		return 0;
 
+	ni = ieee80211_ref_node(vap->iv_bss);
 	/*
 	 * Fetch a beacon from net80211.
 	 */
-	m = m_getm2(NULL, 2048, M_NOWAIT, MT_DATA, M_PKTHDR);
+	m = ieee80211_beacon_alloc(ni);
 	if (m == NULL) {
 		ath10k_warn(ar, "%s: failed to get mbuf for beacon template\n",
 		    __func__);
@@ -1843,7 +1844,6 @@ ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
 	/*
 	 * Ask net80211 to fill it in for us.
 	 */
-	ni = ieee80211_ref_node(vap->iv_bss);
 	(void) ieee80211_beacon_update(ni, m, 0);
 	ieee80211_free_node(ni);
 
