@@ -3435,9 +3435,17 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 		}
 #endif
 		ni = ieee80211_ref_node(vap->iv_bss);
+		if (ni->ni_chan == IEEE80211_CHAN_ANYC) {
+			ath10k_warn(ar, "%s: beacon channel is ANYC; skipping\n",
+			    __func__);
+			ieee80211_free_node(ni);
+			continue;
+		}
+
 		m = ieee80211_beacon_alloc(ni);
 		if (m == NULL) {
 			ath10k_warn(ar, "%s: couldn't allocate beacon mbuf\n", __func__);
+			ieee80211_free_node(ni);
 			continue;
 		}
 

@@ -1831,6 +1831,13 @@ ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
 		return 0;
 
 	ni = ieee80211_ref_node(vap->iv_bss);
+
+	if (ni->ni_chan == IEEE80211_CHAN_ANYC) {
+		ath10k_warn(ar, "%s: no active channel for beacon template\n",
+		    __func__);
+		ieee80211_free_node(ni);
+		return (-EPERM);
+	}
 	/*
 	 * Fetch a beacon from net80211.
 	 */
@@ -1838,6 +1845,7 @@ ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
 	if (m == NULL) {
 		ath10k_warn(ar, "%s: failed to get mbuf for beacon template\n",
 		    __func__);
+		ieee80211_free_node(ni);
 		return (-EPERM);
 	}
 
