@@ -505,6 +505,9 @@ static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 #endif
 }
 
+/*
+ * XXX NOTE: I think this is for clearing WEP keys.
+ */
 static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 				  const u8 *addr)
 {
@@ -1873,6 +1876,7 @@ ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
 		tim_offset = 0;
 	else
 		tim_offset = bo->bo_tim - mtod(m, uint8_t *);
+	ath10k_warn(ar, "%s: tim_offset=%d\n", __func__, tim_offset);
 	ret = ath10k_wmi_bcn_tmpl(ar, arvif->vdev_id, tim_offset, m, 0,
 				  0, NULL, 0);
 	m_freem(m);
@@ -8794,7 +8798,6 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		ath10k_warn(ar, "failed to set beacon mode for vdev %d: %i\n",
 			    arvif->vdev_id, ret);
 
-#if 0
 	/*
 	 * Beacon template - this is for the WMI TLV firmware that
 	 * is doing more firmware offload style operations.
@@ -8803,9 +8806,6 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	if (ret)
 		ath10k_warn(ar, "failed to update beacon template: %d\n",
 		    ret);
-#else
-	ath10k_warn(ar, "%s: TODO: beacon template setup\n", __func__);
-#endif
 
 #if 0
 	if (changed & BSS_CHANGED_AP_PROBE_RESP) {
@@ -8831,6 +8831,7 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 			    arvif->vdev_id, ret);
 
 	/* XXX TODO: here's where we configure it as a hidden SSID */
+	ath10k_warn(ar, "%s: TODO: set hidden_ssid flag if required\n", __func__);
 
 	arvif->u.ap.ssid_len = ni->ni_esslen;
 	if (ni->ni_esslen)
