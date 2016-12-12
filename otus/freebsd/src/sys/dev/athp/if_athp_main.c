@@ -1331,6 +1331,12 @@ athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	ku = athp_taskq_entry_to_ptr(e);
 	vap = ku->vap;
 
+	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+		ATHP_CONF_LOCK(ar);
+		(void) ath10k_station_disassoc(ar, vap, ku->ni);
+		ATHP_CONF_UNLOCK(ar);
+	}
+
 	if (athp_peer_free(vap, ku->peer_macaddr) != 0) {
 		ath10k_err(ar, "%s: failed to delete peer: %6D\n", __func__,
 		    ku->peer_macaddr, ":");
@@ -1398,10 +1404,24 @@ athp_node_alloc(struct ieee80211vap *vap,
 }
 
 static void
+athp_node_assoc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211vap *vap;
+
+	ku = athp_taskq_entry_to_ptr(e);
+	vap = ku->vap;
+
+	ATHP_CONF_LOCK(ar);
+	(void) ath10k_station_assoc(ar, vap, ku->ni, ! ku->is_assoc);
+	ATHP_CONF_UNLOCK(ar);
+}
+
+static void
 athp_newassoc(struct ieee80211_node *ni, int isnew)
 {
-	/* XXX TODO */
-	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	device_printf(ar->sc_dev,
 	    "%s: called; mac=%6D; isnew=%d\n",
@@ -1411,6 +1431,36 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	 * XXX TODO - should update association state for, well, all modes,
 	 * including STA mode.
 	 */
+	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		struct athp_taskq_entry *e;
+		struct athp_node_alloc_state *ku;
+
+		device_printf(ar->sc_dev,
+		    "%s: add association state for MAC %6D\n",
+		    __func__, ni->ni_macaddr, ":");
+
+		/*
+		 * Allocate a callback function state.
+		 */
+		e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+		if (e == NULL) {
+			ath10k_err(ar, "%s: failed to setup association state\n",
+			    __func__);
+			return;
+		}
+		ku = athp_taskq_entry_to_ptr(e);
+
+		/* Which MAC to feed to the command */
+		memcpy(&ku->peer_macaddr, ni->ni_macaddr, ETH_ALEN);
+
+		/* XXX ugh */
+		ku->vap = vap;
+		ku->ni = ni;
+		ku->is_assoc = isnew;
+
+		/* schedule */
+		(void) athp_taskq_queue(ar, e, "athp_node_assoc_cb", athp_node_assoc_cb);
+	}
 }
 
 static void

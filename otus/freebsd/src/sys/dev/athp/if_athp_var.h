@@ -53,6 +53,7 @@ struct athp_key_update {
 struct athp_node_alloc_state {
 	struct ieee80211vap *vap;
 	struct ieee80211_node *ni;
+	uint32_t is_assoc;
 	uint8_t peer_macaddr[ETH_ALEN];
 };
 

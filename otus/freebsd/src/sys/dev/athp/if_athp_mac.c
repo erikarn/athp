@@ -413,10 +413,10 @@ ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
 	return 0;
 }
 
-#if 0
 static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 					const u8 *addr)
 {
+#if 0
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
 	int ret;
@@ -499,11 +499,16 @@ static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 	}
 
 	return 0;
+#else
+	ath10k_warn(arvif->ar, "%s: TODO\n", __func__);
+	return (0);
+#endif
 }
 
 static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 				  const u8 *addr)
 {
+#if 0
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
 	int first_errno = 0;
@@ -540,8 +545,11 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 	}
 
 	return first_errno;
-}
+#else
+	ath10k_warn(arvif->ar, "%s: TODO\n", __func__);
+	return (0);
 #endif
+}
 
 bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 				    u8 keyidx)
@@ -1463,9 +1471,9 @@ static int ath10k_monitor_recalc(struct ath10k *ar)
 		return ath10k_monitor_stop(ar);
 }
 
-#if 0
 static int ath10k_recalc_rtscts_prot(struct ath10k_vif *arvif)
 {
+#define	SM(_v, _f)	(((_v) << _f##_LSB) & _f##_MASK)
 	struct ath10k *ar = arvif->ar;
 	u32 vdev_param, rts_cts = 0;
 
@@ -1484,8 +1492,10 @@ static int ath10k_recalc_rtscts_prot(struct ath10k_vif *arvif)
 
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
 					 rts_cts);
+#undef	SM
 }
 
+#if 0
 static int ath10k_start_cac(struct ath10k *ar)
 {
 	int ret;
@@ -3460,10 +3470,9 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
  * XXX adrian: I think this is the hostap side "add a new node"
  * method.
  */
-#if 0
-static int ath10k_station_assoc(struct ath10k *ar,
-				struct ieee80211_vif *vif,
-				struct ieee80211_sta *sta,
+int ath10k_station_assoc(struct ath10k *ar,
+				struct ieee80211vap *vif,
+				struct ieee80211_node *sta,
 				bool reassoc)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
@@ -3472,17 +3481,17 @@ static int ath10k_station_assoc(struct ath10k *ar,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ret = ath10k_peer_assoc_prepare(ar, vif, sta, &peer_arg);
+	ret = ath10k_peer_assoc_prepare(ar, vif, sta, &peer_arg, 1);
 	if (ret) {
-		ath10k_warn(ar, "failed to prepare WMI peer assoc for %pM vdev %i: %i\n",
-			    sta->addr, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to prepare WMI peer assoc for %6D vdev %i: %i\n",
+			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 		return ret;
 	}
 
 	ret = ath10k_wmi_peer_assoc(ar, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to run peer assoc for STA %pM vdev %i: %d\n",
-			    sta->addr, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to run peer assoc for STA %6D vdev %i: %d\n",
+			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 		return ret;
 	}
 
@@ -3490,22 +3499,24 @@ static int ath10k_station_assoc(struct ath10k *ar,
 	 * doesn't make much sense to reconfigure the peer completely.
 	 */
 	if (!reassoc) {
-		ret = ath10k_setup_peer_smps(ar, arvif, sta->addr,
-					     &sta->ht_cap);
+		ret = ath10k_setup_peer_smps(ar, arvif, sta->ni_macaddr, sta);
 		if (ret) {
 			ath10k_warn(ar, "failed to setup peer SMPS for vdev %d: %d\n",
 				    arvif->vdev_id, ret);
 			return ret;
 		}
 
+#if 0
 		ret = ath10k_peer_assoc_qos_ap(ar, arvif, sta);
 		if (ret) {
-			ath10k_warn(ar, "failed to set qos params for STA %pM for vdev %i: %d\n",
-				    sta->addr, arvif->vdev_id, ret);
+			ath10k_warn(ar, "failed to set qos params for STA %6D for vdev %i: %d\n",
+				    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 			return ret;
 		}
-
-		if (!sta->wme) {
+#else
+		ath10k_warn(ar, "%s: TODO: assoc_qos_ap\n", __func__);
+#endif
+		if (! (sta->ni_flags & IEEE80211_NODE_QOS)) {
 			arvif->num_legacy_stations++;
 			ret  = ath10k_recalc_rtscts_prot(arvif);
 			if (ret) {
@@ -3517,7 +3528,7 @@ static int ath10k_station_assoc(struct ath10k *ar,
 
 		/* Plumb cached keys only for static WEP */
 		if (arvif->def_wep_key_idx != -1) {
-			ret = ath10k_install_peer_wep_keys(arvif, sta->addr);
+			ret = ath10k_install_peer_wep_keys(arvif, sta->ni_macaddr);
 			if (ret) {
 				ath10k_warn(ar, "failed to install peer wep keys for vdev %i: %d\n",
 					    arvif->vdev_id, ret);
@@ -3532,16 +3543,16 @@ static int ath10k_station_assoc(struct ath10k *ar,
 /*
  * XXX adrian I think this is the "delete a station from hostap" method.
  */
-static int ath10k_station_disassoc(struct ath10k *ar,
-				   struct ieee80211_vif *vif,
-				   struct ieee80211_sta *sta)
+int ath10k_station_disassoc(struct ath10k *ar,
+				   struct ieee80211vap *vif,
+				   struct ieee80211_node *sta)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (!sta->wme) {
+	if (! (sta->ni_flags & IEEE80211_NODE_QOS)) {
 		arvif->num_legacy_stations--;
 		ret = ath10k_recalc_rtscts_prot(arvif);
 		if (ret) {
@@ -3551,7 +3562,7 @@ static int ath10k_station_disassoc(struct ath10k *ar,
 		}
 	}
 
-	ret = ath10k_clear_peer_keys(arvif, sta->addr);
+	ret = ath10k_clear_peer_keys(arvif, sta->ni_macaddr);
 	if (ret) {
 		ath10k_warn(ar, "failed to clear all peer wep keys for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
@@ -3560,6 +3571,8 @@ static int ath10k_station_disassoc(struct ath10k *ar,
 
 	return ret;
 }
+
+#if 0
 
 /**************/
 /* Regulatory */
