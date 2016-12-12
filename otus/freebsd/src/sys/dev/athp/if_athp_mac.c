@@ -8675,7 +8675,7 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
  * So - not sure what the fix would be for this!
  */
 int
-athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
+athp_peer_free(struct ieee80211vap *vap, const uint8_t *mac)
 {
 	struct ath10k *ar = vap->iv_ic->ic_softc;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
@@ -8692,7 +8692,7 @@ athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	}
 
 	(void) ath10k_tx_flush_locked(ar, vap, 0, 0);
-	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
+	ret = ath10k_peer_delete(ar, arvif->vdev_id, mac);
 //	ath10k_mac_dec_num_stations(arvif, sta);
 	ATHP_CONF_UNLOCK(ar);
 

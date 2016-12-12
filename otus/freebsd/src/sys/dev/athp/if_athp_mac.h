@@ -98,7 +98,7 @@ ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf *pbuf)
 extern	void ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok);
 
 extern	int athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac);
-extern	int athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni);
+extern	int athp_peer_free(struct ieee80211vap *vap, const uint8_t *mac);
 extern	int athp_vif_update_txpower(struct ieee80211vap *vap);
 
 extern	int athp_vif_update_ap_ssid(struct ieee80211vap *vap,

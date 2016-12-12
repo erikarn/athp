@@ -191,6 +191,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_frame *wh;
+	struct ath10k_sta *arsta;
 	struct mbuf *m = NULL;
 	int is_wep, is_qos;
 
@@ -201,6 +202,15 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	 */
 	athp_tx_enter(ar);
 	if (athp_tx_disabled(ar)) {
+		athp_tx_exit(ar);
+		m_freem(m0);
+		return (ENXIO);
+	}
+
+	arsta = ATHP_NODE(ni);
+	if (arsta->is_in_peer_table == 0) {
+		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
 		athp_tx_exit(ar);
 		m_freem(m0);
 		return (ENXIO);
@@ -382,6 +392,7 @@ static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 {
 	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
 	struct ieee80211vap *vap;
 	struct ath10k_vif *arvif;
 	struct athp_buf *pbuf;
@@ -400,7 +411,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
-
 	trace_ath10k_transmit(ar, 1, 0);
 
 	/*
@@ -412,6 +422,14 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (athp_tx_disabled(ar)) {
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
+		return (ENXIO);
+	}
+
+	arsta = ATHP_NODE(ni);
+	if (arsta->is_in_peer_table == 0) {
+		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
+		athp_tx_exit(ar);
 		return (ENXIO);
 	}
 
@@ -1280,35 +1298,103 @@ athp_update_mcast(struct ieee80211com *ic)
 
 }
 
+static void
+athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211vap *vap;
+	struct ath10k_sta *arsta;
+
+	ku = athp_taskq_entry_to_ptr(e);
+	vap = ku->vap;
+
+	if (athp_peer_create(vap, ku->peer_macaddr) != 0) {
+		ath10k_err(ar, "%s: failed to create peer: %6D\n", __func__,
+		    ku->peer_macaddr, ":");
+		return;
+	}
+
+	ath10k_warn(ar, "%s: added node for mac %6D (%p)\n", __func__,
+	    ku->peer_macaddr, ":", ku->ni);
+
+	/* XXX TODO: set "node" xmit flag to 1 */
+	arsta = ATHP_NODE(ku->ni);
+	arsta->is_in_peer_table = 1;
+}
+
+static void
+athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211vap *vap;
+
+	ku = athp_taskq_entry_to_ptr(e);
+	vap = ku->vap;
+
+	if (athp_peer_free(vap, ku->peer_macaddr) != 0) {
+		ath10k_err(ar, "%s: failed to delete peer: %6D\n", __func__,
+		    ku->peer_macaddr, ":");
+	}
+
+	ath10k_warn(ar, "%s: deleted node for mac %6D (%p)\n", __func__,
+	    ku->peer_macaddr, ":", ku->ni);
+}
+
 static struct ieee80211_node *
 athp_node_alloc(struct ieee80211vap *vap,
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	struct athp_node *an;
+	struct ath10k_sta *an;
 
 	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, mac, ":");
 
-	an = malloc(sizeof(struct athp_node), M_80211_NODE, M_NOWAIT | M_ZERO);
+	an = malloc(sizeof(struct ath10k_sta), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
 		return (NULL);
 
+	/*
+	 * Defer peer creation into the taskqueue.
+	 * We need the peer entry to be created before we can transmit.
+	 */
+
 	/* XXX TODO: Create peer if it's not our MAC address */
 	if (memcmp(mac, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		struct athp_taskq_entry *e;
+		struct athp_node_alloc_state *ku;
+
 		device_printf(ar->sc_dev,
 		    "%s: add peer for MAC %6D\n",
 		    __func__, mac, ":");
 
-		if (athp_peer_create(vap, mac) != 0) {
-			device_printf(ar->sc_dev, "%s: failed to create peer\n",
+		/*
+		 * Allocate a callback function state.
+		 */
+		e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+		if (e == NULL) {
+			ath10k_err(ar, "%s: failed to allocate node\n",
 			    __func__);
 			free(an, M_80211_NODE);
 			return (NULL);
 		}
+		ku = athp_taskq_entry_to_ptr(e);
+
+		/* Which MAC to feed to the command */
+		memcpy(&ku->peer_macaddr, mac, ETH_ALEN);
+
+		/* XXX ugh */
+		ku->vap = vap;
+		ku->ni = (void *) an;
+
+		/* schedule */
+		(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb", athp_node_alloc_cb);
+
+	} else {
+		an->is_in_peer_table = 1;
 	}
 
-	return (&an->ni);
+	return (&an->an_node);
 }
 
 static void
@@ -1320,6 +1406,11 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	device_printf(ar->sc_dev,
 	    "%s: called; mac=%6D; isnew=%d\n",
 	    __func__, ni->ni_macaddr, ":", isnew);
+
+	/*
+	 * XXX TODO - should update association state for, well, all modes,
+	 * including STA mode.
+	 */
 }
 
 static void
@@ -1329,16 +1420,24 @@ athp_node_free(struct ieee80211_node *ni)
 	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
 
 	device_printf(ar->sc_dev,
 	    "%s: called; mac=%6D\n",
 	    __func__, ni->ni_macaddr, ":");
 
+	arsta = ATHP_NODE(ni);
+
 	/* XXX TODO: delete peer */
 	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		struct athp_taskq_entry *e;
+		struct athp_node_alloc_state *ku;
+
 		device_printf(ar->sc_dev,
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
+
+		arsta->is_in_peer_table = 0;
 
 		/*
 		 * Note: when deleting a peer, we need to make sure that no
@@ -1347,9 +1446,30 @@ athp_node_free(struct ieee80211_node *ni)
 		 * is gone.  But, we should likely wait until the transmit
 		 * queue is emptied here just to be sure.
 		 */
-		athp_peer_free(ni->ni_vap, ni);
-	}
 
+		/*
+		 * Allocate a callback function state.
+		 */
+		e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+		if (e == NULL) {
+			ath10k_err(ar, "%s: failed to delete the peer!\n",
+			    __func__);
+			goto finish;
+		}
+		ku = athp_taskq_entry_to_ptr(e);
+
+		/* Which MAC to feed to the command */
+		memcpy(&ku->peer_macaddr, ni->ni_macaddr, ETH_ALEN);
+
+		/* XXX ugh */
+		ku->vap = ni->ni_vap;
+		ku->ni = (void *) ni;
+
+		/* schedule */
+		(void) athp_taskq_queue(ar, e, "athp_node_free_cb",
+		    athp_node_free_cb);
+	}
+finish:
 	ar->sc_node_free(ni);
 }
 
