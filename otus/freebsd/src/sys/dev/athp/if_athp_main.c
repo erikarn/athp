@@ -216,6 +216,12 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (ENXIO);
 	}
 
+	if (arvif->is_dying == 1) {
+		m_freem(m0);
+		athp_tx_exit(ar);
+		return (ENXIO);
+	}
+
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 	is_qos = IEEE80211_IS_QOS(wh);
@@ -224,30 +230,6 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D, is_wep=%d, is_qos=%d\n",
 	    __func__,
 	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":", is_wep, is_qos);
-
-	ATHP_CONF_LOCK(ar);
-
-	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
-	if (vap->iv_opmode == IEEE80211_M_STA) {
-		if (arvif->is_stabss_setup == 0) {
-			ATHP_CONF_UNLOCK(ar);
-			ath10k_warn(ar,
-			    "%s: stabss not setup; don't xmit\n",
-			    __func__);
-			m_freem(m0);
-			athp_tx_exit(ar);
-			return (ENXIO);
-		}
-	}
-
-	if (arvif->is_dying == 1) {
-		ATHP_CONF_UNLOCK(ar);
-		m_freem(m0);
-		athp_tx_exit(ar);
-		return (ENXIO);
-	}
-
-	ATHP_CONF_UNLOCK(ar);
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
@@ -433,26 +415,11 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		return (ENXIO);
 	}
 
-	ATHP_CONF_LOCK(ar);
-	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
-	if (vap->iv_opmode == IEEE80211_M_STA) {
-		if (arvif->is_stabss_setup == 0) {
-			ATHP_CONF_UNLOCK(ar);
-			ath10k_warn(ar, "%s: stabss not setup; don't xmit\n", __func__);
-			athp_tx_exit(ar);
-			trace_ath10k_transmit(ar, 0, 0);
-			return (ENXIO);
-		}
-	}
-
 	if (arvif->is_dying == 1) {
-		ATHP_CONF_UNLOCK(ar);
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
-
-	ATHP_CONF_UNLOCK(ar);
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
