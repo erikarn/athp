@@ -8565,6 +8565,8 @@ void ath10k_mac_unregister(struct ath10k *ar)
 
 /*
  * STA mode: update BSS info as appropriate.
+ *
+ * Note: this also adds/deletes the BSS peer as well.
  */
 void
 ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
@@ -8597,6 +8599,15 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 */
 		ath10k_bss_disassoc(ar, vap, is_run);
 
+		ATHP_DATA_LOCK(ar);
+		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
+			ATHP_DATA_UNLOCK(ar);
+			(void) ath10k_peer_create(ar, arvif->vdev_id,
+			    ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
+		} else {
+			ATHP_DATA_UNLOCK(ar);
+		}
+
 		/* Recalculate TX power - this is in dBm */
 		arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
 		ret = ath10k_mac_txpower_recalc(ar);
@@ -8610,6 +8621,7 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 
 	} else {
 		ath10k_bss_disassoc(ar, vap, is_run);
+		(void) ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 		arvif->is_stabss_setup = 0;
 	}
 }
