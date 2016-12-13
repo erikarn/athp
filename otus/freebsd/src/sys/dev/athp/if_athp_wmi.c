@@ -3132,10 +3132,11 @@ static void ath10k_wmi_update_tim(struct ath10k *ar,
 				  struct athp_buf *bcn,
 				  const struct wmi_tim_info_arg *tim_info)
 {
-#if 0
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)bcn->data;
+	struct ieee80211vap *vap = &arvif->av_vap;
+	struct ieee80211_frame *hdr = (struct ieee80211_frame *) mbuf_skb_data(bcn->m);
 	struct ieee80211_tim_ie *tim;
-	u8 *ies, *ie;
+	struct ieee80211_beacon_offsets *bo = &vap->iv_bcn_off;
+	char *ies, *ie;
 	u8 ie_len, pvm_len;
 	__le32 t;
 	u32 v, tim_len;
@@ -3173,10 +3174,24 @@ static void ath10k_wmi_update_tim(struct ath10k *ar,
 		arvif->u.ap.tim_len++;
 	}
 
-	ies = bcn->data;
-	ies += ieee80211_hdrlen(hdr->frame_control);
+	ies = mbuf_skb_data(bcn->m);
+	ies += ieee80211_anyhdrsize(hdr);
 	ies += 12; /* fixed parameters */
 
+	/*
+	 * Only need to do this for certain modes.
+	 */
+	if (vap->iv_opmode != IEEE80211_M_HOSTAP &&
+	    vap->iv_opmode != IEEE80211_M_IBSS &&
+	    vap->iv_opmode != IEEE80211_M_MBSS) {
+		return;
+	}
+
+	/* Only do this if we HAVE a TIM bitmap */
+	if (! isset(bo->bo_flags, IEEE80211_BEACON_TIM))
+		return;
+
+#if 0
 	ie = (u8 *)cfg80211_find_ie(WLAN_EID_TIM, ies,
 				    (u8 *)skb_tail_pointer(bcn) - ies);
 	if (!ie) {
@@ -3184,17 +3199,38 @@ static void ath10k_wmi_update_tim(struct ath10k *ar,
 			ath10k_warn(ar, "no tim ie found;\n");
 		return;
 	}
-
-	tim = (void *)ie + 2;
+#else
+	ie = bo->bo_tim;
+	if (ie == NULL) {
+		if (arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
+			ath10k_warn(ar, "no tim ie found;\n");
+		return;
+	}
+#endif
+	tim = (void *) ((char *)ie + 2);
 	ie_len = ie[1];
 	pvm_len = ie_len - 3; /* exclude dtim count, dtim period, bmap ctl */
 
+	ath10k_dbg(ar, ATH10K_DBG_BEACON,
+	    "%s: tim ie_len=%d, pvm_len=%d, tim_len=%d\n",
+	    __func__,
+	    (int) ie_len,
+	    (int) pvm_len,
+	    arvif->u.ap.tim_len);
+
 	if (pvm_len < arvif->u.ap.tim_len) {
 		int expand_size = tim_len - pvm_len;
-		int move_size = skb_tail_pointer(bcn) - (ie + 2 + ie_len);
-		void *next_ie = ie + 2 + ie_len;
+		int move_size = (mbuf_skb_data(bcn->m) + mbuf_skb_len(bcn->m))
+		    - (ie + 2 + ie_len);
+		char *next_ie = ie + 2 + ie_len;
 
-		if (skb_put(bcn, expand_size)) {
+		ath10k_dbg(ar, ATH10K_DBG_BEACON,
+		    "%s: expand_size=%d, move_size=%d\n",
+		    __func__,
+		    expand_size,
+		    move_size);
+
+		if (mbuf_skb_put(bcn->m, expand_size)) {
 			memmove(next_ie + expand_size, next_ie, move_size);
 
 			ie[1] += expand_size;
@@ -3210,22 +3246,20 @@ static void ath10k_wmi_update_tim(struct ath10k *ar,
 		return;
 	}
 
-	tim->bitmap_ctrl = !!__le32_to_cpu(tim_info->tim_mcast);
-	memcpy(tim->virtual_map, arvif->u.ap.tim_bitmap, pvm_len);
+	tim->tim_bitctl = !!__le32_to_cpu(tim_info->tim_mcast);
+	memcpy(tim->tim_bitmap, arvif->u.ap.tim_bitmap, pvm_len);
 
-	if (tim->dtim_count == 0) {
+	if (tim->tim_count == 0) {
 		ATH10K_SKB_CB(bcn)->bcn.dtim_zero = true;
 
 		if (__le32_to_cpu(tim_info->tim_mcast) == 1)
 			ATH10K_SKB_CB(bcn)->bcn.deliver_cab = true;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_MGMT, "dtim %d/%d mcast %d pvmlen %d\n",
-		   tim->dtim_count, tim->dtim_period,
-		   tim->bitmap_ctrl, pvm_len);
-#else
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-#endif
+	ath10k_dbg(ar, ATH10K_DBG_MGMT | ATH10K_DBG_BEACON,
+	    "dtim %d/%d mcast %d pvmlen %d\n",
+		   tim->tim_count, tim->tim_period,
+		   tim->tim_bitctl, pvm_len);
 }
 
 static void ath10k_wmi_update_noa(struct ath10k *ar, struct ath10k_vif *arvif,
@@ -3462,10 +3496,19 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 
 		athp_buf_give_mbuf(ar, &ar->buf_tx, bcn, m);
 
+		/* Note: net80211 currently increases the seqno for beacons */
+
 #if 0
 		ath10k_tx_h_seq_no(arvif->vif, bcn);
 		ath10k_wmi_update_tim(ar, arvif, bcn, tim_info);
 		ath10k_wmi_update_noa(ar, arvif, bcn, noa_info);
+#else
+		/*
+		 * Note: we should really just pass in the TIM bitmap
+		 * into ieee80211_beacon_update() or call a method
+		 * before it so we don't have to do these hijinx.
+		 */
+		ath10k_wmi_update_tim(ar, arvif, bcn, tim_info);
 #endif
 
 		ATHP_DATA_LOCK(ar);
