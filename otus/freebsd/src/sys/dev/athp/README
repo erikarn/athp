@@ -124,6 +124,23 @@ MSI:
 * TODO: teach the athp_transmit() API about fragments and at least warn/print
   about it for now!
 
+Suspend/resume, restarting VAPs after firmware panic:
+
+* when we suspend, we power down the NIC.  Upon resume, we need to transition
+  through INIT, and this requires re-creating the ath10k state.  Same with
+  firmware panics.
+
+  So, think of a way to iterate over the vdevs, mark the state as down /
+  free the ath10k state, drag the interfaces back to init, and then
+  re-allocate the vdevs again.  Then bring the interface/vdevs up so
+  net80211 can just restart programming in things.
+
+  The tricky bit will be tearing down the state without tearing down the
+  vap, and then making sure the net80211 state is gone (eg nodes, crypto
+  keys, etc) before the firmware is brought up.  We don't want to see
+  net80211 expect things that aren't setup (eg keys, peers/nodes) or
+  things are there it doesn't have setup, or trampling upon existing state.
+
 ===
 
 * Re-revisit all of the regulatory stuff - hardcoded txpower lists are bad.
@@ -163,7 +180,7 @@ MSI:
   (done) Go find ath10k_regd_update() and ensure we call it as part of dev/vif up or
   firmware will panic upon scan!
 
-* add an iv_reset method to handle TX power changes on the fly, and turn that
+* (done) add an iv_reset method to handle TX power changes on the fly, and turn that
   into a suitable WMI command.
 
 Panics / locking issues that need addressing
