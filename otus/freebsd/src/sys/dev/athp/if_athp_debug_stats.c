@@ -201,18 +201,18 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct athp_buf *skb)
 	num_peers = ath10k_debug_fw_stats_num_peers(&ar->debug.fw_stats);
 	num_vdevs = ath10k_debug_fw_stats_num_vdevs(&ar->debug.fw_stats);
 
-	is_start = (list_empty(&ar->debug.fw_stats.pdevs) &&
-		    !list_empty(&stats.pdevs));
-	is_end = (!list_empty(&ar->debug.fw_stats.pdevs) &&
-		  !list_empty(&stats.pdevs));
+	is_start = (TAILQ_EMPTY(&ar->debug.fw_stats.pdevs) &&
+		    !TAILQ_EMPTY(&stats.pdevs));
+	is_end = (!TAILQ_EMPTY(&ar->debug.fw_stats.pdevs) &&
+		  !TAILQ_EMPTY(&stats.pdevs));
 
 	if (is_start)
-		list_splice_tail_init(&stats.pdevs, &ar->debug.fw_stats.pdevs);
+		TAILQ_CONCAT(&ar->debug.fw_stats.pdevs, &stats.pdevs, list);
 
 	if (is_end)
 		ar->debug.fw_stats_done = true;
 
-	is_started = !list_empty(&ar->debug.fw_stats.pdevs);
+	is_started = !TAILQ_EMPTY(&ar->debug.fw_stats.pdevs);
 
 	if (is_started && !is_end) {
 		if (num_peers >= ATH10K_MAX_NUM_PEER_IDS) {
@@ -223,13 +223,13 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct athp_buf *skb)
 			goto free;
 		}
 
-		if (num_vdevs >= BITS_PER_LONG) {
+		if (num_vdevs >= 32) {
 			ath10k_warn(ar, "dropping fw vdev stats\n");
 			goto free;
 		}
 
-		list_splice_tail_init(&stats.peers, &ar->debug.fw_stats.peers);
-		list_splice_tail_init(&stats.vdevs, &ar->debug.fw_stats.vdevs);
+		TAILQ_CONCAT(&ar->debug.fw_stats.peers, &stats.peers, list);
+		TAILQ_CONCAT(&ar->debug.fw_stats.vdevs, &stats.vdevs, list);
 	}
 
 	ath10k_compl_wakeup_one(&ar->debug.fw_stats_complete);
@@ -247,18 +247,20 @@ free:
 
 static int ath10k_debug_fw_stats_request(struct ath10k *ar)
 {
-	unsigned long timeout, time_left;
+	int timeout, time_left;
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	timeout = jiffies + msecs_to_jiffies(1 * HZ);
+	timeout = ticks + ((1000 * hz) / 1000);
 
 	ath10k_debug_fw_stats_reset(ar);
 
 	for (;;) {
-		if (time_after(jiffies, timeout))
+		if (ieee80211_time_after(ticks, timeout)) {
+			ath10k_warn(ar, "%s: fw stats request timeout\n", __func__);
 			return -ETIMEDOUT;
+		}
 
 		ath10k_compl_reinit(&ar->debug.fw_stats_complete);
 

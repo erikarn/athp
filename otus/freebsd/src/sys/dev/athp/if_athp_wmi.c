@@ -103,6 +103,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_fwlog.h"
 #include "if_athp_trace.h"
 #include "if_athp_regs.h"
+#include "if_athp_debug_stats.h"
 
 MALLOC_DECLARE(M_ATHPDEV);
 MALLOC_DECLARE(M_ATHP_FW_STATS);
@@ -3005,10 +3006,7 @@ static int ath10k_wmi_10_2_4_op_pull_fw_stats(struct ath10k *ar,
 void ath10k_wmi_event_update_stats(struct ath10k *ar, struct athp_buf *pbuf)
 {
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "WMI_UPDATE_STATS_EVENTID\n");
-	device_printf(ar->sc_dev, "%s: TODO\n", __func__);
-#if 0
 	ath10k_debug_fw_stats_process(ar, pbuf);
-#endif
 }
 
 static int

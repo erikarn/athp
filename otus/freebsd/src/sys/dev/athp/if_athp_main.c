@@ -91,6 +91,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_taskq.h"
 #include "if_athp_trace.h"
 
+#include "if_athp_debug_stats.h"
+
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
 /*
@@ -1733,6 +1735,25 @@ athp_sysctl_reg_read(SYSCTL_HANDLER_ARGS)
 }
 
 static int
+athp_sysctl_fw_stats(SYSCTL_HANDLER_ARGS)
+{
+	struct ath10k *ar = arg1;
+	int error, val;
+	int ret;
+
+	val = 0;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	if (val == 1) {
+		ret = ath10k_fw_stats_open(ar);
+		ath10k_warn(ar, "%s: ath10k_wmi_request_stats: returned %d\n", __func__, ret);
+	}
+	return (0);
+}
+
+static int
 athp_sysctl_trace_enable(SYSCTL_HANDLER_ARGS)
 {
 	struct ath10k *ar = arg1;
@@ -1770,6 +1791,9 @@ athp_attach_sysctl(struct ath10k *ar)
 	    CTLFLAG_RW, &ar->sc_dbg_regidx, 0, "");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "regval",
 	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_reg_read, "I", "");
+
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "fw_stats",
+	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_fw_stats, "I", "");
 
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_msdu_invalid_len, "");
