@@ -15,7 +15,7 @@
  */
 
 /*
- * ath10k statistics routines (from debug.c.)
+ * ath10k vdev/pdev statistics routines (from debug.c.)
  */
 
 #include <sys/cdefs.h>
@@ -98,8 +98,6 @@ MALLOC_DECLARE(M_ATHPDEV);
 /* ms */
 #define ATH10K_DEBUG_HTT_STATS_INTERVAL 1000
 
-#define ATH10K_FW_CRASH_DUMP_VERSION 1
-
 static void ath10k_debug_fw_stats_pdevs_free(struct list_head *head)
 {
 	struct ath10k_fw_stats_pdev *i, *tmp;
@@ -132,12 +130,13 @@ static void ath10k_debug_fw_stats_peers_free(struct list_head *head)
 
 static void ath10k_debug_fw_stats_reset(struct ath10k *ar)
 {
-	spin_lock_bh(&ar->data_lock);
+
+	ATHP_DATA_LOCK(ar);
 	ar->debug.fw_stats_done = false;
 	ath10k_debug_fw_stats_pdevs_free(&ar->debug.fw_stats.pdevs);
 	ath10k_debug_fw_stats_vdevs_free(&ar->debug.fw_stats.vdevs);
 	ath10k_debug_fw_stats_peers_free(&ar->debug.fw_stats.peers);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 }
 
 static size_t ath10k_debug_fw_stats_num_peers(struct list_head *head)
@@ -174,7 +173,7 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
 	INIT_LIST_HEAD(&stats.vdevs);
 	INIT_LIST_HEAD(&stats.peers);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	ret = ath10k_wmi_pull_fw_stats(ar, skb, &stats);
 	if (ret) {
 		ath10k_warn(ar, "failed to pull fw stats: %d\n", ret);
@@ -241,7 +240,7 @@ free:
 	ath10k_debug_fw_stats_vdevs_free(&stats.vdevs);
 	ath10k_debug_fw_stats_peers_free(&stats.peers);
 
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 }
 
 static int ath10k_debug_fw_stats_request(struct ath10k *ar)
@@ -273,12 +272,12 @@ static int ath10k_debug_fw_stats_request(struct ath10k *ar)
 		if (!time_left)
 			return -ETIMEDOUT;
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		if (ar->debug.fw_stats_done) {
-			spin_unlock_bh(&ar->data_lock);
+			ATHP_DATA_UNLOCK(ar);
 			break;
 		}
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 	}
 
 	return 0;
@@ -300,7 +299,7 @@ static void ath10k_fw_stats_fill(struct ath10k *ar,
 	size_t num_vdevs;
 	int i;
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 
 	pdev = list_first_entry_or_null(&fw_stats->pdevs,
 					struct ath10k_fw_stats_pdev, list);
@@ -510,7 +509,7 @@ static void ath10k_fw_stats_fill(struct ath10k *ar,
 	}
 
 unlock:
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	if (len >= buf_len)
 		buf[len - 1] = 0;
@@ -518,13 +517,13 @@ unlock:
 		buf[len] = 0;
 }
 
-static int ath10k_fw_stats_open(struct inode *inode, struct file *file)
+int
+ath10k_fw_stats_open(struct ath10k *ar)
 {
-	struct ath10k *ar = inode->i_private;
 	void *buf = NULL;
 	int ret;
 
-	mutex_lock(&ar->conf_mutex);
+	ATHP_CONF_LOCK(ar);
 
 	if (ar->state != ATH10K_STATE_ON) {
 		ret = -ENETDOWN;
@@ -546,14 +545,14 @@ static int ath10k_fw_stats_open(struct inode *inode, struct file *file)
 	ath10k_fw_stats_fill(ar, &ar->debug.fw_stats, buf);
 	file->private_data = buf;
 
-	mutex_unlock(&ar->conf_mutex);
+	ATHP_CONF_UNLOCK(ar);
 	return 0;
 
 err_free:
 	vfree(buf);
 
 err_unlock:
-	mutex_unlock(&ar->conf_mutex);
+	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
 
@@ -572,4 +571,3 @@ static ssize_t ath10k_fw_stats_read(struct file *file, char __user *user_buf,
 
 	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 }
-
