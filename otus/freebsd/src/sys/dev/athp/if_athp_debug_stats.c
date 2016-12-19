@@ -86,45 +86,46 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac.h"
 #include "if_athp_mac2.h"
 #include "if_athp_hif.h"
+#include "if_athp_wmi_ops.h"
 
 #include "if_athp_main.h"
 #include "if_athp_taskq.h"
 #include "if_athp_trace.h"
 
-#include "if_athp_wmi_ops.h"	/* XXX temporary; for ath10k_wmi_* */
+#include "if_athp_debug_stats.h"
 
-MALLOC_DECLARE(M_ATHPDEV);
+MALLOC_DEFINE(M_ATHP_FW_STATS, "athp fw stats", "athp firmware statistics buffers");
 
 /* ms */
 #define ATH10K_DEBUG_HTT_STATS_INTERVAL 1000
 
-static void ath10k_debug_fw_stats_pdevs_free(struct list_head *head)
+static void ath10k_debug_fw_stats_pdevs_free(struct ath10k_fw_stats *stats)
 {
 	struct ath10k_fw_stats_pdev *i, *tmp;
 
-	list_for_each_entry_safe(i, tmp, head, list) {
-		list_del(&i->list);
-		kfree(i);
+	TAILQ_FOREACH_SAFE(i, &stats->pdevs, list, tmp) {
+		TAILQ_REMOVE(&stats->pdevs, i, list);
+		free(i, M_ATHP_FW_STATS);
 	}
 }
 
-static void ath10k_debug_fw_stats_vdevs_free(struct list_head *head)
+static void ath10k_debug_fw_stats_vdevs_free(struct ath10k_fw_stats *stats)
 {
 	struct ath10k_fw_stats_vdev *i, *tmp;
 
-	list_for_each_entry_safe(i, tmp, head, list) {
-		list_del(&i->list);
-		kfree(i);
+	TAILQ_FOREACH_SAFE(i, &stats->vdevs, list, tmp) {
+		TAILQ_REMOVE(&stats->vdevs, i, list);
+		free(i, M_ATHP_FW_STATS);
 	}
 }
 
-static void ath10k_debug_fw_stats_peers_free(struct list_head *head)
+static void ath10k_debug_fw_stats_peers_free(struct ath10k_fw_stats *stats)
 {
 	struct ath10k_fw_stats_peer *i, *tmp;
 
-	list_for_each_entry_safe(i, tmp, head, list) {
-		list_del(&i->list);
-		kfree(i);
+	TAILQ_FOREACH_SAFE(i, &stats->peers, list, tmp) {
+		TAILQ_REMOVE(&stats->peers, i, list);
+		free(i, M_ATHP_FW_STATS);
 	}
 }
 
@@ -133,35 +134,35 @@ static void ath10k_debug_fw_stats_reset(struct ath10k *ar)
 
 	ATHP_DATA_LOCK(ar);
 	ar->debug.fw_stats_done = false;
-	ath10k_debug_fw_stats_pdevs_free(&ar->debug.fw_stats.pdevs);
-	ath10k_debug_fw_stats_vdevs_free(&ar->debug.fw_stats.vdevs);
-	ath10k_debug_fw_stats_peers_free(&ar->debug.fw_stats.peers);
+	ath10k_debug_fw_stats_pdevs_free(&ar->debug.fw_stats);
+	ath10k_debug_fw_stats_vdevs_free(&ar->debug.fw_stats);
+	ath10k_debug_fw_stats_peers_free(&ar->debug.fw_stats);
 	ATHP_DATA_UNLOCK(ar);
 }
 
-static size_t ath10k_debug_fw_stats_num_peers(struct list_head *head)
+static size_t ath10k_debug_fw_stats_num_peers(struct ath10k_fw_stats *stats)
 {
 	struct ath10k_fw_stats_peer *i;
 	size_t num = 0;
 
-	list_for_each_entry(i, head, list)
+	TAILQ_FOREACH(i, &stats->peers, list)
 		++num;
 
 	return num;
 }
 
-static size_t ath10k_debug_fw_stats_num_vdevs(struct list_head *head)
+static size_t ath10k_debug_fw_stats_num_vdevs(struct ath10k_fw_stats *stats)
 {
 	struct ath10k_fw_stats_vdev *i;
 	size_t num = 0;
 
-	list_for_each_entry(i, head, list)
+	TAILQ_FOREACH(i, &stats->vdevs, list)
 		++num;
 
 	return num;
 }
 
-void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
+void ath10k_debug_fw_stats_process(struct ath10k *ar, struct athp_buf *skb)
 {
 	struct ath10k_fw_stats stats = {};
 	bool is_start, is_started, is_end;
@@ -169,9 +170,9 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
 	size_t num_vdevs;
 	int ret;
 
-	INIT_LIST_HEAD(&stats.pdevs);
-	INIT_LIST_HEAD(&stats.vdevs);
-	INIT_LIST_HEAD(&stats.peers);
+	TAILQ_INIT(&stats.pdevs);
+	TAILQ_INIT(&stats.vdevs);
+	TAILQ_INIT(&stats.peers);
 
 	ATHP_DATA_LOCK(ar);
 	ret = ath10k_wmi_pull_fw_stats(ar, skb, &stats);
@@ -197,8 +198,9 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
 		goto free;
 	}
 
-	num_peers = ath10k_debug_fw_stats_num_peers(&ar->debug.fw_stats.peers);
-	num_vdevs = ath10k_debug_fw_stats_num_vdevs(&ar->debug.fw_stats.vdevs);
+	num_peers = ath10k_debug_fw_stats_num_peers(&ar->debug.fw_stats);
+	num_vdevs = ath10k_debug_fw_stats_num_vdevs(&ar->debug.fw_stats);
+
 	is_start = (list_empty(&ar->debug.fw_stats.pdevs) &&
 		    !list_empty(&stats.pdevs));
 	is_end = (!list_empty(&ar->debug.fw_stats.pdevs) &&
@@ -230,15 +232,15 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
 		list_splice_tail_init(&stats.vdevs, &ar->debug.fw_stats.vdevs);
 	}
 
-	complete(&ar->debug.fw_stats_complete);
+	ath10k_compl_wakeup_one(&ar->debug.fw_stats_complete);
 
 free:
 	/* In some cases lists have been spliced and cleared. Free up
 	 * resources if that is not the case.
 	 */
-	ath10k_debug_fw_stats_pdevs_free(&stats.pdevs);
-	ath10k_debug_fw_stats_vdevs_free(&stats.vdevs);
-	ath10k_debug_fw_stats_peers_free(&stats.peers);
+	ath10k_debug_fw_stats_pdevs_free(&stats);
+	ath10k_debug_fw_stats_vdevs_free(&stats);
+	ath10k_debug_fw_stats_peers_free(&stats);
 
 	ATHP_DATA_UNLOCK(ar);
 }
@@ -248,7 +250,7 @@ static int ath10k_debug_fw_stats_request(struct ath10k *ar)
 	unsigned long timeout, time_left;
 	int ret;
 
-	lockdep_assert_held(&ar->conf_mutex);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	timeout = jiffies + msecs_to_jiffies(1 * HZ);
 
@@ -258,7 +260,7 @@ static int ath10k_debug_fw_stats_request(struct ath10k *ar)
 		if (time_after(jiffies, timeout))
 			return -ETIMEDOUT;
 
-		reinit_completion(&ar->debug.fw_stats_complete);
+		ath10k_compl_reinit(&ar->debug.fw_stats_complete);
 
 		ret = ath10k_wmi_request_stats(ar, ar->fw_stats_req_mask);
 		if (ret) {
@@ -267,8 +269,9 @@ static int ath10k_debug_fw_stats_request(struct ath10k *ar)
 		}
 
 		time_left =
-		wait_for_completion_timeout(&ar->debug.fw_stats_complete,
-					    1 * HZ);
+		ath10k_compl_wait(&ar->debug.fw_stats_complete, "stats_wait",
+		    &ar->sc_conf_mtx, 1);
+
 		if (!time_left)
 			return -ETIMEDOUT;
 
@@ -301,15 +304,14 @@ static void ath10k_fw_stats_fill(struct ath10k *ar,
 
 	ATHP_DATA_LOCK(ar);
 
-	pdev = list_first_entry_or_null(&fw_stats->pdevs,
-					struct ath10k_fw_stats_pdev, list);
+	pdev = TAILQ_FIRST(&fw_stats->pdevs);
 	if (!pdev) {
 		ath10k_warn(ar, "failed to get pdev stats\n");
 		goto unlock;
 	}
 
-	num_peers = ath10k_debug_fw_stats_num_peers(&fw_stats->peers);
-	num_vdevs = ath10k_debug_fw_stats_num_vdevs(&fw_stats->vdevs);
+	num_peers = ath10k_debug_fw_stats_num_peers(fw_stats);
+	num_vdevs = ath10k_debug_fw_stats_num_vdevs(fw_stats);
 
 	len += scnprintf(buf + len, buf_len - len, "\n");
 	len += scnprintf(buf + len, buf_len - len, "%30s\n",
@@ -437,7 +439,7 @@ static void ath10k_fw_stats_fill(struct ath10k *ar,
 	len += scnprintf(buf + len, buf_len - len, "%30s\n\n",
 				 "=================");
 
-	list_for_each_entry(vdev, &fw_stats->vdevs, list) {
+	TAILQ_FOREACH(vdev, &fw_stats->vdevs, list) {
 		len += scnprintf(buf + len, buf_len - len, "%30s %u\n",
 				 "vdev id", vdev->vdev_id);
 		len += scnprintf(buf + len, buf_len - len, "%30s %u\n",
@@ -496,7 +498,7 @@ static void ath10k_fw_stats_fill(struct ath10k *ar,
 	len += scnprintf(buf + len, buf_len - len, "%30s\n\n",
 				 "=================");
 
-	list_for_each_entry(peer, &fw_stats->peers, list) {
+	TAILQ_FOREACH(peer, &fw_stats->peers, list) {
 		len += scnprintf(buf + len, buf_len - len, "%30s %pM\n",
 				 "Peer MAC address", peer->peer_macaddr);
 		len += scnprintf(buf + len, buf_len - len, "%30s %u\n",
@@ -520,7 +522,9 @@ unlock:
 int
 ath10k_fw_stats_open(struct ath10k *ar)
 {
+#if 0
 	void *buf = NULL;
+#endif
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
@@ -530,11 +534,13 @@ ath10k_fw_stats_open(struct ath10k *ar)
 		goto err_unlock;
 	}
 
-	buf = vmalloc(ATH10K_FW_STATS_BUF_SIZE);
+#if 0
+	buf = malloc(M_TEMP, ATH10K_FW_STATS_BUF_SIZE, M_NOWAIT | M_ZERO);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto err_unlock;
 	}
+#endif
 
 	ret = ath10k_debug_fw_stats_request(ar);
 	if (ret) {
@@ -542,27 +548,34 @@ ath10k_fw_stats_open(struct ath10k *ar)
 		goto err_free;
 	}
 
+#if 0
 	ath10k_fw_stats_fill(ar, &ar->debug.fw_stats, buf);
 	file->private_data = buf;
+#else
+	ath10k_warn(ar, "%s: TODO: actually call fw_stats_fill; dump it somewhere!\n", __func__);
+#endif
 
 	ATHP_CONF_UNLOCK(ar);
 	return 0;
 
 err_free:
-	vfree(buf);
+	//free(buf, M_TEMP);
 
 err_unlock:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
 
+#if 0
 static int ath10k_fw_stats_release(struct inode *inode, struct file *file)
 {
-	vfree(file->private_data);
+	free(file->private_data);
 
 	return 0;
 }
+#endif
 
+#if 0
 static ssize_t ath10k_fw_stats_read(struct file *file, char __user *user_buf,
 				    size_t count, loff_t *ppos)
 {
@@ -571,3 +584,4 @@ static ssize_t ath10k_fw_stats_read(struct file *file, char __user *user_buf,
 
 	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 }
+#endif
