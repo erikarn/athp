@@ -95,6 +95,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_debug_stats.h"
 
 MALLOC_DEFINE(M_ATHP_FW_STATS, "athp fw stats", "athp firmware statistics buffers");
+MALLOC_DECLARE(M_TEMP);
 
 /* ms */
 #define ATH10K_DEBUG_HTT_STATS_INTERVAL 1000
@@ -501,8 +502,8 @@ static void ath10k_fw_stats_fill(struct ath10k *ar,
 				 "=================");
 
 	TAILQ_FOREACH(peer, &fw_stats->peers, list) {
-		len += scnprintf(buf + len, buf_len - len, "%30s %pM\n",
-				 "Peer MAC address", peer->peer_macaddr);
+		len += scnprintf(buf + len, buf_len - len, "%30s %6D\n",
+				 "Peer MAC address", peer->peer_macaddr, ":");
 		len += scnprintf(buf + len, buf_len - len, "%30s %u\n",
 				 "Peer RSSI", peer->peer_rssi);
 		len += scnprintf(buf + len, buf_len - len, "%30s %u\n",
@@ -524,9 +525,7 @@ unlock:
 int
 ath10k_fw_stats_open(struct ath10k *ar)
 {
-#if 0
 	void *buf = NULL;
-#endif
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
@@ -536,13 +535,11 @@ ath10k_fw_stats_open(struct ath10k *ar)
 		goto err_unlock;
 	}
 
-#if 0
-	buf = malloc(M_TEMP, ATH10K_FW_STATS_BUF_SIZE, M_NOWAIT | M_ZERO);
+	buf = malloc(ATH10K_FW_STATS_BUF_SIZE, M_TEMP, M_NOWAIT | M_ZERO);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto err_unlock;
 	}
-#endif
 
 	ret = ath10k_debug_fw_stats_request(ar);
 	if (ret) {
@@ -550,18 +547,21 @@ ath10k_fw_stats_open(struct ath10k *ar)
 		goto err_free;
 	}
 
-#if 0
 	ath10k_fw_stats_fill(ar, &ar->debug.fw_stats, buf);
+#if 0
 	file->private_data = buf;
-#else
-	ath10k_warn(ar, "%s: TODO: actually call fw_stats_fill; dump it somewhere!\n", __func__);
 #endif
 
 	ATHP_CONF_UNLOCK(ar);
+
+	/* Ew */
+	printf("%s\n", buf);
+	free(buf, M_TEMP);
+
 	return 0;
 
 err_free:
-	//free(buf, M_TEMP);
+	free(buf, M_TEMP);
 
 err_unlock:
 	ATHP_CONF_UNLOCK(ar);
