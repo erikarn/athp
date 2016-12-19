@@ -206,6 +206,10 @@ int
 ath10k_debug_create(struct ath10k *ar)
 {
 
+	TAILQ_INIT(&ar->debug.fw_stats.pdevs);
+	TAILQ_INIT(&ar->debug.fw_stats.vdevs);
+	TAILQ_INIT(&ar->debug.fw_stats.peers);
+
 	return (0);
 }
 
