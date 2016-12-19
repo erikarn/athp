@@ -481,9 +481,7 @@ struct ath10k {
 
 	unsigned long tx_paused; /* see ATH10K_TX_PAUSE_ */
 
-#ifdef CONFIG_ATH10K_DEBUGFS
 	struct ath10k_debug debug;
-#endif
 
 #if 0
 	struct {
