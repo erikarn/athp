@@ -1524,17 +1524,21 @@ athp_node_assoc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	struct athp_node_alloc_state *ku;
 	struct ieee80211vap *vap;
 
+	ku = athp_taskq_entry_to_ptr(e);
+
 	if (flush == 0) {
 		ath10k_warn(ar, "%s: flushing\n", __func__);
+		ieee80211_free_node(ku->ni);
 		return;
 	}
 
-	ku = athp_taskq_entry_to_ptr(e);
 	vap = ku->vap;
 
 	ATHP_CONF_LOCK(ar);
 	(void) ath10k_station_assoc(ar, vap, ku->ni, ! ku->is_assoc);
 	ATHP_CONF_UNLOCK(ar);
+
+	ieee80211_free_node(ku->ni);
 }
 
 static void
@@ -1578,7 +1582,7 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 
 		/* XXX ugh */
 		ku->vap = vap;
-		ku->ni = ni;
+		ku->ni = ieee80211_ref_node(ni);
 		ku->is_assoc = isnew;
 
 		/* schedule */
