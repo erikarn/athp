@@ -55,6 +55,7 @@ struct athp_node_alloc_state {
 	struct ieee80211_node *ni;
 	uint32_t is_assoc;
 	uint32_t is_run;
+	uint32_t is_node_qos;
 	uint8_t peer_macaddr[ETH_ALEN];
 };
 

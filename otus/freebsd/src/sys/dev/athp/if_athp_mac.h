@@ -111,6 +111,6 @@ extern	int athp_vif_ap_stop(struct ieee80211vap *vap,
 extern	int ath10k_station_assoc(struct ath10k *ar, struct ieee80211vap *vap,
 	    struct ieee80211_node *ni, bool reassoc);
 extern	int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vap,
-	    struct ieee80211_node *ni);
+	    const uint8_t *mac, int is_node_qos);
 
 #endif /* _MAC_H_ */

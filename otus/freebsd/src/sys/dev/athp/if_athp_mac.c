@@ -3547,16 +3547,15 @@ int ath10k_station_assoc(struct ath10k *ar,
 /*
  * XXX adrian I think this is the "delete a station from hostap" method.
  */
-int ath10k_station_disassoc(struct ath10k *ar,
-				   struct ieee80211vap *vif,
-				   struct ieee80211_node *sta)
+int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vif,
+    const uint8_t *macaddr, int is_node_qos)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (! (sta->ni_flags & IEEE80211_NODE_QOS)) {
+	if (! is_node_qos) {
 		arvif->num_legacy_stations--;
 		ret = ath10k_recalc_rtscts_prot(arvif);
 		if (ret) {
@@ -3566,7 +3565,7 @@ int ath10k_station_disassoc(struct ath10k *ar,
 		}
 	}
 
-	ret = ath10k_clear_peer_keys(arvif, sta->ni_macaddr);
+	ret = ath10k_clear_peer_keys(arvif, macaddr);
 	if (ret) {
 		ath10k_warn(ar, "failed to clear all peer wep keys for vdev %i: %d\n",
 			    arvif->vdev_id, ret);

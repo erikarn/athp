@@ -1440,7 +1440,8 @@ athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
 		ATHP_CONF_LOCK(ar);
-		(void) ath10k_station_disassoc(ar, vap, ku->ni);
+		(void) ath10k_station_disassoc(ar, vap, ku->peer_macaddr,
+		    ku->is_node_qos);
 		ATHP_CONF_UNLOCK(ar);
 	}
 
@@ -1505,6 +1506,14 @@ athp_node_alloc(struct ieee80211vap *vap,
 
 			/* XXX ugh */
 			ku->vap = vap;
+
+			/*
+			 * Ideally we'd take a reference here - but the rest
+			 * of the node state hasn't been setup yet.
+			 *
+			 * So, net80211 should split ic_node_alloc into
+			 * "alloc" and "driver setup".
+			 */
 			ku->ni = (void *) an;
 
 			/* schedule */
@@ -1647,7 +1656,13 @@ athp_node_free(struct ieee80211_node *ni)
 
 			/* XXX ugh */
 			ku->vap = ni->ni_vap;
-			ku->ni = (void *) ni;
+
+			/*
+			 * At this stage we can't store a pointer to the node
+			 * because, well, we are /freeing/ the node.
+			 */
+//			ku->ni = (void *) ni;
+			ku->is_node_qos = !! (ni->ni_flags & IEEE80211_NODE_QOS);
 
 			/* schedule */
 			(void) athp_taskq_queue(ar, e, "athp_node_free_cb",
