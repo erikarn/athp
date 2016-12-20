@@ -1013,8 +1013,14 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	if (k->wk_keyix == 0)
 		ku->wmi_flags |= WMI_KEY_PAIRWISE;
 
-	/* Which MAC to feed to the command */
-	memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	/*
+	 * Which MAC to feed to the command - group key is our
+	 * address; pairwise key is the peer MAC.
+	 */
+	if (k->wk_flags & IEEE80211_KEY_GROUP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else
+		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
 	/* Copy the whole key contents for now; which is dirty.. */
 	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
@@ -1024,6 +1030,13 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	/* XXX ugh */
 	ku->vap = vap;
+
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D\n",
+	    __func__,
+	    ku->k.wk_keyix, ku->wmi_add,
+	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
+	    ku->wmi_macaddr, ":");
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_set", athp_key_update_cb);
@@ -1104,8 +1117,14 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	if (k->wk_keyix == 0)
 		ku->wmi_flags |= WMI_KEY_PAIRWISE;
 
-	/* Which MAC to feed to the command */
-	memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	/*
+	 * Which MAC to feed to the command - group key is our
+	 * address; pairwise key is the peer MAC.
+	 */
+	if (k->wk_flags & IEEE80211_KEY_GROUP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else
+		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
 	/* Copy the whole key contents for now; which is dirty.. */
 	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
