@@ -140,6 +140,12 @@ athp_pci_probe(device_t dev)
 		return (BUS_PROBE_DEFAULT);
 	}
 
+	if (vendor_id == 0x168c && device_id == 0x0040) {
+		device_set_desc(dev, "QCA9980/QCA9990");
+		return (BUS_PROBE_DEFAULT);
+	}
+
+
 	return (ENXIO);
 }
 
