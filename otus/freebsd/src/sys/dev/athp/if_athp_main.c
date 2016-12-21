@@ -1170,7 +1170,9 @@ athp_beacon_update(struct ieee80211vap *vap, int item)
 
 	/* Typically this is called when the TIM changes */
 
-	ath10k_warn(ar, "%s: called; item=%d\n", __func__, item);
+	ath10k_dbg(ar, ATH10K_DBG_BEACON,
+	    "%s: called; item=%d\n", __func__, item);
+
 	setbit(bo->bo_flags, item);
 }
 
