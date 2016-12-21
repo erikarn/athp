@@ -110,9 +110,13 @@ Things to finish doing:
 
 MSI:
 
-* figure out all of the MSI bits that I missed!
+* (done) figure out all of the MSI bits that I missed!
 * (done) add single MSI support
-* do MSI-X support
+* (done) do MSI-X support
+* Figure out what to do about beeliner MSI - the regvals say there are 12
+  CEs, the HW says "32 MSIs", but when we request them, we only get 8?
+  Need to figure that out.
+* Have MSI-X failure try MSI, then if that fails try legacy.
 
 802.11 fragmentation:
 
@@ -141,10 +145,28 @@ Suspend/resume, restarting VAPs after firmware panic:
   net80211 expect things that aren't setup (eg keys, peers/nodes) or
   things are there it doesn't have setup, or trampling upon existing state.
 
-===
+Regulatory:
 
 * Re-revisit all of the regulatory stuff - hardcoded txpower lists are bad.
   Hard-coded EEPROM regulatory code is bad.  Etc, etc.
+
+WEP:
+
+* We need to actually, yes, plumb in WEP keys
+* There are a few things to do:
+  + Re-read ath10k/mac.c and see how WEP keys are plumbed in, and in what order;
+  + Note that whenever the default TX key index changes, we should replumb all
+    of the keys per peer
+  + The keys are per-peer, not global - so we track those in ath10k_vif as
+    arvif->wep_keys[0..3] and then when a peer is added, all of those keys are
+    added.
+  + And then theres another routine that loops over the peers and plumbs in
+    updated WEP keys.
+  + So, let's go see what needs to be done for all of the above.
+
+===
+
+Random completion bits:
 
 * (done) Add busdma ops to all the places where we do descdma operations - especiall
   ath10k_htt_tx() and the completion path (wherever txbuf_paddr is referenced -
