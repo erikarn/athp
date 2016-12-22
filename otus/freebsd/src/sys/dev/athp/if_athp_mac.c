@@ -386,7 +386,7 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 	return ath10k_wmi_vdev_install_key(arvif->ar, &arg);
 }
 
-int
+static int
 ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
     int cmd, const u8 *macaddr, u32 flags)
 {
@@ -5949,7 +5949,7 @@ ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 	ATHP_DATA_UNLOCK(ar);
 }
 
-int
+static int
 ath10k_set_key_h_def_keyidx(struct ath10k *ar,
     struct ath10k_vif *arvif, int cmd, const struct ieee80211_key *k)
 {
@@ -6068,8 +6068,8 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 
 	if (!peer) {
 		if (cmd == SET_KEY) {
-			ath10k_warn(ar, "failed to install key for non-existent peer %pM\n",
-				    peer_addr);
+			ath10k_warn(ar, "failed to install key for non-existent peer %6D\n",
+				    peer_addr, ":");
 			ret = -EOPNOTSUPP;
 			goto exit;
 		} else {
@@ -6173,7 +6173,6 @@ exit:
 	return ret;
 }
 
-#if 0
 /*
  * This is for WEP operation.
  */
@@ -6181,7 +6180,6 @@ void
 ath10k_set_default_unicast_key(struct ath10k *ar,
     struct ieee80211vap *vif, int keyidx)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
@@ -6210,7 +6208,6 @@ ath10k_set_default_unicast_key(struct ath10k *ar,
 unlock:
 	ATHP_CONF_UNLOCK(ar);
 }
-#endif
 
 #if 0
 
