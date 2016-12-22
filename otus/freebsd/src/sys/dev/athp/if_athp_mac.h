@@ -20,6 +20,8 @@
 
 #define WEP_KEYID_SHIFT 6
 
+#define	ATH10K_BEACON_BUF_LEN	2048
+
 enum wmi_tlv_tx_pause_id;
 enum wmi_tlv_tx_pause_action;
 
@@ -96,7 +98,19 @@ ath10k_tx_h_seq_no(struct ieee80211vap *vap, struct athp_buf *pbuf)
 extern	void ath10k_tx_free_pbuf(struct ath10k *ar, struct athp_buf *pbuf, int tx_ok);
 
 extern	int athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac);
-extern	int athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni);
+extern	int athp_peer_free(struct ieee80211vap *vap, const uint8_t *mac);
 extern	int athp_vif_update_txpower(struct ieee80211vap *vap);
+
+extern	int athp_vif_update_ap_ssid(struct ieee80211vap *vap,
+	    struct ieee80211_node *ni);
+extern	int athp_vif_ap_setup(struct ieee80211vap *vap,
+	    struct ieee80211_node *ni);
+extern	int athp_vif_ap_stop(struct ieee80211vap *vap,
+	    struct ieee80211_node *ni);
+
+extern	int ath10k_station_assoc(struct ath10k *ar, struct ieee80211vap *vap,
+	    struct ieee80211_node *ni, bool reassoc);
+extern	int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vap,
+	    const uint8_t *mac, int is_node_qos);
 
 #endif /* _MAC_H_ */

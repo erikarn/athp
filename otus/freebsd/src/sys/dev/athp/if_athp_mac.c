@@ -413,10 +413,10 @@ ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
 	return 0;
 }
 
-#if 0
 static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 					const u8 *addr)
 {
+#if 0
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
 	int ret;
@@ -499,11 +499,19 @@ static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 	}
 
 	return 0;
+#else
+	ath10k_warn(arvif->ar, "%s: TODO\n", __func__);
+	return (0);
+#endif
 }
 
+/*
+ * XXX NOTE: I think this is for clearing WEP keys.
+ */
 static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 				  const u8 *addr)
 {
+#if 0
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
 	int first_errno = 0;
@@ -540,8 +548,11 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 	}
 
 	return first_errno;
-}
+#else
+	ath10k_warn(arvif->ar, "%s: TODO\n", __func__);
+	return (0);
 #endif
+}
 
 bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 				    u8 keyidx)
@@ -1047,9 +1058,9 @@ void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif)
 	if (!arvif->beacon)
 		return;
 
-	if (arvif->beacon_buf.dd_desc != NULL) {
-		athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &arvif->beacon->mb);
-	}
+	/*
+	 * Note: athp_freebuf will unmap the mbuf for us.
+	 */
 
 	if (WARN_ON(arvif->beacon_state != ATH10K_BEACON_SCHEDULED &&
 		    arvif->beacon_state != ATH10K_BEACON_SENT))
@@ -1069,15 +1080,7 @@ static void ath10k_mac_vif_beacon_cleanup(struct ath10k_vif *arvif)
 
 	ath10k_mac_vif_beacon_free(arvif);
 
-#if 0
-	if (arvif->beacon_buf) {
-		dma_free_coherent(ar->dev, IEEE80211_MAX_FRAME_LEN,
-				  arvif->beacon_buf, arvif->beacon_paddr);
-		arvif->beacon_buf = NULL;
-	}
-#else
 	athp_descdma_free(ar, &arvif->beacon_buf);
-#endif
 }
 
 static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
@@ -1471,9 +1474,9 @@ static int ath10k_monitor_recalc(struct ath10k *ar)
 		return ath10k_monitor_stop(ar);
 }
 
-#if 0
 static int ath10k_recalc_rtscts_prot(struct ath10k_vif *arvif)
 {
+#define	SM(_v, _f)	(((_v) << _f##_LSB) & _f##_MASK)
 	struct ath10k *ar = arvif->ar;
 	u32 vdev_param, rts_cts = 0;
 
@@ -1492,8 +1495,10 @@ static int ath10k_recalc_rtscts_prot(struct ath10k_vif *arvif)
 
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
 					 rts_cts);
+#undef	SM
 }
 
+#if 0
 static int ath10k_start_cac(struct ath10k *ar)
 {
 	int ret;
@@ -1818,7 +1823,75 @@ static int ath10k_mac_setup_bcn_tmpl(struct ath10k_vif *arvif)
 
 	return 0;
 }
+#endif
 
+static int
+ath10k_mac_setup_bcn_tmpl_freebsd(struct ath10k_vif *arvif)
+{
+	struct ath10k *ar = arvif->ar;
+	struct ieee80211vap *vap = &arvif->av_vap;
+	struct ieee80211_beacon_offsets *bo = &vap->iv_bcn_off;
+	struct ieee80211_node *ni;
+	struct mbuf *m;
+	int tim_offset;
+	int ret;
+
+	if (!test_bit(WMI_SERVICE_BEACON_OFFLOAD, ar->wmi.svc_map))
+		return 0;
+
+	if (arvif->vdev_type != WMI_VDEV_TYPE_AP &&
+	    arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
+		return 0;
+
+	ni = ieee80211_ref_node(vap->iv_bss);
+
+	if (ni->ni_chan == IEEE80211_CHAN_ANYC) {
+		ath10k_warn(ar, "%s: no active channel for beacon template\n",
+		    __func__);
+		ieee80211_free_node(ni);
+		return (-EPERM);
+	}
+	/*
+	 * Fetch a beacon from net80211.
+	 */
+	m = ieee80211_beacon_alloc(ni);
+	if (m == NULL) {
+		ath10k_warn(ar, "%s: failed to get mbuf for beacon template\n",
+		    __func__);
+		ieee80211_free_node(ni);
+		return (-EPERM);
+	}
+
+	/*
+	 * Ask net80211 to fill it in for us.
+	 */
+	(void) ieee80211_beacon_update(ni, m, 0);
+	ieee80211_free_node(ni);
+
+	/*
+	 * Note: we don't do p2p; so we don't need to delete the
+	 * IE from net80211.
+	 */
+	if (bo->bo_tim == NULL)
+		tim_offset = 0;
+	else
+		tim_offset = bo->bo_tim - mtod(m, uint8_t *);
+	ath10k_warn(ar, "%s: tim_offset=%d\n", __func__, tim_offset);
+	ret = ath10k_wmi_bcn_tmpl(ar, arvif->vdev_id, tim_offset, m, 0,
+				  0, NULL, 0);
+	m_freem(m);
+
+	if (ret) {
+		ath10k_warn(ar, "failed to submit beacon template command: %d\n",
+			    ret);
+		return ret;
+	}
+
+	return 0;
+
+}
+
+#if 0
 static int ath10k_mac_setup_prb_tmpl(struct ath10k_vif *arvif)
 {
 	struct ath10k *ar = arvif->ar;
@@ -1924,16 +1997,20 @@ static int ath10k_mac_vif_fix_hidden_ssid(struct ath10k_vif *arvif)
 
 	return 0;
 }
+#endif
 
-static void ath10k_control_beaconing(struct ath10k_vif *arvif,
-				     struct ieee80211_bss_conf *info)
+static void
+ath10k_control_beaconing(struct ath10k_vif *arvif,
+    struct ieee80211_node *ni, int enable)
 {
 	struct ath10k *ar = arvif->ar;
 	int ret = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (!info->enable_beacon) {
+	ath10k_warn(ar, "%s: called; enable=%d\n", __func__, enable);
+
+	if (enable == 0) {
 		ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
 		if (ret)
 			ath10k_warn(ar, "failed to down vdev_id %i: %d\n",
@@ -1941,9 +2018,9 @@ static void ath10k_control_beaconing(struct ath10k_vif *arvif,
 
 		arvif->is_up = false;
 
-		spin_lock_bh(&arvif->ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		ath10k_mac_vif_beacon_free(arvif);
-		spin_unlock_bh(&arvif->ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 
 		return;
 	}
@@ -1951,7 +2028,7 @@ static void ath10k_control_beaconing(struct ath10k_vif *arvif,
 	arvif->tx_seq_no = 0x1000;
 
 	arvif->aid = 0;
-	ether_addr_copy(arvif->bssid, info->bssid);
+	ether_addr_copy(arvif->bssid, ni->ni_bssid);
 
 	ret = ath10k_wmi_vdev_up(arvif->ar, arvif->vdev_id, arvif->aid,
 				 arvif->bssid);
@@ -1963,16 +2040,21 @@ static void ath10k_control_beaconing(struct ath10k_vif *arvif,
 
 	arvif->is_up = true;
 
+#if 0
 	ret = ath10k_mac_vif_fix_hidden_ssid(arvif);
 	if (ret) {
 		ath10k_warn(ar, "failed to fix hidden ssid for vdev %i, expect trouble: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
+#else
+	ath10k_warn(ar, "%s: TODO: fix_hidden_ssid!\n", __func__);
+#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d up\n", arvif->vdev_id);
 }
 
+#if 0
 static void ath10k_control_ibss(struct ath10k_vif *arvif,
 				struct ieee80211_bss_conf *info,
 				const u8 self_peer[ETH_ALEN])
@@ -3392,10 +3474,9 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
  * XXX adrian: I think this is the hostap side "add a new node"
  * method.
  */
-#if 0
-static int ath10k_station_assoc(struct ath10k *ar,
-				struct ieee80211_vif *vif,
-				struct ieee80211_sta *sta,
+int ath10k_station_assoc(struct ath10k *ar,
+				struct ieee80211vap *vif,
+				struct ieee80211_node *sta,
 				bool reassoc)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
@@ -3404,17 +3485,17 @@ static int ath10k_station_assoc(struct ath10k *ar,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ret = ath10k_peer_assoc_prepare(ar, vif, sta, &peer_arg);
+	ret = ath10k_peer_assoc_prepare(ar, vif, sta, &peer_arg, 1);
 	if (ret) {
-		ath10k_warn(ar, "failed to prepare WMI peer assoc for %pM vdev %i: %i\n",
-			    sta->addr, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to prepare WMI peer assoc for %6D vdev %i: %i\n",
+			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 		return ret;
 	}
 
 	ret = ath10k_wmi_peer_assoc(ar, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to run peer assoc for STA %pM vdev %i: %d\n",
-			    sta->addr, arvif->vdev_id, ret);
+		ath10k_warn(ar, "failed to run peer assoc for STA %6D vdev %i: %d\n",
+			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 		return ret;
 	}
 
@@ -3422,22 +3503,24 @@ static int ath10k_station_assoc(struct ath10k *ar,
 	 * doesn't make much sense to reconfigure the peer completely.
 	 */
 	if (!reassoc) {
-		ret = ath10k_setup_peer_smps(ar, arvif, sta->addr,
-					     &sta->ht_cap);
+		ret = ath10k_setup_peer_smps(ar, arvif, sta->ni_macaddr, sta);
 		if (ret) {
 			ath10k_warn(ar, "failed to setup peer SMPS for vdev %d: %d\n",
 				    arvif->vdev_id, ret);
 			return ret;
 		}
 
+#if 0
 		ret = ath10k_peer_assoc_qos_ap(ar, arvif, sta);
 		if (ret) {
-			ath10k_warn(ar, "failed to set qos params for STA %pM for vdev %i: %d\n",
-				    sta->addr, arvif->vdev_id, ret);
+			ath10k_warn(ar, "failed to set qos params for STA %6D for vdev %i: %d\n",
+				    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 			return ret;
 		}
-
-		if (!sta->wme) {
+#else
+		ath10k_warn(ar, "%s: TODO: assoc_qos_ap\n", __func__);
+#endif
+		if (! (sta->ni_flags & IEEE80211_NODE_QOS)) {
 			arvif->num_legacy_stations++;
 			ret  = ath10k_recalc_rtscts_prot(arvif);
 			if (ret) {
@@ -3449,7 +3532,7 @@ static int ath10k_station_assoc(struct ath10k *ar,
 
 		/* Plumb cached keys only for static WEP */
 		if (arvif->def_wep_key_idx != -1) {
-			ret = ath10k_install_peer_wep_keys(arvif, sta->addr);
+			ret = ath10k_install_peer_wep_keys(arvif, sta->ni_macaddr);
 			if (ret) {
 				ath10k_warn(ar, "failed to install peer wep keys for vdev %i: %d\n",
 					    arvif->vdev_id, ret);
@@ -3464,16 +3547,15 @@ static int ath10k_station_assoc(struct ath10k *ar,
 /*
  * XXX adrian I think this is the "delete a station from hostap" method.
  */
-static int ath10k_station_disassoc(struct ath10k *ar,
-				   struct ieee80211_vif *vif,
-				   struct ieee80211_sta *sta)
+int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vif,
+    const uint8_t *macaddr, int is_node_qos)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (!sta->wme) {
+	if (! is_node_qos) {
 		arvif->num_legacy_stations--;
 		ret = ath10k_recalc_rtscts_prot(arvif);
 		if (ret) {
@@ -3483,7 +3565,7 @@ static int ath10k_station_disassoc(struct ath10k *ar,
 		}
 	}
 
-	ret = ath10k_clear_peer_keys(arvif, sta->addr);
+	ret = ath10k_clear_peer_keys(arvif, macaddr);
 	if (ret) {
 		ath10k_warn(ar, "failed to clear all peer wep keys for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
@@ -3492,6 +3574,8 @@ static int ath10k_station_disassoc(struct ath10k *ar,
 
 	return ret;
 }
+
+#if 0
 
 /**************/
 /* Regulatory */
@@ -5256,6 +5340,9 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	case IEEE80211_M_MONITOR:
 		arvif->vdev_type = WMI_VDEV_TYPE_MONITOR;
 		break;
+	case IEEE80211_M_HOSTAP:
+		arvif->vdev_type = WMI_VDEV_TYPE_AP;
+		break;
 	default:
 		ath10k_warn(ar, "%s: unsupported opmode (%d)\n", __func__, opmode);
 		ret = -EINVAL;
@@ -5292,20 +5379,13 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	 */
 	if (opmode == IEEE80211_M_IBSS ||
 	    opmode == IEEE80211_M_HOSTAP) {
-#if 0
-		arvif->beacon_buf = dma_zalloc_coherent(ar->dev,
-							IEEE80211_MAX_FRAME_LEN,
-							&arvif->beacon_paddr,
-							GFP_ATOMIC);
-		if (!arvif->beacon_buf) {
-			ret = -ENOMEM;
-			ath10k_warn(ar, "failed to allocate beacon buffer: %d\n",
-				    ret);
+		ret = athp_descdma_alloc(ar, &arvif->beacon_buf,
+		    "beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+		if (ret != 0) {
+			ath10k_warn(ar,
+			    "%s: TODO: beacon_buf failed to allocate\n", __func__);
 			goto err;
 		}
-#else
-		ath10k_warn(ar, "%s: TODO: beacon_buf for IBSS/AP mode\n", __func__);
-#endif
 	}
 	if (test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags))
 		arvif->nohwcrypt = true;
@@ -5431,6 +5511,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		goto err_peer_delete;
 	}
 
+	/* XXX TODO: txpower default? */
 	arvif->txpower = 30;	/* 30dBm? It's just a hard-default for now; fix later */
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {
@@ -8483,6 +8564,8 @@ void ath10k_mac_unregister(struct ath10k *ar)
 
 /*
  * STA mode: update BSS info as appropriate.
+ *
+ * Note: this also adds/deletes the BSS peer as well.
  */
 void
 ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
@@ -8515,6 +8598,15 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 */
 		ath10k_bss_disassoc(ar, vap, is_run);
 
+		ATHP_DATA_LOCK(ar);
+		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
+			ATHP_DATA_UNLOCK(ar);
+			(void) ath10k_peer_create(ar, arvif->vdev_id,
+			    ni->ni_macaddr, WMI_PEER_TYPE_DEFAULT);
+		} else {
+			ATHP_DATA_UNLOCK(ar);
+		}
+
 		/* Recalculate TX power - this is in dBm */
 		arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
 		ret = ath10k_mac_txpower_recalc(ar);
@@ -8528,6 +8620,7 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 
 	} else {
 		ath10k_bss_disassoc(ar, vap, is_run);
+		(void) ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 		arvif->is_stabss_setup = 0;
 	}
 }
@@ -8610,7 +8703,7 @@ athp_peer_create(struct ieee80211vap *vap, const uint8_t *mac)
  * So - not sure what the fix would be for this!
  */
 int
-athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
+athp_peer_free(struct ieee80211vap *vap, const uint8_t *mac)
 {
 	struct ath10k *ar = vap->iv_ic->ic_softc;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
@@ -8627,7 +8720,7 @@ athp_peer_free(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	}
 
 	(void) ath10k_tx_flush_locked(ar, vap, 0, 0);
-	ret = ath10k_peer_delete(ar, arvif->vdev_id, ni->ni_macaddr);
+	ret = ath10k_peer_delete(ar, arvif->vdev_id, mac);
 //	ath10k_mac_dec_num_stations(arvif, sta);
 	ATHP_CONF_UNLOCK(ar);
 
@@ -8658,4 +8751,192 @@ athp_vif_update_txpower(struct ieee80211vap *vap)
 	if (ret)
 		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
 	return (ret);
+}
+
+int
+athp_vif_update_ap_ssid(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	memcpy(arvif->u.ap.ssid, ni->ni_essid, ni->ni_esslen);
+	arvif->u.ap.ssid_len = ni->ni_esslen;
+
+	return (0);
+}
+
+/*
+ * Initial "bring-up" of an AP interface.
+ */
+int
+athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret = 0;
+	u32 vdev_param, pdev_param;
+//	u32 slottime, preamble;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* Initial AP configuration */
+
+	/* Beacon interval */
+	arvif->beacon_interval = ni->ni_intval;
+	vdev_param = ar->wmi.vdev_param->beacon_interval;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					arvif->beacon_interval);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac vdev %d beacon_interval %d\n",
+		   arvif->vdev_id, arvif->beacon_interval);
+
+	if (ret)
+		ath10k_warn(ar, "failed to set beacon interval for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	/* Staggered mode beacon config */
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "vdev %d set beacon tx mode to staggered\n",
+		   arvif->vdev_id);
+
+	pdev_param = ar->wmi.pdev_param->beacon_tx_mode;
+	ret = ath10k_wmi_pdev_set_param(ar, pdev_param,
+					WMI_BEACON_STAGGERED_MODE);
+	if (ret)
+		ath10k_warn(ar, "failed to set beacon mode for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	/*
+	 * Beacon template - this is for the WMI TLV firmware that
+	 * is doing more firmware offload style operations.
+	 */
+	ret = ath10k_mac_setup_bcn_tmpl_freebsd(arvif);
+	if (ret)
+		ath10k_warn(ar, "failed to update beacon template: %d\n",
+		    ret);
+
+#if 0
+	if (changed & BSS_CHANGED_AP_PROBE_RESP) {
+		ret = ath10k_mac_setup_prb_tmpl(arvif);
+		if (ret)
+			ath10k_warn(ar, "failed to setup probe resp template on vdev %i: %d\n",
+				    arvif->vdev_id, ret);
+	}
+#else
+	ath10k_warn(ar, "%s: TODO: probe response template setup\n", __func__);
+#endif
+
+	/* DTIM period */
+	arvif->dtim_period = ni->ni_dtim_period;
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac vdev %d dtim_period %d\n",
+		   arvif->vdev_id, arvif->dtim_period);
+	vdev_param = ar->wmi.vdev_param->dtim_period;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					arvif->dtim_period);
+	if (ret)
+		ath10k_warn(ar, "failed to set dtim period for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	arvif->u.ap.ssid_len = ni->ni_esslen;
+	if (ni->ni_esslen)
+		memcpy(arvif->u.ap.ssid, ni->ni_essid, ni->ni_esslen);
+	/* XXX TODO: here's where we configure it as a hidden SSID */
+#if 0
+	arvif->u.ap.hidden_ssid = info->hidden_ssid;
+#else
+	ath10k_warn(ar, "%s: TODO: set hidden_ssid flag if required\n", __func__);
+#endif
+
+	/* XXX Here's where we would change the BSSID? */
+#if 0
+	if (changed & BSS_CHANGED_BSSID && !is_zero_ether_addr(info->bssid))
+		ether_addr_copy(arvif->bssid, info->bssid);
+#endif
+
+	/* Enable beaconing */
+	ath10k_control_beaconing(arvif, ni, 1);
+
+	/* Stuff we don't do yet: */
+	/* RTS/CTS protection */
+	/* ERP slot */
+	/* ERP preamble */
+	ath10k_warn(ar,
+	    "%s: TODO: RTS/CTS prot, ERP slot, ERP preamble\n",
+	    __func__);
+
+#if 0
+	if (changed & BSS_CHANGED_ERP_CTS_PROT) {
+		arvif->use_cts_prot = info->use_cts_prot;
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d cts_prot %d\n",
+			   arvif->vdev_id, info->use_cts_prot);
+
+		ret = ath10k_recalc_rtscts_prot(arvif);
+		if (ret)
+			ath10k_warn(ar, "failed to recalculate rts/cts prot for vdev %d: %d\n",
+				    arvif->vdev_id, ret);
+
+		vdev_param = ar->wmi.vdev_param->protection_mode;
+		ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+						info->use_cts_prot ? 1 : 0);
+		if (ret)
+			ath10k_warn(ar, "failed to set protection mode %d on vdev %i: %d\n",
+					info->use_cts_prot, arvif->vdev_id, ret);
+	}
+
+	if (changed & BSS_CHANGED_ERP_SLOT) {
+		if (info->use_short_slot)
+			slottime = WMI_VDEV_SLOT_TIME_SHORT; /* 9us */
+
+		else
+			slottime = WMI_VDEV_SLOT_TIME_LONG; /* 20us */
+
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d slot_time %d\n",
+			   arvif->vdev_id, slottime);
+
+		vdev_param = ar->wmi.vdev_param->slot_time;
+		ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+						slottime);
+		if (ret)
+			ath10k_warn(ar, "failed to set erp slot for vdev %d: %i\n",
+				    arvif->vdev_id, ret);
+	}
+
+	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
+		if (info->use_short_preamble)
+			preamble = WMI_VDEV_PREAMBLE_SHORT;
+		else
+			preamble = WMI_VDEV_PREAMBLE_LONG;
+
+		ath10k_dbg(ar, ATH10K_DBG_MAC,
+			   "mac vdev %d preamble %dn",
+			   arvif->vdev_id, preamble);
+
+		vdev_param = ar->wmi.vdev_param->preamble;
+		ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+						preamble);
+		if (ret)
+			ath10k_warn(ar, "failed to set preamble for vdev %d: %i\n",
+				    arvif->vdev_id, ret);
+	}
+#endif
+
+	return (0);
+}
+
+int
+athp_vif_ap_stop(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* Disable beaconing */
+	ath10k_control_beaconing(arvif, ni, 0);
+
+	return (0);
 }

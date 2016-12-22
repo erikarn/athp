@@ -140,6 +140,12 @@ athp_pci_probe(device_t dev)
 		return (BUS_PROBE_DEFAULT);
 	}
 
+	if (vendor_id == 0x168c && device_id == 0x0040) {
+		device_set_desc(dev, "QCA9980/QCA9990");
+		return (BUS_PROBE_DEFAULT);
+	}
+
+
 	return (ENXIO);
 }
 
@@ -292,7 +298,7 @@ static int ath10k_pci_request_irq_msix(struct ath10k_pci *ar_pci)
 		ar_pci->sc_irq[i] = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 		    RF_ACTIVE);
 		if (ar_pci->sc_irq[i] == NULL) {
-			device_printf(dev, "could not map CE interrupt\n");
+			device_printf(dev, "could not map CE interrupt (rid=%d of %d)\n", rid, MSI_ASSIGN_CE_MAX(ar->sc_regvals));
 			err = ENXIO;
 			goto bad;
 		}
@@ -397,6 +403,10 @@ static int ath10k_pci_request_irq(struct ath10k_pci *ar_pci)
 		return ath10k_pci_request_irq_msi(ar_pci);
 	case MSI_NUM_REQUEST:
 		return ath10k_pci_request_irq_msix(ar_pci);
+	default:
+		ath10k_err(ar, "%s: unknown number of interrupts (%d)\n",
+		    __func__,
+		    ar_pci->num_msi_intrs);
 	}
 
 	ath10k_warn(ar, "unknown irq configuration upon request\n");

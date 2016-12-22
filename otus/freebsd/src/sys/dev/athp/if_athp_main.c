@@ -91,6 +91,8 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_taskq.h"
 #include "if_athp_trace.h"
 
+#include "if_athp_debug_stats.h"
+
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
 /*
@@ -191,6 +193,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
 	struct ieee80211_frame *wh;
+	struct ath10k_sta *arsta;
 	struct mbuf *m = NULL;
 	int is_wep, is_qos;
 
@@ -206,6 +209,21 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (ENXIO);
 	}
 
+	arsta = ATHP_NODE(ni);
+	if (arsta->is_in_peer_table == 0) {
+		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
+		athp_tx_exit(ar);
+		m_freem(m0);
+		return (ENXIO);
+	}
+
+	if (arvif->is_dying == 1) {
+		m_freem(m0);
+		athp_tx_exit(ar);
+		return (ENXIO);
+	}
+
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
 	is_qos = IEEE80211_IS_QOS(wh);
@@ -214,30 +232,6 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D, is_wep=%d, is_qos=%d\n",
 	    __func__,
 	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":", is_wep, is_qos);
-
-	ATHP_CONF_LOCK(ar);
-
-	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
-	if (vap->iv_opmode == IEEE80211_M_STA) {
-		if (arvif->is_stabss_setup == 0) {
-			ATHP_CONF_UNLOCK(ar);
-			ath10k_warn(ar,
-			    "%s: stabss not setup; don't xmit\n",
-			    __func__);
-			m_freem(m0);
-			athp_tx_exit(ar);
-			return (ENXIO);
-		}
-	}
-
-	if (arvif->is_dying == 1) {
-		ATHP_CONF_UNLOCK(ar);
-		m_freem(m0);
-		athp_tx_exit(ar);
-		return (ENXIO);
-	}
-
-	ATHP_CONF_UNLOCK(ar);
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
@@ -382,6 +376,7 @@ static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 {
 	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
 	struct ieee80211vap *vap;
 	struct ath10k_vif *arvif;
 	struct athp_buf *pbuf;
@@ -400,7 +395,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
-
 	trace_ath10k_transmit(ar, 1, 0);
 
 	/*
@@ -415,26 +409,19 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		return (ENXIO);
 	}
 
-	ATHP_CONF_LOCK(ar);
-	/* XXX station mode hacks - don't xmit until we plumb up a BSS context */
-	if (vap->iv_opmode == IEEE80211_M_STA) {
-		if (arvif->is_stabss_setup == 0) {
-			ATHP_CONF_UNLOCK(ar);
-			ath10k_warn(ar, "%s: stabss not setup; don't xmit\n", __func__);
-			athp_tx_exit(ar);
-			trace_ath10k_transmit(ar, 0, 0);
-			return (ENXIO);
-		}
+	arsta = ATHP_NODE(ni);
+	if (arsta->is_in_peer_table == 0) {
+		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
+		athp_tx_exit(ar);
+		return (ENXIO);
 	}
 
 	if (arvif->is_dying == 1) {
-		ATHP_CONF_UNLOCK(ar);
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
-
-	ATHP_CONF_UNLOCK(ar);
 
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
@@ -522,12 +509,102 @@ athp_parent(struct ieee80211com *ic)
 	}
 }
 
+#if 0
 /*
- * TODO:
+ * STA mode BSS update - deferred since node additions need deferring.
  *
- * + if we fail assoc and move to another bssid, do we go via INIT
- *   first?  Ie, how do we delete the existing bssid?
+ * Note: use vap->iv_bss; not the passed-in node.
  */
+static void
+athp_node_bss_update_cb(struct ath10k *ar, struct athp_taskq_entry *e,
+    int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211_node *ni;
+	struct ieee80211vap *vap;
+	int ret;
+
+	ku = athp_taskq_entry_to_ptr(e);
+
+	if (flush == 0) {
+		ath10k_warn(ar, "%s: flushing\n", __func__);
+		return;
+	}
+
+	vap = ku->vap;
+
+	/* This is only relevant for station operation */
+	if (vap->iv_opmode != IEEE80211_M_STA)
+		return;
+
+	ni = ieee80211_ref_node(vap->iv_bss);
+
+	ath10k_warn(ar, "%s: bss_update_cb: MAC %6D, is_assoc=%d, is_run=%d\n",
+	    __func__,
+	    ni->ni_macaddr, ":",
+	    ku->is_assoc,
+	    ku->is_run);
+
+
+	ATHP_CONF_LOCK(ar);
+
+	/*
+	 * NOTE: ic->ic_curchan is wrong; we should use ni->ni_chan
+	 * as long as it's not ANYC.
+	 */
+	if (ku->is_assoc) {
+		ret = ath10k_vif_restart(ar, vap, ni, vap->iv_ic->ic_curchan);
+		if (ret != 0) {
+			ATHP_CONF_UNLOCK(ar);
+			ath10k_err(ar,
+			    "%s: ath10k_vdev_start failed; ret=%d\n",
+			    __func__, ret);
+			ieee80211_free_node(ni);
+			return;
+		}
+	}
+
+	ath10k_bss_update(ar, vap, ni, ku->is_assoc, ku->is_run);
+	ATHP_CONF_UNLOCK(ar);
+
+	ieee80211_free_node(ni);
+}
+
+static int
+athp_vap_bss_update_queue(struct ath10k *ar, struct ieee80211vap *vap,
+    int is_assoc, int is_run)
+{
+	struct athp_taskq_entry *e;
+	struct athp_node_alloc_state *ku;
+
+	device_printf(ar->sc_dev,
+	    "%s: is_assoc=%d, is_run=%d\n",
+	    __func__, is_assoc, is_run);
+
+	/*
+	 * Allocate a callback function state.
+	 */
+	e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate node\n",
+		    __func__);
+		return (-ENOMEM);
+	}
+	ku = athp_taskq_entry_to_ptr(e);
+
+	/* XXX ugh */
+	ku->vap = vap;
+	ku->is_assoc = is_assoc;
+	ku->is_run = is_run;
+
+	/* schedule */
+	(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb",
+	    athp_node_bss_update_cb);
+
+	return (0);
+}
+#endif
+
 static int
 athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
@@ -560,8 +637,40 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (ostate == IEEE80211_S_RUN)
 			break;
 
+		/*
+		 * Station mode - we can't defer BSS updates for now
+		 * as net80211/wpa_supplicant sends frames immediately
+		 * once the state change is done.
+		 *
+		 * So, uhm, do it inline.  It's "okay" as we've unlocked
+		 * the comlock above.  Eventually it'd be good to
+		 * turn this into a bit more of an async state change..
+		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
+			/* XXX note: can we use bss_ni->ic_chan? */
+			ret = ath10k_vif_restart(ar, vap, bss_ni,
+			    ic->ic_curchan);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				ath10k_err(ar,
+				    "%s: ath10k_vdev_start failed: %d\n",
+				    __func__, ret);
+				break;
+			}
+			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
+			ATHP_CONF_UNLOCK(ar);
+		}
+
+		/*
+		 * Hostap - need to ensure we've set the SSID right first.
+		 */
+		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			ATHP_CONF_LOCK(ar);
+			(void) athp_vif_update_ap_ssid(vap, bss_ni);
+
+			/* Should we do vif_restart before ap_setup? */
 			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
@@ -570,7 +679,15 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				    __func__, ret);
 				break;
 			}
-			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
+			ret = athp_vif_ap_setup(vap, bss_ni);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				ath10k_err(ar,
+				    "%s: ath10k_vif_ap_setup failed; ret=%d\n",
+				    __func__, ret);
+				break;
+			}
+
 			ATHP_CONF_UNLOCK(ar);
 		}
 
@@ -610,31 +727,37 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		break;
 
 	case IEEE80211_S_INIT:
-		if (vap->iv_opmode == IEEE80211_M_STA) {
-			athp_tx_disable(ar, vap);
-		}
 
-		ATHP_CONF_LOCK(ar);
+		athp_tx_disable(ar, vap);
 
 		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 			/* Monitor mode - explicit down */
+			ATHP_CONF_LOCK(ar);
 			ath10k_vif_bring_down(vap);
+			ATHP_CONF_UNLOCK(ar);
 		}
-		if (vap->iv_opmode == IEEE80211_M_STA) {
 
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			ATHP_CONF_LOCK(ar);
 			/* Wait for xmit to finish before continuing */
 			ath10k_tx_flush_locked(ar, vap, 0, 1);
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
+				ATHP_NODE(bss_ni)->is_in_peer_table = 0;
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
+			ATHP_CONF_UNLOCK(ar);
 		}
-		ATHP_CONF_UNLOCK(ar);
 
-		if (vap->iv_opmode == IEEE80211_M_STA) {
-			athp_tx_enable(ar, vap);
+		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			ATHP_CONF_LOCK(ar);
+			ath10k_tx_flush_locked(ar, vap, 0, 1);
+			ret = athp_vif_ap_stop(vap, bss_ni);
+			ATHP_CONF_UNLOCK(ar);
 		}
+
+		athp_tx_enable(ar, vap);
 
 		break;
 
@@ -648,17 +771,22 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * Then for RUN we update the BSS configuration
 		 * with whatever new information we've found.
 		 */
-		ATHP_CONF_LOCK(ar);
-		ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
-		if (ret != 0) {
+		if (vap->iv_opmode == IEEE80211_M_STA) {
+			ATHP_CONF_LOCK(ar);
+			/* XXX note: can we use bss_ni->ic_chan? */
+			ret = ath10k_vif_restart(ar, vap, bss_ni,
+			    ic->ic_curchan);
+			if (ret != 0) {
+				ATHP_CONF_UNLOCK(ar);
+				ath10k_err(ar,
+				    "%s: ath10k_vdev_start failed: %d\n",
+				    __func__, ret);
+				break;
+			}
+			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
+			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			ATHP_CONF_UNLOCK(ar);
-			ath10k_err(ar,
-			    "%s: ath10k_vdev_start failed; ret=%d\n",
-			    __func__, ret);
-			break;
 		}
-		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
-		ATHP_CONF_UNLOCK(ar);
 		break;
 	case IEEE80211_S_ASSOC:
 		/* Assuming we already went through AUTH */
@@ -847,6 +975,14 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
+	/*
+	 * TODO: For native wifi mode, we do need to push in keys
+	 * or the key exchange doesn't finish as firmware buffers
+	 * PM4 frames.
+	 *
+	 * I don't know about the software-only crypto bits
+	 * (eg GCMP.)  ath10k doesn't seem do anything special there.
+	 */
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
 
@@ -885,8 +1021,14 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	if (k->wk_keyix == 0)
 		ku->wmi_flags |= WMI_KEY_PAIRWISE;
 
-	/* Which MAC to feed to the command */
-	memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	/*
+	 * Which MAC to feed to the command - group key is our
+	 * address; pairwise key is the peer MAC.
+	 */
+	if (k->wk_flags & IEEE80211_KEY_GROUP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else
+		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
 	/* Copy the whole key contents for now; which is dirty.. */
 	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
@@ -896,6 +1038,13 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	/* XXX ugh */
 	ku->vap = vap;
+
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D\n",
+	    __func__,
+	    ku->k.wk_keyix, ku->wmi_add,
+	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
+	    ku->wmi_macaddr, ":");
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_set", athp_key_update_cb);
@@ -976,8 +1125,14 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	if (k->wk_keyix == 0)
 		ku->wmi_flags |= WMI_KEY_PAIRWISE;
 
-	/* Which MAC to feed to the command */
-	memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	/*
+	 * Which MAC to feed to the command - group key is our
+	 * address; pairwise key is the peer MAC.
+	 */
+	if (k->wk_flags & IEEE80211_KEY_GROUP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else
+		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
 	/* Copy the whole key contents for now; which is dirty.. */
 	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
@@ -1012,6 +1167,21 @@ athp_vap_reset(struct ieee80211vap *vap, u_long cmd)
 
 	/* For now, we don't have a reset hardware to running handler.. */
 	return (0);
+}
+
+static void
+athp_beacon_update(struct ieee80211vap *vap, int item)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211_beacon_offsets *bo = &vap->iv_bcn_off;
+
+	/* Typically this is called when the TIM changes */
+
+	ath10k_dbg(ar, ATH10K_DBG_BEACON,
+	    "%s: called; item=%d\n", __func__, item);
+
+	setbit(bo->bo_flags, item);
 }
 
 static struct ieee80211vap *
@@ -1081,6 +1251,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_key_set = athp_key_set;
 	vap->iv_key_delete = athp_key_delete;
 	vap->iv_reset = athp_vap_reset;
+	vap->iv_update_beacon = athp_beacon_update;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -1234,46 +1405,208 @@ athp_update_mcast(struct ieee80211com *ic)
 
 }
 
+static void
+athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211vap *vap;
+	struct ath10k_sta *arsta;
+
+	ku = athp_taskq_entry_to_ptr(e);
+	vap = ku->vap;
+
+	if (flush == 0) {
+		ath10k_warn(ar, "%s: flushing\n", __func__);
+		return;
+	}
+
+	if (athp_peer_create(vap, ku->peer_macaddr) != 0) {
+		ath10k_err(ar, "%s: failed to create peer: %6D\n", __func__,
+		    ku->peer_macaddr, ":");
+		return;
+	}
+
+	ath10k_warn(ar, "%s: added node for mac %6D (%p)\n", __func__,
+	    ku->peer_macaddr, ":", ku->ni);
+
+	/* XXX TODO: set "node" xmit flag to 1 */
+	arsta = ATHP_NODE(ku->ni);
+	arsta->is_in_peer_table = 1;
+}
+
+static void
+athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211vap *vap;
+
+	ku = athp_taskq_entry_to_ptr(e);
+	vap = ku->vap;
+
+	if (flush == 0) {
+		ath10k_warn(ar, "%s: flushing\n", __func__);
+		return;
+	}
+
+	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+		ATHP_CONF_LOCK(ar);
+		(void) ath10k_station_disassoc(ar, vap, ku->peer_macaddr,
+		    ku->is_node_qos);
+		ATHP_CONF_UNLOCK(ar);
+	}
+
+	if (athp_peer_free(vap, ku->peer_macaddr) != 0) {
+		ath10k_err(ar, "%s: failed to delete peer: %6D\n", __func__,
+		    ku->peer_macaddr, ":");
+	}
+
+	ath10k_warn(ar, "%s: deleted node for mac %6D (%p)\n", __func__,
+	    ku->peer_macaddr, ":", ku->ni);
+}
+
 static struct ieee80211_node *
 athp_node_alloc(struct ieee80211vap *vap,
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
-	struct athp_node *an;
+	struct ath10k_sta *an;
 
 	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, mac, ":");
 
-	an = malloc(sizeof(struct athp_node), M_80211_NODE, M_NOWAIT | M_ZERO);
+	an = malloc(sizeof(struct ath10k_sta), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
 		return (NULL);
 
+	/*
+	 * Defer peer creation into the taskqueue.
+	 * We need the peer entry to be created before we can transmit.
+	 */
+
 	/* XXX TODO: Create peer if it's not our MAC address */
 	if (memcmp(mac, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
-		device_printf(ar->sc_dev,
-		    "%s: add peer for MAC %6D\n",
-		    __func__, mac, ":");
+		struct athp_taskq_entry *e;
+		struct athp_node_alloc_state *ku;
 
-		if (athp_peer_create(vap, mac) != 0) {
-			device_printf(ar->sc_dev, "%s: failed to create peer\n",
-			    __func__);
-			free(an, M_80211_NODE);
-			return (NULL);
+		/*
+		 * Only do this for hostap mode.
+		 *
+		 * STA mode nodes are added/removed as part of the state
+		 * transition.
+		 */
+		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			device_printf(ar->sc_dev,
+			    "%s: add peer for MAC %6D\n",
+			    __func__, mac, ":");
+
+			/*
+			 * Allocate a callback function state.
+			 */
+			e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+			if (e == NULL) {
+				ath10k_err(ar, "%s: failed to allocate node\n",
+				    __func__);
+				free(an, M_80211_NODE);
+				return (NULL);
+			}
+			ku = athp_taskq_entry_to_ptr(e);
+
+			/* Which MAC to feed to the command */
+			memcpy(&ku->peer_macaddr, mac, ETH_ALEN);
+
+			/* XXX ugh */
+			ku->vap = vap;
+
+			/*
+			 * Ideally we'd take a reference here - but the rest
+			 * of the node state hasn't been setup yet.
+			 *
+			 * So, net80211 should split ic_node_alloc into
+			 * "alloc" and "driver setup".
+			 */
+			ku->ni = (void *) an;
+
+			/* schedule */
+			(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb", athp_node_alloc_cb);
 		}
+	} else {
+		/* "our" node - we always have it for hostap mode */
+		an->is_in_peer_table = 1;
 	}
 
-	return (&an->ni);
+	return (&an->an_node);
+}
+
+static void
+athp_node_assoc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct athp_node_alloc_state *ku;
+	struct ieee80211vap *vap;
+
+	ku = athp_taskq_entry_to_ptr(e);
+
+	if (flush == 0) {
+		ath10k_warn(ar, "%s: flushing\n", __func__);
+		ieee80211_free_node(ku->ni);
+		return;
+	}
+
+	vap = ku->vap;
+
+	ATHP_CONF_LOCK(ar);
+	(void) ath10k_station_assoc(ar, vap, ku->ni, ! ku->is_assoc);
+	ATHP_CONF_UNLOCK(ar);
+
+	ieee80211_free_node(ku->ni);
 }
 
 static void
 athp_newassoc(struct ieee80211_node *ni, int isnew)
 {
-	/* XXX TODO */
-	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
+
+	/*
+	 * Only do this for hostap.
+	 */
+	if (vap->iv_opmode != IEEE80211_M_HOSTAP)
+		return;
+
 	device_printf(ar->sc_dev,
 	    "%s: called; mac=%6D; isnew=%d\n",
 	    __func__, ni->ni_macaddr, ":", isnew);
+
+	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		struct athp_taskq_entry *e;
+		struct athp_node_alloc_state *ku;
+
+		device_printf(ar->sc_dev,
+		    "%s: add association state for MAC %6D\n",
+		    __func__, ni->ni_macaddr, ":");
+
+		/*
+		 * Allocate a callback function state.
+		 */
+		e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+		if (e == NULL) {
+			ath10k_err(ar, "%s: failed to setup association state\n",
+			    __func__);
+			return;
+		}
+		ku = athp_taskq_entry_to_ptr(e);
+
+		/* Which MAC to feed to the command */
+		memcpy(&ku->peer_macaddr, ni->ni_macaddr, ETH_ALEN);
+
+		/* XXX ugh */
+		ku->vap = vap;
+		ku->ni = ieee80211_ref_node(ni);
+		ku->is_assoc = isnew;
+
+		/* schedule */
+		(void) athp_taskq_queue(ar, e, "athp_node_assoc_cb", athp_node_assoc_cb);
+	}
 }
 
 static void
@@ -1283,27 +1616,70 @@ athp_node_free(struct ieee80211_node *ni)
 	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
 
 	device_printf(ar->sc_dev,
 	    "%s: called; mac=%6D\n",
 	    __func__, ni->ni_macaddr, ":");
 
+	arsta = ATHP_NODE(ni);
+
 	/* XXX TODO: delete peer */
 	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
+		struct athp_taskq_entry *e;
+		struct athp_node_alloc_state *ku;
+
 		device_printf(ar->sc_dev,
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
-		/*
-		 * Note: when deleting a peer, we need to make sure that no
-		 * frames have been scheduled to said peer.  net80211
-		 * shouldn't delete nodes until the last transmit reference
-		 * is gone.  But, we should likely wait until the transmit
-		 * queue is emptied here just to be sure.
-		 */
-		athp_peer_free(ni->ni_vap, ni);
-	}
+		arsta->is_in_peer_table = 0;
 
+		/*
+		 * Only do this for hostap mode.
+		 *
+		 * STA mode nodes are added/removed as part of the state
+		 * transition.
+		 */
+		if (ni->ni_vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			/*
+			 * Note: when deleting a peer, we need to make sure that no
+			 * frames have been scheduled to said peer.  net80211
+			 * shouldn't delete nodes until the last transmit reference
+			 * is gone.  But, we should likely wait until the transmit
+			 * queue is emptied here just to be sure.
+			 */
+
+			/*
+			 * Allocate a callback function state.
+			 */
+			e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+			if (e == NULL) {
+				ath10k_err(ar, "%s: failed to delete the peer!\n",
+				    __func__);
+				goto finish;
+			}
+			ku = athp_taskq_entry_to_ptr(e);
+
+			/* Which MAC to feed to the command */
+			memcpy(&ku->peer_macaddr, ni->ni_macaddr, ETH_ALEN);
+
+			/* XXX ugh */
+			ku->vap = ni->ni_vap;
+
+			/*
+			 * At this stage we can't store a pointer to the node
+			 * because, well, we are /freeing/ the node.
+			 */
+//			ku->ni = (void *) ni;
+			ku->is_node_qos = !! (ni->ni_flags & IEEE80211_NODE_QOS);
+
+			/* schedule */
+			(void) athp_taskq_queue(ar, e, "athp_node_free_cb",
+			    athp_node_free_cb);
+		}
+	}
+finish:
 	ar->sc_node_free(ni);
 }
 
@@ -1407,6 +1783,25 @@ athp_sysctl_reg_read(SYSCTL_HANDLER_ARGS)
 }
 
 static int
+athp_sysctl_fw_stats(SYSCTL_HANDLER_ARGS)
+{
+	struct ath10k *ar = arg1;
+	int error, val;
+	int ret;
+
+	val = 0;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	if (val == 1) {
+		ret = ath10k_fw_stats_open(ar);
+		ath10k_warn(ar, "%s: ath10k_wmi_request_stats: returned %d\n", __func__, ret);
+	}
+	return (0);
+}
+
+static int
 athp_sysctl_trace_enable(SYSCTL_HANDLER_ARGS)
 {
 	struct ath10k *ar = arg1;
@@ -1444,6 +1839,9 @@ athp_attach_sysctl(struct ath10k *ar)
 	    CTLFLAG_RW, &ar->sc_dbg_regidx, 0, "");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "regval",
 	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_reg_read, "I", "");
+
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "fw_stats",
+	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_fw_stats, "I", "");
 
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_msdu_invalid_len, "");
@@ -1574,6 +1972,7 @@ athp_attach_net80211(struct ath10k *ar)
 	/* Setup device capabilities */
 	ic->ic_caps =
 	    IEEE80211_C_STA |
+	    IEEE80211_C_HOSTAP |
 	    IEEE80211_C_BGSCAN |
 	    IEEE80211_C_SHPREAMBLE |
 	    IEEE80211_C_WME |

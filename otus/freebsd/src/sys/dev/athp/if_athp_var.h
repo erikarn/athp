@@ -50,11 +50,13 @@ struct athp_key_update {
 	int wmi_add;
 };
 
-struct athp_node {
-	struct ieee80211_node	ni;
-	uint64_t		tx_done;
-	uint64_t		tx_err;
-	uint64_t		tx_retries;
+struct athp_node_alloc_state {
+	struct ieee80211vap *vap;
+	struct ieee80211_node *ni;
+	uint32_t is_assoc;
+	uint32_t is_run;
+	uint32_t is_node_qos;
+	uint8_t peer_macaddr[ETH_ALEN];
 };
 
 static inline void
@@ -73,7 +75,7 @@ athp_mtx_assert(struct mtx *mtx, int op)
 	kdb_backtrace();
 }
 
-#define	ATHP_NODE(ni)		((struct athp_node *)(ni))
+#define	ATHP_NODE(ni)		((struct ath10k_sta *)(ni))
 
 #define	ATHP_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	ATHP_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
@@ -480,9 +482,7 @@ struct ath10k {
 
 	unsigned long tx_paused; /* see ATH10K_TX_PAUSE_ */
 
-#ifdef CONFIG_ATH10K_DEBUGFS
 	struct ath10k_debug debug;
-#endif
 
 #if 0
 	struct {

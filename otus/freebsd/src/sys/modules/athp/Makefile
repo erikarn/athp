@@ -97,4 +97,7 @@ SRCS    += if_athp_spectral.c
 # Thermal management support
 SRCS    += if_athp_thermal.c
 
+# Firmware statistics support
+SRCS    += if_athp_debug_stats.c
+
 .include <bsd.kmod.mk>

@@ -58,13 +58,13 @@ enum qca6174_chip_id_rev {
 	QCA6174_HW_3_2_CHIP_ID_REV = 10,
 };
 
-#define QCA6174_HW_2_1_FW_DIR		"ath10k/QCA6174/hw2.1"
+#define QCA6174_HW_2_1_FW_DIR		ATH10K_FW_DIR "_QCA6174_hw2.1"
 #define QCA6174_HW_2_1_FW_FILE		"firmware.bin"
 #define QCA6174_HW_2_1_OTP_FILE		"otp.bin"
 #define QCA6174_HW_2_1_BOARD_DATA_FILE	"board.bin"
 #define QCA6174_HW_2_1_PATCH_LOAD_ADDR	0x1234
 
-#define QCA6174_HW_3_0_FW_DIR		"ath10k/QCA6174/hw3.0"
+#define QCA6174_HW_3_0_FW_DIR		ATH10K_FW_DIR "_QCA6174_hw3.0"
 #define QCA6174_HW_3_0_FW_FILE		"firmware.bin"
 #define QCA6174_HW_3_0_OTP_FILE		"otp.bin"
 #define QCA6174_HW_3_0_BOARD_DATA_FILE	"board.bin"
@@ -76,7 +76,7 @@ enum qca6174_chip_id_rev {
 /* QCA99X0 2.0 definitions */
 #define QCA99X0_HW_2_0_DEV_VERSION     0x01000000
 #define QCA99X0_HW_2_0_CHIP_ID_REV     0x1
-#define QCA99X0_HW_2_0_FW_DIR          ATH10K_FW_DIR "/QCA99X0/hw2.0"
+#define QCA99X0_HW_2_0_FW_DIR          ATH10K_FW_DIR "_QCA99X0_hw2.0"
 #define QCA99X0_HW_2_0_FW_FILE         "firmware.bin"
 #define QCA99X0_HW_2_0_OTP_FILE        "otp.bin"
 #define QCA99X0_HW_2_0_BOARD_DATA_FILE "board.bin"

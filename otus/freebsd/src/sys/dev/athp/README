@@ -110,9 +110,13 @@ Things to finish doing:
 
 MSI:
 
-* figure out all of the MSI bits that I missed!
+* (done) figure out all of the MSI bits that I missed!
 * (done) add single MSI support
-* do MSI-X support
+* (done) do MSI-X support
+* Figure out what to do about beeliner MSI - the regvals say there are 12
+  CEs, the HW says "32 MSIs", but when we request them, we only get 8?
+  Need to figure that out.
+* Have MSI-X failure try MSI, then if that fails try legacy.
 
 802.11 fragmentation:
 
@@ -124,10 +128,93 @@ MSI:
 * TODO: teach the athp_transmit() API about fragments and at least warn/print
   about it for now!
 
-===
+Suspend/resume, restarting VAPs after firmware panic:
+
+* when we suspend, we power down the NIC.  Upon resume, we need to transition
+  through INIT, and this requires re-creating the ath10k state.  Same with
+  firmware panics.
+
+  So, think of a way to iterate over the vdevs, mark the state as down /
+  free the ath10k state, drag the interfaces back to init, and then
+  re-allocate the vdevs again.  Then bring the interface/vdevs up so
+  net80211 can just restart programming in things.
+
+  The tricky bit will be tearing down the state without tearing down the
+  vap, and then making sure the net80211 state is gone (eg nodes, crypto
+  keys, etc) before the firmware is brought up.  We don't want to see
+  net80211 expect things that aren't setup (eg keys, peers/nodes) or
+  things are there it doesn't have setup, or trampling upon existing state.
+
+Regulatory:
 
 * Re-revisit all of the regulatory stuff - hardcoded txpower lists are bad.
   Hard-coded EEPROM regulatory code is bad.  Etc, etc.
+
+WEP:
+
+* We need to actually, yes, plumb in WEP keys
+* There are a few things to do:
+  + Re-read ath10k/mac.c and see how WEP keys are plumbed in, and in what order;
+  + Note that whenever the default TX key index changes, we should replumb all
+    of the keys per peer
+  + The keys are per-peer, not global - so we track those in ath10k_vif as
+    arvif->wep_keys[0..3] and then when a peer is added, all of those keys are
+    added.
+  + And then theres another routine that loops over the peers and plumbs in
+    updated WEP keys.
+  + So, let's go see what needs to be done for all of the above.
+
+* Ideally - convert the driver to use ath10k_install_key(),
+  ath10k_set_default_unicast_key(), and have the /deferred/ callback
+  routines call that instead of doing direct key set calls.
+
+  That way we get the WEP STA mode stuff for free.
+
+* For WEP IBSS/AP - need to do all of the peer wep key changes/updates
+  as done below.  Interestingly - what to do about the BSS peer key
+  for broadcast/unicast traffic?  Will have to figure that one out.
+
+Hostap (and also STA too, as part of unifying node handling):
+
+* We need to buffer frames to a node until the firmware has finished plumbing
+  up a node via the async callback driven path.  We can't just sleep; net80211
+  currently holds a TX lock during all of this.  So, we'll have to append
+  frames to a buffer queue and then flush it when the node is plumbed up.
+
+* BSS changes - not sure what to do here yet.  Do we get notification that our
+  BSS changed?
+
+* Need to take care of peer wep key changes/updates - whenever the key changes,
+  all peers need their WEP key / default key index updated.
+
+===
+
+net80211 changes:
+
+* Its time to push seqno allocation into the driver and have drivers correctly
+  serialise queuing frames into their own stack.  Doing this will allow that
+  net80211 TX lock to be removed.
+
+  This means:
+
+  + Add a new method that does the seqno allocation/assignment
+  + Add a flag that states that a driver does its own seqno assignment
+  + Slowly migrate all drivers over to doing seqno assignment and crypto
+    encap in the same driver TX lock so as to correctly serialise all
+    of that stuff
+  + This exposes some races, eg setting up A-MPDU sessions.  Hm!
+  + Re-test at least ath(4) with this + the TX lock removed, to verify
+    that indeed the damned crypto stuff doesn't go out of order.
+    A lot of these bugs got fixed in 2012 and it'd suck to see them
+    come back.
+
+* Add a deferred callout to set the tx key once userland sets it, in case
+  it gets changed on the fly.  It needs to be deferred into the callout
+  queue so it happens in the same as order as submitted key updates.
+
+===
+
+Random completion bits:
 
 * (done) Add busdma ops to all the places where we do descdma operations - especiall
   ath10k_htt_tx() and the completion path (wherever txbuf_paddr is referenced -
@@ -163,7 +250,7 @@ MSI:
   (done) Go find ath10k_regd_update() and ensure we call it as part of dev/vif up or
   firmware will panic upon scan!
 
-* add an iv_reset method to handle TX power changes on the fly, and turn that
+* (done) add an iv_reset method to handle TX power changes on the fly, and turn that
   into a suitable WMI command.
 
 Panics / locking issues that need addressing

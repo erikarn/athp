@@ -77,7 +77,14 @@ struct ath10k_sta {
 	/* This must always be the first entry */
 	struct ieee80211_node an_node;
 
-	struct ath10k_vif *arvif;
+//	struct ath10k_vif *arvif;
+
+	/*
+	 * This is set if the node is programmed into the peer table.
+	 * This is currently done via the callback queue to avoid
+	 * sleeping whilst holding net80211 locks, so..
+	 */
+	int is_in_peer_table;
 
 	/* the following are protected by ar->data_lock */
 	u32 changed; /* IEEE80211_RC_* */

@@ -143,11 +143,11 @@ struct wmi_ops {
 					  const u8 *mac, u32 tid, u32 initiator,
 					  u32 reason);
 	struct athp_buf *(*gen_bcn_tmpl)(struct ath10k *ar, u32 vdev_id,
-					u32 tim_ie_offset, struct athp_buf *bcn,
+					u32 tim_ie_offset, struct mbuf *bcn,
 					u32 prb_caps, u32 prb_erp,
 					void *prb_ies, size_t prb_ies_len);
 	struct athp_buf *(*gen_prb_tmpl)(struct ath10k *ar, u32 vdev_id,
-					struct athp_buf *bcn);
+					struct mbuf *bcn);
 	struct athp_buf *(*gen_p2p_go_bcn_ie)(struct ath10k *ar, u32 vdev_id,
 					     const u8 *p2p_ie);
 	struct athp_buf *(*gen_vdev_sta_uapsd)(struct ath10k *ar, u32 vdev_id,
@@ -1067,7 +1067,7 @@ ath10k_wmi_delba_send(struct ath10k *ar, u32 vdev_id, const u8 *mac,
 
 static inline int
 ath10k_wmi_bcn_tmpl(struct ath10k *ar, u32 vdev_id, u32 tim_ie_offset,
-		    struct athp_buf *bcn, u32 prb_caps, u32 prb_erp,
+		    struct mbuf *bcn, u32 prb_caps, u32 prb_erp,
 		    void *prb_ies, size_t prb_ies_len)
 {
 	struct athp_buf *pbuf;
@@ -1085,7 +1085,7 @@ ath10k_wmi_bcn_tmpl(struct ath10k *ar, u32 vdev_id, u32 tim_ie_offset,
 }
 
 static inline int
-ath10k_wmi_prb_tmpl(struct ath10k *ar, u32 vdev_id, struct athp_buf *prb)
+ath10k_wmi_prb_tmpl(struct ath10k *ar, u32 vdev_id, struct mbuf *prb)
 {
 	struct athp_buf *pbuf;
 

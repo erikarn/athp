@@ -1829,6 +1829,7 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 int
 ath10k_core_init(struct ath10k *ar)
 {
+	int ret;
 
 	ath10k_compl_init(&ar->scan.started);
 	ath10k_compl_init(&ar->scan.completed);
@@ -1888,17 +1889,14 @@ ath10k_core_init(struct ath10k *ar)
 	TASK_INIT(&ar->register_work, 0, ath10k_core_register_work, ar);
 	TASK_INIT(&ar->restart_work, 0, ath10k_core_restart, ar);
 
-#if 0
 	ret = ath10k_debug_create(ar);
 	if (ret)
 		goto err_free_aux_wq;
-#endif
-	device_printf(ar->sc_dev, "%s: TODO: ath10k_debug_create() init!\n", __func__);
 
 	return 0;
 
 //err_free_all_wq:
-	//taskqueue_free(ar->attach_workqueue);
+//	taskqueue_free(ar->attach_workqueue);
 err_free_aux_wq:
 	taskqueue_free(ar->workqueue_aux);
 err_free_wq:
