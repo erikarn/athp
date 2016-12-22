@@ -5975,11 +5975,11 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 	if (cip->ic_cipher == IEEE80211_CIPHER_WEP)
 		return (0);
 
-	/* XXX TODO yes, should mark keys as pairwise */
-	if (k->wk_keyix == 0)
+	/* This is only for group keys */
+	if ((k->wk_flags & IEEE80211_KEY_GROUP) == 0)
 		return (0);
 
-	if (cmd != 1)
+	if (cmd != SET_KEY)
 		return (0);
 
 	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
@@ -6004,7 +6004,7 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 	bool is_wep = key->cipher == WLAN_CIPHER_SUITE_WEP40 ||
 		      key->cipher == WLAN_CIPHER_SUITE_WEP104;
 #else
-	bool is_wep = !! (key->wk_cipher == IEEE80211_CIPHER_WEP);
+	bool is_wep = !! (key->wk_cipher->ic_cipher == IEEE80211_CIPHER_WEP);
 #endif
 	int ret = 0;
 	int ret2;
@@ -6118,11 +6118,12 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 			flags |= WMI_KEY_TX_USAGE;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: cmd=%d, peer=%6D, flags=0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: cmd=%d, peer=%6D, flags=0x%08x, defkey=%d\n",
 	    __func__,
 	    cmd,
 	    peer_addr, ":",
-	    flags);
+	    flags,
+	    arvif->def_wep_key_idx);
 
 	ret = ath10k_install_key(arvif, key, cmd, peer_addr, flags);
 	if (ret) {
