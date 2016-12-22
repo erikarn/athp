@@ -164,6 +164,54 @@ WEP:
     updated WEP keys.
   + So, let's go see what needs to be done for all of the above.
 
+* Ideally - convert the driver to use ath10k_install_key(),
+  ath10k_set_default_unicast_key(), and have the /deferred/ callback
+  routines call that instead of doing direct key set calls.
+
+  That way we get the WEP STA mode stuff for free.
+
+* For WEP IBSS/AP - need to do all of the peer wep key changes/updates
+  as done below.  Interestingly - what to do about the BSS peer key
+  for broadcast/unicast traffic?  Will have to figure that one out.
+
+Hostap (and also STA too, as part of unifying node handling):
+
+* We need to buffer frames to a node until the firmware has finished plumbing
+  up a node via the async callback driven path.  We can't just sleep; net80211
+  currently holds a TX lock during all of this.  So, we'll have to append
+  frames to a buffer queue and then flush it when the node is plumbed up.
+
+* BSS changes - not sure what to do here yet.  Do we get notification that our
+  BSS changed?
+
+* Need to take care of peer wep key changes/updates - whenever the key changes,
+  all peers need their WEP key / default key index updated.
+
+===
+
+net80211 changes:
+
+* Its time to push seqno allocation into the driver and have drivers correctly
+  serialise queuing frames into their own stack.  Doing this will allow that
+  net80211 TX lock to be removed.
+
+  This means:
+
+  + Add a new method that does the seqno allocation/assignment
+  + Add a flag that states that a driver does its own seqno assignment
+  + Slowly migrate all drivers over to doing seqno assignment and crypto
+    encap in the same driver TX lock so as to correctly serialise all
+    of that stuff
+  + This exposes some races, eg setting up A-MPDU sessions.  Hm!
+  + Re-test at least ath(4) with this + the TX lock removed, to verify
+    that indeed the damned crypto stuff doesn't go out of order.
+    A lot of these bugs got fixed in 2012 and it'd suck to see them
+    come back.
+
+* Add a deferred callout to set the tx key once userland sets it, in case
+  it gets changed on the fly.  It needs to be deferred into the callout
+  queue so it happens in the same as order as submitted key updates.
+
 ===
 
 Random completion bits:

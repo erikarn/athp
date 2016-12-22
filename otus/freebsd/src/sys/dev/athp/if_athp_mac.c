@@ -8841,13 +8841,15 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		ath10k_warn(ar, "failed to set dtim period for vdev %d: %i\n",
 			    arvif->vdev_id, ret);
 
-	/* XXX TODO: here's where we configure it as a hidden SSID */
-	ath10k_warn(ar, "%s: TODO: set hidden_ssid flag if required\n", __func__);
-
 	arvif->u.ap.ssid_len = ni->ni_esslen;
 	if (ni->ni_esslen)
 		memcpy(arvif->u.ap.ssid, ni->ni_essid, ni->ni_esslen);
-//	arvif->u.ap.hidden_ssid = info->hidden_ssid;
+	/* XXX TODO: here's where we configure it as a hidden SSID */
+#if 0
+	arvif->u.ap.hidden_ssid = info->hidden_ssid;
+#else
+	ath10k_warn(ar, "%s: TODO: set hidden_ssid flag if required\n", __func__);
+#endif
 
 	/* XXX Here's where we would change the BSSID? */
 #if 0
@@ -8862,6 +8864,9 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	/* RTS/CTS protection */
 	/* ERP slot */
 	/* ERP preamble */
+	ath10k_warn(ar,
+	    "%s: TODO: RTS/CTS prot, ERP slot, ERP preamble\n",
+	    __func__);
 
 #if 0
 	if (changed & BSS_CHANGED_ERP_CTS_PROT) {
