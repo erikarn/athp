@@ -907,27 +907,16 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	arvif = ath10k_vif_to_arvif(ku->vap);
 
-	ATHP_CONF_LOCK(ar);
-	ret = ath10k_install_key(arvif, &ku->k, ku->wmi_add, ku->wmi_macaddr,
-	    ku->wmi_flags);
+	ret = ath10k_set_key(ar, ku->wmi_add, &arvif->av_vap,
+	    ku->wmi_macaddr, ku->k);
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
 	    "%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d,"
 	    " wmimac=%6D\n",
 	    __func__,
-	    ku->k.wk_keyix, ku->wmi_add,
-	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
+	    ku->k->wk_keyix, ku->wmi_add,
+	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
 	    ret, ku->wmi_macaddr, ":");
-
-	if (ku->wmi_add == 1) {
-		/* Note: this only matters for WEP. */
-		ret = ath10k_set_key_h_def_keyidx(ar, arvif, 1, &ku->k);
-		ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
-		    "%s: TODO: gk update=%d\n", __func__, ret);
-	}
-
-	ATHP_CONF_UNLOCK(ar);
-
 }
 
 /*
@@ -1010,40 +999,30 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	}
 	ku = athp_taskq_entry_to_ptr(e);
 
-	/* WMI_KEY_TX_USAGE is for static WEP */
-#if 0
-	if (k->wk_flags & IEEE80211_KEY_XMIT)
-		flags |= WMI_KEY_TX_USAGE;
-#endif
-
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
-		ku->wmi_flags |= WMI_KEY_GROUP;
-	if (k->wk_keyix == 0)
-		ku->wmi_flags |= WMI_KEY_PAIRWISE;
-
 	/*
 	 * Which MAC to feed to the command - group key is our
 	 * address; pairwise key is the peer MAC.
+	 *
+	 * net80211 sets the group key MAC to ff:ff:ff:ff:ff:ff
+	 * which isn't what the firmware wants.
 	 */
 	if (k->wk_flags & IEEE80211_KEY_GROUP)
 		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 	else
 		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
-	/* Copy the whole key contents for now; which is dirty.. */
-	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
-
 	/* Add */
-	ku->wmi_add = 1;
+	ku->wmi_add = SET_KEY;
 
 	/* XXX ugh */
+	ku->k = k;
 	ku->vap = vap;
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
 	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D\n",
 	    __func__,
-	    ku->k.wk_keyix, ku->wmi_add,
-	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
+	    ku->k->wk_keyix, ku->wmi_add,
+	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
 	    ku->wmi_macaddr, ":");
 
 	/* schedule */
@@ -1115,16 +1094,6 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	ni = ieee80211_ref_node(vap->iv_bss);
 
-	/* Again, this is for WEP */
-#if 0
-	if (k->wk_flags & IEEE80211_KEY_XMIT)
-		flags |= WMI_KEY_TX_USAGE;
-#endif
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
-		ku->wmi_flags |= WMI_KEY_GROUP;
-	if (k->wk_keyix == 0)
-		ku->wmi_flags |= WMI_KEY_PAIRWISE;
-
 	/*
 	 * Which MAC to feed to the command - group key is our
 	 * address; pairwise key is the peer MAC.
@@ -1134,14 +1103,12 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	else
 		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
-	/* Copy the whole key contents for now; which is dirty.. */
-	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
-
 	/* Delete */
-	ku->wmi_add = 0;
+	ku->wmi_add = DISABLE_KEY;
 
 	/* XXX ugh */
 	ku->vap = vap;
+	ku->k = k;
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_del", athp_key_update_cb);

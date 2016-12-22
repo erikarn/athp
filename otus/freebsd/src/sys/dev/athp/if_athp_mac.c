@@ -595,7 +595,7 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
  * comparing key pointer values..
  */
 static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
-				 struct ieee80211_key *key)
+				 const struct ieee80211_key *key)
 {
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
@@ -642,7 +642,7 @@ static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 }
 
 static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
-					 struct ieee80211_key *key)
+					 const struct ieee80211_key *key)
 {
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
@@ -5996,7 +5996,7 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 
 int
 ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
-    const u8 *peer_addr, struct ieee80211_key *key)
+    const u8 *peer_addr, const struct ieee80211_key *key)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct ath10k_peer *peer;

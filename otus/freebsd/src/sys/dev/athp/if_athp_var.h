@@ -44,9 +44,8 @@
  */
 struct athp_key_update {
 	struct ieee80211vap *vap;
-	struct ieee80211_key k;
+	const struct ieee80211_key *k;
 	uint8_t wmi_macaddr[ETH_ALEN];
-	uint32_t wmi_flags;
 	int wmi_add;
 };
 

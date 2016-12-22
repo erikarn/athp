@@ -70,7 +70,7 @@ struct ath10k_peer {
 	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);
 
 	/* protected by ar->data_lock */
-	struct ieee80211_key *keys[WMI_MAX_KEY_INDEX + 1];
+	const struct ieee80211_key *keys[WMI_MAX_KEY_INDEX + 1];
 };
 
 struct ath10k_sta {
@@ -143,7 +143,7 @@ struct ath10k_vif {
 	u32 aid;
 	u8 bssid[ETH_ALEN];
 
-	struct ieee80211_key *wep_keys[WMI_MAX_KEY_INDEX + 1];
+	const struct ieee80211_key *wep_keys[WMI_MAX_KEY_INDEX + 1];
 	s8 def_wep_key_idx;
 
 	u16 tx_seq_no;
