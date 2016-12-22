@@ -60,6 +60,6 @@ extern	void ath10k_mgmt_over_wmi_tx_work(void *arg, int npending);
 extern	void ath10k_offchan_tx_work(void *arg, int npending);
 
 extern	int ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vap,
-	    struct ieee80211_node *sta, struct ieee80211_key *key);
+	    const u8 *peer_addr, struct ieee80211_key *key);
 
 #endif

@@ -5996,11 +5996,10 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 
 int
 ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
-    struct ieee80211_node *sta, struct ieee80211_key *key)
+    const u8 *peer_addr, struct ieee80211_key *key)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct ath10k_peer *peer;
-	u8 peer_addr[ETH_ALEN];
 #if 0
 	bool is_wep = key->cipher == WLAN_CIPHER_SUITE_WEP40 ||
 		      key->cipher == WLAN_CIPHER_SUITE_WEP104;
@@ -6027,26 +6026,16 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 		return -ENOSPC;
 #endif
 
-	/*
-	 * For STA mode, we use the BSS peer MAC.
-	 * For AP/IBSS/MBSS mode, we use the node MAC
-	 *  if it's a node, otherwise we use the NIC address.
-	 *
-	 * Yes, the caller should ensure that for STA mode
-	 * we don't pass in the node so this logic "works".
-	 */
-	if (sta)
-		memcpy(peer_addr, sta->ni_macaddr, ETH_ALEN);
-	else if (arvif->vdev_type == WMI_VDEV_TYPE_STA) {
-		struct ieee80211_node *bss_ni;
-		bss_ni = ieee80211_ref_node(vif->iv_bss);
-		memcpy(peer_addr, bss_ni->ni_macaddr, ETH_ALEN);
-		ieee80211_free_node(bss_ni);
-	} else
-		memcpy(peer_addr, vif->iv_myaddr, ETH_ALEN);
 
 	ATHP_CONF_LOCK(ar);
 
+	/*
+	 * This is done by the caller so we don't need to store
+	 * a node reference.
+	 *
+	 * The key set routine from net80211 doesn't pass in a
+	 * node entry.
+	 */
 #if 0
 	if (sta)
 		peer_addr = sta->ni_macaddr;
@@ -6144,7 +6133,8 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 	 * the "!sta" check is "I'm a station."  That means that yes, the
 	 * net80211 implementation needs to pass in NULL for STA mode.
 	 */
-	if (is_wep && !sta && vif->iv_opmode == IEEE80211_M_STA) {
+	//if (is_wep && !sta && vif->iv_opmode == IEEE80211_M_STA) {
+	if (is_wep && vif->iv_opmode == IEEE80211_M_STA) {
 		flags2 = flags;
 		flags2 &= ~WMI_KEY_GROUP;
 		flags2 |= WMI_KEY_PAIRWISE;
