@@ -5994,9 +5994,9 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 	return (ret);
 }
 
-static int ath10k_set_key(struct ath10k *ar, int cmd,
-			  struct ieee80211vap *vif, struct ieee80211_node *sta,
-			  struct ieee80211_key *key)
+int
+ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
+    struct ieee80211_node *sta, struct ieee80211_key *key)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct ath10k_peer *peer;
