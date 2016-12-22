@@ -1005,8 +1005,14 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 *
 	 * net80211 sets the group key MAC to ff:ff:ff:ff:ff:ff
 	 * which isn't what the firmware wants.
+	 *
+	 * net80211 sets WEP keys to our own MAC address rather
+	 * than the BSSID.  So, we need to use the BSS ID here
+	 * as well.
 	 */
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
+	if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_WEP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else if (k->wk_flags & IEEE80211_KEY_GROUP)
 		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 	else
 		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
@@ -1019,11 +1025,11 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	ku->vap = vap;
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
-	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D\n",
+	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D, bss_ni mac=%6D\n",
 	    __func__,
 	    ku->k->wk_keyix, ku->wmi_add,
 	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
-	    ku->wmi_macaddr, ":");
+	    ku->wmi_macaddr, ":", ni->ni_macaddr, ":");
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_set", athp_key_update_cb);
@@ -1097,11 +1103,21 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	/*
 	 * Which MAC to feed to the command - group key is our
 	 * address; pairwise key is the peer MAC.
+	 *
+	 * net80211 sets the group key MAC to ff:ff:ff:ff:ff:ff
+	 * which isn't what the firmware wants.
+	 *
+	 * net80211 sets WEP keys to our own MAC address rather
+	 * than the BSSID.  So, we need to use the BSS ID here
+	 * as well.
 	 */
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
+	if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_WEP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else if (k->wk_flags & IEEE80211_KEY_GROUP)
 		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 	else
 		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
+
 
 	/* Delete */
 	ku->wmi_add = DISABLE_KEY;
