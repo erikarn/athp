@@ -6118,6 +6118,12 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 			flags |= WMI_KEY_TX_USAGE;
 	}
 
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: cmd=%d, peer=%6D, flags=0x%08x\n",
+	    __func__,
+	    cmd,
+	    peer_addr, ":",
+	    flags);
+
 	ret = ath10k_install_key(arvif, key, cmd, peer_addr, flags);
 	if (ret) {
 		WARN_ON(ret > 0);
@@ -6165,7 +6171,7 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 		peer->keys[key->wk_keyix] = NULL;
 	else if (peer == NULL)
 		/* impossible unless FW goes crazy */
-		ath10k_warn(ar, "Peer %pM disappeared!\n", peer_addr);
+		ath10k_warn(ar, "Peer %6D disappeared!\n", peer_addr, ":");
 	ATHP_DATA_UNLOCK(ar);
 
 exit:
