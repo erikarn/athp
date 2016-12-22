@@ -975,6 +975,14 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	}
 	ATHP_CONF_UNLOCK(ar);
 
+	/*
+	 * TODO: For native wifi mode, we do need to push in keys
+	 * or the key exchange doesn't finish as firmware buffers
+	 * PM4 frames.
+	 *
+	 * I don't know about the software-only crypto bits
+	 * (eg GCMP.)  ath10k doesn't seem do anything special there.
+	 */
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
 		return (1);
 
