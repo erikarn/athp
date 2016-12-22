@@ -590,9 +590,12 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 	return false;
 }
 
-#if 0
+/*
+ * Note: there needs to be a better way of doing this without
+ * comparing key pointer values..
+ */
 static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
-				 struct ieee80211_key_conf *key)
+				 struct ieee80211_key *key)
 {
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
@@ -607,9 +610,9 @@ static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 	for (;;) {
 		/* since ath10k_install_key we can't hold data_lock all the
 		 * time, so we try to remove the keys incrementally */
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		i = 0;
-		list_for_each_entry(peer, &ar->peers, list) {
+		TAILQ_FOREACH(peer, &ar->peers, list) {
 			for (i = 0; i < ARRAY_SIZE(peer->keys); i++) {
 				if (peer->keys[i] == key) {
 					ether_addr_copy(addr, peer->addr);
@@ -621,7 +624,7 @@ static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 			if (i < ARRAY_SIZE(peer->keys))
 				break;
 		}
-		spin_unlock_bh(&ar->data_lock);
+		ATHP_DATA_UNLOCK(ar);
 
 		if (i == ARRAY_SIZE(peer->keys))
 			break;
@@ -631,15 +634,15 @@ static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 			first_errno = ret;
 
 		if (ret)
-			ath10k_warn(ar, "failed to remove key for %pM: %d\n",
-				    addr, ret);
+			ath10k_warn(ar, "failed to remove key for %6D: %d\n",
+				    addr, ":", ret);
 	}
 
 	return first_errno;
 }
 
 static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
-					 struct ieee80211_key_conf *key)
+					 struct ieee80211_key *key)
 {
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
@@ -647,30 +650,34 @@ static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	list_for_each_entry(peer, &ar->peers, list) {
-		if (!memcmp(peer->addr, arvif->vif->addr, ETH_ALEN))
+	if (key->wk_keyix == ATHP_PAIRWISE_KEY_IDX) {
+		ath10k_warn(ar, "%s: called with pairwise key\n", __func__);
+		return (0);
+	}
+
+	TAILQ_FOREACH(peer, &ar->peers, list) {
+		if (!memcmp(peer->addr, arvif->vif->iv_myaddr, ETH_ALEN))
 			continue;
 
 		if (!memcmp(peer->addr, arvif->bssid, ETH_ALEN))
 			continue;
 
-		if (peer->keys[key->keyidx] == key)
+		if (peer->keys[key->wk_keyix] == key)
 			continue;
 
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vif vdev %i update key %i needs update\n",
-			   arvif->vdev_id, key->keyidx);
+			   arvif->vdev_id, key->wk_keyix);
 
 		ret = ath10k_install_peer_wep_keys(arvif, peer->addr);
 		if (ret) {
-			ath10k_warn(ar, "failed to update wep keys on vdev %i for peer %pM: %d\n",
-				    arvif->vdev_id, peer->addr, ret);
+			ath10k_warn(ar, "failed to update wep keys on vdev %i for peer %6D: %d\n",
+				    arvif->vdev_id, peer->addr, ":", ret);
 			return ret;
 		}
 	}
 
 	return 0;
 }
-#endif
 
 /*********************/
 /* General utilities */
@@ -5987,55 +5994,88 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 	return (ret);
 }
 
-#if 0
-static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
-			  struct ieee80211_vif *vif, struct ieee80211_sta *sta,
-			  struct ieee80211_key_conf *key)
+static int ath10k_set_key(struct ath10k *ar, int cmd,
+			  struct ieee80211vap *vif, struct ieee80211_node *sta,
+			  struct ieee80211_key *key)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct ath10k_peer *peer;
-	const u8 *peer_addr;
+	u8 peer_addr[ETH_ALEN];
+#if 0
 	bool is_wep = key->cipher == WLAN_CIPHER_SUITE_WEP40 ||
 		      key->cipher == WLAN_CIPHER_SUITE_WEP104;
+#else
+	bool is_wep = !! (key->wk_cipher == IEEE80211_CIPHER_WEP);
+#endif
 	int ret = 0;
 	int ret2;
 	u32 flags = 0;
 	u32 flags2;
 
+#if 0
 	/* this one needs to be done in software */
 	if (key->cipher == WLAN_CIPHER_SUITE_AES_CMAC)
 		return 1;
+#endif
 
 	if (arvif->nohwcrypt)
 		return 1;
 
+	/* It's going to be 0..3, or 16 for "pairwise" */
+#if 0
 	if (key->keyidx > WMI_MAX_KEY_INDEX)
 		return -ENOSPC;
+#endif
+
+	/*
+	 * For STA mode, we use the BSS peer MAC.
+	 * For AP/IBSS/MBSS mode, we use the node MAC
+	 *  if it's a node, otherwise we use the NIC address.
+	 *
+	 * Yes, the caller should ensure that for STA mode
+	 * we don't pass in the node so this logic "works".
+	 */
+	if (sta)
+		memcpy(peer_addr, sta->ni_macaddr, ETH_ALEN);
+	else if (arvif->vdev_type == WMI_VDEV_TYPE_STA) {
+		struct ieee80211_node *bss_ni;
+		bss_ni = ieee80211_ref_node(vif->iv_bss);
+		memcpy(peer_addr, bss_ni->ni_macaddr, ETH_ALEN);
+		ieee80211_free_node(bss_ni);
+	} else
+		memcpy(peer_addr, vif->iv_myaddr, ETH_ALEN);
 
 	ATHP_CONF_LOCK(ar);
 
+#if 0
 	if (sta)
-		peer_addr = sta->addr;
+		peer_addr = sta->ni_macaddr;
 	else if (arvif->vdev_type == WMI_VDEV_TYPE_STA)
 		peer_addr = vif->bss_conf.bssid;
 	else
 		peer_addr = vif->addr;
+#endif
 
+	/*
+	 * This is currently not relevant here.  We know WEP keys versus
+	 * non-WEP keys.
+	 */
+#if 0
 	key->hw_key_idx = key->keyidx;
+#endif
 
 	if (is_wep) {
 		if (cmd == SET_KEY)
-			arvif->wep_keys[key->keyidx] = key;
+			arvif->wep_keys[key->wk_keyix] = key;
 		else
-			arvif->wep_keys[key->keyidx] = NULL;
+			arvif->wep_keys[key->wk_keyix] = NULL;
 	}
 
 	/* the peer should not disappear in mid-way (unless FW goes awry) since
 	 * we already hold conf_mutex. we just make sure its there now. */
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, arvif->vdev_id, peer_addr);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	if (!peer) {
 		if (cmd == SET_KEY) {
@@ -6050,10 +6090,22 @@ static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		}
 	}
 
+	/*
+	 * We don't have a nice "we're pairwise!" key hint.
+	 * Instead, we assume that keyidx 16 is the "I'm pairwise"
+	 * signal.
+	 */
+#if 0
 	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
 		flags |= WMI_KEY_PAIRWISE;
 	else
 		flags |= WMI_KEY_GROUP;
+#else
+	if (key->wk_keyix == ATHP_PAIRWISE_KEY_IDX)
+		flags |= WMI_KEY_PAIRWISE;
+	else
+		flags |= WMI_KEY_GROUP;
+#endif
 
 	if (is_wep) {
 		if (cmd == DISABLE_KEY)
@@ -6063,7 +6115,7 @@ static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		 * stations associated already (e.g. when merging) without any
 		 * keys. Static WEP needs an explicit per-peer key upload.
 		 */
-		if (vif->type == NL80211_IFTYPE_ADHOC &&
+		if (vif->iv_opmode == IEEE80211_M_IBSS &&
 		    cmd == SET_KEY)
 			ath10k_mac_vif_update_wep_key(arvif, key);
 
@@ -6088,7 +6140,11 @@ static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	/* mac80211 sets static WEP keys as groupwise while firmware requires
 	 * them to be installed twice as both pairwise and groupwise.
 	 */
-	if (is_wep && !sta && vif->type == NL80211_IFTYPE_STATION) {
+	/*
+	 * the "!sta" check is "I'm a station."  That means that yes, the
+	 * net80211 implementation needs to pass in NULL for STA mode.
+	 */
+	if (is_wep && !sta && vif->iv_opmode == IEEE80211_M_STA) {
 		flags2 = flags;
 		flags2 &= ~WMI_KEY_GROUP;
 		flags2 |= WMI_KEY_PAIRWISE;
@@ -6111,22 +6167,21 @@ static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	ath10k_set_key_h_def_keyidx(ar, arvif, cmd, key);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, arvif->vdev_id, peer_addr);
 	if (peer && cmd == SET_KEY)
-		peer->keys[key->keyidx] = key;
+		peer->keys[key->wk_keyix] = key;
 	else if (peer && cmd == DISABLE_KEY)
-		peer->keys[key->keyidx] = NULL;
+		peer->keys[key->wk_keyix] = NULL;
 	else if (peer == NULL)
 		/* impossible unless FW goes crazy */
 		ath10k_warn(ar, "Peer %pM disappeared!\n", peer_addr);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
-#endif
 
 #if 0
 /*

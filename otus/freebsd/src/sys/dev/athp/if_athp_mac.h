@@ -20,6 +20,9 @@
 
 #define WEP_KEYID_SHIFT 6
 
+#define	SET_KEY		1
+#define	DISABLE_KEY	2
+
 #define	ATH10K_BEACON_BUF_LEN	2048
 
 enum wmi_tlv_tx_pause_id;
