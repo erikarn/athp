@@ -572,16 +572,10 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
 		return false;
 
 	/*
-	 * Note: the wrong keyindex is being ued here.
-	 * wk_keyix is the hardware key index.
-	 * We want to see if there is a WEP key index
-	 * entry at this ID for the given peer.
-	 *
-	 * I'm not sure what to do here; but if we /do/
-	 * get here it's time to handle it.
+	 * Check whether the given key index has a WEP key plumbed
+	 * into the firmware.  Those are keyix 0..3.  pairwise keys
+	 * will have a keyix of 16.
 	 */
-	ath10k_warn(ar, "%s: **** WARNING **** the wrong keyidx (wk_keyidx) is being compared!\n", __func__);
-
 	for (i = 0; i < ARRAY_SIZE(peer->keys); i++) {
 		if (peer->keys[i] && peer->keys[i]->wk_keyix == keyidx)
 			return true;
@@ -6026,8 +6020,7 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 		return -ENOSPC;
 #endif
 
-
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	/*
 	 * This is done by the caller so we don't need to store
@@ -6176,7 +6169,6 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 	ATHP_DATA_UNLOCK(ar);
 
 exit:
-	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
 
@@ -8667,6 +8659,9 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		arvif->is_stabss_setup = 1;
 		ath10k_monitor_recalc(ar);
 
+		/* For WEP mode - replumb keys */
+		athp_sta_vif_wep_replumb(vap, ni->ni_macaddr);
+
 	} else {
 		ath10k_bss_disassoc(ar, vap, is_run);
 		(void) ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
@@ -8988,4 +8983,47 @@ athp_vif_ap_stop(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	ath10k_control_beaconing(arvif, ni, 0);
 
 	return (0);
+}
+
+/*
+ * When a STA mode VAP associates or re-associates, the net80211 crypto code
+ * doesn't re-plumb in the crypto state.  It instead expects the chip just
+ * has a global table of keys that can be plumbed in at any time.
+ *
+ * So until net80211 grows that for WEP, let's loop over any WEP keys for
+ * the given VAP and plumb them in for the BSS.
+ *
+ * This is intended for STA mode only.  AP mode gets things plumbed in for
+ * a peer each time a station is added.
+ */
+void
+athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int i;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (vap->iv_opmode != IEEE80211_M_STA)
+		return;
+	if ((vap->iv_flags & IEEE80211_F_PRIVACY) == 0)
+		return;
+
+	/*
+	 * If net80211 has a default key index, use it.
+	 */
+	arvif->def_wep_key_idx = -1;
+	if (vap->iv_def_txkey != IEEE80211_KEYIX_NONE) {
+		arvif->def_wep_key_idx = vap->iv_def_txkey;
+	}
+
+	for (i = 0; i < 4; i++) {
+		if (arvif->wep_keys[i] == NULL)
+			continue;
+		if (arvif->wep_keys[i]->wk_cipher->ic_cipher != IEEE80211_CIPHER_WEP)
+			continue;
+		(void) ath10k_set_key(ar, SET_KEY, vap, peer_addr,
+		    arvif->wep_keys[i]);
+	}
 }

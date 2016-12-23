@@ -59,4 +59,7 @@ extern	void ath10k_offchan_tx_work(void *arg, int npending);
 extern	int ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vap,
 	    const u8 *peer_addr, const struct ieee80211_key *key);
 
+extern	void athp_sta_vif_wep_replumb(struct ieee80211vap *vap,
+	    const uint8_t *peer_addr);
+
 #endif

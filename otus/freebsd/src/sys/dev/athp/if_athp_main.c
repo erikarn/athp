@@ -907,8 +907,10 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	arvif = ath10k_vif_to_arvif(ku->vap);
 
+	ATHP_CONF_LOCK(ar);
 	ret = ath10k_set_key(ar, ku->wmi_add, &arvif->av_vap,
 	    ku->wmi_macaddr, ku->k);
+	ATHP_CONF_UNLOCK(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
 	    "%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d,"
