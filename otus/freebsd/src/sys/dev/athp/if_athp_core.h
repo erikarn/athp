@@ -175,6 +175,8 @@ struct ath10k_vif {
 
 	/* net80211 state */
 	int (*av_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
+	void (*av_update_deftxkey)(struct ieee80211vap *,
+	    ieee80211_keyix deftxkey);
 };
 
 struct ath10k_vif_iter {

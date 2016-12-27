@@ -1135,6 +1135,17 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	return (1);
 }
 
+static void
+athp_update_deftxkey(struct ieee80211vap *vap, ieee80211_keyix deftxkey)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called; deftxkey=%d\n", __func__, (int) deftxkey);
+	arvif->av_update_deftxkey(vap, deftxkey);
+}
+
 static int
 athp_vap_reset(struct ieee80211vap *vap, u_long cmd)
 {
@@ -1237,6 +1248,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_key_delete = athp_key_delete;
 	vap->iv_reset = athp_vap_reset;
 	vap->iv_update_beacon = athp_beacon_update;
+	uvp->av_update_deftxkey = vap->iv_update_deftxkey;
+	vap->iv_update_deftxkey = athp_update_deftxkey;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
