@@ -893,6 +893,34 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 }
 
 static void
+athp_key_change_default_tx_cb(struct ath10k *ar, struct athp_taskq_entry *e,
+    int flush)
+{
+	struct ath10k_vif *arvif;
+	struct athp_keyidx_update *ku;
+
+	ku = athp_taskq_entry_to_ptr(e);
+
+	/* Yes, it's badly named .. */
+	if (flush == 0)
+		return;
+
+	arvif = ath10k_vif_to_arvif(ku->vap);
+
+	/* If it's -1, then we don't tell firmware (yet) */
+	if (ku->keyidx == IEEE80211_KEYIX_NONE) {
+		ath10k_warn(ar,
+		    "%s: TODO: tell the firmware to disable WEP TX key?\n",
+		    __func__);
+	} else {
+		ath10k_set_default_unicast_key(ar, ku->vap, ku->keyidx);
+	}
+
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: def tx key=%d\n", __func__, ku->keyidx);
+}
+
+static void
 athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 {
 	struct ath10k_vif *arvif;
@@ -1141,9 +1169,45 @@ athp_update_deftxkey(struct ieee80211vap *vap, ieee80211_keyix deftxkey)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct ath10k *ar = ic->ic_softc;
+	struct athp_taskq_entry *e;
+	struct athp_keyidx_update *ku;
+
+	/*
+	 * We're going to cheat - update the deftxkey in the
+	 * VAP here; but defer the firmware command.
+	 */
+
+	/* Racy - see above key routines for the background */
+	ATHP_CONF_LOCK(ar);
+	if (! arvif->is_setup) {
+		ATHP_CONF_UNLOCK(ar);
+		return;
+	}
+	ATHP_CONF_UNLOCK(ar);
 
 	ath10k_warn(ar, "%s: called; deftxkey=%d\n", __func__, (int) deftxkey);
 	arvif->av_update_deftxkey(vap, deftxkey);
+
+	/*
+	 * Allocate a callback function state.
+	 */
+	e = athp_taskq_entry_alloc(ar, sizeof(struct athp_keyidx_update));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate keyidx-update\n",
+		    __func__);
+		return;
+	}
+	ku = athp_taskq_entry_to_ptr(e);
+
+	ku->vap = vap;
+	ku->keyidx = deftxkey;
+
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: scheduling: keyidx=%d\n", __func__, (int) deftxkey);
+
+	/* schedule */
+	(void) athp_taskq_queue(ar, e, "athp_keyidx_set",
+	    athp_key_change_default_tx_cb);
 }
 
 static int

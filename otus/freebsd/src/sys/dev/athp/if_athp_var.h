@@ -58,6 +58,11 @@ struct athp_node_alloc_state {
 	uint8_t peer_macaddr[ETH_ALEN];
 };
 
+struct athp_keyidx_update {
+	struct ieee80211vap *vap;
+	ieee80211_keyix keyidx;
+};
+
 static inline void
 athp_mtx_assert(struct mtx *mtx, int op)
 {
