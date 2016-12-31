@@ -893,6 +893,34 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 }
 
 static void
+athp_key_change_default_tx_cb(struct ath10k *ar, struct athp_taskq_entry *e,
+    int flush)
+{
+	struct ath10k_vif *arvif;
+	struct athp_keyidx_update *ku;
+
+	ku = athp_taskq_entry_to_ptr(e);
+
+	/* Yes, it's badly named .. */
+	if (flush == 0)
+		return;
+
+	arvif = ath10k_vif_to_arvif(ku->vap);
+
+	/* If it's -1, then we don't tell firmware (yet) */
+	if (ku->keyidx == IEEE80211_KEYIX_NONE) {
+		ath10k_warn(ar,
+		    "%s: TODO: tell the firmware to disable WEP TX key?\n",
+		    __func__);
+	} else {
+		ath10k_set_default_unicast_key(ar, ku->vap, ku->keyidx);
+	}
+
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: def tx key=%d\n", __func__, ku->keyidx);
+}
+
+static void
 athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 {
 	struct ath10k_vif *arvif;
@@ -908,26 +936,17 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	arvif = ath10k_vif_to_arvif(ku->vap);
 
 	ATHP_CONF_LOCK(ar);
-	ret = ath10k_install_key(arvif, &ku->k, ku->wmi_add, ku->wmi_macaddr,
-	    ku->wmi_flags);
+	ret = ath10k_set_key(ar, ku->wmi_add, &arvif->av_vap,
+	    ku->wmi_macaddr, ku->k, ku->cipher);
+	ATHP_CONF_UNLOCK(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
 	    "%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d,"
 	    " wmimac=%6D\n",
 	    __func__,
-	    ku->k.wk_keyix, ku->wmi_add,
-	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
+	    ku->k->wk_keyix, ku->wmi_add,
+	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
 	    ret, ku->wmi_macaddr, ":");
-
-	if (ku->wmi_add == 1) {
-		/* Note: this only matters for WEP. */
-		ret = ath10k_set_key_h_def_keyidx(ar, arvif, 1, &ku->k);
-		ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
-		    "%s: TODO: gk update=%d\n", __func__, ret);
-	}
-
-	ATHP_CONF_UNLOCK(ar);
-
 }
 
 /*
@@ -944,9 +963,9 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
  * re-inserting a QoS header and that causes "issues" with the
  * software encryption.
  *
- * XXX TODO - no, we actually kinda have to push this into a deferred
- * context and run it on the taskqueue.  net80211 holds locks that
- * we shouldn't be sleeping through.
+ * Deleting keys means the cipher state gets immediately removed,
+ * which means we can't check wk_cipher here or in any subsequent
+ * commits.
  */
 static int
 athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
@@ -1010,41 +1029,38 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	}
 	ku = athp_taskq_entry_to_ptr(e);
 
-	/* WMI_KEY_TX_USAGE is for static WEP */
-#if 0
-	if (k->wk_flags & IEEE80211_KEY_XMIT)
-		flags |= WMI_KEY_TX_USAGE;
-#endif
-
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
-		ku->wmi_flags |= WMI_KEY_GROUP;
-	if (k->wk_keyix == 0)
-		ku->wmi_flags |= WMI_KEY_PAIRWISE;
-
 	/*
 	 * Which MAC to feed to the command - group key is our
 	 * address; pairwise key is the peer MAC.
+	 *
+	 * net80211 sets the group key MAC to ff:ff:ff:ff:ff:ff
+	 * which isn't what the firmware wants.
+	 *
+	 * net80211 sets WEP keys to our own MAC address rather
+	 * than the BSSID.  So, we need to use the BSS ID here
+	 * as well.
 	 */
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
+	if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_WEP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else if (k->wk_flags & IEEE80211_KEY_GROUP)
 		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 	else
 		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
-	/* Copy the whole key contents for now; which is dirty.. */
-	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
-
 	/* Add */
-	ku->wmi_add = 1;
+	ku->wmi_add = SET_KEY;
 
 	/* XXX ugh */
+	ku->k = k;
+	ku->cipher = k->wk_cipher->ic_cipher;
 	ku->vap = vap;
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
-	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D\n",
+	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D, bss_ni mac=%6D\n",
 	    __func__,
-	    ku->k.wk_keyix, ku->wmi_add,
-	    ku->k.wk_flags, ku->k.wk_macaddr, ":",
-	    ku->wmi_macaddr, ":");
+	    ku->k->wk_keyix, ku->wmi_add,
+	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
+	    ku->wmi_macaddr, ":", ni->ni_macaddr, ":");
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_set", athp_key_update_cb);
@@ -1115,39 +1131,85 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	ni = ieee80211_ref_node(vap->iv_bss);
 
-	/* Again, this is for WEP */
-#if 0
-	if (k->wk_flags & IEEE80211_KEY_XMIT)
-		flags |= WMI_KEY_TX_USAGE;
-#endif
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
-		ku->wmi_flags |= WMI_KEY_GROUP;
-	if (k->wk_keyix == 0)
-		ku->wmi_flags |= WMI_KEY_PAIRWISE;
-
 	/*
 	 * Which MAC to feed to the command - group key is our
 	 * address; pairwise key is the peer MAC.
+	 *
+	 * net80211 sets the group key MAC to ff:ff:ff:ff:ff:ff
+	 * which isn't what the firmware wants.
+	 *
+	 * net80211 sets WEP keys to our own MAC address rather
+	 * than the BSSID.  So, we need to use the BSS ID here
+	 * as well.
 	 */
-	if (k->wk_flags & IEEE80211_KEY_GROUP)
+	if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_WEP)
+		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
+	else if (k->wk_flags & IEEE80211_KEY_GROUP)
 		memcpy(&ku->wmi_macaddr, ni->ni_macaddr, ETH_ALEN);
 	else
 		memcpy(&ku->wmi_macaddr, k->wk_macaddr, ETH_ALEN);
 
-	/* Copy the whole key contents for now; which is dirty.. */
-	memcpy(&ku->k, k, sizeof(struct ieee80211_key));
 
 	/* Delete */
-	ku->wmi_add = 0;
+	ku->wmi_add = DISABLE_KEY;
 
 	/* XXX ugh */
 	ku->vap = vap;
+	ku->k = k;
+	ku->cipher = k->wk_cipher->ic_cipher;
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_del", athp_key_update_cb);
 
 	ieee80211_free_node(ni);
 	return (1);
+}
+
+static void
+athp_update_deftxkey(struct ieee80211vap *vap, ieee80211_keyix deftxkey)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = ic->ic_softc;
+	struct athp_taskq_entry *e;
+	struct athp_keyidx_update *ku;
+
+	/*
+	 * We're going to cheat - update the deftxkey in the
+	 * VAP here; but defer the firmware command.
+	 */
+
+	/* Racy - see above key routines for the background */
+	ATHP_CONF_LOCK(ar);
+	if (! arvif->is_setup) {
+		ATHP_CONF_UNLOCK(ar);
+		return;
+	}
+	ATHP_CONF_UNLOCK(ar);
+
+	ath10k_warn(ar, "%s: called; deftxkey=%d\n", __func__, (int) deftxkey);
+	arvif->av_update_deftxkey(vap, deftxkey);
+
+	/*
+	 * Allocate a callback function state.
+	 */
+	e = athp_taskq_entry_alloc(ar, sizeof(struct athp_keyidx_update));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate keyidx-update\n",
+		    __func__);
+		return;
+	}
+	ku = athp_taskq_entry_to_ptr(e);
+
+	ku->vap = vap;
+	ku->keyidx = deftxkey;
+
+	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
+	    "%s: scheduling: keyidx=%d\n", __func__, (int) deftxkey);
+
+	/* schedule */
+	(void) athp_taskq_queue(ar, e, "athp_keyidx_set",
+	    athp_key_change_default_tx_cb);
 }
 
 static int
@@ -1252,6 +1314,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_key_delete = athp_key_delete;
 	vap->iv_reset = athp_vap_reset;
 	vap->iv_update_beacon = athp_beacon_update;
+	uvp->av_update_deftxkey = vap->iv_update_deftxkey;
+	vap->iv_update_deftxkey = athp_update_deftxkey;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,

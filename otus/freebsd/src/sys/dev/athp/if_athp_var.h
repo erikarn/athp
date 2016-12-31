@@ -44,10 +44,10 @@
  */
 struct athp_key_update {
 	struct ieee80211vap *vap;
-	struct ieee80211_key k;
+	const struct ieee80211_key *k;
 	uint8_t wmi_macaddr[ETH_ALEN];
-	uint32_t wmi_flags;
 	int wmi_add;
+	uint32_t cipher;
 };
 
 struct athp_node_alloc_state {
@@ -57,6 +57,11 @@ struct athp_node_alloc_state {
 	uint32_t is_run;
 	uint32_t is_node_qos;
 	uint8_t peer_macaddr[ETH_ALEN];
+};
+
+struct athp_keyidx_update {
+	struct ieee80211vap *vap;
+	ieee80211_keyix keyidx;
 };
 
 static inline void

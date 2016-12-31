@@ -20,6 +20,9 @@
 
 #define WEP_KEYID_SHIFT 6
 
+#define	SET_KEY		1
+#define	DISABLE_KEY	2
+
 #define	ATH10K_BEACON_BUF_LEN	2048
 
 enum wmi_tlv_tx_pause_id;
@@ -112,5 +115,7 @@ extern	int ath10k_station_assoc(struct ath10k *ar, struct ieee80211vap *vap,
 	    struct ieee80211_node *ni, bool reassoc);
 extern	int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vap,
 	    const uint8_t *mac, int is_node_qos);
+extern	void ath10k_set_default_unicast_key(struct ath10k *ar,
+	    struct ieee80211vap *vap, int keyidx);
 
 #endif /* _MAC_H_ */
