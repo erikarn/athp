@@ -937,7 +937,7 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	ATHP_CONF_LOCK(ar);
 	ret = ath10k_set_key(ar, ku->wmi_add, &arvif->av_vap,
-	    ku->wmi_macaddr, ku->k);
+	    ku->wmi_macaddr, ku->k, ku->cipher);
 	ATHP_CONF_UNLOCK(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
@@ -963,9 +963,9 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
  * re-inserting a QoS header and that causes "issues" with the
  * software encryption.
  *
- * XXX TODO - no, we actually kinda have to push this into a deferred
- * context and run it on the taskqueue.  net80211 holds locks that
- * we shouldn't be sleeping through.
+ * Deleting keys means the cipher state gets immediately removed,
+ * which means we can't check wk_cipher here or in any subsequent
+ * commits.
  */
 static int
 athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
@@ -1052,6 +1052,7 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	/* XXX ugh */
 	ku->k = k;
+	ku->cipher = k->wk_cipher->ic_cipher;
 	ku->vap = vap;
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
@@ -1155,6 +1156,7 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	/* XXX ugh */
 	ku->vap = vap;
 	ku->k = k;
+	ku->cipher = k->wk_cipher->ic_cipher;
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_del", athp_key_update_cb);

@@ -71,6 +71,7 @@ struct ath10k_peer {
 
 	/* protected by ar->data_lock */
 	const struct ieee80211_key *keys[WMI_MAX_KEY_INDEX + 1];
+	uint32_t key_ciphers[WMI_MAX_KEY_INDEX + 1];
 };
 
 struct ath10k_sta {
@@ -144,6 +145,7 @@ struct ath10k_vif {
 	u8 bssid[ETH_ALEN];
 
 	const struct ieee80211_key *wep_keys[WMI_MAX_KEY_INDEX + 1];
+	uint32_t wep_key_ciphers[WMI_MAX_KEY_INDEX + 1];
 	s8 def_wep_key_idx;
 
 	u16 tx_seq_no;

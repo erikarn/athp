@@ -47,6 +47,7 @@ struct athp_key_update {
 	const struct ieee80211_key *k;
 	uint8_t wmi_macaddr[ETH_ALEN];
 	int wmi_add;
+	uint32_t cipher;
 };
 
 struct athp_node_alloc_state {

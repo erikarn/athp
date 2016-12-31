@@ -315,10 +315,10 @@ ath10k_mac_max_vht_nss(const u16 vht_mcs_mask[NL80211_VHT_NSS_MAX])
 
 static int ath10k_send_key(struct ath10k_vif *arvif,
 			   const struct ieee80211_key *k,
-			   int cmd, const u8 *macaddr, u32 flags)
+			   int cmd, const u8 *macaddr, u32 flags,
+			   uint32_t cipher)
 {
 	struct ath10k *ar = arvif->ar;
-	const struct ieee80211_cipher *cip = k->wk_cipher;
 
 	struct wmi_vdev_install_key_arg arg;
 
@@ -342,7 +342,7 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		arg.key_idx = 0;
 	}
 
-	switch (cip->ic_cipher) {
+	switch (cipher) {
 	case IEEE80211_CIPHER_AES_CCM:
 		arg.key_cipher = WMI_CIPHER_AES_CCM;
 #if 0
@@ -367,7 +367,7 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		arg.key_cipher = WMI_CIPHER_WEP;
 		break;
 	default:
-		ath10k_warn(ar, "cipher %d is not supported\n", cip->ic_cipher);
+		ath10k_warn(ar, "cipher %d is not supported\n", cipher);
 		return -EOPNOTSUPP;
 	}
 
@@ -388,7 +388,7 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 
 static int
 ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
-    int cmd, const u8 *macaddr, u32 flags)
+    int cmd, const u8 *macaddr, u32 flags, uint32_t cipher)
 {
 	struct ath10k *ar = arvif->ar;
 	int ret;
@@ -401,7 +401,7 @@ ath10k_install_key(struct ath10k_vif *arvif, const struct ieee80211_key *key,
 	if (arvif->nohwcrypt)
 		return 1;
 
-	ret = ath10k_send_key(arvif, key, cmd, macaddr, flags);
+	ret = ath10k_send_key(arvif, key, cmd, macaddr, flags, cipher);
 	if (ret)
 		return ret;
 
@@ -589,7 +589,8 @@ bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
  * comparing key pointer values..
  */
 static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
-				 const struct ieee80211_key *key)
+				 const struct ieee80211_key *key,
+				 uint32_t cipher)
 {
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
@@ -623,7 +624,7 @@ static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 		if (i == ARRAY_SIZE(peer->keys))
 			break;
 		/* key flags are not required to delete the key */
-		ret = ath10k_install_key(arvif, key, DISABLE_KEY, addr, flags);
+		ret = ath10k_install_key(arvif, key, DISABLE_KEY, addr, flags, cipher);
 		if (ret < 0 && first_errno == 0)
 			first_errno = ret;
 
@@ -636,7 +637,8 @@ static int ath10k_clear_vdev_key(struct ath10k_vif *arvif,
 }
 
 static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
-					 const struct ieee80211_key *key)
+					 const struct ieee80211_key *key,
+					 uint32_t cipher)
 {
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
@@ -658,6 +660,8 @@ static int ath10k_mac_vif_update_wep_key(struct ath10k_vif *arvif,
 
 		if (peer->keys[key->wk_keyix] == key)
 			continue;
+
+		/* XXX check cipher? */
 
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vif vdev %i update key %i needs update\n",
 			   arvif->vdev_id, key->wk_keyix);
@@ -5945,9 +5949,9 @@ ath10k_cancel_hw_scan(struct ath10k *ar, struct ieee80211vap *vif)
 
 static int
 ath10k_set_key_h_def_keyidx(struct ath10k *ar,
-    struct ath10k_vif *arvif, int cmd, const struct ieee80211_key *k)
+    struct ath10k_vif *arvif, int cmd, const struct ieee80211_key *k,
+    uint32_t cipher)
 {
-	const struct ieee80211_cipher *cip = k->wk_cipher;
 	u32 vdev_param = arvif->ar->wmi.vdev_param->def_keyid;
 	int ret;
 
@@ -5966,7 +5970,7 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 	    arvif->vdev_type != WMI_VDEV_TYPE_IBSS)
 		return (0);
 
-	if (cip->ic_cipher == IEEE80211_CIPHER_WEP)
+	if (cipher == IEEE80211_CIPHER_WEP)
 		return (0);
 
 	/* This is only for group keys */
@@ -5990,7 +5994,8 @@ ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 
 int
 ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
-    const u8 *peer_addr, const struct ieee80211_key *key)
+    const u8 *peer_addr, const struct ieee80211_key *key,
+    uint32_t cipher)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct ath10k_peer *peer;
@@ -5998,7 +6003,7 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 	bool is_wep = key->cipher == WLAN_CIPHER_SUITE_WEP40 ||
 		      key->cipher == WLAN_CIPHER_SUITE_WEP104;
 #else
-	bool is_wep = !! (key->wk_cipher->ic_cipher == IEEE80211_CIPHER_WEP);
+	bool is_wep = !! (cipher == IEEE80211_CIPHER_WEP);
 #endif
 	int ret = 0;
 	int ret2;
@@ -6047,10 +6052,13 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 #endif
 
 	if (is_wep) {
-		if (cmd == SET_KEY)
+		if (cmd == SET_KEY) {
 			arvif->wep_keys[key->wk_keyix] = key;
-		else
+			arvif->wep_key_ciphers[key->wk_keyix] = cipher;
+		} else {
 			arvif->wep_keys[key->wk_keyix] = NULL;
+			arvif->wep_key_ciphers[key->wk_keyix] = IEEE80211_CIPHER_NONE;
+		}
 	}
 
 	/* the peer should not disappear in mid-way (unless FW goes awry) since
@@ -6091,7 +6099,7 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 
 	if (is_wep) {
 		if (cmd == DISABLE_KEY)
-			ath10k_clear_vdev_key(arvif, key);
+			ath10k_clear_vdev_key(arvif, key, cipher);
 
 		/* When WEP keys are uploaded it's possible that there are
 		 * stations associated already (e.g. when merging) without any
@@ -6099,7 +6107,7 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 		 */
 		if (vif->iv_opmode == IEEE80211_M_IBSS &&
 		    cmd == SET_KEY)
-			ath10k_mac_vif_update_wep_key(arvif, key);
+			ath10k_mac_vif_update_wep_key(arvif, key, cipher);
 
 		/* 802.1x never sets the def_wep_key_idx so each set_key()
 		 * call changes default tx key.
@@ -6118,11 +6126,11 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 	    flags,
 	    arvif->def_wep_key_idx);
 
-	ret = ath10k_install_key(arvif, key, cmd, peer_addr, flags);
+	ret = ath10k_install_key(arvif, key, cmd, peer_addr, flags, cipher);
 	if (ret) {
 		WARN_ON(ret > 0);
-		ath10k_warn(ar, "failed to install key for vdev %i peer %pM: %d\n",
-			    arvif->vdev_id, peer_addr, ret);
+		ath10k_warn(ar, "failed to install key for vdev %i peer %6D: %d\n",
+			    arvif->vdev_id, peer_addr, ":", ret);
 		goto exit;
 	}
 
@@ -6139,31 +6147,33 @@ ath10k_set_key(struct ath10k *ar, int cmd, struct ieee80211vap *vif,
 		flags2 &= ~WMI_KEY_GROUP;
 		flags2 |= WMI_KEY_PAIRWISE;
 
-		ret = ath10k_install_key(arvif, key, cmd, peer_addr, flags2);
+		ret = ath10k_install_key(arvif, key, cmd, peer_addr, flags2, cipher);
 		if (ret) {
 			WARN_ON(ret > 0);
-			ath10k_warn(ar, "failed to install (ucast) key for vdev %i peer %pM: %d\n",
-				    arvif->vdev_id, peer_addr, ret);
+			ath10k_warn(ar, "failed to install (ucast) key for vdev %i peer %6D: %d\n",
+				    arvif->vdev_id, peer_addr, ":", ret);
 			ret2 = ath10k_install_key(arvif, key, DISABLE_KEY,
-						  peer_addr, flags);
+						  peer_addr, flags, cipher);
 			if (ret2) {
 				WARN_ON(ret2 > 0);
-				ath10k_warn(ar, "failed to disable (mcast) key for vdev %i peer %pM: %d\n",
-					    arvif->vdev_id, peer_addr, ret2);
+				ath10k_warn(ar, "failed to disable (mcast) key for vdev %i peer %6D: %d\n",
+					    arvif->vdev_id, peer_addr, ":", ret2);
 			}
 			goto exit;
 		}
 	}
 
-	ath10k_set_key_h_def_keyidx(ar, arvif, cmd, key);
+	ath10k_set_key_h_def_keyidx(ar, arvif, cmd, key, cipher);
 
 	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, arvif->vdev_id, peer_addr);
-	if (peer && cmd == SET_KEY)
+	if (peer && cmd == SET_KEY) {
 		peer->keys[key->wk_keyix] = key;
-	else if (peer && cmd == DISABLE_KEY)
+		peer->key_ciphers[key->wk_keyix] = cipher;
+	} else if (peer && cmd == DISABLE_KEY) {
 		peer->keys[key->wk_keyix] = NULL;
-	else if (peer == NULL)
+		peer->key_ciphers[key->wk_keyix] = IEEE80211_CIPHER_WEP;
+	} else if (peer == NULL)
 		/* impossible unless FW goes crazy */
 		ath10k_warn(ar, "Peer %6D disappeared!\n", peer_addr, ":");
 	ATHP_DATA_UNLOCK(ar);
@@ -9021,9 +9031,9 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 	for (i = 0; i < 4; i++) {
 		if (arvif->wep_keys[i] == NULL)
 			continue;
-		if (arvif->wep_keys[i]->wk_cipher->ic_cipher != IEEE80211_CIPHER_WEP)
+		if (arvif->wep_key_ciphers[i] != IEEE80211_CIPHER_WEP)
 			continue;
 		(void) ath10k_set_key(ar, SET_KEY, vap, peer_addr,
-		    arvif->wep_keys[i]);
+		    arvif->wep_keys[i], arvif->wep_key_ciphers[i]);
 	}
 }
