@@ -1826,6 +1826,7 @@ athp_setup_channels(struct ath10k *ar)
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11A);
 		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
+			ath10k_warn(ar, "%s: enabling HT/VHT rates\n", __func__);
 			setbit(bands, IEEE80211_MODE_11NA);
 			setbit(bands, IEEE80211_MODE_VHT_5GHZ);
 		}
