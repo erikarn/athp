@@ -3745,8 +3745,15 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 		ch->allow_ht = true;
 		ch->allow_vht = true;
 		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
-		ch->ht40plus = (ieee80211_find_channel(ic, c->ic_freq,
+		/*
+		 * This is cleared by linux wireless if the channel doesn't
+		 * have a HT40+.  For HT40- channels then yes, it's fine.
+		 */
+		ch->ht40plus = !! (ieee80211_find_channel(ic, c->ic_freq,
 		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40U) != NULL);
+		ch->ht40plus |= !! (ieee80211_find_channel(ic, c->ic_freq,
+		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40D) != NULL);
+
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
 
