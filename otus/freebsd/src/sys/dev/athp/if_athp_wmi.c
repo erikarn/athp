@@ -5776,9 +5776,9 @@ ath10k_wmi_op_gen_vdev_start(struct ath10k *ar,
 	ath10k_wmi_put_wmi_channel(&cmd->chan, &arg->channel);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
-		   "wmi vdev %s id 0x%x flags: 0x%0X, freq %d, mode %d, ch_flags: 0x%0X, max_power: %d\n",
+		   "wmi vdev %s id 0x%x flags: 0x%0X, freq %d, freq1 %d, mode %d, ch_flags: 0x%0X, max_power: %d\n",
 		   cmdname, arg->vdev_id,
-		   flags, arg->channel.freq, arg->channel.mode,
+		   flags, arg->channel.freq, arg->channel.band_center_freq1, arg->channel.mode,
 		   cmd->chan.flags, arg->channel.max_power);
 
 	return pbuf;
