@@ -3424,7 +3424,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
 	/* Note: if we haven't restarted the vdev before here; this causes a firmware panic */
-	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, ni->ni_associd, arvif->bssid);
+	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, arvif->aid, arvif->bssid);
 	if (ret) {
 		ath10k_warn(ar, "failed to set vdev %d up: %d\n",
 			    arvif->vdev_id, ret);
