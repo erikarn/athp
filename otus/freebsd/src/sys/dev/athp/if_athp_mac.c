@@ -686,6 +686,7 @@ chan_to_phymode(struct ieee80211_channel *c)
 {
 	enum wmi_phy_mode phymode = MODE_UNKNOWN;
 
+	/* XXX VHT TODO: VHT 2G */
 	if (IEEE80211_IS_CHAN_2GHZ(c)) {
 		if (IEEE80211_IS_CHAN_HT20(c))
 			phymode = MODE_11NG_HT20;
@@ -698,10 +699,16 @@ chan_to_phymode(struct ieee80211_channel *c)
 	}
 
 	if (IEEE80211_IS_CHAN_5GHZ(c)) {
-		if (IEEE80211_IS_CHAN_HT20(c))
-			phymode = MODE_11NA_HT20;
+		if (IEEE80211_IS_CHAN_VHT80(c))
+			phymode = MODE_11AC_VHT80;
+		else if (IEEE80211_IS_CHAN_VHT40(c))
+			phymode = MODE_11AC_VHT40;
+		else if (IEEE80211_IS_CHAN_VHT20(c))
+			phymode = MODE_11AC_VHT20;
 		else if (IEEE80211_IS_CHAN_HT40(c))
 			phymode = MODE_11NA_HT40;
+		else if (IEEE80211_IS_CHAN_HT20(c))
+			phymode = MODE_11NA_HT20;
 		else if (IEEE80211_IS_CHAN_A(c))
 			phymode = MODE_11A;
 	}
@@ -3742,7 +3749,6 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40U) != NULL);
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
-
 
 		ch->freq = ieee80211_get_channel_center_freq(c);
 		ch->band_center_freq1 = ieee80211_get_channel_center_freq(c);
