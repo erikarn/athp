@@ -3284,10 +3284,9 @@ static int ath10k_setup_peer_smps(struct ath10k *ar, struct ath10k_vif *arvif,
 					 ath10k_smps_map[smps]);
 }
 
-#if 0
 static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
-				      struct ieee80211_vif *vif,
-				      struct ieee80211_sta_vht_cap vht_cap)
+				      struct ieee80211vap *vif,
+				      uint32_t vht_cap_info)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
@@ -3298,10 +3297,10 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 		return 0;
 
 	if (!(ar->vht_cap_info &
-	      (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
-	       IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE |
-	       IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
-	       IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)))
+	      (IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE |
+	       IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE |
+	       IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE |
+	       IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)))
 		return 0;
 
 	param = ar->wmi.vdev_param->txbf;
@@ -3315,22 +3314,22 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 	 */
 
 	if (ar->vht_cap_info &
-	    (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
-	     IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)) {
-		if (vht_cap.cap & IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE)
+	    (IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE |
+	     IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE)) {
+		if (vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFEE;
 
-		if (vht_cap.cap & IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)
+		if (vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_MU_TX_BFEE;
 	}
 
 	if (ar->vht_cap_info &
-	    (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
-	     IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)) {
-		if (vht_cap.cap & IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE)
+	    (IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE |
+	     IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)) {
+		if (vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFER;
 
-		if (vht_cap.cap & IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)
+		if (vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_MU_TX_BFER;
 	}
 
@@ -3349,7 +3348,6 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 
 	return 0;
 }
-#endif
 
 /*
  * XXX adrian - I /think/ this is the "join a BSS" as a station
@@ -3362,6 +3360,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct ieee80211_sta_ht_cap ht_cap;
 //	struct ieee80211_sta_vht_cap vht_cap;
+	uint32_t vhtcap;
 	struct wmi_peer_assoc_complete_arg peer_arg;
 	int ret;
 
@@ -3382,6 +3381,12 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	 * before calling ath10k_setup_peer_smps() which might sleep. */
 //	htcap = ap_sta->ht_cap;
 //	vht_cap = ap_sta->vht_cap;
+
+	if (IEEE80211_IS_CHAN_VHT(ni->ni_chan)) {
+		vhtcap = ni->ni_vhtcap;
+	} else {
+		vhtcap = 0;
+	}
 
 	ret = ath10k_peer_assoc_prepare(ar, vif, ni, &peer_arg, is_run);
 	if (ret) {
@@ -3404,16 +3409,12 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 		return;
 	}
 
-#if 0
-	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
+	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vhtcap);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %6D: %d\n",
-			    arvif->vdev_id, bss_conf->bssid, ":", ret);
+			    arvif->vdev_id, ni->ni_macaddr, ":", ret);
 		return;
 	}
-#else
-	ath10k_warn(ar, "%s: TODO: vhtcap\n", __func__);
-#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 		   "mac vdev %d up (associated) bssid %6D aid %d\n",
@@ -3468,16 +3469,12 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
 
 	arvif->def_wep_key_idx = -1;
 
-#if 0
-	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
+	ret = ath10k_mac_vif_recalc_txbf(ar, vif, 0);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc txbf for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
-#else
-	ath10k_warn(ar, "%s: TODO: txbf/vht_cap\n", __func__);
-#endif
 	arvif->is_up = false;
 
 	callout_drain(&arvif->connection_loss_work);
@@ -5212,45 +5209,41 @@ static u32 get_nss_from_chainmask(u16 chain_mask)
 
 static int ath10k_mac_set_txbf_conf(struct ath10k_vif *arvif)
 {
-#if 0
+#define	SM(_v, _f)	(((_v) << _f##_LSB) & _f##_MASK)
 	u32 value = 0;
 	struct ath10k *ar = arvif->ar;
 
 	if (ath10k_wmi_get_txbf_conf_scheme(ar) != WMI_TXBF_CONF_BEFORE_ASSOC)
 		return 0;
 
-	if (ar->vht_cap_info & (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
-				IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE))
+	if (ar->vht_cap_info & (IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE |
+				IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE))
 		value |= SM((ar->num_rf_chains - 1), WMI_TXBF_STS_CAP_OFFSET);
 
-	if (ar->vht_cap_info & (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
-				IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE))
+	if (ar->vht_cap_info & (IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE |
+				IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE))
 		value |= SM((ar->num_rf_chains - 1), WMI_BF_SOUND_DIM_OFFSET);
 
 	if (!value)
 		return 0;
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE)
 		value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFER;
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)
 		value |= (WMI_VDEV_PARAM_TXBF_MU_TX_BFER |
 			  WMI_VDEV_PARAM_TXBF_SU_TX_BFER);
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE)
 		value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFEE;
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE)
 		value |= (WMI_VDEV_PARAM_TXBF_MU_TX_BFEE |
 			  WMI_VDEV_PARAM_TXBF_SU_TX_BFEE);
 
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
 					 ar->wmi.vdev_param->txbf, value);
-#else
-	struct ath10k *ar = arvif->ar;
-	ath10k_warn(ar, "%s: TODO: we may /need/ some TXBF setup!!\n", __func__);
-	return (0);
-#endif
+#undef	SM
 }
 
 /*
