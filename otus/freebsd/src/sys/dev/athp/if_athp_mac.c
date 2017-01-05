@@ -2893,9 +2893,10 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 	    "mac ht density=%d, rxmax=%d\n",
 	    arg->peer_mpdu_density, arg->peer_max_mpdu);
-#if 0
+#if 1
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
-		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "  %d: MCS %d\n",
+		    i, arg->peer_ht_rates.rates[i]);
 	}
 #endif
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
