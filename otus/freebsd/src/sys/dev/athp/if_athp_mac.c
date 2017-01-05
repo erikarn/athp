@@ -3041,66 +3041,76 @@ ath10k_peer_assoc_h_vht_limit(u16 tx_mcs_set,
 }
 #endif
 
-#if 0
 static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
-				    struct ieee80211_vif *vif,
-				    struct ieee80211_sta *sta,
+				    struct ieee80211vap *vif,
+				    struct ieee80211_node *sta,
 				    struct wmi_peer_assoc_complete_arg *arg)
 {
-	const struct ieee80211_sta_vht_cap *vht_cap = &sta->vht_cap;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct cfg80211_chan_def def;
-	enum ieee80211_band band;
-	const u16 *vht_mcs_mask;
+//	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+//	struct cfg80211_chan_def def;
+//	enum ieee80211_band band;
+//	const u16 *vht_mcs_mask;
+	uint32_t vht_cap;
 	u8 ampdu_factor;
 
+#if 0
 	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
 		return;
+#endif
 
-	if (!vht_cap->vht_supported)
+	vht_cap = sta->ni_vhtcap;
+
+	if (! IEEE80211_IS_CHAN_VHT(sta->ni_chan)) {
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac vht not a VHT channel\n", __func__);
 		return;
+	}
 
+	if (! (vht_cap & IEEE80211_VHTCAP_HTC_VHT)) {
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac HTC_VHT not set (vhtcap 0x%08x)\n", __func__, vht_cap);
+		return;
+	}
+
+#if 0
 	band = def.chan->band;
 	vht_mcs_mask = arvif->bitrate_mask.control[band].vht_mcs;
 
 	if (ath10k_peer_assoc_h_vht_masked(vht_mcs_mask))
 		return;
+#endif
 
 	arg->peer_flags |= WMI_PEER_VHT;
 
-	if (def.chan->band == IEEE80211_BAND_2GHZ)
+	if (IEEE80211_IS_CHAN_2GHZ(sta->ni_chan))
 		arg->peer_flags |= WMI_PEER_VHT_2G;
 
-	arg->peer_vht_caps = vht_cap->cap;
+	arg->peer_vht_caps = vht_cap;
 
-	ampdu_factor = (vht_cap->cap &
-			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
-		       IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT;
+	ampdu_factor = (vht_cap &
+			IEEE80211_VHTCAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
+		       IEEE80211_VHTCAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT;
 
 	/* Workaround: Some Netgear/Linksys 11ac APs set Rx A-MPDU factor to
 	 * zero in VHT IE. Using it would result in degraded throughput.
 	 * arg->peer_max_mpdu at this point contains HT max_mpdu so keep
 	 * it if VHT max_mpdu is smaller. */
 	arg->peer_max_mpdu = max(arg->peer_max_mpdu,
-				 (1U << (IEEE80211_HT_MAX_AMPDU_FACTOR +
+				 (1U << (/* IEEE80211_HT_MAX_AMPDU_FACTOR */ 13 +
 					ampdu_factor)) - 1);
 
-	if (sta->bandwidth == IEEE80211_STA_RX_BW_80)
+	if (IEEE80211_IS_CHAN_VHT80(sta->ni_chan))
 		arg->peer_flags |= WMI_PEER_80MHZ;
 
-	arg->peer_vht_rates.rx_max_rate =
-		__le16_to_cpu(vht_cap->vht_mcs.rx_highest);
-	arg->peer_vht_rates.rx_mcs_set =
-		__le16_to_cpu(vht_cap->vht_mcs.rx_mcs_map);
-	arg->peer_vht_rates.tx_max_rate =
-		__le16_to_cpu(vht_cap->vht_mcs.tx_highest);
-	arg->peer_vht_rates.tx_mcs_set = ath10k_peer_assoc_h_vht_limit(
-		__le16_to_cpu(vht_cap->vht_mcs.tx_mcs_map), vht_mcs_mask);
+	arg->peer_vht_rates.rx_max_rate = sta->ni_vht_mcsinfo.rx_highest;
+	arg->peer_vht_rates.rx_mcs_set = sta->ni_vht_mcsinfo.rx_mcs_map;
+	arg->peer_vht_rates.tx_max_rate = sta->ni_vht_mcsinfo.tx_highest;
+
+	/* Ensure we only transmit what the peer AND us can handle */
+	arg->peer_vht_rates.tx_mcs_set = sta->ni_vht_mcsinfo.tx_mcs_map &
+	    vif->iv_vht_mcsinfo.tx_mcs_map;
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D max_mpdu %d flags 0x%x\n",
-		   sta->addr, ":", arg->peer_max_mpdu, arg->peer_flags);
+		   sta->ni_macaddr, ":", arg->peer_max_mpdu, arg->peer_flags);
 }
-#endif
 
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
     struct ieee80211vap *vif, struct ieee80211_node *ni,
@@ -3259,10 +3269,9 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	ath10k_peer_assoc_h_crypto(ar, vif, ni, arg, is_run);
 	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
-	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
-	ath10k_warn(ar, "%s: TODO: finish WEP crypto, vht!\n", __func__);
 	return 0;
 }
 
