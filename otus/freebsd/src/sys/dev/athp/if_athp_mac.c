@@ -2655,9 +2655,17 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		return;
 #endif
 
-	if ((sta->ni_flags & IEEE80211_NODE_HT) == 0)
+	/*
+	 * Only do this for 11n/11ac nodes.
+	 */
+	if ((sta->ni_flags & (IEEE80211_NODE_VHT | IEEE80211_NODE_HT)) == 0)
 		return;
-	if (! IEEE80211_IS_CHAN_HT(sta->ni_chan))
+
+	/*
+	 * Don't do it for non-HT, non-VHT channels.
+	 */
+	if ((! IEEE80211_IS_CHAN_HT(sta->ni_chan)) &&
+	    (! IEEE80211_IS_CHAN_VHT(sta->ni_chan)))
 		return;
 
 #if 0
