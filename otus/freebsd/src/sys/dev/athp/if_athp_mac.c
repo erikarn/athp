@@ -3065,7 +3065,7 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 		return;
 	}
 
-	if (! (vht_cap & IEEE80211_VHTCAP_HTC_VHT)) {
+	if (! (sta->ni_flags & IEEE80211_NODE_VHT)) {
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac HTC_VHT not set (vhtcap 0x%08x)\n", __func__, vht_cap);
 		return;
 	}
@@ -3242,7 +3242,7 @@ ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
     struct wmi_peer_assoc_complete_arg *arg)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
-	struct ieee80211_channel *c = ic->ic_curchan;
+	struct ieee80211_channel *c = ic->ic_curchan; /* XXX ni->ni_chan? */
 	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	enum wmi_phy_mode phymode = MODE_UNKNOWN;
 
