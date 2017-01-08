@@ -2704,19 +2704,26 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	 * Max MPDU/density - use lowest value of max mpdu;
 	 * highest value for density.
 	 */
-	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
-	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
+	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
+	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
-	    "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, "
-	    "iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
+	    "%s: htparam 0x%08x mpdu_density=0x%x, mpdu_size=0x%x, "
+	    "iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x, "
+	    "iv_ampdu_rxmax=%d\n",
 	    __func__,
+	    sta->ni_htparam,
 	    mpdu_density,
 	    mpdu_size,
 	    vif->iv_ampdu_density,
-	    vif->iv_ampdu_limit);
+	    vif->iv_ampdu_limit,
+	    vif->iv_ampdu_rxmax);
 
 	if (vif->iv_ampdu_density > mpdu_density)
 		mpdu_density = vif->iv_ampdu_density;
+	/*
+	 * Sigh. net80211's ampdu_rxmax versus ampdu_limit difference
+	 * in meaning and ioctl configuration needs to be fixed..
+	 */
 	if (vif->iv_ampdu_rxmax < mpdu_size)
 		mpdu_size = vif->iv_ampdu_limit;
 	arg->peer_max_mpdu = (1 << (13 + mpdu_size));
@@ -3083,6 +3090,12 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	if (IEEE80211_IS_CHAN_2GHZ(sta->ni_chan))
 		arg->peer_flags |= WMI_PEER_VHT_2G;
 
+	/*
+	 * XXX TODO: should this include limiting things to what
+	 * the negotiated set is, rather than just blindly trusting
+	 * the peer?
+	 */
+
 	arg->peer_vht_caps = vht_cap;
 
 	ampdu_factor = (vht_cap &
@@ -3108,8 +3121,8 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	arg->peer_vht_rates.tx_mcs_set = sta->ni_vht_mcsinfo.tx_mcs_map &
 	    vif->iv_vht_mcsinfo.tx_mcs_map;
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D max_mpdu %d flags 0x%x\n",
-		   sta->ni_macaddr, ":", arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D vhtcaps 0x%08x max_mpdu %d flags 0x%x\n",
+		   sta->ni_macaddr, ":", vht_cap, arg->peer_max_mpdu, arg->peer_flags);
 }
 
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
