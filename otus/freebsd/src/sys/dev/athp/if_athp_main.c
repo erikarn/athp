@@ -1993,20 +1993,50 @@ athp_attach_11n(struct ath10k *ar)
 	    | IEEE80211_HTC_AMPDU
 	    | IEEE80211_HTC_AMSDU
 	    | IEEE80211_HTCAP_CHWIDTH40
-	    | IEEE80211_HTCAP_MAXAMSDU_3839
-	    | IEEE80211_HTCAP_SMPS_OFF;
+	    ;
 
+	/*
+	 * Take maximum AMSDU from VHT capabilities.
+	 *
+	 * If it's anything other than 0 (3839 bytes) then
+	 * set the HT cap to at least that.
+	 */
+	if (ar->vht_cap_info & WMI_VHT_CAP_MAX_MPDU_LEN_MASK) {
+	    ic->ic_htcaps |= IEEE80211_HTCAP_MAXAMSDU_7935;
+	} else {
+	    ic->ic_htcaps |= IEEE80211_HTCAP_MAXAMSDU_3839;
+	}
+
+	/*
+	 * XXX TODO: L-Sig txop protection if in WMI capabilities.
+	 * XXX TODO: DSSSCCK40 - always
+	 * XXX TODO: Sup-width 2040 - always
+	 */
+
+	/*
+	 * Guard interval.
+	 */
 	if (ar->ht_cap_info & WMI_HT_CAP_HT20_SGI)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
 	if (ar->ht_cap_info & WMI_HT_CAP_HT40_SGI)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI40;
 
-	/* STBC - 1x for now */
+	/*
+	 * XXX SMPS (will need to be able to drive SMPS changes
+	 * through the newassoc API or something newer.)
+	 */
+	ic->ic_htcaps |= IEEE80211_HTCAP_SMPS_OFF;
+
+	/*
+	 * STBC
+	 * XXX TODO: pull from capabilities
+	 */
 	ic->ic_htcaps |= IEEE80211_HTCAP_RXSTBC_1STREAM;
 	ic->ic_htcaps |= IEEE80211_HTCAP_TXSTBC;
 
 	/* LDPC */
-	ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
+	if (ar->ht_cap_info & WMI_HT_CAP_LDPC);
+		ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
 
 	/* XXX TODO: max ampdu size / density; but is per-vap */
 
@@ -2028,6 +2058,14 @@ athp_attach_11ac(struct ath10k *ar)
 
 	/* Grab VHT capability information from firmware */
 	ic->ic_vhtcaps = ar->vht_cap_info;
+
+	/*
+	 * XXX TODO: check ath10k/mac.c for beamform additions -
+	 * we need to add the number of active rf chains into
+	 * vhtcaps.
+	 *
+	 * see ath10k_create_vht_cap() for more details.
+	 */
 
 	/* XXX opmode? */
 

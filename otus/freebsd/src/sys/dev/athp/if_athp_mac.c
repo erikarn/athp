@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #ifdef	IEEE80211_SUPPORT_SUPERG
 #include <net80211/ieee80211_superg.h>
 #endif
+#include <net80211/ieee80211_vht.h>
 
 #include "hal/linux_compat.h"
 #include "hal/targaddrs.h"
@@ -3053,6 +3054,7 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 				    struct ieee80211_node *sta,
 				    struct wmi_peer_assoc_complete_arg *arg)
 {
+	struct ieee80211_ie_vhtcap vhtcap;
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct cfg80211_chan_def def;
 //	enum ieee80211_band band;
@@ -3065,7 +3067,9 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 		return;
 #endif
 
-	vht_cap = sta->ni_vhtcap;
+	ieee80211_vht_get_vhtcap_ie(sta, &vhtcap, 1);
+
+	vht_cap = vhtcap.vht_cap_info;
 
 	if (! IEEE80211_IS_CHAN_VHT(sta->ni_chan)) {
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac vht not a VHT channel\n", __func__);
@@ -3113,16 +3117,24 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	if (IEEE80211_IS_CHAN_VHT80(sta->ni_chan))
 		arg->peer_flags |= WMI_PEER_80MHZ;
 
-	arg->peer_vht_rates.rx_max_rate = sta->ni_vht_mcsinfo.rx_highest;
-	arg->peer_vht_rates.rx_mcs_set = sta->ni_vht_mcsinfo.rx_mcs_map;
-	arg->peer_vht_rates.tx_max_rate = sta->ni_vht_mcsinfo.tx_highest;
+	arg->peer_vht_rates.rx_max_rate = vhtcap.supp_mcs.rx_highest;
+	arg->peer_vht_rates.rx_mcs_set = vhtcap.supp_mcs.rx_mcs_map;
+	arg->peer_vht_rates.tx_max_rate = vhtcap.supp_mcs.tx_highest;
+	arg->peer_vht_rates.tx_mcs_set = vhtcap.supp_mcs.tx_mcs_map;
 
-	/* Ensure we only transmit what the peer AND us can handle */
-	arg->peer_vht_rates.tx_mcs_set = sta->ni_vht_mcsinfo.tx_mcs_map &
-	    vif->iv_vht_mcsinfo.tx_mcs_map;
-
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D vhtcaps 0x%08x max_mpdu %d flags 0x%x\n",
-		   sta->ni_macaddr, ":", vht_cap, arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac vht peer %6D peer-vhtcaps 0x%08x "
+	    "vhtcaps 0x%08x max_mpdu %d flags 0x%x\n",
+	    sta->ni_macaddr, ":", sta->ni_vhtcap,
+	    vht_cap, arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac vht peer %6D peer-rxmcs 0x%04x peer-txmcs 0x%04x "
+	    "rxmcs 0x%04x txmcs 0x%04x\n",
+	    sta->ni_macaddr, ":",
+	    sta->ni_vht_mcsinfo.rx_mcs_map,
+	    sta->ni_vht_mcsinfo.tx_mcs_map,
+	    vhtcap.supp_mcs.rx_mcs_map,
+	    vhtcap.supp_mcs.tx_mcs_map);
 }
 
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
@@ -3403,6 +3415,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	/* XXX ADRIAN: TODO: do this early; or arvif->bssid is 00:00:00:00:00:00 */
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
+	arvif->aid = IEEE80211_AID(ni->ni_associd);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %6D aid %d\n",
 		   arvif->vdev_id, arvif->bssid, ":", arvif->aid);
