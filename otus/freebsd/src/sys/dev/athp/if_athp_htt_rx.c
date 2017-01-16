@@ -2717,7 +2717,6 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	struct athp_buf *skb;
 	athp_buf_head ah;
 
-	/* XXX TODO: migrate this to "grab list" under the lock */
 	TAILQ_INIT(&ah);
 	ATHP_HTT_TX_COMP_LOCK(htt);
 	TAILQ_CONCAT(&ah, &htt->tx_compl_q, next);
@@ -2733,6 +2732,11 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
 
+	/*
+	 * Holding this lock across the entire RX path involves holding
+	 * said RX lock across all the net80211, ethernet,
+	 * IP/TCP/etc stack processing.  This is a lot of lock holding!
+	 */
 	ATHP_HTT_RX_LOCK(htt);
 	while ((skb = TAILQ_FIRST(&htt->rx_compl_q))) {
 		TAILQ_REMOVE(&htt->rx_compl_q, skb, next);
