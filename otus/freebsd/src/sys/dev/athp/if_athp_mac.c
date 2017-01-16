@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #ifdef	IEEE80211_SUPPORT_SUPERG
 #include <net80211/ieee80211_superg.h>
 #endif
+#include <net80211/ieee80211_vht.h>
 
 #include "hal/linux_compat.h"
 #include "hal/targaddrs.h"
@@ -686,6 +687,7 @@ chan_to_phymode(struct ieee80211_channel *c)
 {
 	enum wmi_phy_mode phymode = MODE_UNKNOWN;
 
+	/* XXX VHT TODO: VHT 2G */
 	if (IEEE80211_IS_CHAN_2GHZ(c)) {
 		if (IEEE80211_IS_CHAN_HT20(c))
 			phymode = MODE_11NG_HT20;
@@ -698,10 +700,16 @@ chan_to_phymode(struct ieee80211_channel *c)
 	}
 
 	if (IEEE80211_IS_CHAN_5GHZ(c)) {
-		if (IEEE80211_IS_CHAN_HT20(c))
-			phymode = MODE_11NA_HT20;
+		if (IEEE80211_IS_CHAN_VHT80(c))
+			phymode = MODE_11AC_VHT80;
+		else if (IEEE80211_IS_CHAN_VHT40(c))
+			phymode = MODE_11AC_VHT40;
+		else if (IEEE80211_IS_CHAN_VHT20(c))
+			phymode = MODE_11AC_VHT20;
 		else if (IEEE80211_IS_CHAN_HT40(c))
 			phymode = MODE_11NA_HT40;
+		else if (IEEE80211_IS_CHAN_HT20(c))
+			phymode = MODE_11NA_HT20;
 		else if (IEEE80211_IS_CHAN_A(c))
 			phymode = MODE_11A;
 	}
@@ -2648,9 +2656,17 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		return;
 #endif
 
-	if ((sta->ni_flags & IEEE80211_NODE_HT) == 0)
+	/*
+	 * Only do this for 11n/11ac nodes.
+	 */
+	if ((sta->ni_flags & (IEEE80211_NODE_VHT | IEEE80211_NODE_HT)) == 0)
 		return;
-	if (! IEEE80211_IS_CHAN_HT(sta->ni_chan))
+
+	/*
+	 * Don't do it for non-HT, non-VHT channels.
+	 */
+	if ((! IEEE80211_IS_CHAN_HT(sta->ni_chan)) &&
+	    (! IEEE80211_IS_CHAN_VHT(sta->ni_chan)))
 		return;
 
 #if 0
@@ -2689,19 +2705,26 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	 * Max MPDU/density - use lowest value of max mpdu;
 	 * highest value for density.
 	 */
-	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
-	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
+	mpdu_size = MS(sta->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
+	mpdu_density = MS(sta->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
-	    "%s: htparam mpdu_density=0x%x, mpdu_size=0x%x, "
-	    "iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x\n",
+	    "%s: htparam 0x%08x mpdu_density=0x%x, mpdu_size=0x%x, "
+	    "iv_ampdu_density=0x%x, iv_ampdu_limit=0x%x, "
+	    "iv_ampdu_rxmax=%d\n",
 	    __func__,
+	    sta->ni_htparam,
 	    mpdu_density,
 	    mpdu_size,
 	    vif->iv_ampdu_density,
-	    vif->iv_ampdu_limit);
+	    vif->iv_ampdu_limit,
+	    vif->iv_ampdu_rxmax);
 
 	if (vif->iv_ampdu_density > mpdu_density)
 		mpdu_density = vif->iv_ampdu_density;
+	/*
+	 * Sigh. net80211's ampdu_rxmax versus ampdu_limit difference
+	 * in meaning and ioctl configuration needs to be fixed..
+	 */
 	if (vif->iv_ampdu_rxmax < mpdu_size)
 		mpdu_size = vif->iv_ampdu_limit;
 	arg->peer_max_mpdu = (1 << (13 + mpdu_size));
@@ -2886,9 +2909,10 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 	    "mac ht density=%d, rxmax=%d\n",
 	    arg->peer_mpdu_density, arg->peer_max_mpdu);
-#if 0
+#if 1
 	for (i = 0; i < arg->peer_ht_rates.num_rates; i++) {
-		ath10k_warn(ar, "  %d: MCS %d\n", i, arg->peer_ht_rates.rates[i]);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "  %d: MCS %d\n",
+		    i, arg->peer_ht_rates.rates[i]);
 	}
 #endif
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
@@ -3025,66 +3049,93 @@ ath10k_peer_assoc_h_vht_limit(u16 tx_mcs_set,
 }
 #endif
 
-#if 0
 static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
-				    struct ieee80211_vif *vif,
-				    struct ieee80211_sta *sta,
+				    struct ieee80211vap *vif,
+				    struct ieee80211_node *sta,
 				    struct wmi_peer_assoc_complete_arg *arg)
 {
-	const struct ieee80211_sta_vht_cap *vht_cap = &sta->vht_cap;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
-	struct cfg80211_chan_def def;
-	enum ieee80211_band band;
-	const u16 *vht_mcs_mask;
+	struct ieee80211_ie_vhtcap vhtcap;
+//	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+//	struct cfg80211_chan_def def;
+//	enum ieee80211_band band;
+//	const u16 *vht_mcs_mask;
+	uint32_t vht_cap;
 	u8 ampdu_factor;
 
+#if 0
 	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
 		return;
+#endif
 
-	if (!vht_cap->vht_supported)
+	ieee80211_vht_get_vhtcap_ie(sta, &vhtcap, 1);
+
+	vht_cap = vhtcap.vht_cap_info;
+
+	if (! IEEE80211_IS_CHAN_VHT(sta->ni_chan)) {
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac vht not a VHT channel\n", __func__);
 		return;
+	}
 
+	if (! (sta->ni_flags & IEEE80211_NODE_VHT)) {
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac HTC_VHT not set (vhtcap 0x%08x)\n", __func__, vht_cap);
+		return;
+	}
+
+#if 0
 	band = def.chan->band;
 	vht_mcs_mask = arvif->bitrate_mask.control[band].vht_mcs;
 
 	if (ath10k_peer_assoc_h_vht_masked(vht_mcs_mask))
 		return;
+#endif
 
 	arg->peer_flags |= WMI_PEER_VHT;
 
-	if (def.chan->band == IEEE80211_BAND_2GHZ)
+	if (IEEE80211_IS_CHAN_2GHZ(sta->ni_chan))
 		arg->peer_flags |= WMI_PEER_VHT_2G;
 
-	arg->peer_vht_caps = vht_cap->cap;
+	/*
+	 * XXX TODO: should this include limiting things to what
+	 * the negotiated set is, rather than just blindly trusting
+	 * the peer?
+	 */
 
-	ampdu_factor = (vht_cap->cap &
-			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
-		       IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT;
+	arg->peer_vht_caps = vht_cap;
+
+	ampdu_factor = (vht_cap &
+			IEEE80211_VHTCAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
+		       IEEE80211_VHTCAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT;
 
 	/* Workaround: Some Netgear/Linksys 11ac APs set Rx A-MPDU factor to
 	 * zero in VHT IE. Using it would result in degraded throughput.
 	 * arg->peer_max_mpdu at this point contains HT max_mpdu so keep
 	 * it if VHT max_mpdu is smaller. */
 	arg->peer_max_mpdu = max(arg->peer_max_mpdu,
-				 (1U << (IEEE80211_HT_MAX_AMPDU_FACTOR +
+				 (1U << (/* IEEE80211_HT_MAX_AMPDU_FACTOR */ 13 +
 					ampdu_factor)) - 1);
 
-	if (sta->bandwidth == IEEE80211_STA_RX_BW_80)
+	if (IEEE80211_IS_CHAN_VHT80(sta->ni_chan))
 		arg->peer_flags |= WMI_PEER_80MHZ;
 
-	arg->peer_vht_rates.rx_max_rate =
-		__le16_to_cpu(vht_cap->vht_mcs.rx_highest);
-	arg->peer_vht_rates.rx_mcs_set =
-		__le16_to_cpu(vht_cap->vht_mcs.rx_mcs_map);
-	arg->peer_vht_rates.tx_max_rate =
-		__le16_to_cpu(vht_cap->vht_mcs.tx_highest);
-	arg->peer_vht_rates.tx_mcs_set = ath10k_peer_assoc_h_vht_limit(
-		__le16_to_cpu(vht_cap->vht_mcs.tx_mcs_map), vht_mcs_mask);
+	arg->peer_vht_rates.rx_max_rate = vhtcap.supp_mcs.rx_highest;
+	arg->peer_vht_rates.rx_mcs_set = vhtcap.supp_mcs.rx_mcs_map;
+	arg->peer_vht_rates.tx_max_rate = vhtcap.supp_mcs.tx_highest;
+	arg->peer_vht_rates.tx_mcs_set = vhtcap.supp_mcs.tx_mcs_map;
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %6D max_mpdu %d flags 0x%x\n",
-		   sta->addr, ":", arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac vht peer %6D peer-vhtcaps 0x%08x "
+	    "vhtcaps 0x%08x max_mpdu %d flags 0x%x\n",
+	    sta->ni_macaddr, ":", sta->ni_vhtcap,
+	    vht_cap, arg->peer_max_mpdu, arg->peer_flags);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+	    "mac vht peer %6D peer-rxmcs 0x%04x peer-txmcs 0x%04x "
+	    "rxmcs 0x%04x txmcs 0x%04x\n",
+	    sta->ni_macaddr, ":",
+	    sta->ni_vht_mcsinfo.rx_mcs_map,
+	    sta->ni_vht_mcsinfo.tx_mcs_map,
+	    vhtcap.supp_mcs.rx_mcs_map,
+	    vhtcap.supp_mcs.tx_mcs_map);
 }
-#endif
 
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
     struct ieee80211vap *vif, struct ieee80211_node *ni,
@@ -3216,7 +3267,7 @@ ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
     struct wmi_peer_assoc_complete_arg *arg)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
-	struct ieee80211_channel *c = ic->ic_curchan;
+	struct ieee80211_channel *c = ic->ic_curchan; /* XXX ni->ni_chan? */
 	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	enum wmi_phy_mode phymode = MODE_UNKNOWN;
 
@@ -3243,10 +3294,9 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	ath10k_peer_assoc_h_crypto(ar, vif, ni, arg, is_run);
 	ath10k_peer_assoc_h_rates(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_ht(ar, vif, ni, arg);
-	//ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
+	ath10k_peer_assoc_h_vht(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, ni, arg);
 	ath10k_peer_assoc_h_phymode_freebsd(ar, vif, ni, arg);
-	ath10k_warn(ar, "%s: TODO: finish WEP crypto, vht!\n", __func__);
 	return 0;
 }
 
@@ -3276,10 +3326,9 @@ static int ath10k_setup_peer_smps(struct ath10k *ar, struct ath10k_vif *arvif,
 					 ath10k_smps_map[smps]);
 }
 
-#if 0
 static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
-				      struct ieee80211_vif *vif,
-				      struct ieee80211_sta_vht_cap vht_cap)
+				      struct ieee80211vap *vif,
+				      uint32_t vht_cap_info)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
@@ -3290,10 +3339,10 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 		return 0;
 
 	if (!(ar->vht_cap_info &
-	      (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
-	       IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE |
-	       IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
-	       IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)))
+	      (IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE |
+	       IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE |
+	       IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE |
+	       IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)))
 		return 0;
 
 	param = ar->wmi.vdev_param->txbf;
@@ -3307,22 +3356,22 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 	 */
 
 	if (ar->vht_cap_info &
-	    (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
-	     IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)) {
-		if (vht_cap.cap & IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE)
+	    (IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE |
+	     IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE)) {
+		if (vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFEE;
 
-		if (vht_cap.cap & IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)
+		if (vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_MU_TX_BFEE;
 	}
 
 	if (ar->vht_cap_info &
-	    (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
-	     IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)) {
-		if (vht_cap.cap & IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE)
+	    (IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE |
+	     IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)) {
+		if (vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFER;
 
-		if (vht_cap.cap & IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)
+		if (vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE)
 			value |= WMI_VDEV_PARAM_TXBF_MU_TX_BFER;
 	}
 
@@ -3341,7 +3390,6 @@ static int ath10k_mac_vif_recalc_txbf(struct ath10k *ar,
 
 	return 0;
 }
-#endif
 
 /*
  * XXX adrian - I /think/ this is the "join a BSS" as a station
@@ -3354,6 +3402,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct ieee80211_sta_ht_cap ht_cap;
 //	struct ieee80211_sta_vht_cap vht_cap;
+	uint32_t vhtcap;
 	struct wmi_peer_assoc_complete_arg peer_arg;
 	int ret;
 
@@ -3366,6 +3415,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	/* XXX ADRIAN: TODO: do this early; or arvif->bssid is 00:00:00:00:00:00 */
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
+	arvif->aid = IEEE80211_AID(ni->ni_associd);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i assoc bssid %6D aid %d\n",
 		   arvif->vdev_id, arvif->bssid, ":", arvif->aid);
@@ -3374,6 +3424,12 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	 * before calling ath10k_setup_peer_smps() which might sleep. */
 //	htcap = ap_sta->ht_cap;
 //	vht_cap = ap_sta->vht_cap;
+
+	if (IEEE80211_IS_CHAN_VHT(ni->ni_chan)) {
+		vhtcap = ni->ni_vhtcap;
+	} else {
+		vhtcap = 0;
+	}
 
 	ret = ath10k_peer_assoc_prepare(ar, vif, ni, &peer_arg, is_run);
 	if (ret) {
@@ -3396,16 +3452,12 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 		return;
 	}
 
-#if 0
-	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
+	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vhtcap);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %6D: %d\n",
-			    arvif->vdev_id, bss_conf->bssid, ":", ret);
+			    arvif->vdev_id, ni->ni_macaddr, ":", ret);
 		return;
 	}
-#else
-	ath10k_warn(ar, "%s: TODO: vhtcap\n", __func__);
-#endif
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 		   "mac vdev %d up (associated) bssid %6D aid %d\n",
@@ -3417,7 +3469,7 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
 	/* Note: if we haven't restarted the vdev before here; this causes a firmware panic */
-	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, ni->ni_associd, arvif->bssid);
+	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, arvif->aid, arvif->bssid);
 	if (ret) {
 		ath10k_warn(ar, "failed to set vdev %d up: %d\n",
 			    arvif->vdev_id, ret);
@@ -3460,16 +3512,12 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
 
 	arvif->def_wep_key_idx = -1;
 
-#if 0
-	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vht_cap);
+	ret = ath10k_mac_vif_recalc_txbf(ar, vif, 0);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc txbf for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 		return;
 	}
-#else
-	ath10k_warn(ar, "%s: TODO: txbf/vht_cap\n", __func__);
-#endif
 	arvif->is_up = false;
 
 	callout_drain(&arvif->connection_loss_work);
@@ -3738,11 +3786,17 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 		ch->allow_ht = true;
 		ch->allow_vht = true;
 		ch->allow_ibss = ! IEEE80211_IS_CHAN_PASSIVE(c);
-		ch->ht40plus = (ieee80211_find_channel(ic, c->ic_freq,
+		/*
+		 * This is cleared by linux wireless if the channel doesn't
+		 * have a HT40+.  For HT40- channels then yes, it's fine.
+		 */
+		ch->ht40plus = !! (ieee80211_find_channel(ic, c->ic_freq,
 		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40U) != NULL);
+		ch->ht40plus |= !! (ieee80211_find_channel(ic, c->ic_freq,
+		    IEEE80211_CHAN_HT | IEEE80211_CHAN_HT40D) != NULL);
+
 		ch->chan_radar = !! IEEE80211_IS_CHAN_RADAR(c);
 		ch->passive = IEEE80211_IS_CHAN_PASSIVE(c);
-
 
 		ch->freq = ieee80211_get_channel_center_freq(c);
 		ch->band_center_freq1 = ieee80211_get_channel_center_freq(c);
@@ -5198,45 +5252,41 @@ static u32 get_nss_from_chainmask(u16 chain_mask)
 
 static int ath10k_mac_set_txbf_conf(struct ath10k_vif *arvif)
 {
-#if 0
+#define	SM(_v, _f)	(((_v) << _f##_LSB) & _f##_MASK)
 	u32 value = 0;
 	struct ath10k *ar = arvif->ar;
 
 	if (ath10k_wmi_get_txbf_conf_scheme(ar) != WMI_TXBF_CONF_BEFORE_ASSOC)
 		return 0;
 
-	if (ar->vht_cap_info & (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
-				IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE))
+	if (ar->vht_cap_info & (IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE |
+				IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE))
 		value |= SM((ar->num_rf_chains - 1), WMI_TXBF_STS_CAP_OFFSET);
 
-	if (ar->vht_cap_info & (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
-				IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE))
+	if (ar->vht_cap_info & (IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE |
+				IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE))
 		value |= SM((ar->num_rf_chains - 1), WMI_BF_SOUND_DIM_OFFSET);
 
 	if (!value)
 		return 0;
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMER_CAPABLE)
 		value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFER;
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMER_CAPABLE)
 		value |= (WMI_VDEV_PARAM_TXBF_MU_TX_BFER |
 			  WMI_VDEV_PARAM_TXBF_SU_TX_BFER);
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_SU_BEAMFORMEE_CAPABLE)
 		value |= WMI_VDEV_PARAM_TXBF_SU_TX_BFEE;
 
-	if (ar->vht_cap_info & IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)
+	if (ar->vht_cap_info & IEEE80211_VHTCAP_MU_BEAMFORMEE_CAPABLE)
 		value |= (WMI_VDEV_PARAM_TXBF_MU_TX_BFEE |
 			  WMI_VDEV_PARAM_TXBF_SU_TX_BFEE);
 
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
 					 ar->wmi.vdev_param->txbf, value);
-#else
-	struct ath10k *ar = arvif->ar;
-	ath10k_warn(ar, "%s: TODO: we may /need/ some TXBF setup!!\n", __func__);
-	return (0);
-#endif
+#undef	SM
 }
 
 /*

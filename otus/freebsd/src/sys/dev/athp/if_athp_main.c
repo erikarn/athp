@@ -1825,8 +1825,14 @@ athp_setup_channels(struct ath10k *ar)
 
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11A);
-		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
+		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
+			ath10k_warn(ar, "%s: enabling HT/VHT rates\n", __func__);
 			setbit(bands, IEEE80211_MODE_11NA);
+			setbit(bands, IEEE80211_MODE_VHT_5GHZ);
+		}
+		/*
+		 * XXX TODO: need to pass in VHT80 flag.
+		 */
 		ieee80211_add_channel_list_5ghz(chans, IEEE80211_CHAN_MAX,
 		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
 		    bands, ht40);
@@ -1987,20 +1993,50 @@ athp_attach_11n(struct ath10k *ar)
 	    | IEEE80211_HTC_AMPDU
 	    | IEEE80211_HTC_AMSDU
 	    | IEEE80211_HTCAP_CHWIDTH40
-	    | IEEE80211_HTCAP_MAXAMSDU_3839
-	    | IEEE80211_HTCAP_SMPS_OFF;
+	    ;
 
+	/*
+	 * Take maximum AMSDU from VHT capabilities.
+	 *
+	 * If it's anything other than 0 (3839 bytes) then
+	 * set the HT cap to at least that.
+	 */
+	if (ar->vht_cap_info & WMI_VHT_CAP_MAX_MPDU_LEN_MASK) {
+	    ic->ic_htcaps |= IEEE80211_HTCAP_MAXAMSDU_7935;
+	} else {
+	    ic->ic_htcaps |= IEEE80211_HTCAP_MAXAMSDU_3839;
+	}
+
+	/*
+	 * XXX TODO: L-Sig txop protection if in WMI capabilities.
+	 * XXX TODO: DSSSCCK40 - always
+	 * XXX TODO: Sup-width 2040 - always
+	 */
+
+	/*
+	 * Guard interval.
+	 */
 	if (ar->ht_cap_info & WMI_HT_CAP_HT20_SGI)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI20;
 	if (ar->ht_cap_info & WMI_HT_CAP_HT40_SGI)
 		ic->ic_htcaps |= IEEE80211_HTCAP_SHORTGI40;
 
-	/* STBC - 1x for now */
+	/*
+	 * XXX SMPS (will need to be able to drive SMPS changes
+	 * through the newassoc API or something newer.)
+	 */
+	ic->ic_htcaps |= IEEE80211_HTCAP_SMPS_OFF;
+
+	/*
+	 * STBC
+	 * XXX TODO: pull from capabilities
+	 */
 	ic->ic_htcaps |= IEEE80211_HTCAP_RXSTBC_1STREAM;
 	ic->ic_htcaps |= IEEE80211_HTCAP_TXSTBC;
 
 	/* LDPC */
-	ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
+	if (ar->ht_cap_info & WMI_HT_CAP_LDPC);
+		ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
 
 	/* XXX TODO: max ampdu size / density; but is per-vap */
 
@@ -2011,6 +2047,47 @@ athp_attach_11n(struct ath10k *ar)
 	    __func__,
 	    ic->ic_txstream,
 	    ic->ic_rxstream);
+}
+
+static void
+athp_attach_11ac(struct ath10k *ar)
+{
+	struct ieee80211com *ic = &ar->sc_ic;
+	uint16_t m;
+	int i;
+
+	/* Grab VHT capability information from firmware */
+	ic->ic_vhtcaps = ar->vht_cap_info;
+
+	/*
+	 * XXX TODO: check ath10k/mac.c for beamform additions -
+	 * we need to add the number of active rf chains into
+	 * vhtcaps.
+	 *
+	 * see ath10k_create_vht_cap() for more details.
+	 */
+
+	/* XXX opmode? */
+
+	/*
+	 * Populate the rate information based on the number
+	 * of radio chains.  This chip supports MCS0..9 for each
+	 * stream.
+	 */
+	m = 0;
+	for (i = 0; i < 8; i++) {
+		if (i < ar->num_rf_chains)
+			m = m | (IEEE80211_VHT_MCS_SUPPORT_0_9 << (i*2));
+		else
+			m = m | (IEEE80211_VHT_MCS_NOT_SUPPORTED << (i*2));
+	}
+	ic->ic_vht_mcsinfo.rx_mcs_map = m;
+	ic->ic_vht_mcsinfo.rx_highest = 0;
+	ic->ic_vht_mcsinfo.tx_mcs_map = m;
+	ic->ic_vht_mcsinfo.tx_highest = 0;
+
+	device_printf(ar->sc_dev, "%s: MCS map=0x%04x; vhtcap=0x%08x\n",
+	    __func__, m, ar->vht_cap_info);
 }
 
 /*
@@ -2103,6 +2180,7 @@ athp_attach_net80211(struct ath10k *ar)
 	/* Initial 11n state; capabilities */
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
 		athp_attach_11n(ar);
+		athp_attach_11ac(ar);
 	}
 
 	/* radiotap attach */
