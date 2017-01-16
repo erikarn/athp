@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015, The Linux Foundation. All rights reserved.
- * Copyright (c) 2016, Adrian Chadd.
+ * Copyright (c) 2016-2017, Adrian Chadd.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
