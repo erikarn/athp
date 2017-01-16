@@ -2035,7 +2035,7 @@ athp_attach_11n(struct ath10k *ar)
 	ic->ic_htcaps |= IEEE80211_HTCAP_TXSTBC;
 
 	/* LDPC */
-	if (ar->ht_cap_info & WMI_HT_CAP_LDPC);
+	if (ar->ht_cap_info & WMI_HT_CAP_LDPC)
 		ic->ic_htcaps |= IEEE80211_HTCAP_LDPC;
 
 	/* XXX TODO: max ampdu size / density; but is per-vap */
