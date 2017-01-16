@@ -2715,11 +2715,16 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	struct ath10k *ar = htt->ar;
 	struct htt_resp *resp;
 	struct athp_buf *skb;
+	athp_buf_head ah;
 
 	/* XXX TODO: migrate this to "grab list" under the lock */
+	TAILQ_INIT(&ah);
 	ATHP_HTT_TX_COMP_LOCK(htt);
-	while ((skb = TAILQ_FIRST(&htt->tx_compl_q))) {
-		TAILQ_REMOVE(&htt->tx_compl_q, skb, next);
+	TAILQ_CONCAT(&ah, &htt->tx_compl_q, next);
+	ATHP_HTT_TX_COMP_UNLOCK(htt);
+
+	while ((skb = TAILQ_FIRST(&ah))) {
+		TAILQ_REMOVE(&ah, skb, next);
 		/*
 		 * Note - these are TX frame completion notifications;
 		 * but they're RX HTC messages.
@@ -2727,7 +2732,6 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 		ath10k_htt_rx_frm_tx_compl(htt->ar, skb);
 		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
-	ATHP_HTT_TX_COMP_UNLOCK(htt);
 
 	ATHP_HTT_RX_LOCK(htt);
 	while ((skb = TAILQ_FIRST(&htt->rx_compl_q))) {
