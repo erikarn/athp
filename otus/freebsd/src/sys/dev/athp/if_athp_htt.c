@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2015 Adrian Chadd <adrian@FreeBSD.org>
+ * Copyright (c) 2015-2017 Adrian Chadd <adrian@FreeBSD.org>
+ * Copyright (c) 2005-2011 Atheros Communications Inc.
+ * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -12,10 +14,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * Playground for QCA988x chipsets.
  */
 
 #include <sys/cdefs.h>

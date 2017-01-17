@@ -14,10 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * Playground for QCA988x chipsets.
- */
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
