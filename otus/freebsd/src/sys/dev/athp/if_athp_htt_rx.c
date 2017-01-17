@@ -758,7 +758,6 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 	htt->rx_ring.paddrs_ring = htt->rx_ring.paddrs_dd.dd_desc;
 	htt->rx_ring.base_paddr = htt->rx_ring.paddrs_dd.dd_desc_paddr;
 
-
 	htt->rx_ring.alloc_idx.vaddr = htt->rx_ring.alloc_idx.dd.dd_desc;
 	htt->rx_ring.alloc_idx.paddr = htt->rx_ring.alloc_idx.dd.dd_desc_paddr;
 	htt->rx_ring.sw_rd_idx.msdu_payld = htt->rx_ring.size_mask;
@@ -769,6 +768,11 @@ int ath10k_htt_rx_alloc(struct ath10k_htt *htt)
 		    device_get_nameunit(ar->sc_dev));
 		mtx_init(&htt->rx_ring.lock, htt->rx_ring.lock_buf,
 		    "athp rx htt", MTX_DEF);
+
+		snprintf(htt->rx_ring.comp_lock_buf, 16, "%s:htt_rx_comp",
+		    device_get_nameunit(ar->sc_dev));
+		mtx_init(&htt->rx_ring.comp_lock, htt->rx_ring.comp_lock_buf,
+		    "athp rx_comp htt", MTX_DEF);
 
 		/* Initialize the Rx refill retry timer */
 		callout_init_mtx(timer, &htt->rx_ring.lock, 0);
@@ -2577,9 +2581,9 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_IND:
-		ATHP_HTT_RX_LOCK(htt);
+		ATHP_HTT_RX_COMP_LOCK(htt);
 		TAILQ_INSERT_TAIL(&htt->rx_compl_q, skb, next);
-		ATHP_HTT_RX_UNLOCK(htt);
+		ATHP_HTT_RX_COMP_UNLOCK(htt);
 		taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
 		return;
 	case HTT_T2H_MSG_TYPE_PEER_MAP: {
@@ -2681,9 +2685,9 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_IN_ORD_PADDR_IND: {
-		ATHP_HTT_RX_LOCK(htt);
+		ATHP_HTT_RX_COMP_LOCK(htt);
 		TAILQ_INSERT_TAIL(&htt->rx_in_ord_compl_q, skb, next);
-		ATHP_HTT_RX_UNLOCK(htt);
+		ATHP_HTT_RX_COMP_UNLOCK(htt);
 		taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
 		break;
 	}
@@ -2715,7 +2719,7 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	struct ath10k *ar = htt->ar;
 	struct htt_resp *resp;
 	struct athp_buf *skb;
-	athp_buf_head ah;
+	athp_buf_head ah, af;
 
 	TAILQ_INIT(&ah);
 	ATHP_HTT_TX_COMP_LOCK(htt);
@@ -2737,18 +2741,58 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	 * said RX lock across all the net80211, ethernet,
 	 * IP/TCP/etc stack processing.  This is a lot of lock holding!
 	 */
+
+	TAILQ_INIT(&ah);
+	TAILQ_INIT(&af);
+	ATHP_HTT_RX_COMP_LOCK(htt);
+	TAILQ_CONCAT(&ah, &htt->rx_compl_q, next);
+	ATHP_HTT_RX_COMP_UNLOCK(htt);
+
 	ATHP_HTT_RX_LOCK(htt);
-	while ((skb = TAILQ_FIRST(&htt->rx_compl_q))) {
-		TAILQ_REMOVE(&htt->rx_compl_q, skb, next);
+	while ((skb = TAILQ_FIRST(&ah))) {
+		TAILQ_REMOVE(&ah, skb, next);
 		resp = (struct htt_resp *)mbuf_skb_data(skb->m);
 		ath10k_htt_rx_handler(htt, &resp->rx_ind);
+		TAILQ_INSERT_TAIL(&af, skb, next);
+	}
+	ATHP_HTT_RX_UNLOCK(htt);
+
+	/* XXX maybe push ath_freebuf out of that lock? */
+	while ((skb = TAILQ_FIRST(&af))) {
+		TAILQ_REMOVE(&af, skb, next);
 		athp_freebuf(ar, &ar->buf_rx, skb);
 	}
 
-	while ((skb = TAILQ_FIRST(&htt->rx_in_ord_compl_q))) {
-		TAILQ_REMOVE(&htt->rx_in_ord_compl_q, skb, next);
+	TAILQ_INIT(&ah);
+	TAILQ_INIT(&af);
+	ATHP_HTT_RX_COMP_LOCK(htt);
+	TAILQ_CONCAT(&ah, &htt->rx_in_ord_compl_q, next);
+	ATHP_HTT_RX_COMP_UNLOCK(htt);
+
+	ATHP_HTT_RX_LOCK(htt);
+	while ((skb = TAILQ_FIRST(&ah))) {
+		TAILQ_REMOVE(&ah, skb, next);
 		ath10k_htt_rx_in_ord_ind(ar, skb);
-		athp_freebuf(ar, &ar->buf_rx, skb);
+		TAILQ_INSERT_TAIL(&af, skb, next);
 	}
 	ATHP_HTT_RX_UNLOCK(htt);
+
+	/* XXX maybe push ath_freebuf out of that lock? */
+	while ((skb = TAILQ_FIRST(&af))) {
+		TAILQ_REMOVE(&af, skb, next);
+		athp_freebuf(ar, &ar->buf_rx, skb);
+	}
+
+	/* Reschedule if there's anything left to do */
+	ATHP_HTT_RX_COMP_LOCK(htt);
+		if (! TAILQ_EMPTY(&htt->rx_compl_q))
+			taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
+		if (! TAILQ_EMPTY(&htt->rx_in_ord_compl_q))
+			taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
+	ATHP_HTT_RX_COMP_UNLOCK(htt);
+
+	ATHP_HTT_TX_COMP_LOCK(htt);
+		if (! TAILQ_EMPTY(&htt->tx_compl_q))
+			taskqueue_enqueue(ar->workqueue, &htt->txrx_compl_task);
+	ATHP_HTT_TX_COMP_UNLOCK(htt);
 }
