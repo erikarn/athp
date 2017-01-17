@@ -60,6 +60,11 @@ struct ath10k_htt_txbuf {
 #define	ATHP_HTT_RX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_OWNED)
 #define	ATHP_HTT_RX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_NOTOWNED)
 
+#define	ATHP_HTT_RX_COMP_LOCK(htt)		mtx_lock(&(htt)->rx_ring.comp_lock)
+#define	ATHP_HTT_RX_COMP_UNLOCK(htt)		mtx_unlock(&(htt)->rx_ring.comp_lock)
+#define	ATHP_HTT_RX_COMP_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.comp_lock, MA_OWNED)
+#define	ATHP_HTT_RX_COMP_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.comp_lock, MA_NOTOWNED)
+
 #define	ATHP_RX_SKB_HASH_BUCKET_COUNT	32
 
 struct ath10k_htt {
@@ -157,6 +162,9 @@ struct ath10k_htt {
 		/* Protects access to all rx ring buffer state variables */
 		struct mtx lock;
 		char lock_buf[16];
+
+		struct mtx comp_lock;
+		char comp_lock_buf[16];
 	} rx_ring;
 
 	unsigned int prefetch_len;
