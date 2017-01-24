@@ -1257,9 +1257,6 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	if (! TAILQ_EMPTY(&ic->ic_vaps))
 		return (NULL);
 
-	/* XXX TODO: figure out what we need to implement! */
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
-
 	/* We have to bring up the hardware if it isn't yet */
 	if (TAILQ_EMPTY(&ic->ic_vaps)) {
 		/*
@@ -1344,6 +1341,8 @@ athp_vap_delete(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *uvp = ath10k_vif_to_arvif(vap);
+	struct ieee80211vap *v;
+	int n;
 
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
@@ -1422,7 +1421,20 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * will have to check that we're running and error out as
 	 * appropriate.
 	 */
-	ath10k_stop(ar);
+
+	/*
+	 * For multi-VAP support (eventually) - only stop the hardware
+	 * if we're shutting down our last VAP.
+	 */
+	n = 0;
+	/* XXX Locking (ieee80211com) */
+	/* XXX make a net80211 method w/ locking */
+	TAILQ_FOREACH(v, &ic->ic_vaps, iv_next) {
+		n++;
+	}
+
+	if (n == 1)
+		ath10k_stop(ar);
 
 	/*
 	 * Detaching the VAP at this point may generate other events,
