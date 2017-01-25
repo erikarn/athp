@@ -560,6 +560,8 @@ ath10k_fw_stats_open(struct ath10k *ar)
 	printf("%s\n", buf);
 	free(buf, M_TEMP);
 
+	ath10k_debug_fw_stats_reset(ar);
+
 	return 0;
 
 err_free:
@@ -567,6 +569,7 @@ err_free:
 
 err_unlock:
 	ATHP_CONF_UNLOCK(ar);
+	ath10k_debug_fw_stats_reset(ar);
 	return ret;
 }
 
