@@ -5199,6 +5199,8 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 			txpower = min(txpower, arvif->txpower);
 	}
 
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac txpower recalc: %d\n", txpower);
+
 	if (WARN_ON(txpower == -1))
 		return -EINVAL;
 
@@ -5564,7 +5566,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	}
 
 	/* XXX TODO: txpower default? */
-	arvif->txpower = 30;	/* 30dBm? It's just a hard-default for now; fix later */
+	arvif->txpower = 15;	/* 15dBm starting point */
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
@@ -8705,7 +8707,7 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 			ATHP_DATA_UNLOCK(ar);
 		}
 
-		/* Recalculate TX power - this is in dBm */
+		/* Recalculate TX power */
 		arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
 		ret = ath10k_mac_txpower_recalc(ar);
 		if (ret)
