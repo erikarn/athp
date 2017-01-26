@@ -1692,6 +1692,8 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 	hdr_len = ieee80211_anyhdrsize(hdr);
 	memcpy(first_hdr, hdr, hdr_len);
 
+	ath10k_dbg_dump(ar, ATH10K_DBG_RECV, "hdr", "", hdr, 64);
+
 	/* Each A-MSDU subframe will use the original header as the base and be
 	 * reported as a separate MSDU so strip the A-MSDU bit from QoS Ctl.
 	 */
