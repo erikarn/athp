@@ -35,7 +35,7 @@
 #define	ATHP_TXBUF_MAX_SCATTER	1
 /* XXX upped these from 1024 */
 #define	ATHP_RX_LIST_COUNT	2048
-#define	ATHP_TX_LIST_COUNT	2048
+#define	ATHP_TX_LIST_COUNT	1024
 
 /*
  * XXX TODO: key updates with the vap pointer like this is

@@ -229,6 +229,19 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	    __func__,
 	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":", is_wep, is_qos);
 
+	/* Allocate a TX mbuf */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		ar->sc_stats.xmit_fail_get_pbuf++;
+//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+		m_freem(m0);
+		athp_tx_exit(ar);
+		return (ENOBUFS);
+	}
+
+	/*
+	 * Note - this may change the buffer.
+	 */
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
 		m_freem(m0);
@@ -252,16 +265,6 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (ENOBUFS);
 	}
 	m0 = NULL;
-
-	/* Allocate a TX mbuf */
-	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
-	if (pbuf == NULL) {
-		ar->sc_stats.xmit_fail_get_pbuf++;
-//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
-		m_freem(m);
-		athp_tx_exit(ar);
-		return (ENOBUFS);
-	}
 
 	/* Put the mbuf into the given pbuf */
 	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
@@ -419,11 +422,32 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		return (ENXIO);
 	}
 
+	/*
+	 * Allocate a TX mbuf.
+	 *
+	 * Do this early so we error out whilst we can tell the upper layer
+	 * we can't queue this and before we potentially modify the mbuf.
+	 */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		ar->sc_stats.xmit_fail_get_pbuf++;
+//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (ENOBUFS);
+	}
+
+	/*
+	 * At this point the buffer may be modified, so we can't
+	 * return an error up the stack as the interface expects
+	 * the mbuf hasn't been modified.
+	 */
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
-		return (ENXIO);
+		m_freem(m0);
+		return (0);
 	}
 
 	/*
@@ -439,19 +463,10 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 //		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
-		return (ENOBUFS);
+		m_freem(m0);
+		return (0);
 	}
 	m0 = NULL;
-
-	/* Allocate a TX mbuf */
-	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
-	if (pbuf == NULL) {
-		ar->sc_stats.xmit_fail_get_pbuf++;
-//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
-		athp_tx_exit(ar);
-		trace_ath10k_transmit(ar, 0, 0);
-		return (ENOBUFS);
-	}
 
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
 	    "%s: called; ni=%p, m=%p; pbuf=%p, ni.macaddr=%6D; iswep=%d, isqos=%d, seqno=0x%04x\n",
@@ -1298,6 +1313,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* A-MPDU density/maximum size */
 	vap->iv_ampdu_density = IEEE80211_HTCAP_MPDUDENSITY_8;
 	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
+	vap->iv_ampdu_limit = IEEE80211_HTCAP_MAXRXAMPDU_64K;
 
 	/* Override vap methods */
 	uvp->av_newstate = vap->iv_newstate;
@@ -1921,6 +1937,7 @@ athp_attach_sysctl(struct ath10k *ar)
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "fw_stats",
 	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_fw_stats, "I", "");
 
+	/* statistics */
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_msdu_invalid_len, "");
 	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_short_len", CTLFLAG_RD,
@@ -2066,6 +2083,7 @@ athp_attach_11ac(struct ath10k *ar)
 
 	/* Grab VHT capability information from firmware */
 	ic->ic_vhtcaps = ar->vht_cap_info;
+	ic->ic_flags_ext |= IEEE80211_FEXT_VHT;
 
 	/*
 	 * XXX TODO: check ath10k/mac.c for beamform additions -
@@ -2093,9 +2111,10 @@ athp_attach_11ac(struct ath10k *ar)
 	ic->ic_vht_mcsinfo.rx_highest = 0;
 	ic->ic_vht_mcsinfo.tx_mcs_map = m;
 	ic->ic_vht_mcsinfo.tx_highest = 0;
-
+#if 0
 	device_printf(ar->sc_dev, "%s: MCS map=0x%04x; vhtcap=0x%08x\n",
 	    __func__, m, ar->vht_cap_info);
+#endif
 }
 
 /*
@@ -2142,7 +2161,10 @@ athp_attach_net80211(struct ath10k *ar)
 	}
 
 	/* capabilities, etc */
-	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD;
+	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD
+	    | IEEE80211_FEXT_FRAG_OFFLOAD
+//	    | IEEE80211_FEXT_SEQNO_OFFLOAD
+	    ;
 
 	/* XXX 11n bits */
 
