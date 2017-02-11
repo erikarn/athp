@@ -83,6 +83,9 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_mac2.h"
 #include "if_athp_hif.h"
 
+#include "if_athp_wmi_ops.h"	/* for now, debug firmware crash simulation */
+#include "hal/linux_skb.h"
+
 #include "if_athp_main.h"
 #include "if_athp_taskq.h"
 #include "if_athp_trace.h"
@@ -1914,6 +1917,81 @@ athp_sysctl_trace_enable(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
+static int
+ath10k_debug_fw_assert(struct ath10k *ar)
+{
+	struct wmi_vdev_install_key_cmd *cmd;
+	struct athp_buf *pbuf;
+
+	pbuf = ath10k_wmi_alloc_skb(ar, sizeof(*cmd) + 16);
+	if (pbuf == NULL)
+		return (EINVAL);
+	cmd = (void *) mbuf_skb_data(pbuf->m);
+	memset(cmd, 0, sizeof(*cmd));
+
+	/* big enough number so firmware asserts */
+	cmd->vdev_id = __cpu_to_le32(0x7ffe);
+
+	return ath10k_wmi_cmd_send(ar,pbuf,
+	    ar->wmi.cmd->vdev_install_key_cmdid);
+}
+
+static int
+athp_sysctl_simulate_fw_hang(SYSCTL_HANDLER_ARGS)
+{
+	struct ath10k *ar = arg1;
+	int error, val, ret;
+
+	val = (ar->sc_trace.active);
+
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || !req->newptr) {
+		return (error);
+	}
+
+	/*
+	 * 1 - soft crash
+	 * 2 - hard crash
+	 * 3 - assert
+	 * 4 - hw-restart
+	 */
+
+	switch (val) {
+	case 1:
+		/* soft crash */
+		ath10k_info(ar, "simulating soft firmware crash\n");
+		ATHP_CONF_LOCK(ar);
+		ret = ath10k_wmi_force_fw_hang(ar, WMI_FORCE_FW_HANG_ASSERT, 0);
+		ATHP_CONF_UNLOCK(ar);
+		break;
+	case 2:
+		/* hard crash */
+		ath10k_info(ar, "simulating hard firmware crash\n");
+		ATHP_CONF_LOCK(ar);
+		ret = ath10k_wmi_vdev_set_param(ar, 0x7fff,
+		    ar->wmi.vdev_param->rts_threshold,
+		    0);
+		ATHP_CONF_UNLOCK(ar);
+		break;
+	case 3:
+		/* assert */
+		ath10k_info(ar, "simulating firmware assert\n");
+		ATHP_CONF_LOCK(ar);
+		ret = ath10k_debug_fw_assert(ar);
+		ATHP_CONF_UNLOCK(ar);
+		break;
+	case 4:
+		/* hw restart */
+		ath10k_info(ar, "simulating core restart\n");
+		taskqueue_enqueue(ar->workqueue, &ar->restart_work);
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (0);
+}
+
 
 void
 athp_attach_sysctl(struct ath10k *ar)
@@ -1973,6 +2051,10 @@ athp_attach_sysctl(struct ath10k *ar)
 	    CTLFLAG_RW, &ar->sc_dbglog_module, 0, "Debuglog module mask");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "dbglog_module_level",
 	    CTLFLAG_RW, &ar->sc_dbglog_level, 0, "Debuglog module level");
+
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "simulate_fw_hang",
+	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_simulate_fw_hang,
+	    "I", "");
 }
 
 /*
