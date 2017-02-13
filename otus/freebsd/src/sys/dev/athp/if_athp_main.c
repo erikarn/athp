@@ -208,6 +208,12 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (ENXIO);
 	}
 
+	if (! arvif->is_setup) {
+		athp_tx_exit(ar);
+		m_freem(m0);
+		return (ENXIO);
+	}
+
 	arsta = ATHP_NODE(ni);
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
@@ -370,9 +376,6 @@ finish:
  * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
  *
  * XXX TODO: handle fragmented frame list
- *
- * XXX TODO: we shouldn't transmit a frame if there's no peer setup
- * for it!
  */
 static int
 athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
@@ -406,6 +409,12 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	 */
 	athp_tx_enter(ar);
 	if (athp_tx_disabled(ar)) {
+		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (ENXIO);
+	}
+
+	if (! arvif->is_setup) {
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
@@ -509,17 +518,70 @@ athp_parent(struct ieee80211com *ic)
 {
 	struct ath10k *ar = ic->ic_softc;
 
+	ath10k_warn(ar, "%s: called; nrunning=%d\n", __func__, ic->ic_nrunning);
+
 	/* XXX TODO: add conf lock */
+
+	/*
+	 * If nothing is yet running, power up the chip in preparation for
+	 * VAPs going through a state change.  The first state change that
+	 * occurs will re-create the arvif entry.
+	 */
 	if (ic->ic_nrunning > 0) {
 		/* Track if we're running already */
 		if (ar->sc_isrunning == 0) {
+			int ret;
+
+			/* Power up */
+			ret = ath10k_start(ar);
+			if (ret != 0) {
+				ath10k_err(ar,
+				    "%s: ath10k_start failed; ret=%d\n",
+				    __func__, ret);
+				return;
+			}
+
+			ath10k_warn(ar, "%s: not yet running; start\n", __func__);
 			ieee80211_start_all(ic);
 			ar->sc_isrunning = 1;
 		}
 	}
 
+	/*
+	 * This is the main path for notifying that we've stopped all
+	 * the VAPs.  This is also part of the main path for determining that
+	 * the hardware needs restarting.
+	 *
+	 * So if we get here, power off the hardware and mark the
+	 * VAPs as not-configured.  That way
+	 */
 	if (ic->ic_nrunning == 0) {
+		struct ath10k_vif *uvp;
+		struct ieee80211vap *vap;
 		ar->sc_isrunning = 0;
+		ath10k_warn(ar, "%s: stopped; flush everything and power down\n", __func__);
+
+		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+			uvp = ath10k_vif_to_arvif(vap);
+
+			ATHP_CONF_LOCK(ar);
+			if (! uvp->is_setup) {
+				ATHP_CONF_UNLOCK(ar);
+				continue;
+			}
+
+			/* Wait for active xmit to finish before continuing */
+			ath10k_tx_flush_locked(ar, vap, 0, 1);
+
+			/* Remove the vap from tracking */
+			ath10k_vdev_stop(uvp);
+			ath10k_remove_interface(ar, vap);
+			uvp->is_setup = 0;
+			ATHP_CONF_UNLOCK(ar);
+		}
+
+		/* Everything is shutdown; power off the chip */
+		ath10k_stop(ar);
 	}
 }
 
@@ -630,11 +692,6 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	int error = 0;
 	struct ieee80211_node *bss_ni;
 
-	/* XXX locking */
-	if (vif->is_setup == 0) {
-		ath10k_warn(ar, "%s: !is_setup; skipping!\n", __func__);
-		goto skip;
-	}
 
 	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
 	    ieee80211_state_name[ostate],
@@ -644,6 +701,37 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	bss_ni = ieee80211_ref_node(vap->iv_bss);
 
 	IEEE80211_UNLOCK(ic);
+
+	/*
+	 * If it isn't setup, this is our initial chance to actually add
+	 * the interface and power up the chip as required.
+	 */
+	if (vif->is_setup == 0) {
+		/* XXX TODO - handle flags, like CLONE_BSSID, CLONE_MAC, etc */
+
+		/* call into driver; setup state */
+		ret = ath10k_add_interface(ar, vap,
+		    vap->iv_opmode,
+		    vif->vap_f_flags,
+		    vif->vap_f_bssid,
+		    vif->vap_f_macaddr);
+		if (ret != 0) {
+			ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
+			    __func__, ret);
+
+			/*
+			 * Free the node ref here; we're going to skip the
+			 * rest of processing
+			 */
+			IEEE80211_LOCK(ic);
+			ieee80211_free_node(bss_ni);
+
+			goto skip;
+		}
+
+		/* Get here - we're okay */
+		vif->is_setup = 1;
+	}
 
 	switch (nstate) {
 	case IEEE80211_S_RUN:
@@ -1266,15 +1354,16 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     const uint8_t bssid[IEEE80211_ADDR_LEN],
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
-	struct ath10k *ar = ic->ic_softc;
+//	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *uvp;
 	struct ieee80211vap *vap;
-	int ret;
+//	int ret;
 
 	/* XXX for now, one vap */
 	if (! TAILQ_EMPTY(&ic->ic_vaps))
 		return (NULL);
 
+#if 0
 	/* We have to bring up the hardware if it isn't yet */
 	if (TAILQ_EMPTY(&ic->ic_vaps)) {
 		/*
@@ -1301,6 +1390,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 			return (NULL);
 		}
 	}
+#endif
 
 	uvp = malloc(sizeof(struct ath10k_vif), M_80211_VAP, M_WAITOK | M_ZERO);
 	if (uvp == NULL)
@@ -1335,21 +1425,13 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	/* XXX ew */
 	ic->ic_opmode = opmode;
 
-	/* call into driver; setup state */
-	ret = ath10k_add_interface(ar, vap, opmode, flags, bssid, mac);
-	if (ret != 0) {
-		ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
-		    __func__, ret);
-		/*
-		 * For now, we can't abort here - too much state needs
-		 * to be setup before we call the linux ath10k mac.c
-		 * routine.
-		 */
-		return (vap);
-	}
-
-	/* Get here - we're okay */
-	uvp->is_setup = 1;
+	/*
+	 * Defer the net80211 interface creation until later, but we need
+	 * to keep a copy of the passed in paramters.
+	 */
+	uvp->vap_f_flags = flags;
+	IEEE80211_ADDR_COPY(uvp->vap_f_macaddr, mac);
+	IEEE80211_ADDR_COPY(uvp->vap_f_bssid, bssid);
 
 	return (vap);
 }
@@ -1360,8 +1442,8 @@ athp_vap_delete(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *uvp = ath10k_vif_to_arvif(vap);
-	struct ieee80211vap *v;
-	int n;
+//	struct ieee80211vap *v;
+//	int n;
 
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
@@ -1440,20 +1522,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * will have to check that we're running and error out as
 	 * appropriate.
 	 */
-
-	/*
-	 * For multi-VAP support (eventually) - only stop the hardware
-	 * if we're shutting down our last VAP.
-	 */
-	n = 0;
-	/* XXX Locking (ieee80211com) */
-	/* XXX make a net80211 method w/ locking */
-	TAILQ_FOREACH(v, &ic->ic_vaps, iv_next) {
-		n++;
-	}
-
-	if (n == 1)
-		ath10k_stop(ar);
 
 	/*
 	 * Detaching the VAP at this point may generate other events,
@@ -2326,6 +2394,42 @@ athp_detach_net80211(struct ath10k *ar)
 
 	if (ic->ic_softc == ar)
 		ieee80211_ifdetach(ic);
+
+	return (0);
+}
+
+int
+athp_suspend(struct ath10k *ar)
+{
+
+	ath10k_warn(ar, "%s: called\n", __func__);
+	ieee80211_suspend_all(&ar->sc_ic);
+
+	/* XXX TODO: should wait for taskqueues to drain, etc */
+	return (0);
+}
+
+int
+athp_resume(struct ath10k *ar)
+{
+
+	ath10k_warn(ar, "%s: called\n", __func__);
+	/* TODO: maybe yes, limit resume-all to whether we have active VAPs */
+//	if (ar->sc_resume_up)
+		ieee80211_resume_all(&ar->sc_ic);
+
+	return (0);
+}
+
+/*
+ * Called during shutdown path.  Eventually - just shut down the hardware
+ * path and VAPs so no future traffic/work is scheduld.
+ */
+int
+athp_shutdown(struct ath10k *ar)
+{
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	return (0);
 }

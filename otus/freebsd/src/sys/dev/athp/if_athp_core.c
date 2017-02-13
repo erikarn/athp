@@ -1157,12 +1157,19 @@ static void ath10k_core_restart(void *arg, int npending)
 		ar->state = ATH10K_STATE_RESTARTING;
 		ath10k_hif_stop(ar);
 		ath10k_scan_finish(ar);
-#if 0
-		ieee80211_restart_hw(ar->hw);
-#else
-		ath10k_warn(ar, "%s: TODO: we don't have a 'restart-hw' net80211 method!\n",
-		    __func__);
-#endif
+
+		/*
+		 * net80211 will do "suspend all" followed by "resume all"
+		 * here.
+		 *
+		 * So ideally we would tie into the suspend path to
+		 * mark all the vaps as "down" and de-init them, then
+		 * the "resume" path can re-add the contexts.
+		 *
+		 * As long as net80211 frees nodes, keys, etc in between
+		 * then this driver will pick it all up.
+		 */
+		ieee80211_restart_all(&ar->sc_ic);
 		break;
 	case ATH10K_STATE_OFF:
 		/* this can happen if driver is being unloaded
