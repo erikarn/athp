@@ -695,11 +695,21 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	int error = 0;
 	struct ieee80211_node *bss_ni;
 
-
-	ath10k_warn(ar, "%s: %s -> %s (is_setup=%d)\n", __func__,
+	ath10k_warn(ar, "%s: %s -> %s (is_setup=%d) (is_dying=%d)\n",
+	    __func__,
 	    ieee80211_state_name[ostate],
 	    ieee80211_state_name[nstate],
-	    vif->is_setup);
+	    vif->is_setup,
+	    vif->is_dying);
+
+	/*
+	 * NOTE: if we're tearing down the interface, we should just shortcut
+	 * this stuff - don't bother creating an interface, don't do the
+	 * rest of the routine.
+	 */
+	if (vif->is_dying) {
+		goto skip;
+	}
 
 	/* Grab bss node ref before unlocking */
 	bss_ni = ieee80211_ref_node(vap->iv_bss);
@@ -723,14 +733,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
 			    __func__, ret);
 
-			/*
-			 * Free the node ref here; we're going to skip the
-			 * rest of processing
-			 */
-			IEEE80211_LOCK(ic);
-			ieee80211_free_node(bss_ni);
-
-			goto skip;
+			goto skip2;
 		}
 		ath10k_warn(ar, "%s: interface add done: vdev id=%d\n", __func__, vif->vdev_id);
 
@@ -910,8 +913,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		    ieee80211_state_name[nstate]);
 		break;
 	}
-	IEEE80211_LOCK(ic);
 
+skip2:
+	IEEE80211_LOCK(ic);
 	ieee80211_free_node(bss_ni);
 
 skip:
