@@ -532,6 +532,8 @@ athp_parent(struct ieee80211com *ic)
 		if (ar->sc_isrunning == 0) {
 			int ret;
 
+			ath10k_warn(ar, "%s: powering up\n", __func__);
+
 			/* Power up */
 			ret = ath10k_start(ar);
 			if (ret != 0) {
@@ -581,6 +583,7 @@ athp_parent(struct ieee80211com *ic)
 		}
 
 		/* Everything is shutdown; power off the chip */
+		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
 	}
 }
@@ -693,9 +696,10 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	struct ieee80211_node *bss_ni;
 
 
-	ath10k_warn(ar, "%s: %s -> %s\n", __func__,
+	ath10k_warn(ar, "%s: %s -> %s (is_setup=%d)\n", __func__,
 	    ieee80211_state_name[ostate],
-	    ieee80211_state_name[nstate]);
+	    ieee80211_state_name[nstate],
+	    vif->is_setup);
 
 	/* Grab bss node ref before unlocking */
 	bss_ni = ieee80211_ref_node(vap->iv_bss);
@@ -707,8 +711,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	 * the interface and power up the chip as required.
 	 */
 	if (vif->is_setup == 0) {
+		ath10k_warn(ar, "%s: adding interface\n", __func__);
 		/* XXX TODO - handle flags, like CLONE_BSSID, CLONE_MAC, etc */
-
 		/* call into driver; setup state */
 		ret = ath10k_add_interface(ar, vap,
 		    vap->iv_opmode,
@@ -728,6 +732,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 			goto skip;
 		}
+		ath10k_warn(ar, "%s: interface add done: vdev id=%d\n", __func__, vif->vdev_id);
 
 		/* Get here - we're okay */
 		vif->is_setup = 1;
