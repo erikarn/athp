@@ -124,6 +124,11 @@ struct ath10k_vif {
 
 	int is_dying;	/* set if we're in the process of being torn down */
 
+	/* net80211 side state passed in during vap creation - need to keep it cached */
+	uint32_t vap_f_flags;
+	uint8_t vap_f_bssid[ETH_ALEN];
+	uint8_t vap_f_macaddr[ETH_ALEN];
+
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
 	enum wmi_vdev_subtype vdev_subtype;

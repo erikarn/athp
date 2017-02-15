@@ -92,12 +92,17 @@ __FBSDID("$FreeBSD$");
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
 static device_detach_t athp_pci_detach;
-/* XXX TODO: shutdown, suspend, resume */
+static device_suspend_t athp_pci_suspend;
+static device_resume_t athp_pci_resume;
+static device_shutdown_t athp_pci_shutdown;
 
 static device_method_t athp_methods[] = {
 	DEVMETHOD(device_probe,		athp_pci_probe),
 	DEVMETHOD(device_attach,	athp_pci_attach),
 	DEVMETHOD(device_detach,	athp_pci_detach),
+	DEVMETHOD(device_suspend,	athp_pci_suspend),
+	DEVMETHOD(device_resume,	athp_pci_resume),
+	DEVMETHOD(device_shutdown,	athp_pci_shutdown),
 
 	DEVMETHOD_END
 };
@@ -1075,4 +1080,31 @@ athp_pci_detach(device_t dev)
 	}
 
 	return (0);
+}
+
+static int
+athp_pci_suspend(device_t dev)
+{
+	struct ath10k_pci *ar_pci = device_get_softc(dev);
+	struct ath10k *ar = &ar_pci->sc_sc;
+
+	return athp_suspend(ar);
+}
+
+static int
+athp_pci_resume(device_t dev)
+{
+	struct ath10k_pci *ar_pci = device_get_softc(dev);
+	struct ath10k *ar = &ar_pci->sc_sc;
+
+	return athp_resume(ar);
+}
+
+static int
+athp_pci_shutdown(device_t dev)
+{
+	struct ath10k_pci *ar_pci = device_get_softc(dev);
+	struct ath10k *ar = &ar_pci->sc_sc;
+
+	return athp_shutdown(ar);
 }

@@ -5309,6 +5309,8 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 //	int i;
 	u32 vdev_param;
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 #if 0
 	vif->driver_flags |= IEEE80211_VIF_SUPPORTS_UAPSD;
 #endif
@@ -5601,6 +5603,7 @@ err_vdev_delete:
 	ath10k_wmi_vdev_delete(ar, arvif->vdev_id);
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
+	arvif->vdev_id = 0;
 
 err:
 	athp_descdma_free(ar, &arvif->beacon_buf);
@@ -5627,6 +5630,8 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 #if 0
@@ -5689,6 +5694,12 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 		if (ret)
 			ath10k_warn(ar, "failed to recalc monitor: %d\n", ret);
 	}
+
+	/*
+	 * Finished - ensure the caller has a garbage vdev_id
+	 * that will cause the firmware to lose its marbles.
+	 */
+	arvif->vdev_id = 0;
 
 	ATHP_HTT_TX_LOCK(&ar->htt);
 	ath10k_mac_vif_tx_unlock_all(arvif);
