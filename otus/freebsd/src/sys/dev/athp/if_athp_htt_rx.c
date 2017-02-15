@@ -1099,6 +1099,30 @@ static void ath10k_htt_rx_h_signal(struct ath10k *ar,
 	status->r_flags |= IEEE80211_R_NF | IEEE80211_R_RSSI;
 }
 
+static void
+ath10k_htt_rx_h_signal_mimo(struct ath10k *ar,
+				   struct ieee80211_rx_stats *status,
+				   struct htt_rx_desc *rxd)
+{
+	int i;
+
+	status->r_flags |= IEEE80211_R_C_CHAIN
+		    | IEEE80211_R_C_NF
+		    | IEEE80211_R_C_RSSI;
+
+	/* XXX TODO: RX chain count */
+	status->c_chain = 4;
+	for (i = 0; i < 4; i++) {
+		/* XXX TODO: ext40, ext80 */
+		status->c_rssi_ctl[i] = rxd->ppdu_start.rssi_chains[i].pri20_mhz;
+		status->c_rssi_ext[i] = rxd->ppdu_start.rssi_chains[i].ext20_mhz;
+
+		/* XXX TODO: ext40, ext80; use real noise floor */
+		status->c_nf_ctl[i] = ATH10K_DEFAULT_NOISE_FLOOR;
+		status->c_nf_ext[i] = ATH10K_DEFAULT_NOISE_FLOOR;
+	}
+}
+
 static void ath10k_htt_rx_h_mactime(struct ath10k *ar,
 				    struct ieee80211_rx_stats *status,
 				    struct htt_rx_desc *rxd)
@@ -1169,6 +1193,7 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 		    );
 
 		ath10k_htt_rx_h_signal(ar, status, rxd);
+		ath10k_htt_rx_h_signal_mimo(ar, status, rxd);
 		ath10k_htt_rx_h_channel(ar, status, rxd, vdev_id);
 		ath10k_htt_rx_h_rates(ar, status, rxd);
 	}
