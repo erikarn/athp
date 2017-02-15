@@ -120,7 +120,7 @@ MSI:
 
 802.11 fragmentation:
 
-* TODO: need to teach net80211 about never doing 802.11 fragmentation, as the
+* (done) TODO: need to teach net80211 about never doing 802.11 fragmentation, as the
   firmware does it for us.  Otherwise firmware will transmit the frames with
   the fragment bit cleared (which it does), leading to garbage.
 * TODO: if in raw mode then net80211 does fragmentation; else don't and let
@@ -128,7 +128,7 @@ MSI:
 * TODO: teach the athp_transmit() API about fragments and at least warn/print
   about it for now!
 
-Suspend/resume, restarting VAPs after firmware panic:
+(done) Suspend/resume, restarting VAPs after firmware panic:
 
 * when we suspend, we power down the NIC.  Upon resume, we need to transition
   through INIT, and this requires re-creating the ath10k state.  Same with
