@@ -4578,8 +4578,15 @@ void __ath10k_scan_finish(struct ath10k *ar)
 		if (!ar->scan.is_roc) {
 			struct ath10k_vif *vif;
 			vif = ath10k_get_arvif(ar, ar->scan.vdev_id);
-			if (vif != NULL)
+			if (vif != NULL) {
 				ieee80211_scan_done(&vif->av_vap);
+			} else {
+				ath10k_warn(ar,
+				    "%s: scan running/aborting; couldn't "
+				    "find vif for vdev_id %d\n",
+				    __func__,
+				    ar->scan.vdev_id);
+			}
 		} else if (ar->scan.roc_notify) {
 #if 0
 			ieee80211_remain_on_channel_expired(ar->hw);
