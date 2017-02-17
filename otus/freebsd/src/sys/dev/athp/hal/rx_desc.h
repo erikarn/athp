@@ -733,12 +733,16 @@ enum rx_ppdu_start_rate {
 };
 
 struct rx_ppdu_start {
+#if 0
 	struct {
 		u8 pri20_mhz;
 		u8 ext20_mhz;
 		u8 ext40_mhz;
 		u8 ext80_mhz;
 	} rssi_chains[4];
+#else
+	uint32_t rssi_chain[4];
+#endif
 	u8 rssi_comb;
 	__le16 rsvd0;
 	u8 info0; /* %RX_PPDU_START_INFO0_ */

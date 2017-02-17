@@ -1114,9 +1114,14 @@ ath10k_htt_rx_h_signal_mimo(struct ath10k *ar,
 	status->c_chain = 4;
 	for (i = 0; i < 4; i++) {
 		/* XXX TODO: ext40, ext80 */
+#if 0
 		status->c_rssi_ctl[i] = rxd->ppdu_start.rssi_chains[i].pri20_mhz;
 		status->c_rssi_ext[i] = rxd->ppdu_start.rssi_chains[i].ext20_mhz;
-
+#else
+		//ath10k_warn(ar, "%s: %d: 0x%08x\n", __func__, i, rxd->ppdu_start.rssi_chain[i]);
+		status->c_rssi_ctl[i] = rxd->ppdu_start.rssi_chain[i] & 0xff;
+		status->c_rssi_ext[i] = (rxd->ppdu_start.rssi_chain[i] >> 8) & 0xff;
+#endif
 		/* XXX TODO: ext40, ext80; use real noise floor */
 		status->c_nf_ctl[i] = ATH10K_DEFAULT_NOISE_FLOOR;
 		status->c_nf_ext[i] = ATH10K_DEFAULT_NOISE_FLOOR;
