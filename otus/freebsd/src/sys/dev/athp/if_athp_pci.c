@@ -121,14 +121,6 @@ MODULE_DEPEND(athp, firmware, 1, 1, 1);
 MODULE_DEPEND(athp, alq, 1, 1, 1);
 MODULE_VERSION(athp, 1);
 
-/*
- * For now: let's just attach on this device:
- none4@pci0:5:0:0:	class=0x028000 card=0x00000000 chip=0x003c168c rev=0x00 hdr=0x00
- vendor     = 'Qualcomm Atheros'
- device     = 'QCA986x/988x 802.11ac Wireless Network Adapter'
- class      = network
- */
-
 static int
 athp_pci_probe(device_t dev)
 {
@@ -138,6 +130,11 @@ athp_pci_probe(device_t dev)
 	device_id = pci_get_device(dev);
 	if (vendor_id == 0x168c && device_id == 0x003c) {
 		device_set_desc(dev, "QCA988x");
+		return (BUS_PROBE_DEFAULT);
+	}
+
+	if (vendor_id == 0x168c && device_id == 0x003e) {
+		device_set_desc(dev, "QCA6174");
 		return (BUS_PROBE_DEFAULT);
 	}
 
