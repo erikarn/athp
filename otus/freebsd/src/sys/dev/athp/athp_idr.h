@@ -35,10 +35,6 @@
 #include <sys/lock.h>
 #include <sys/mutex.h>
 
-#if 0
-#include <linux/types.h>
-#endif
-
 #define	IDR_BITS	5
 #define	IDR_SIZE	(1 << IDR_BITS)
 #define	IDR_MASK	(IDR_SIZE - 1)
