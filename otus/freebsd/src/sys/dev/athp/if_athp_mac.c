@@ -5095,6 +5095,8 @@ int ath10k_start(struct ath10k *ar)
 	/* Kick-start deferred */
 	athp_taskq_start(ar);
 
+	ath10k_warn(ar, "%s: finished; state is now %d\n", __func__, ar->state);
+
 	return 0;
 
 
