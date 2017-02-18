@@ -529,6 +529,7 @@ static void ath10k_wmi_tlv_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		break;
 	case WMI_TLV_DEBUG_MESG_EVENTID:
 		ath10k_wmi_event_debug_mesg(ar, pbuf);
+		return;
 		break;
 	case WMI_TLV_UPDATE_STATS_EVENTID:
 		ath10k_wmi_event_update_stats(ar, pbuf);
