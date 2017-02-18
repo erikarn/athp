@@ -1486,7 +1486,7 @@ static void ath10k_fwlog_parse_msg(struct ath10k *ar, u8 *data, int len)
 	len -= sizeof(dropped);
 
 	if (dropped > 0)
-		ath10k_warn(ar, "%d log buffers are dropped \n",
+		ath10k_warn(ar, "%u log buffers are dropped \n",
 		       dropped);
 
 	count = 0;
