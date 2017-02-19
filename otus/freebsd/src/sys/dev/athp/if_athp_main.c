@@ -2412,7 +2412,10 @@ athp_suspend(struct ath10k *ar)
 {
 
 	ath10k_warn(ar, "%s: called\n", __func__);
+
 	ieee80211_suspend_all(&ar->sc_ic);
+
+	ath10k_hif_suspend(ar);
 
 	/* XXX TODO: should wait for taskqueues to drain, etc */
 	return (0);
@@ -2423,6 +2426,9 @@ athp_resume(struct ath10k *ar)
 {
 
 	ath10k_warn(ar, "%s: called\n", __func__);
+
+	ath10k_hif_resume(ar);
+
 	/* TODO: maybe yes, limit resume-all to whether we have active VAPs */
 //	if (ar->sc_resume_up)
 		ieee80211_resume_all(&ar->sc_ic);
