@@ -5709,6 +5709,8 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	 * that will cause the firmware to lose its marbles.
 	 */
 	arvif->vdev_id = 0;
+	arvif->is_started = false;
+	arvif->is_up = false;
 
 	ATHP_HTT_TX_LOCK(&ar->htt);
 	ath10k_mac_vif_tx_unlock_all(arvif);
