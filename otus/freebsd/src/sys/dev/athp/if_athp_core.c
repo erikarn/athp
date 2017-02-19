@@ -1535,6 +1535,8 @@ ath10k_wait_for_suspend(struct ath10k *ar, u32 suspend_opt)
 
 	ath10k_compl_reinit(&ar->target_suspend);
 
+	ath10k_warn(ar, "%s: state=%d\n", __func__, ar->state);
+
 	ret = ath10k_wmi_pdev_suspend_target(ar, suspend_opt);
 	if (ret) {
 		ath10k_warn(ar, "could not suspend target (%d)\n", ret);
@@ -1575,6 +1577,8 @@ ath10k_core_stop(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 	ath10k_debug_stop(ar);
+
+	ath10k_warn(ar, "%s: state=%d\n", __func__, ar->state);
 
 	/* try to suspend target */
 	if (ar->state != ATH10K_STATE_RESTARTING &&
