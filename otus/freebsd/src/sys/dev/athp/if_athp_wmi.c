@@ -5062,6 +5062,8 @@ ath10k_wmi_op_gen_pdev_suspend(struct ath10k *ar, u32 suspend_opt)
 	struct wmi_pdev_suspend_cmd *cmd;
 	struct athp_buf *pbuf;
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	pbuf = ath10k_wmi_alloc_skb(ar, sizeof(*cmd));
 	if (!pbuf)
 		return ERR_PTR(-ENOMEM);
@@ -5076,6 +5078,8 @@ static struct athp_buf *
 ath10k_wmi_op_gen_pdev_resume(struct ath10k *ar)
 {
 	struct athp_buf *pbuf;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	pbuf = ath10k_wmi_alloc_skb(ar, 0);
 	if (!pbuf)

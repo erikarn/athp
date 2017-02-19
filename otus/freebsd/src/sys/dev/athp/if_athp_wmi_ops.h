@@ -393,6 +393,8 @@ ath10k_wmi_pdev_suspend_target(struct ath10k *ar, u32 suspend_opt)
 {
 	struct athp_buf *pbuf;
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	if (!ar->wmi.ops->gen_pdev_suspend)
 		return -EOPNOTSUPP;
 
@@ -407,6 +409,8 @@ static inline int
 ath10k_wmi_pdev_resume_target(struct ath10k *ar)
 {
 	struct athp_buf *pbuf;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	if (!ar->wmi.ops->gen_pdev_resume)
 		return -EOPNOTSUPP;
