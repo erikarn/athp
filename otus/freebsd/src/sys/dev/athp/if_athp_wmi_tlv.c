@@ -1368,7 +1368,9 @@ ath10k_wmi_tlv_op_gen_pdev_set_rd(struct ath10k *ar,
 	cmd->conform_limit_2ghz = __cpu_to_le32(rd2g);
 	cmd->conform_limit_5ghz = __cpu_to_le32(rd5g);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv pdev set rd\n");
+	ath10k_dbg(ar, ATH10K_DBG_WMI,
+	    "wmi tlv pdev set rd %d rd2g %d rd5g %d\n",
+	    rd, rd2g, rd5g);
 	return pbuf;
 }
 
@@ -1396,7 +1398,8 @@ ath10k_wmi_tlv_op_gen_pdev_set_param(struct ath10k *ar, u32 param_id,
 	cmd->param_id = __cpu_to_le32(param_id);
 	cmd->param_value = __cpu_to_le32(param_value);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv pdev set param\n");
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv pdev set param %d -> %d\n",
+	    param_id, param_value);
 	return pbuf;
 }
 
@@ -1854,7 +1857,8 @@ ath10k_wmi_tlv_op_gen_vdev_set_param(struct ath10k *ar, u32 vdev_id,
 	cmd->param_id = __cpu_to_le32(param_id);
 	cmd->param_value = __cpu_to_le32(param_value);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev set param\n");
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d set param %d -> %d\n",
+	    vdev_id, param_id, param_value);
 	return pbuf;
 }
 
@@ -2168,7 +2172,8 @@ ath10k_wmi_tlv_op_gen_peer_set_param(struct ath10k *ar, u32 vdev_id,
 	cmd->param_value = __cpu_to_le32(param_value);
 	ether_addr_copy(cmd->peer_macaddr.addr, peer_addr);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv peer set param\n");
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d peer %6D set param %d -> %d\n",
+	    vdev_id, peer_addr, ":", param_id, param_value);
 	return pbuf;
 }
 
@@ -2258,7 +2263,15 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*vht_rate);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv peer assoc\n");
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d peer %6D assoc aid %d caps %d intval %d htcaps 0x%08x vhtcaps 0x%08x\n",
+	    arg->vdev_id,
+	    arg->addr, ":",
+	    arg->peer_aid,
+	    arg->peer_caps,
+	    arg->peer_listen_intval,
+	    arg->peer_ht_caps,
+	    arg->peer_vht_caps);
+
 	return pbuf;
 }
 
@@ -2306,7 +2319,8 @@ ath10k_wmi_tlv_op_gen_set_sta_ps(struct ath10k *ar, u32 vdev_id,
 	cmd->param_id = __cpu_to_le32(param_id);
 	cmd->param_value = __cpu_to_le32(param_value);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv set sta ps\n");
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d set sta ps param %d value %d\n",
+	    vdev_id, param_id, param_value);
 	return pbuf;
 }
 
