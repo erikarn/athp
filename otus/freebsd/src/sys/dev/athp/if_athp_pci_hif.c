@@ -1220,6 +1220,8 @@ ath10k_pci_hif_suspend(struct ath10k *ar)
 {
 	struct ath10k_pci *ar_pci = ar->sc_psc;
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	/* The grace timer can still be counting down and ar->ps_awake be true.
 	 * It is known that the device may be asleep after resuming regardless
 	 * of the SoC powersave state before suspending. Hence make sure the
@@ -1233,6 +1235,8 @@ ath10k_pci_hif_suspend(struct ath10k *ar)
 static int
 ath10k_pci_hif_resume(struct ath10k *ar)
 {
+
+	ath10k_warn(ar, "%s: called\n", __func__);
 
 	/* Suspend/Resume resets the PCI configuration space, so we have to
 	 * re-disable the RETRY_TIMEOUT register (0x41) to keep PCI Tx retries

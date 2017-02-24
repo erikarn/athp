@@ -320,6 +320,8 @@ ath10k_pci_sleep_sync(struct ath10k_pci *ar_pci)
 	del_timer_sync(&ar_pci->ps_timer);
 #endif
 
+	ath10k_warn(ar, "%s: called\n", __func__);
+
 	ATHP_PCI_PS_LOCK(ar_pci);
 	if (ar_pci->ps_wake_refcount > 0) {
 		ath10k_err(ar, "%s: wake_refcount=%d\n",
