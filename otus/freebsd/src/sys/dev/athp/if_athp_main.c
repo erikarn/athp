@@ -1363,34 +1363,20 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     const uint8_t bssid[IEEE80211_ADDR_LEN],
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
-//	struct ath10k *ar = ic->ic_softc;
-	struct ath10k_vif *uvp;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *vif;
 	struct ieee80211vap *vap;
-//	int ret;
+	int ret;
 
+#if 0
 	/* XXX for now, one vap */
 	if (! TAILQ_EMPTY(&ic->ic_vaps))
 		return (NULL);
+#endif
 
-#if 0
-	/* We have to bring up the hardware if it isn't yet */
+	/* We have to bring up the hardware/driver state if it isn't yet */
+	/* XXX methodize */
 	if (TAILQ_EMPTY(&ic->ic_vaps)) {
-		/*
-		 * XXX TODO: sigh, this path actually goes and re-re-re-re
-		 * re-inits everything; which includes the memory allocations,
-		 * and the /mutexes/, and the /tasks/, and the /callouts/.
-		 *
-		 * This .. can't happen, as it completely breaks how
-		 * FreeBSD expects things to work.
-		 *
-		 * Trouble is, sigh, a whole bunch of WMI setup really seems
-		 * to assume that we've completely powered off/reset the
-		 * target CPU before its reinit'ed.  So, I may have to
-		 * review each and every one of those pieces and fix
-		 * the whole thing up.
-		 *
-		 * Ugh.
-		 */
 		ret = ath10k_start(ar);
 		if (ret != 0) {
 			ath10k_err(ar,
@@ -1399,16 +1385,18 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 			return (NULL);
 		}
 	}
-#endif
 
-	uvp = malloc(sizeof(struct ath10k_vif), M_80211_VAP, M_WAITOK | M_ZERO);
-	if (uvp == NULL)
+	/*
+	 * Allocate vap!
+	 */
+	vif = malloc(sizeof(struct ath10k_vif), M_80211_VAP, M_WAITOK | M_ZERO);
+	if (vif == NULL)
 		return (NULL);
-	vap = (void *) uvp;
+	vap = (void *) vif;
 
 	if (ieee80211_vap_setup(ic, vap, name, unit, opmode,
 	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
-		free(uvp, M_80211_VAP);
+		free(vif, M_80211_VAP);
 		return (NULL);
 	}
 
@@ -1418,14 +1406,14 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_ampdu_limit = IEEE80211_HTCAP_MAXRXAMPDU_64K;
 
 	/* Override vap methods */
-	uvp->av_newstate = vap->iv_newstate;
+	vif->av_newstate = vap->iv_newstate;
 	vap->iv_newstate = athp_vap_newstate;
 	vap->iv_key_alloc = athp_key_alloc;
 	vap->iv_key_set = athp_key_set;
 	vap->iv_key_delete = athp_key_delete;
 	vap->iv_reset = athp_vap_reset;
 	vap->iv_update_beacon = athp_beacon_update;
-	uvp->av_update_deftxkey = vap->iv_update_deftxkey;
+	vif->av_update_deftxkey = vap->iv_update_deftxkey;
 	vap->iv_update_deftxkey = athp_update_deftxkey;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
@@ -1435,12 +1423,63 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	ic->ic_opmode = opmode;
 
 	/*
-	 * Defer the net80211 interface creation until later, but we need
-	 * to keep a copy of the passed in paramters.
+	 * Support deferring the net80211 interface creation until later,
+	 * but we need to keep a copy of the passed in paramters.
 	 */
-	uvp->vap_f_flags = flags;
-	IEEE80211_ADDR_COPY(uvp->vap_f_macaddr, mac);
-	IEEE80211_ADDR_COPY(uvp->vap_f_bssid, bssid);
+	vif->vap_f_flags = flags;
+	/*
+	 * XXX TODO: figure out what's going on with the clone field;
+	 * do we have to figure out the "right" MAC addresses to use
+	 * for multi-BSSID?  See what ath10k does.
+	 */
+	IEEE80211_ADDR_COPY(vif->vap_f_macaddr, mac);
+	IEEE80211_ADDR_COPY(vif->vap_f_bssid, bssid);
+
+	/*
+	 * Note: it turns out that the hostap interface needs to be up
+	 * much earlier - hostap for some reason brings up the group key
+	 * /before/ the interface is started using the parent start/stop
+	 * method, so hostap doesn't work.
+	 *
+	 * I'm not sure whether this also affects hostap restart; that
+	 * needs to be addressed!  Let's figure out why the interface
+	 * isn't started first!
+	 *
+	 * .. and also, maybe we need to cache key updates until the
+	 * interface comes up, OR upon the first INIT->INIT state change
+	 * actually do bring power up and create the interface.
+	 *
+	 * Unless it's shutdown time, it should be pretty harmless to
+	 * power up the interface on that INIT->INIT.
+	 *
+	 * .. and indeed, it's also harmless to have it happen here..
+	 */
+	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+		ath10k_warn(ar, "%s: adding interface\n", __func__);
+		/* XXX TODO - handle flags, like CLONE_BSSID, CLONE_MAC, etc */
+		/* call into driver; setup state */
+		ret = ath10k_add_interface(ar, vap,
+		    vap->iv_opmode,
+		    vif->vap_f_flags,
+		    vif->vap_f_bssid,
+		    vif->vap_f_macaddr);
+		if (ret != 0) {
+			ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
+			    __func__, ret);
+			/*
+			 * XXX TODO: we can't unfortunately bring the
+			 * interface up here, but we can't actually
+			 * return a failure because too much state
+			 * has been setup..
+			 */
+			return (vap);
+		}
+		ath10k_warn(ar, "%s: interface add done: vdev id=%d\n",
+		    __func__, vif->vdev_id);
+
+		/* Get here - we're okay */
+		vif->is_setup = 1;
+	}
 
 	return (vap);
 }
