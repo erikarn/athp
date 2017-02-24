@@ -104,7 +104,7 @@ struct ath10k_sta {
 #endif
 };
 
-#define ATH10K_VDEV_SETUP_TIMEOUT_HZ (5)
+#define ATH10K_VDEV_SETUP_TIMEOUT_HZ (50)
 
 enum ath10k_beacon_state {
 	ATH10K_BEACON_SCHEDULED = 0,
