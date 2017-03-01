@@ -1804,6 +1804,12 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		TAILQ_REMOVE(amsdu, msdu, next);
 		/* Setup per-MSDU flags */
 
+		/*
+		 * XXX TODO: yes, now's the time to start telling net80211
+		 * about the start/end boundaries of A-MSDU decap RX tracking.
+		 * The crypto and RX BA code needs to know these things.
+		 */
+
 		status->c_pktflags &= ~(
 		    IEEE80211_RX_F_AMSDU
 		    | IEEE80211_RX_F_AMSDU_MORE);
