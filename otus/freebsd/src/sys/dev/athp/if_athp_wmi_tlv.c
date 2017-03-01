@@ -507,7 +507,7 @@ static void ath10k_wmi_tlv_op_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	if (mbuf_skb_pull(pbuf->m, sizeof(struct wmi_cmd_hdr)) == NULL)
 		goto out;
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event; id=%d, len=%d\n",
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "%s: event; id=0x%04x, len=%d\n",
 	    __func__,
 	    id,
 	    mbuf_skb_len(pbuf->m));
@@ -2263,7 +2263,7 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	ptr += sizeof(*tlv);
 	ptr += sizeof(*vht_rate);
 
-	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d peer %6D assoc aid %d caps %d intval %d htcaps 0x%08x vhtcaps 0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d peer %6D assoc aid %d caps 0x%08x intval %d htcaps 0x%08x vhtcaps 0x%08x\n",
 	    arg->vdev_id,
 	    arg->addr, ":",
 	    arg->peer_aid,
@@ -2271,6 +2271,14 @@ ath10k_wmi_tlv_op_gen_peer_assoc(struct ath10k *ar,
 	    arg->peer_listen_intval,
 	    arg->peer_ht_caps,
 	    arg->peer_vht_caps);
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv vdev %d peer %6D phymode %d nss %d num-legacy-rates %d num-ht-rates %d peer-reassoc %d\n",
+	    arg->vdev_id,
+	    arg->addr, ":",
+	    arg->peer_phymode,
+	    arg->peer_num_spatial_streams,
+	    arg->peer_legacy_rates.num_rates,
+	    arg->peer_ht_rates.num_rates,
+	    arg->peer_reassoc);
 
 	return pbuf;
 }
