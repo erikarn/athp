@@ -1652,6 +1652,8 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.dtim_period = arvif->dtim_period;
 	arg.bcn_intval = arvif->beacon_interval;
 
+	ath10k_warn(ar, "%s: called; dtim=%d, intval=%d\n", __func__, arg.dtim_period, arg.bcn_intval);
+
 	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
 	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
@@ -6666,10 +6668,12 @@ exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211_vif *vif,
+static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
 				u16 ac, bool enable)
 {
+#if 0
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_sta_uapsd_auto_trig_arg arg = {};
 	u32 prio = 0, acc = 0;
@@ -6771,30 +6775,39 @@ static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211_vif *vif,
 
 exit:
 	return ret;
+#else
+	ath10k_warn(ar, "%s: TODO!\n", __func__);
+	return (0);
+#endif
 }
 
-static int ath10k_conf_tx(struct ieee80211_hw *hw,
-			  struct ieee80211_vif *vif, u16 ac,
-			  const struct ieee80211_tx_queue_params *params)
+/*
+ * This is called only in the STA path for now, but yes, it should also
+ * be called in the AP path.  Double-check what the semantics there
+ * should be.
+ */
+static int ath10k_conf_tx(struct ath10k *ar,
+			  struct ieee80211vap *vif, u16 ac,
+			  struct wmeParams *wmep)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_wmm_params_arg *p = NULL;
+//	struct wmeParams *wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
 	int ret;
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	switch (ac) {
-	case IEEE80211_AC_VO:
+	case WME_AC_VO:
 		p = &arvif->wmm_params.ac_vo;
 		break;
-	case IEEE80211_AC_VI:
+	case WME_AC_VI:
 		p = &arvif->wmm_params.ac_vi;
 		break;
-	case IEEE80211_AC_BE:
+	case WME_AC_BE:
 		p = &arvif->wmm_params.ac_be;
 		break;
-	case IEEE80211_AC_BK:
+	case WME_AC_BK:
 		p = &arvif->wmm_params.ac_bk;
 		break;
 	}
@@ -6804,16 +6817,23 @@ static int ath10k_conf_tx(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-	p->cwmin = params->cw_min;
-	p->cwmax = params->cw_max;
-	p->aifs = params->aifs;
+	p->cwmin = (1 << wmep->wmep_logcwmin) - 1;
+	p->cwmax = (1 << wmep->wmep_logcwmax) - 1;
+	p->aifs = wmep->wmep_aifsn;
 
 	/*
 	 * The channel time duration programmed in the HW is in absolute
-	 * microseconds, while mac80211 gives the txop in units of
-	 * 32 microseconds.
+	 * microseconds, which net80211 cheerfully gives us.
 	 */
-	p->txop = params->txop * 32;
+	p->txop = IEEE80211_TXOP_TO_US(wmep->wmep_txopLimit);
+
+	ath10k_warn(ar, "%s: ac=%d, cwmin=%d, cwmax=%d, aifs=%d, txop=%d\n",
+	    __func__,
+	    ac,
+	    p->cwmin,
+	    p->cwmax,
+	    p->aifs,
+	    p->txop);
 
 	if (ar->wmi.ops->gen_vdev_wmm_conf) {
 		ret = ath10k_wmi_vdev_wmm_conf(ar, arvif->vdev_id,
@@ -6834,14 +6854,18 @@ static int ath10k_conf_tx(struct ieee80211_hw *hw,
 		}
 	}
 
+#if 0
 	ret = ath10k_conf_tx_uapsd(ar, vif, ac, params->uapsd);
 	if (ret)
 		ath10k_warn(ar, "failed to set sta uapsd: %d\n", ret);
-
+#else
+	ath10k_warn(ar, "%s: TODO: set sta uapsd\n", __func__);
+#endif
 exit:
-	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+
+#if 0
 
 #define ATH10K_ROC_TIMEOUT_HZ (2)
 
@@ -9220,7 +9244,7 @@ athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
 		preamble = WMI_VDEV_PREAMBLE_LONG;
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
-		   "mac vdev %d preamble %dn",
+		   "mac vdev %d preamble %d\n",
 		   arvif->vdev_id, preamble);
 
 	vdev_param = ar->wmi.vdev_param->preamble;
@@ -9229,4 +9253,10 @@ athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
 	if (ret)
 		ath10k_warn(ar, "failed to set preamble for vdev %d: %i\n",
 			    arvif->vdev_id, ret);
+
+	/* now WMM */
+	(void) ath10k_conf_tx(ar, vap, WME_AC_BE, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE]);
+	(void) ath10k_conf_tx(ar, vap, WME_AC_BK, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BK]);
+	(void) ath10k_conf_tx(ar, vap, WME_AC_VI, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VI]);
+	(void) ath10k_conf_tx(ar, vap, WME_AC_VO, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VO]);
 }
