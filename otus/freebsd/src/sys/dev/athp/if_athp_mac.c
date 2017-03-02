@@ -9162,6 +9162,37 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 	}
 }
 
+int
+ath10k_update_wme(struct ieee80211com *ic)
+{
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211vap *vap;
+	struct ath10k_vif *arvif;
+	int ret = 0;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* XXX locking - but we're already currently deferred by net80211 */
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		arvif = ath10k_vif_to_arvif(vap);
+
+		if (arvif->is_setup == 0)
+			continue;
+
+		/* now WMM */
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_BE,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE]);
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_BK,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BK]);
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_VI,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VI]);
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_VO,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VO]);
+	}
+
+	return (ret == 0 ? 0 : ENXIO);
+}
+
 /*
  * configure slot time, short/long preamble, beacon interval for
  * STA mode operation.
@@ -9253,10 +9284,4 @@ athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
 	if (ret)
 		ath10k_warn(ar, "failed to set preamble for vdev %d: %i\n",
 			    arvif->vdev_id, ret);
-
-	/* now WMM */
-	(void) ath10k_conf_tx(ar, vap, WME_AC_BE, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE]);
-	(void) ath10k_conf_tx(ar, vap, WME_AC_BK, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BK]);
-	(void) ath10k_conf_tx(ar, vap, WME_AC_VI, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VI]);
-	(void) ath10k_conf_tx(ar, vap, WME_AC_VO, &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VO]);
 }

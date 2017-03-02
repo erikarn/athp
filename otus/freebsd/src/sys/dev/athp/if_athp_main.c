@@ -1570,6 +1570,14 @@ athp_vap_delete(struct ieee80211vap *vap)
 static int
 athp_wme_update(struct ieee80211com *ic)
 {
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
+
+	/* Yes, aptly named.. */
+	ATHP_CONF_LOCK(ar);
+	ath10k_update_wme(ic);
+	ATHP_CONF_UNLOCK(ar);
 
 	return (0);
 }
