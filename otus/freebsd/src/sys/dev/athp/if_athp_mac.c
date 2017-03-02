@@ -2743,7 +2743,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	    | IEEE80211_HTCAP_SHORTGI20
 	    | IEEE80211_HTCAP_SHORTGI40
 	    | IEEE80211_HTCAP_DELBA
-	    | IEEE80211_HTCAP_MAXAMSDU_7935
 	    | IEEE80211_HTCAP_DSSSCCK40
 	    | IEEE80211_HTCAP_PSMP
 	    | IEEE80211_HTCAP_40INTOLERANT
@@ -2760,6 +2759,12 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	    htcap_mask);
 
 	htcap = (sta->ni_htcap & ~(htcap_mask)) | htcap_filt;
+
+	/* MAX_AMSDU - only if both sides can do it */
+	htcap &= ~(IEEE80211_HTCAP_MAXAMSDU);
+	if ((sta->ni_htcap & IEEE80211_HTCAP_MAXAMSDU_7935) &&
+	    (vif->iv_htcaps & IEEE80211_HTCAP_MAXAMSDU_7935))
+		htcap |= IEEE80211_HTCAP_MAXAMSDU_7935;
 
 	/* CHWIDTH40 - only enable it if we're on a HT40 channel */
 	htcap &= ~(IEEE80211_HTCAP_CHWIDTH40);
