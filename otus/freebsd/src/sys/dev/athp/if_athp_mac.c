@@ -9137,3 +9137,96 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 		    arvif->wep_keys[i], arvif->wep_key_ciphers[i]);
 	}
 }
+
+/*
+ * configure slot time, short/long preamble, beacon interval for
+ * STA mode operation.
+ *
+ * Note: this is a subset of what ath10k does in ath10k_bss_info_changed().
+ * Notably, the AP changing bintval, or dtim period, etc, should be picked
+ * up and turned into driver methods.
+ *
+ * So yes, let's eventually turn ath10k_bss_info_changed() into a set of
+ * methods which the driver can then register with net80211 as appropriate.
+ * TX power is already one of them.
+ */
+void
+athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret = 0;
+	u32 vdev_param;
+//	u32 pdev_param;
+	u32 slottime, preamble;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* Configure beacon interval */
+	arvif->beacon_interval = bss_ni->ni_intval;
+	vdev_param = ar->wmi.vdev_param->beacon_interval;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+	    arvif->beacon_interval);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac vdev %d beacon_interval %d\n",
+		   arvif->vdev_id, arvif->beacon_interval);
+
+	if (ret)
+		ath10k_warn(ar, "failed to set beacon interval for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	/* ERP CTS protection */
+	arvif->use_cts_prot = !! (bss_ni->ni_erp & IEEE80211_ERP_USE_PROTECTION);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d cts_prot %d\n",
+	   arvif->vdev_id, arvif->use_cts_prot);
+
+	ret = ath10k_recalc_rtscts_prot(arvif);
+	if (ret)
+		ath10k_warn(ar, "failed to recalculate rts/cts prot for vdev %d: %d\n",
+			    arvif->vdev_id, ret);
+
+	vdev_param = ar->wmi.vdev_param->protection_mode;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					arvif->use_cts_prot ? 1 : 0);
+	if (ret)
+		ath10k_warn(ar, "failed to set protection mode %d on vdev %i: %d\n",
+				arvif->use_cts_prot, arvif->vdev_id, ret);
+
+	/*
+	 * XXX TODO: ERP slot time should be done as part of the channel change,
+	 * as well as operating mode.  Sigh, will have to dig into this
+	 * in a lot more detail, as well as potentially dynamically updating
+	 * it in AP mode!
+	 */
+	if (IEEE80211_GET_SLOTTIME(vap->iv_ic) == IEEE80211_DUR_SHSLOT)
+		slottime = WMI_VDEV_SLOT_TIME_SHORT; /* 9us */
+	else
+		slottime = WMI_VDEV_SLOT_TIME_LONG; /* 20us */
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d slot_time %d\n",
+		   arvif->vdev_id, slottime);
+
+	vdev_param = ar->wmi.vdev_param->slot_time;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					slottime);
+	if (ret)
+		ath10k_warn(ar, "failed to set erp slot for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	/* And we don't track preamble length via a method yet; and it's not per-vap, sigh */
+	if (vap->iv_ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+		preamble = WMI_VDEV_PREAMBLE_SHORT;
+	else
+		preamble = WMI_VDEV_PREAMBLE_LONG;
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac vdev %d preamble %dn",
+		   arvif->vdev_id, preamble);
+
+	vdev_param = ar->wmi.vdev_param->preamble;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					preamble);
+	if (ret)
+		ath10k_warn(ar, "failed to set preamble for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+}

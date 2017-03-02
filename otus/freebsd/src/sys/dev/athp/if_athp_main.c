@@ -759,6 +759,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			ATHP_CONF_UNLOCK(ar);
 		}
@@ -1576,7 +1577,9 @@ athp_wme_update(struct ieee80211com *ic)
 static void
 athp_update_slot(struct ieee80211com *ic)
 {
+	struct ath10k *ar = ic->ic_softc;
 
+	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
 }
 
 static void
