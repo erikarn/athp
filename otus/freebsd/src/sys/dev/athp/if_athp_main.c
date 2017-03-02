@@ -758,16 +758,6 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
-			/* XXX note: can we use bss_ni->ic_chan? */
-			ret = ath10k_vif_restart(ar, vap, bss_ni,
-			    ic->ic_curchan);
-			if (ret != 0) {
-				ATHP_CONF_UNLOCK(ar);
-				ath10k_err(ar,
-				    "%s: ath10k_vdev_start failed: %d\n",
-				    __func__, ret);
-				break;
-			}
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			ATHP_CONF_UNLOCK(ar);
@@ -780,7 +770,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ATHP_CONF_LOCK(ar);
 			(void) athp_vif_update_ap_ssid(vap, bss_ni);
 
-			/* Should we do vif_restart before ap_setup? */
+			/* TODO: Should we do vif_restart before ap_setup? */
 			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
@@ -822,15 +812,17 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	case IEEE80211_S_SCAN:
 		if (vap->iv_opmode != IEEE80211_M_STA)
 			break;
-		if (ostate != IEEE80211_S_RUN)
-			break;
 
 		ath10k_warn(ar, "%s: pausing/flushing queues\n", __func__);
 
 		athp_tx_disable(ar, vap);
 
 		/* Wait for xmit to finish before continuing */
-		ath10k_tx_flush(ar, vap, 0, 1);
+		ATHP_CONF_LOCK(ar);
+		ath10k_tx_flush_locked(ar, vap, 0, 1);
+		/* Delete any existing association */
+		ath10k_bss_update(ar, vap, bss_ni, 0, 0);
+		ATHP_CONF_UNLOCK(ar);
 
 		athp_tx_enable(ar, vap);
 

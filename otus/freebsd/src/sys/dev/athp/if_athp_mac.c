@@ -3411,6 +3411,13 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 	/*
+	 * Note: we don't have to do anything for is_run=0 - only need to
+	 * plumb up the association WMI command when we actually do associate.
+	 */
+	if (is_run == 0)
+		return;
+
+	/*
 	 * net80211: assume the caller has passed ni vap->iv_bss as the
 	 * node; and has also ref'ed it for us.
 	 */
@@ -8704,11 +8711,12 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 #if 0
-	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d\n",
+	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d, is_run=%d\n",
 	    __func__,
 	    vap,
 	    ni,
-	    is_assoc);
+	    is_assoc,
+	    is_run);
 #endif
 
 	if (is_assoc) {
@@ -8723,7 +8731,8 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 * Before updating the base parameters, ensure we clear out
 		 * any previous vdev setup.
 		 */
-		ath10k_bss_disassoc(ar, vap, is_run);
+		if (arvif->is_stabss_setup == 1)
+			ath10k_bss_disassoc(ar, vap, is_run);
 
 		ATHP_DATA_LOCK(ar);
 		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
@@ -8741,15 +8750,23 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 			ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
 
 		/* Now associate */
-		ath10k_bss_assoc(ar, ni, is_run);
-		arvif->is_stabss_setup = 1;
+		if (is_run) {
+			ath10k_bss_assoc(ar, ni, is_run);
+			arvif->is_stabss_setup = 1;
+		}
 		ath10k_monitor_recalc(ar);
 
 		/* For WEP mode - replumb keys */
 		athp_sta_vif_wep_replumb(vap, ni->ni_macaddr);
 
 	} else {
-		ath10k_bss_disassoc(ar, vap, is_run);
+		if (arvif->is_stabss_setup == 1)
+			ath10k_bss_disassoc(ar, vap, is_run);
+
+		/*
+		 * Always do a peer delete, in case we failed to get to
+		 * assoc state
+		 */
 		(void) ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 		arvif->is_stabss_setup = 0;
 	}
