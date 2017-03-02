@@ -1709,15 +1709,17 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	return ret;
 }
 
-int
+static int
 ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
+
 	return ath10k_vdev_start_restart(arvif, c, false);
 }
 
-int
+static int
 ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
+
 	return ath10k_vdev_start_restart(arvif, c, true);
 }
 
@@ -7662,6 +7664,7 @@ ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c)
 		   c->ic_ieee, arvif->vdev_id);
 
 	if (WARN_ON(arvif->is_started)) {
+		ath10k_err(ar, "%s: failed; is already started!\n", __func__);
 		return -EBUSY;
 	}
 
@@ -7750,6 +7753,10 @@ ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap,
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (! arvif->is_started) {
+		ath10k_err(ar, "%s: called, but not started!\n", __func__);
+	}
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: restarting vap\n", __func__);
 

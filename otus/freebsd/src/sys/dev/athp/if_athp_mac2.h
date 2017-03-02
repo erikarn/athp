@@ -58,8 +58,6 @@ extern	void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int i
 extern	void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vap, int is_run);
 
 extern	int ath10k_vdev_stop(struct ath10k_vif *arvif);
-extern	int ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c);
-extern	int ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c);
 
 extern	void ath10k_vif_bring_down(struct ieee80211vap *vap);
 extern	int ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c);

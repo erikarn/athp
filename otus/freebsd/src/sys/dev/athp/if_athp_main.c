@@ -800,7 +800,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				ATHP_CONF_UNLOCK(ar);
 				if (ret != 0) {
 					ath10k_err(ar,
-					    "%s: ath10k_vdev_start failed; ret=%d\n",
+					    "%s: ath10k_vif_bring_up failed; ret=%d\n",
 					    __func__, ret);
 					break;
 				}
@@ -865,23 +865,16 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 	case IEEE80211_S_AUTH:
 		/*
-		 * When going SCAN->AUTH, we need to plumb up the initial
-		 * BSS before we can send frames to it.
-		 *
-		 * For ASSOC, we do the same.
-		 *
-		 * Then for RUN we update the BSS configuration
-		 * with whatever new information we've found.
+		 * When going SCAN->AUTH, do the initial vdev start.
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
 			/* XXX note: can we use bss_ni->ic_chan? */
-			ret = ath10k_vif_restart(ar, vap, bss_ni,
-			    ic->ic_curchan);
+			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
 				ath10k_err(ar,
-				    "%s: ath10k_vdev_start failed: %d\n",
+				    "%s: ath10k_vif_bring_up failed: %d\n",
 				    __func__, ret);
 				break;
 			}
@@ -892,12 +885,6 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		break;
 	case IEEE80211_S_ASSOC:
 		/* Assuming we already went through AUTH */
-#if 0
-		ATHP_CONF_LOCK(ar);
-		/* Update the association state */
-		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
-		ATHP_CONF_UNLOCK(ar);
-#endif
 		break;
 	default:
 		ath10k_warn(ar, "%s: state %s not handled\n",
