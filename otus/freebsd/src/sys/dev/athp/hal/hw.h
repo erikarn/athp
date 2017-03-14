@@ -422,7 +422,7 @@ enum ath10k_hw_rate_cck {
  * so for now we abide by this limit and avoid requesting more
  * than that.
  */
-#define MSI_NUM_REQUEST_LOG2	3
+#define MSI_NUM_REQUEST_LOG2	4
 #define MSI_NUM_REQUEST		(1<<MSI_NUM_REQUEST_LOG2)
 
 /*

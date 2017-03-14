@@ -758,17 +758,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
-			/* XXX note: can we use bss_ni->ic_chan? */
-			ret = ath10k_vif_restart(ar, vap, bss_ni,
-			    ic->ic_curchan);
-			if (ret != 0) {
-				ATHP_CONF_UNLOCK(ar);
-				ath10k_err(ar,
-				    "%s: ath10k_vdev_start failed: %d\n",
-				    __func__, ret);
-				break;
-			}
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			ATHP_CONF_UNLOCK(ar);
 		}
@@ -780,7 +771,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ATHP_CONF_LOCK(ar);
 			(void) athp_vif_update_ap_ssid(vap, bss_ni);
 
-			/* Should we do vif_restart before ap_setup? */
+			/* TODO: Should we do vif_restart before ap_setup? */
 			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
@@ -810,7 +801,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				ATHP_CONF_UNLOCK(ar);
 				if (ret != 0) {
 					ath10k_err(ar,
-					    "%s: ath10k_vdev_start failed; ret=%d\n",
+					    "%s: ath10k_vif_bring_up failed; ret=%d\n",
 					    __func__, ret);
 					break;
 				}
@@ -822,15 +813,17 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	case IEEE80211_S_SCAN:
 		if (vap->iv_opmode != IEEE80211_M_STA)
 			break;
-		if (ostate != IEEE80211_S_RUN)
-			break;
 
 		ath10k_warn(ar, "%s: pausing/flushing queues\n", __func__);
 
 		athp_tx_disable(ar, vap);
 
 		/* Wait for xmit to finish before continuing */
-		ath10k_tx_flush(ar, vap, 0, 1);
+		ATHP_CONF_LOCK(ar);
+		ath10k_tx_flush_locked(ar, vap, 0, 1);
+		/* Delete any existing association */
+		ath10k_bss_update(ar, vap, bss_ni, 0, 0);
+		ATHP_CONF_UNLOCK(ar);
 
 		athp_tx_enable(ar, vap);
 
@@ -873,23 +866,16 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 	case IEEE80211_S_AUTH:
 		/*
-		 * When going SCAN->AUTH, we need to plumb up the initial
-		 * BSS before we can send frames to it.
-		 *
-		 * For ASSOC, we do the same.
-		 *
-		 * Then for RUN we update the BSS configuration
-		 * with whatever new information we've found.
+		 * When going SCAN->AUTH, do the initial vdev start.
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
 			/* XXX note: can we use bss_ni->ic_chan? */
-			ret = ath10k_vif_restart(ar, vap, bss_ni,
-			    ic->ic_curchan);
+			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
 				ath10k_err(ar,
-				    "%s: ath10k_vdev_start failed: %d\n",
+				    "%s: ath10k_vif_bring_up failed: %d\n",
 				    __func__, ret);
 				break;
 			}
@@ -900,12 +886,6 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		break;
 	case IEEE80211_S_ASSOC:
 		/* Assuming we already went through AUTH */
-#if 0
-		ATHP_CONF_LOCK(ar);
-		/* Update the association state */
-		ath10k_bss_update(ar, vap, bss_ni, 1, 0);
-		ATHP_CONF_UNLOCK(ar);
-#endif
 		break;
 	default:
 		ath10k_warn(ar, "%s: state %s not handled\n",
@@ -1357,6 +1337,33 @@ athp_beacon_update(struct ieee80211vap *vap, int item)
 	setbit(bo->bo_flags, item);
 }
 
+static int
+athp_vap_wme_update(struct ieee80211vap *vap,
+    const struct wmeParams *wme_params)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
+	ATHP_CONF_LOCK(ar);
+	ath10k_update_wme_vap(vap, wme_params);
+	ATHP_CONF_UNLOCK(ar);
+
+	return (0);
+}
+
+#if 0
+static int
+athp_vap_update_slot(struct ieee80211vap *vap, int slot)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
+
+	return (0);
+}
+#endif
+
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     enum ieee80211_opmode opmode, int flags,
@@ -1415,6 +1422,10 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_update_beacon = athp_beacon_update;
 	vif->av_update_deftxkey = vap->iv_update_deftxkey;
 	vap->iv_update_deftxkey = athp_update_deftxkey;
+	vap->iv_wme_update = athp_vap_wme_update;
+#if 0
+	vap->iv_slot_update = athp_vap_update_slot;
+#endif
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -1590,6 +1601,14 @@ athp_vap_delete(struct ieee80211vap *vap)
 static int
 athp_wme_update(struct ieee80211com *ic)
 {
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
+
+	/* Yes, aptly named.. */
+	ATHP_CONF_LOCK(ar);
+	ath10k_update_wme(ic);
+	ATHP_CONF_UNLOCK(ar);
 
 	return (0);
 }
@@ -1597,7 +1616,9 @@ athp_wme_update(struct ieee80211com *ic)
 static void
 athp_update_slot(struct ieee80211com *ic)
 {
+	struct ath10k *ar = ic->ic_softc;
 
+	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
 }
 
 static void

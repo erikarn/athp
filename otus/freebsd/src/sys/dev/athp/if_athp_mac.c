@@ -1652,6 +1652,8 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.dtim_period = arvif->dtim_period;
 	arg.bcn_intval = arvif->beacon_interval;
 
+	ath10k_warn(ar, "%s: called; dtim=%d, intval=%d\n", __func__, arg.dtim_period, arg.bcn_intval);
+
 	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
 	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
@@ -1709,15 +1711,17 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	return ret;
 }
 
-int
+static int
 ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
+
 	return ath10k_vdev_start_restart(arvif, c, false);
 }
 
-int
+static int
 ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
+
 	return ath10k_vdev_start_restart(arvif, c, true);
 }
 
@@ -2743,7 +2747,6 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	    | IEEE80211_HTCAP_SHORTGI20
 	    | IEEE80211_HTCAP_SHORTGI40
 	    | IEEE80211_HTCAP_DELBA
-	    | IEEE80211_HTCAP_MAXAMSDU_7935
 	    | IEEE80211_HTCAP_DSSSCCK40
 	    | IEEE80211_HTCAP_PSMP
 	    | IEEE80211_HTCAP_40INTOLERANT
@@ -2760,6 +2763,12 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	    htcap_mask);
 
 	htcap = (sta->ni_htcap & ~(htcap_mask)) | htcap_filt;
+
+	/* MAX_AMSDU - only if both sides can do it */
+	htcap &= ~(IEEE80211_HTCAP_MAXAMSDU);
+	if ((sta->ni_htcap & IEEE80211_HTCAP_MAXAMSDU_7935) &&
+	    (vif->iv_htcaps & IEEE80211_HTCAP_MAXAMSDU_7935))
+		htcap |= IEEE80211_HTCAP_MAXAMSDU_7935;
 
 	/* CHWIDTH40 - only enable it if we're on a HT40 channel */
 	htcap &= ~(IEEE80211_HTCAP_CHWIDTH40);
@@ -3404,6 +3413,13 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/*
+	 * Note: we don't have to do anything for is_run=0 - only need to
+	 * plumb up the association WMI command when we actually do associate.
+	 */
+	if (is_run == 0)
+		return;
 
 	/*
 	 * net80211: assume the caller has passed ni vap->iv_bss as the
@@ -6652,10 +6668,12 @@ exit:
 	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+#endif
 
-static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211_vif *vif,
+static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
 				u16 ac, bool enable)
 {
+#if 0
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_sta_uapsd_auto_trig_arg arg = {};
 	u32 prio = 0, acc = 0;
@@ -6757,30 +6775,39 @@ static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211_vif *vif,
 
 exit:
 	return ret;
+#else
+	ath10k_warn(ar, "%s: TODO!\n", __func__);
+	return (0);
+#endif
 }
 
-static int ath10k_conf_tx(struct ieee80211_hw *hw,
-			  struct ieee80211_vif *vif, u16 ac,
-			  const struct ieee80211_tx_queue_params *params)
+/*
+ * This is called only in the STA path for now, but yes, it should also
+ * be called in the AP path.  Double-check what the semantics there
+ * should be.
+ */
+static int ath10k_conf_tx(struct ath10k *ar,
+			  struct ieee80211vap *vif, u16 ac,
+			  const struct wmeParams *wmep)
 {
-	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_wmm_params_arg *p = NULL;
+//	struct wmeParams *wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
 	int ret;
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	switch (ac) {
-	case IEEE80211_AC_VO:
+	case WME_AC_VO:
 		p = &arvif->wmm_params.ac_vo;
 		break;
-	case IEEE80211_AC_VI:
+	case WME_AC_VI:
 		p = &arvif->wmm_params.ac_vi;
 		break;
-	case IEEE80211_AC_BE:
+	case WME_AC_BE:
 		p = &arvif->wmm_params.ac_be;
 		break;
-	case IEEE80211_AC_BK:
+	case WME_AC_BK:
 		p = &arvif->wmm_params.ac_bk;
 		break;
 	}
@@ -6790,16 +6817,23 @@ static int ath10k_conf_tx(struct ieee80211_hw *hw,
 		goto exit;
 	}
 
-	p->cwmin = params->cw_min;
-	p->cwmax = params->cw_max;
-	p->aifs = params->aifs;
+	p->cwmin = (1 << wmep->wmep_logcwmin) - 1;
+	p->cwmax = (1 << wmep->wmep_logcwmax) - 1;
+	p->aifs = wmep->wmep_aifsn;
 
 	/*
 	 * The channel time duration programmed in the HW is in absolute
-	 * microseconds, while mac80211 gives the txop in units of
-	 * 32 microseconds.
+	 * microseconds, which net80211 cheerfully gives us.
 	 */
-	p->txop = params->txop * 32;
+	p->txop = IEEE80211_TXOP_TO_US(wmep->wmep_txopLimit);
+
+	ath10k_warn(ar, "%s: ac=%d, cwmin=%d, cwmax=%d, aifs=%d, txop=%d\n",
+	    __func__,
+	    ac,
+	    p->cwmin,
+	    p->cwmax,
+	    p->aifs,
+	    p->txop);
 
 	if (ar->wmi.ops->gen_vdev_wmm_conf) {
 		ret = ath10k_wmi_vdev_wmm_conf(ar, arvif->vdev_id,
@@ -6820,14 +6854,18 @@ static int ath10k_conf_tx(struct ieee80211_hw *hw,
 		}
 	}
 
+#if 0
 	ret = ath10k_conf_tx_uapsd(ar, vif, ac, params->uapsd);
 	if (ret)
 		ath10k_warn(ar, "failed to set sta uapsd: %d\n", ret);
-
+#else
+	ath10k_warn(ar, "%s: TODO: set sta uapsd\n", __func__);
+#endif
 exit:
-	ATHP_CONF_UNLOCK(ar);
 	return ret;
 }
+
+#if 0
 
 #define ATH10K_ROC_TIMEOUT_HZ (2)
 
@@ -7650,6 +7688,7 @@ ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c)
 		   c->ic_ieee, arvif->vdev_id);
 
 	if (WARN_ON(arvif->is_started)) {
+		ath10k_err(ar, "%s: failed; is already started!\n", __func__);
 		return -EBUSY;
 	}
 
@@ -7738,6 +7777,10 @@ ath10k_vif_restart(struct ath10k *ar, struct ieee80211vap *vap,
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (! arvif->is_started) {
+		ath10k_err(ar, "%s: called, but not started!\n", __func__);
+	}
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: restarting vap\n", __func__);
 
@@ -8699,11 +8742,12 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 	ATHP_CONF_LOCK_ASSERT(ar);
 
 #if 0
-	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d\n",
+	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d, is_run=%d\n",
 	    __func__,
 	    vap,
 	    ni,
-	    is_assoc);
+	    is_assoc,
+	    is_run);
 #endif
 
 	if (is_assoc) {
@@ -8718,7 +8762,8 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 		 * Before updating the base parameters, ensure we clear out
 		 * any previous vdev setup.
 		 */
-		ath10k_bss_disassoc(ar, vap, is_run);
+		if (arvif->is_stabss_setup == 1)
+			ath10k_bss_disassoc(ar, vap, is_run);
 
 		ATHP_DATA_LOCK(ar);
 		if (! ath10k_peer_find(ar, arvif->vdev_id, ni->ni_macaddr)) {
@@ -8736,15 +8781,23 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 			ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
 
 		/* Now associate */
-		ath10k_bss_assoc(ar, ni, is_run);
-		arvif->is_stabss_setup = 1;
+		if (is_run) {
+			ath10k_bss_assoc(ar, ni, is_run);
+			arvif->is_stabss_setup = 1;
+		}
 		ath10k_monitor_recalc(ar);
 
 		/* For WEP mode - replumb keys */
 		athp_sta_vif_wep_replumb(vap, ni->ni_macaddr);
 
 	} else {
-		ath10k_bss_disassoc(ar, vap, is_run);
+		if (arvif->is_stabss_setup == 1)
+			ath10k_bss_disassoc(ar, vap, is_run);
+
+		/*
+		 * Always do a peer delete, in case we failed to get to
+		 * assoc state
+		 */
 		(void) ath10k_peer_delete(ar, arvif->vdev_id, arvif->bssid);
 		arvif->is_stabss_setup = 0;
 	}
@@ -9107,4 +9160,152 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 		(void) ath10k_set_key(ar, SET_KEY, vap, peer_addr,
 		    arvif->wep_keys[i], arvif->wep_key_ciphers[i]);
 	}
+}
+
+int
+ath10k_update_wme(struct ieee80211com *ic)
+{
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211vap *vap;
+	struct ath10k_vif *arvif;
+	int ret = 0;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* XXX locking - but we're already currently deferred by net80211 */
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		arvif = ath10k_vif_to_arvif(vap);
+
+		if (arvif->is_setup == 0)
+			continue;
+
+		/* now WMM */
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_BE,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE]);
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_BK,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BK]);
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_VI,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VI]);
+		ret |= ath10k_conf_tx(ar, vap, WME_AC_VO,
+		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VO]);
+	}
+
+	return (ret == 0 ? 0 : ENXIO);
+}
+
+int
+ath10k_update_wme_vap(struct ieee80211vap *vap,
+    const struct wmeParams *wme_params)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret = 0;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (arvif->is_setup == 0)
+		return (EINVAL);
+
+	/* now WMM */
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_BE, &wme_params[WME_AC_BE]);
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_BK, &wme_params[WME_AC_BK]);
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_VI, &wme_params[WME_AC_VI]);
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_VO, &wme_params[WME_AC_VO]);
+
+	return (ret == 0 ? 0 : ENXIO);
+}
+
+
+/*
+ * configure slot time, short/long preamble, beacon interval for
+ * STA mode operation.
+ *
+ * Note: this is a subset of what ath10k does in ath10k_bss_info_changed().
+ * Notably, the AP changing bintval, or dtim period, etc, should be picked
+ * up and turned into driver methods.
+ *
+ * So yes, let's eventually turn ath10k_bss_info_changed() into a set of
+ * methods which the driver can then register with net80211 as appropriate.
+ * TX power is already one of them.
+ */
+void
+athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret = 0;
+	u32 vdev_param;
+//	u32 pdev_param;
+	u32 slottime, preamble;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	/* Configure beacon interval */
+	arvif->beacon_interval = bss_ni->ni_intval;
+	vdev_param = ar->wmi.vdev_param->beacon_interval;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+	    arvif->beacon_interval);
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac vdev %d beacon_interval %d\n",
+		   arvif->vdev_id, arvif->beacon_interval);
+
+	if (ret)
+		ath10k_warn(ar, "failed to set beacon interval for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	/* ERP CTS protection */
+	arvif->use_cts_prot = !! (bss_ni->ni_erp & IEEE80211_ERP_USE_PROTECTION);
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d cts_prot %d\n",
+	   arvif->vdev_id, arvif->use_cts_prot);
+
+	ret = ath10k_recalc_rtscts_prot(arvif);
+	if (ret)
+		ath10k_warn(ar, "failed to recalculate rts/cts prot for vdev %d: %d\n",
+			    arvif->vdev_id, ret);
+
+	vdev_param = ar->wmi.vdev_param->protection_mode;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					arvif->use_cts_prot ? 1 : 0);
+	if (ret)
+		ath10k_warn(ar, "failed to set protection mode %d on vdev %i: %d\n",
+				arvif->use_cts_prot, arvif->vdev_id, ret);
+
+	/*
+	 * XXX TODO: ERP slot time should be done as part of the channel change,
+	 * as well as operating mode.  Sigh, will have to dig into this
+	 * in a lot more detail, as well as potentially dynamically updating
+	 * it in AP mode!
+	 */
+	if (IEEE80211_GET_SLOTTIME(vap->iv_ic) == IEEE80211_DUR_SHSLOT)
+		slottime = WMI_VDEV_SLOT_TIME_SHORT; /* 9us */
+	else
+		slottime = WMI_VDEV_SLOT_TIME_LONG; /* 20us */
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d slot_time %d\n",
+		   arvif->vdev_id, slottime);
+
+	vdev_param = ar->wmi.vdev_param->slot_time;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					slottime);
+	if (ret)
+		ath10k_warn(ar, "failed to set erp slot for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	/* And we don't track preamble length via a method yet; and it's not per-vap, sigh */
+	if (vap->iv_ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+		preamble = WMI_VDEV_PREAMBLE_SHORT;
+	else
+		preamble = WMI_VDEV_PREAMBLE_LONG;
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC,
+		   "mac vdev %d preamble %d\n",
+		   arvif->vdev_id, preamble);
+
+	vdev_param = ar->wmi.vdev_param->preamble;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					preamble);
+	if (ret)
+		ath10k_warn(ar, "failed to set preamble for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
 }

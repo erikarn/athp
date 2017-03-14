@@ -1,0 +1,799 @@
+[ 3702.627766] ath10k_pci 0000:03:00.0: pci irq msi interrupts 1 irq_mode 0 reset_mode 0
+[ 3702.768344] ath10k_pci 0000:03:00.0: Direct firmware load for ath10k/cal-pci-0000:03:00.0.bin failed with error -2
+[ 3702.826089] ath10k_pci 0000:03:00.0: Direct firmware load for ath10k/QCA988X/hw2.0/board-2.bin failed with error -2
+[ 3704.027756] ath10k_pci 0000:03:00.0: qca988x hw2.0 (0x4100016c, 0x043202ff sub 0000:0000) fw 10.2.4.70.9-2 fwapi 5 bdapi 1 htt-ver 2.1 wmi-op 5 htt-op 2 cal otp max-sta 128 raw 0 hwcrypto 1 features no-p2p,raw-mode
+[ 3704.027774] ath10k_pci 0000:03:00.0: debug 1 debugfs 1 tracing 1 dfs 0 testmode 0
+[ 3704.093103] ath: EEPROM regdomain: 0x0
+[ 3704.093108] ath: EEPROM indicates default country code should be used
+[ 3704.093110] ath: doing EEPROM country->regdmn map search
+[ 3704.093112] ath: country maps to regdmn code: 0x3a
+[ 3704.093114] ath: Country alpha2 being used: US
+[ 3704.093116] ath: Regpair used: 0x3a
+[ 3704.117755] ath10k_pci 0000:03:00.0 wls1: renamed from wlan0
+[ 3704.141832] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 3705.436094] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 3705.494530] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 3919.000984] ath10k_pci 0000:03:00.0: pci irq msi interrupts 1 irq_mode 0 reset_mode 0
+[ 3919.143968] ath10k_pci 0000:03:00.0: Direct firmware load for ath10k/cal-pci-0000:03:00.0.bin failed with error -2
+[ 3919.199840] ath10k_pci 0000:03:00.0: Direct firmware load for ath10k/QCA988X/hw2.0/board-2.bin failed with error -2
+[ 3920.400717] ath10k_pci 0000:03:00.0: qca988x hw2.0 (0x4100016c, 0x043202ff sub 0000:0000) fw 10.2.4.70.9-2 fwapi 5 bdapi 1 htt-ver 2.1 wmi-op 5 htt-op 2 cal otp max-sta 128 raw 0 hwcrypto 1 features no-p2p,raw-mode
+[ 3920.400766] ath10k_pci 0000:03:00.0: debug 1 debugfs 1 tracing 1 dfs 0 testmode 0
+[ 3920.464773] ath: EEPROM regdomain: 0x0
+[ 3920.464778] ath: EEPROM indicates default country code should be used
+[ 3920.464780] ath: doing EEPROM country->regdmn map search
+[ 3920.464782] ath: country maps to regdmn code: 0x3a
+[ 3920.464784] ath: Country alpha2 being used: US
+[ 3920.464785] ath: Regpair used: 0x3a
+[ 3920.468596] ath10k_pci 0000:03:00.0 wls1: renamed from wlan0
+[ 3920.493635] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 3921.792075] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 3921.840169] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 4001.484603] ath10k_pci: unknown parameter 'debug_mask' ignored
+[ 4001.486083] ath10k_pci 0000:03:00.0: pci irq msi interrupts 1 irq_mode 0 reset_mode 0
+[ 4001.625467] ath10k_pci 0000:03:00.0: Direct firmware load for ath10k/cal-pci-0000:03:00.0.bin failed with error -2
+[ 4001.681343] ath10k_pci 0000:03:00.0: Direct firmware load for ath10k/QCA988X/hw2.0/board-2.bin failed with error -2
+[ 4002.861050] ath10k_pci 0000:03:00.0: wmi svc: 00000000: 0e 00 00 00 07 00 00 00 07 00 00 00 09 00 00 00  ................
+[ 4002.861063] ath10k_pci 0000:03:00.0: wmi svc: 00000010: 0f 00 00 00 0a 00 00 00 03 00 00 00 00 00 00 00  ................
+[ 4002.861077] ath10k_pci 0000:03:00.0: wmi svc: 00000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+[ 4002.861079] ath10k_pci 0000:03:00.0: wmi svc: 00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+[ 4002.861082] ath10k_pci 0000:03:00.0: wmi mem_req_id 1 num_units 0 num_unit_info 2 unit size 440 actual units 145
+[ 4002.861092] ath10k_pci 0000:03:00.0: wmi event service ready min_tx_power 0x0000003f max_tx_power 0x0000003f ht_cap 0x0000085b vht_cap 0x338001b2 sw_ver0 0x41000009 sw_ver1 0x00000000 fw_build 0x00000000 phy_capab 0x00000001 num_rf_chains 0x00000003 eeprom_rd 0x00000000 num_mem_reqs 0x00000001
+[ 4002.861135] ath10k_pci 0000:03:00.0: wmi chunk 0 len 63800 requested, addr 0x1ebf0000
+[ 4002.861138] ath10k_pci 0000:03:00.0: wmi init 10.2
+[ 4002.881345] ath10k_pci 0000:03:00.0: wmi event ready sw_version 1090519049 abi_version 1 mac_addr 00:03:7f:48:ce:bc status 0
+[ 4002.881701] ath10k_pci 0000:03:00.0: wmi disable pktlog
+[ 4002.881715] ath10k_pci 0000:03:00.0: qca988x hw2.0 (0x4100016c, 0x043202ff sub 0000:0000) fw 10.2.4.70.9-2 fwapi 5 bdapi 1 htt-ver 2.1 wmi-op 5 htt-op 2 cal otp max-sta 128 raw 0 hwcrypto 1 features no-p2p,raw-mode
+[ 4002.881719] ath10k_pci 0000:03:00.0: debug 1 debugfs 1 tracing 1 dfs 0 testmode 0
+[ 4002.881735] ath10k_pci 0000:03:00.0: wmi disable pktlog
+[ 4002.947309] ath: EEPROM regdomain: 0x0
+[ 4002.947318] ath: EEPROM indicates default country code should be used
+[ 4002.947320] ath: doing EEPROM country->regdmn map search
+[ 4002.947324] ath: country maps to regdmn code: 0x3a
+[ 4002.947327] ath: Country alpha2 being used: US
+[ 4002.947329] ath: Regpair used: 0x3a
+
+* ok, defaults to 0x3a
+
+[ 4002.952479] ath10k_pci 0000:03:00.0 wls1: renamed from wlan0
+[ 4002.985201] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 4004.245125] ath10k_pci 0000:03:00.0: wmi svc: 00000000: 0e 00 00 00 07 00 00 00 07 00 00 00 09 00 00 00  ................
+[ 4004.245138] ath10k_pci 0000:03:00.0: wmi svc: 00000010: 0f 00 00 00 0a 00 00 00 03 00 00 00 00 00 00 00  ................
+[ 4004.245144] ath10k_pci 0000:03:00.0: wmi svc: 00000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+[ 4004.245150] ath10k_pci 0000:03:00.0: wmi svc: 00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+[ 4004.245161] ath10k_pci 0000:03:00.0: wmi event service ready min_tx_power 0x0000003f max_tx_power 0x0000003f ht_cap 0x0000085b vht_cap 0x338001b2 sw_ver0 0x41000009 sw_ver1 0x00000000 fw_build 0x00000000 phy_capab 0x00000001 num_rf_chains 0x00000003 eeprom_rd 0x00000000 num_mem_reqs 0x00000001
+[ 4004.245243] ath10k_pci 0000:03:00.0: wmi chunk 0 len 63800 requested, addr 0x1ebf0000
+[ 4004.245252] ath10k_pci 0000:03:00.0: wmi init 10.2
+[ 4004.265511] ath10k_pci 0000:03:00.0: wmi event ready sw_version 1090519049 abi_version 1 mac_addr 00:03:7f:48:ce:bc status 0
+[ 4004.266247] ath10k_pci 0000:03:00.0: wmi disable pktlog
+
+* TODO: go look at these
+
+[ 4004.266265] ath10k_pci 0000:03:00.0: wmi pdev set param 30 value 1
+[ 4004.266327] ath10k_pci 0000:03:00.0: wmi pdev set param 10 value 1
+[ 4004.266367] ath10k_pci 0000:03:00.0: wmi pdev set param 41 value 0
+[ 4004.266415] ath10k_pci 0000:03:00.0: wmi pdev set param 1 value 7
+[ 4004.266445] ath10k_pci 0000:03:00.0: wmi pdev set param 2 value 7
+[ 4004.273606] ath10k_pci 0000:03:00.0: wmi pdev set param 31 value 0
+[ 4004.273613] ath10k_pci 0000:03:00.0: wmi pdev set param 33 value 1
+
+* Initial channel configuration
+
+[ 4004.273680] ath10k_pci 0000:03:00.0: mac channel [0/25] freq 5180 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4004.273685] ath10k_pci 0000:03:00.0: mac channel [1/25] freq 5200 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4004.273689] ath10k_pci 0000:03:00.0: mac channel [2/25] freq 5220 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4004.273692] ath10k_pci 0000:03:00.0: mac channel [3/25] freq 5240 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4004.273695] ath10k_pci 0000:03:00.0: mac channel [4/25] freq 5260 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273698] ath10k_pci 0000:03:00.0: mac channel [5/25] freq 5280 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273701] ath10k_pci 0000:03:00.0: mac channel [6/25] freq 5300 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273704] ath10k_pci 0000:03:00.0: mac channel [7/25] freq 5320 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273707] ath10k_pci 0000:03:00.0: mac channel [8/25] freq 5500 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273710] ath10k_pci 0000:03:00.0: mac channel [9/25] freq 5520 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273713] ath10k_pci 0000:03:00.0: mac channel [10/25] freq 5540 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273716] ath10k_pci 0000:03:00.0: mac channel [11/25] freq 5560 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273719] ath10k_pci 0000:03:00.0: mac channel [12/25] freq 5580 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273722] ath10k_pci 0000:03:00.0: mac channel [13/25] freq 5600 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273725] ath10k_pci 0000:03:00.0: mac channel [14/25] freq 5620 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273728] ath10k_pci 0000:03:00.0: mac channel [15/25] freq 5640 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273731] ath10k_pci 0000:03:00.0: mac channel [16/25] freq 5660 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273734] ath10k_pci 0000:03:00.0: mac channel [17/25] freq 5680 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273737] ath10k_pci 0000:03:00.0: mac channel [18/25] freq 5700 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273740] ath10k_pci 0000:03:00.0: mac channel [19/25] freq 5720 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4004.273743] ath10k_pci 0000:03:00.0: mac channel [20/25] freq 5745 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4004.273746] ath10k_pci 0000:03:00.0: mac channel [21/25] freq 5765 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4004.273749] ath10k_pci 0000:03:00.0: mac channel [22/25] freq 5785 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4004.273752] ath10k_pci 0000:03:00.0: mac channel [23/25] freq 5805 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4004.273755] ath10k_pci 0000:03:00.0: mac channel [24/25] freq 5825 maxpower 60 regpower 60 antenna 0 mode 0
+
+* note the regdomain, and CTL used.  I need to fix this in my driver
+
+[ 4004.273762] ath10k_pci 0000:03:00.0: wmi pdev regdomain rd 3a rd2g 3a rd5g 3a ctl2g 10 ctl5g 10 dfs_region 0
+
+* .. and yes, the default quiet time period
+
+[ 4004.280874] ath10k_pci 0000:03:00.0: wmi quiet param: period 100 duration 0 enabled 0
+
+* create interface, STA, not TDLS
+
+[ 4004.280935] ath10k_pci 0000:03:00.0: mac create vdev 0 map ffff
+[ 4004.280939] ath10k_pci 0000:03:00.0: mac vdev create 0 (add interface) type 2 subtype 0 bcnmode per-skb
+[ 4004.280942] ath10k_pci 0000:03:00.0: WMI vdev create: id 0 type 2 subtype 0 macaddr 00:03:7f:48:ce:bc
+[ 4004.280946] ath10k_pci 0000:03:00.0: vdev param 0 not supported by firmware
+
+* TODO figure out these
+
+[ 4004.280949] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 32 value 3
+[ 4004.280952] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4004.281198] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4004.281204] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4004.281235] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 1 value -1
+
+* notice: tell firmware TX power is 0, so I guess "default"
+
+[ 4004.281238] ath10k_pci 0000:03:00.0: mac txpower 0
+[ 4004.281240] ath10k_pci 0000:03:00.0: wmi pdev set param 3 value 0
+[ 4004.281280] ath10k_pci 0000:03:00.0: wmi pdev set param 4 value 0
+
+* TODO: yes, cts prot, slot time, preamble, WMM - I'm not doing these yet :(
+
+[ 4004.281285] ath10k_pci 0000:03:00.0: mac vdev 0 cts_prot 0
+[ 4004.281287] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 43 value 17
+[ 4004.281321] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 24 value 0
+[ 4004.281452] ath10k_pci 0000:03:00.0: mac vdev 0 slot_time 1
+[ 4004.281472] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 7 value 1
+[ 4004.281487] ath10k_pci 0000:03:00.0: mac vdev 0 preamble 1n
+[ 4004.281490] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 8 value 1
+[ 4004.281511] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4004.281539] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4004.281542] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4004.281691] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4004.281729] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4004.281735] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4004.281739] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4004.281821] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4004.281832] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4004.281903] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4004.281910] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4004.281957] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4004.281961] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4004.282034] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4004.282038] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4004.282076] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4004.282079] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4004.282116] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4004.282160] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4004.282163] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+
+* TODO: psmode enable
+
+[ 4004.282208] ath10k_pci 0000:03:00.0: mac vdev 0 psmode enable
+[ 4004.282211] ath10k_pci 0000:03:00.0: wmi set powersave id 0x0 mode 1
+[ 4004.282214] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4004.282259] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4004.282293] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4004.282295] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+[ 4004.282305] ath10k_pci 0000:03:00.0: mac vdev 0 psmode enable
+[ 4004.282310] ath10k_pci 0000:03:00.0: wmi set powersave id 0x0 mode 1
+[ 4004.327005] IPv6: ADDRCONF(NETDEV_UP): wls1: link is not ready
+
+* start a scan!
+
+[ 4004.327746] ath10k_pci 0000:03:00.0: wmi 10x start scan
+[ 4004.327858] ath10k_pci 0000:03:00.0: scan event started type 1 reason 3 freq 0 req_id 40961 scan_id 40960 vdev_id 0 state starting (1)
+[ 4004.327866] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 0 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.331969] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.331975] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 0 noise_floor 0 rx_clear_count 1549690 cycle_count 6549486
+[ 4004.378089] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.378138] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 1 noise_floor -105 rx_clear_count 1604395 cycle_count 10600599
+[ 4004.382088] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.382136] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 0 noise_floor 0 rx_clear_count 1604610 cycle_count 10953710
+[ 4004.428188] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.428231] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 1 noise_floor -105 rx_clear_count 1616956 cycle_count 15004207
+[ 4004.432186] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.432232] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 0 noise_floor 0 rx_clear_count 1617220 cycle_count 15357318
+[ 4004.478237] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.478275] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 1 noise_floor -105 rx_clear_count 1725323 cycle_count 19408167
+[ 4004.482167] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.482184] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 0 noise_floor 0 rx_clear_count 1725538 cycle_count 19761190
+[ 4004.528233] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.528263] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 1 noise_floor -104 rx_clear_count 1738898 cycle_count 23812215
+[ 4004.532283] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.532314] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 0 noise_floor 0 rx_clear_count 1739113 cycle_count 24165326
+[ 4004.678342] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.678385] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 1 noise_floor -104 rx_clear_count 1739543 cycle_count 37016439
+[ 4004.682346] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.682397] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 0 noise_floor 0 rx_clear_count 1739758 cycle_count 37369814
+[ 4004.828372] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.828417] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 1 noise_floor -103 rx_clear_count 1741413 cycle_count 50220839
+[ 4004.832346] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.832381] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 0 noise_floor 0 rx_clear_count 1741628 cycle_count 50574038
+[ 4004.978445] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.978494] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 1 noise_floor -103 rx_clear_count 1742245 cycle_count 63425415
+[ 4004.982430] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4004.982479] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 0 noise_floor 0 rx_clear_count 1742460 cycle_count 63778526
+[ 4005.128502] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.128550] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 1 noise_floor -102 rx_clear_count 1744691 cycle_count 76629903
+[ 4005.132496] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.132543] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 0 noise_floor 0 rx_clear_count 1744691 cycle_count 76983014
+[ 4005.244747] ath10k_pci 0000:03:00.0: wmi event debug mesg len 224
+[ 4005.278536] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.278632] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 1 noise_floor -100 rx_clear_count 1744906 cycle_count 89834127
+[ 4005.282458] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.282483] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 0 noise_floor 0 rx_clear_count 1745170 cycle_count 90187238
+[ 4005.428613] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.428663] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 1 noise_floor -102 rx_clear_count 1747585 cycle_count 103038439
+[ 4005.432607] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.432660] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 0 noise_floor 0 rx_clear_count 1747772 cycle_count 103391462
+[ 4005.578668] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.578711] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 1 noise_floor -103 rx_clear_count 1747772 cycle_count 116242751
+[ 4005.582653] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.582696] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 0 noise_floor 0 rx_clear_count 1748036 cycle_count 116595774
+[ 4005.728719] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.728764] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 1 noise_floor -102 rx_clear_count 1750414 cycle_count 129446887
+[ 4005.732712] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.732758] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 0 noise_floor 0 rx_clear_count 1750629 cycle_count 129799910
+[ 4005.878734] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.878781] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 1 noise_floor -101 rx_clear_count 1750844 cycle_count 142650935
+[ 4005.882732] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4005.882784] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 0 noise_floor 0 rx_clear_count 1751059 cycle_count 143004046
+[ 4006.028807] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.028854] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 1 noise_floor -102 rx_clear_count 1752078 cycle_count 155855071
+[ 4006.032807] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.032853] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 0 noise_floor 0 rx_clear_count 1752265 cycle_count 156208182
+[ 4006.178871] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.178918] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 1 noise_floor -104 rx_clear_count 1752667 cycle_count 169059031
+[ 4006.182801] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.182848] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 0 noise_floor 0 rx_clear_count 1752882 cycle_count 169412230
+[ 4006.328925] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.328973] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 1 noise_floor -103 rx_clear_count 1755253 cycle_count 182264575
+[ 4006.332931] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.332977] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 0 noise_floor 0 rx_clear_count 1755491 cycle_count 182617598
+[ 4006.478990] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.479035] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 1 noise_floor -104 rx_clear_count 1757411 cycle_count 195468359
+[ 4006.482897] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.482932] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 0 noise_floor 0 rx_clear_count 1757626 cycle_count 195821470
+[ 4006.629021] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.629073] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 1 noise_floor -102 rx_clear_count 1757626 cycle_count 208673199
+[ 4006.632958] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.633002] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 0 noise_floor 0 rx_clear_count 1757841 cycle_count 209026310
+[ 4006.779106] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.779148] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 1 noise_floor -102 rx_clear_count 1759999 cycle_count 221878108
+[ 4006.783066] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.783117] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 0 noise_floor 0 rx_clear_count 1760214 cycle_count 222230974
+[ 4006.829152] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.829199] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 1 noise_floor -103 rx_clear_count 1774585 cycle_count 226282175
+[ 4006.833152] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.833198] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 0 noise_floor 0 rx_clear_count 1774772 cycle_count 226635286
+[ 4006.879132] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.879180] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 1 noise_floor -105 rx_clear_count 1789008 cycle_count 230685695
+[ 4006.883150] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.883199] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 0 noise_floor 0 rx_clear_count 1789223 cycle_count 231039070
+[ 4006.929203] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.929253] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 1 noise_floor -106 rx_clear_count 1949230 cycle_count 235089831
+[ 4006.933221] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.933272] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 0 noise_floor 0 rx_clear_count 1949494 cycle_count 235442942
+[ 4006.979234] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.979282] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 1 noise_floor -106 rx_clear_count 1990050 cycle_count 239493967
+[ 4006.983237] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4006.983286] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 0 noise_floor 0 rx_clear_count 1990265 cycle_count 239846990
+[ 4007.029335] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.029385] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 1 noise_floor -106 rx_clear_count 2189331 cycle_count 243897751
+[ 4007.033254] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.033300] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 0 noise_floor 0 rx_clear_count 2189546 cycle_count 244250774
+[ 4007.079288] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.079332] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 1 noise_floor -108 rx_clear_count 2201705 cycle_count 248301183
+[ 4007.079360] ath10k_pci 0000:03:00.0: scan event completed type 2 reason 0 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.772828] ath10k_pci 0000:03:00.0: wmi 10x start scan
+[ 4007.773017] ath10k_pci 0000:03:00.0: scan event started type 1 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state starting (1)
+[ 4007.773043] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.773057] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 1 noise_floor -108 rx_clear_count 2201705 cycle_count 248312119
+[ 4007.777396] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.777443] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 0 noise_floor 0 rx_clear_count 2241718 cycle_count 248686325
+[ 4007.823463] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.823501] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 1 noise_floor -105 rx_clear_count 2296428 cycle_count 252736910
+[ 4007.827440] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.827477] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 0 noise_floor 0 rx_clear_count 2296643 cycle_count 253089933
+[ 4007.873501] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.873546] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 1 noise_floor -105 rx_clear_count 2308801 cycle_count 257140782
+[ 4007.877429] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.877462] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 0 noise_floor 0 rx_clear_count 2309016 cycle_count 257493893
+[ 4007.923552] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.923593] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 1 noise_floor -105 rx_clear_count 2444997 cycle_count 261544830
+[ 4007.927542] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.927585] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 0 noise_floor 0 rx_clear_count 2445883 cycle_count 261897941
+[ 4007.973462] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.973480] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 1 noise_floor -104 rx_clear_count 2458041 cycle_count 265949054
+[ 4007.977512] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4007.977529] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 0 noise_floor 0 rx_clear_count 2458279 cycle_count 266302341
+[ 4008.123664] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.123693] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 1 noise_floor -104 rx_clear_count 2458989 cycle_count 279154238
+[ 4008.127659] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.127688] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 0 noise_floor 0 rx_clear_count 2459253 cycle_count 279508065
+[ 4008.273699] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.273737] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 1 noise_floor -104 rx_clear_count 2461087 cycle_count 292358206
+[ 4008.277700] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.277737] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 0 noise_floor 0 rx_clear_count 2461302 cycle_count 292711141
+[ 4008.423762] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.423799] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 1 noise_floor -102 rx_clear_count 2463292 cycle_count 305561726
+[ 4008.427752] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.427791] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 0 noise_floor 0 rx_clear_count 2463507 cycle_count 305914925
+[ 4008.573765] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.573811] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 1 noise_floor -102 rx_clear_count 2467884 cycle_count 318766038
+[ 4008.577795] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.577842] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 0 noise_floor 0 rx_clear_count 2468099 cycle_count 319119121
+[ 4008.723777] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.723817] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 1 noise_floor -101 rx_clear_count 2470697 cycle_count 331969910
+[ 4008.727768] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.727803] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 0 noise_floor 0 rx_clear_count 2470912 cycle_count 332322933
+[ 4008.873918] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.873953] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 1 noise_floor -101 rx_clear_count 2471127 cycle_count 345174134
+[ 4008.877889] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4008.877925] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 0 noise_floor 0 rx_clear_count 2471342 cycle_count 345527245
+[ 4009.023931] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.023974] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 1 noise_floor -101 rx_clear_count 2471557 cycle_count 358378534
+[ 4009.027941] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.027988] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 0 noise_floor 0 rx_clear_count 2471772 cycle_count 358731733
+[ 4009.173961] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.174011] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 1 noise_floor -101 rx_clear_count 2471772 cycle_count 371582230
+[ 4009.177953] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.177994] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 0 noise_floor 0 rx_clear_count 2472010 cycle_count 371935517
+[ 4009.324074] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.324120] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 1 noise_floor -101 rx_clear_count 2488692 cycle_count 384786699
+[ 4009.328035] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.328078] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 0 noise_floor 0 rx_clear_count 2488956 cycle_count 385139917
+[ 4009.474122] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.474174] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 1 noise_floor -101 rx_clear_count 2495899 cycle_count 397991294
+[ 4009.478091] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.478112] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 0 noise_floor 0 rx_clear_count 2496114 cycle_count 398344669
+[ 4009.624174] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.624225] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 1 noise_floor -101 rx_clear_count 2790350 cycle_count 411195254
+[ 4009.628159] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.628211] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 0 noise_floor 0 rx_clear_count 2790565 cycle_count 411548277
+[ 4009.774237] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.774284] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 1 noise_floor -102 rx_clear_count 2790829 cycle_count 424399654
+[ 4009.778236] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.778255] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 0 noise_floor 0 rx_clear_count 2791093 cycle_count 424752765
+[ 4009.924295] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.924331] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 1 noise_floor -103 rx_clear_count 2793125 cycle_count 437604582
+[ 4009.928233] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4009.928267] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 0 noise_floor 0 rx_clear_count 2793340 cycle_count 437957693
+[ 4010.074210] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.074251] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 1 noise_floor -102 rx_clear_count 2793340 cycle_count 450808894
+[ 4010.078351] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.078405] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 0 noise_floor 0 rx_clear_count 2793555 cycle_count 451162005
+[ 4010.224348] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.224384] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 1 noise_floor -104 rx_clear_count 2795552 cycle_count 464013206
+[ 4010.228347] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.228379] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 0 noise_floor 0 rx_clear_count 2795816 cycle_count 464366317
+[ 4010.274453] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.274495] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 1 noise_floor -106 rx_clear_count 2807975 cycle_count 468417606
+[ 4010.278461] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.278503] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 0 noise_floor 0 rx_clear_count 2808190 cycle_count 468770629
+[ 4010.324464] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.324505] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 1 noise_floor -105 rx_clear_count 2854809 cycle_count 472821814
+[ 4010.328454] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.328486] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 0 noise_floor 0 rx_clear_count 2855073 cycle_count 473174853
+[ 4010.374437] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.374446] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 1 noise_floor -106 rx_clear_count 2989764 cycle_count 477226406
+[ 4010.378554] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.378576] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 0 noise_floor 0 rx_clear_count 2989979 cycle_count 477579781
+[ 4010.424578] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.424605] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 1 noise_floor -106 rx_clear_count 3054853 cycle_count 481630190
+[ 4010.428458] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.428466] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 0 noise_floor 0 rx_clear_count 3061308 cycle_count 481983389
+[ 4010.474642] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.474667] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 1 noise_floor -107 rx_clear_count 3239244 cycle_count 486034150
+[ 4010.478662] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.478690] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 0 noise_floor 0 rx_clear_count 3239508 cycle_count 486387261
+[ 4010.524641] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4010.524667] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 1 noise_floor -107 rx_clear_count 3252133 cycle_count 490438022
+[ 4010.524675] ath10k_pci 0000:03:00.0: scan event completed type 2 reason 0 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+
+* I guess this is a regulatory domain change
+
+[ 4014.910568] ath10k_pci 0000:03:00.0: mac channel [0/25] freq 5180 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4014.910573] ath10k_pci 0000:03:00.0: mac channel [1/25] freq 5200 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4014.910575] ath10k_pci 0000:03:00.0: mac channel [2/25] freq 5220 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4014.910578] ath10k_pci 0000:03:00.0: mac channel [3/25] freq 5240 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4014.910580] ath10k_pci 0000:03:00.0: mac channel [4/25] freq 5260 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910582] ath10k_pci 0000:03:00.0: mac channel [5/25] freq 5280 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910584] ath10k_pci 0000:03:00.0: mac channel [6/25] freq 5300 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910587] ath10k_pci 0000:03:00.0: mac channel [7/25] freq 5320 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910589] ath10k_pci 0000:03:00.0: mac channel [8/25] freq 5500 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910591] ath10k_pci 0000:03:00.0: mac channel [9/25] freq 5520 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910593] ath10k_pci 0000:03:00.0: mac channel [10/25] freq 5540 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910596] ath10k_pci 0000:03:00.0: mac channel [11/25] freq 5560 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910598] ath10k_pci 0000:03:00.0: mac channel [12/25] freq 5580 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910600] ath10k_pci 0000:03:00.0: mac channel [13/25] freq 5600 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910602] ath10k_pci 0000:03:00.0: mac channel [14/25] freq 5620 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910604] ath10k_pci 0000:03:00.0: mac channel [15/25] freq 5640 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910607] ath10k_pci 0000:03:00.0: mac channel [16/25] freq 5660 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910609] ath10k_pci 0000:03:00.0: mac channel [17/25] freq 5680 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910611] ath10k_pci 0000:03:00.0: mac channel [18/25] freq 5700 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910613] ath10k_pci 0000:03:00.0: mac channel [19/25] freq 5720 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4014.910615] ath10k_pci 0000:03:00.0: mac channel [20/25] freq 5745 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4014.910617] ath10k_pci 0000:03:00.0: mac channel [21/25] freq 5765 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4014.910620] ath10k_pci 0000:03:00.0: mac channel [22/25] freq 5785 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4014.910622] ath10k_pci 0000:03:00.0: mac channel [23/25] freq 5805 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4014.910624] ath10k_pci 0000:03:00.0: mac channel [24/25] freq 5825 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4014.910632] ath10k_pci 0000:03:00.0: wmi pdev regdomain rd 3a rd2g 3a rd5g 3a ctl2g 10 ctl5g 10 dfs_region 0
+[ 4014.910643] cfg80211: World regulatory domain updated:
+[ 4014.910644] cfg80211:  DFS Master region: unset
+[ 4014.910646] cfg80211:   (start_freq - end_freq @ bandwidth), (max_antenna_gain, max_eirp), (dfs_cac_time)
+[ 4014.910648] cfg80211:   (2402000 KHz - 2472000 KHz @ 40000 KHz), (N/A, 2000 mBm), (N/A)
+[ 4014.910650] cfg80211:   (2457000 KHz - 2482000 KHz @ 40000 KHz), (N/A, 2000 mBm), (N/A)
+[ 4014.910652] cfg80211:   (2474000 KHz - 2494000 KHz @ 20000 KHz), (N/A, 2000 mBm), (N/A)
+[ 4014.910654] cfg80211:   (5170000 KHz - 5250000 KHz @ 80000 KHz, 160000 KHz AUTO), (N/A, 2000 mBm), (N/A)
+[ 4014.910656] cfg80211:   (5250000 KHz - 5330000 KHz @ 80000 KHz, 160000 KHz AUTO), (N/A, 2000 mBm), (0 s)
+[ 4014.910657] cfg80211:   (5490000 KHz - 5730000 KHz @ 160000 KHz), (N/A, 2000 mBm), (0 s)
+[ 4014.910659] cfg80211:   (5735000 KHz - 5835000 KHz @ 80000 KHz), (N/A, 2000 mBm), (N/A)
+[ 4014.910661] cfg80211:   (57240000 KHz - 63720000 KHz @ 2160000 KHz), (N/A, 0 mBm), (N/A)
+
+.. yup it was. Now it does another scan.
+
+[ 4021.361550] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4025.634671] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4025.660669] ath10k_pci 0000:03:00.0: wmi 10x start scan
+[ 4025.660888] ath10k_pci 0000:03:00.0: scan event started type 1 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state starting (1)
+[ 4025.660900] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.660906] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 1 noise_floor -107 rx_clear_count 3252133 cycle_count 490451788
+[ 4025.665033] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.665052] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 0 noise_floor 0 rx_clear_count 3252133 cycle_count 490815333
+[ 4025.711024] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.711036] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 1 noise_floor -106 rx_clear_count 3436757 cycle_count 494866006
+[ 4025.715062] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.715070] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 0 noise_floor 0 rx_clear_count 3437643 cycle_count 495219381
+[ 4025.761075] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.761081] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 1 noise_floor -105 rx_clear_count 3464072 cycle_count 499270318
+[ 4025.765090] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.765097] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 0 noise_floor 0 rx_clear_count 3464287 cycle_count 499623429
+[ 4025.811164] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.811173] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 1 noise_floor -105 rx_clear_count 3614346 cycle_count 503674278
+[ 4025.815152] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.815160] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 0 noise_floor 0 rx_clear_count 3614610 cycle_count 504027477
+[ 4025.861221] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.861258] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 1 noise_floor -105 rx_clear_count 3641039 cycle_count 508078150
+[ 4025.865240] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4025.865279] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 0 noise_floor 0 rx_clear_count 3641303 cycle_count 508431173
+[ 4026.011300] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.011336] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 1 noise_floor -104 rx_clear_count 3643706 cycle_count 521282198
+[ 4026.015291] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.015332] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 0 noise_floor 0 rx_clear_count 3643970 cycle_count 521635397
+[ 4026.161364] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.161400] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 1 noise_floor -103 rx_clear_count 3643970 cycle_count 534486510
+[ 4026.165370] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.165403] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 0 noise_floor 0 rx_clear_count 3644185 cycle_count 534839621
+[ 4026.311395] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.311430] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 1 noise_floor -103 rx_clear_count 3647872 cycle_count 547691086
+[ 4026.315412] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.315443] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 0 noise_floor 0 rx_clear_count 3648087 cycle_count 548044285
+[ 4026.461497] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.461537] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 1 noise_floor -102 rx_clear_count 3648302 cycle_count 560895662
+[ 4026.465472] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.465509] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 0 noise_floor 0 rx_clear_count 3648517 cycle_count 561248861
+[ 4026.611582] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.611618] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 1 noise_floor -101 rx_clear_count 3650723 cycle_count 574100046
+[ 4026.615574] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.615611] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 0 noise_floor 0 rx_clear_count 3650987 cycle_count 574453261
+[ 4026.761638] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.761681] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 1 noise_floor -103 rx_clear_count 3650987 cycle_count 587304198
+[ 4026.765642] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.765686] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 0 noise_floor 0 rx_clear_count 3651202 cycle_count 587657309
+[ 4026.911692] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.911740] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 1 noise_floor -102 rx_clear_count 3651632 cycle_count 600507806
+[ 4026.915632] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4026.915664] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 0 noise_floor 0 rx_clear_count 3651847 cycle_count 600860917
+[ 4027.061663] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.061700] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 1 noise_floor -104 rx_clear_count 3651847 cycle_count 613711678
+[ 4027.065685] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.065715] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 0 noise_floor 0 rx_clear_count 3652111 cycle_count 614064701
+[ 4027.211775] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.211820] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 1 noise_floor -104 rx_clear_count 3652541 cycle_count 626916254
+[ 4027.215738] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.215777] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 0 noise_floor 0 rx_clear_count 3652805 cycle_count 627269365
+[ 4027.361702] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.361714] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 1 noise_floor -102 rx_clear_count 3655693 cycle_count 640119950
+[ 4027.365709] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.365732] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 0 noise_floor 0 rx_clear_count 3655693 cycle_count 640473061
+[ 4027.511894] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.511929] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 1 noise_floor -104 rx_clear_count 3657007 cycle_count 653323646
+[ 4027.515861] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.515893] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 0 noise_floor 0 rx_clear_count 3657271 cycle_count 653676669
+[ 4027.661810] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.661827] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 1 noise_floor -105 rx_clear_count 3657271 cycle_count 666527782
+[ 4027.665900] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.665935] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 0 noise_floor 0 rx_clear_count 3657486 cycle_count 666880981
+[ 4027.812005] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.812045] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 1 noise_floor -103 rx_clear_count 3657888 cycle_count 679732270
+[ 4027.815968] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.816009] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 0 noise_floor 0 rx_clear_count 3659675 cycle_count 680085293
+[ 4027.961926] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.961979] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 1 noise_floor -104 rx_clear_count 3660540 cycle_count 692936670
+[ 4027.966003] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4027.966028] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 0 noise_floor 0 rx_clear_count 3660755 cycle_count 693289781
+[ 4028.112106] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.112141] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 1 noise_floor -103 rx_clear_count 3661019 cycle_count 706140806
+[ 4028.116095] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.116134] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 0 noise_floor 0 rx_clear_count 3661234 cycle_count 706493917
+[ 4028.162019] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.162038] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 1 noise_floor -102 rx_clear_count 3689477 cycle_count 710544854
+[ 4028.166034] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.166070] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 0 noise_floor 0 rx_clear_count 3689692 cycle_count 710897965
+[ 4028.212174] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.212201] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 1 noise_floor -106 rx_clear_count 3770840 cycle_count 714948902
+[ 4028.216191] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.216223] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 0 noise_floor 0 rx_clear_count 3771104 cycle_count 715301925
+[ 4028.262135] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.262160] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 1 noise_floor -107 rx_clear_count 3947270 cycle_count 719353218
+[ 4028.266115] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.266126] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 0 noise_floor 0 rx_clear_count 3947534 cycle_count 719706567
+[ 4028.312306] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.312337] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 1 noise_floor -107 rx_clear_count 4002277 cycle_count 723757702
+[ 4028.316169] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.316192] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 0 noise_floor 0 rx_clear_count 4002541 cycle_count 724110813
+[ 4028.362202] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.362213] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 1 noise_floor -108 rx_clear_count 4214677 cycle_count 728161926
+[ 4028.366265] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.366288] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 0 noise_floor 0 rx_clear_count 4214892 cycle_count 728514949
+[ 4028.412449] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4028.412480] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 1 noise_floor -106 rx_clear_count 4241321 cycle_count 732565798
+[ 4028.412490] ath10k_pci 0000:03:00.0: scan event completed type 2 reason 0 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+
+* time to associate!
+
+[ 4028.413602] wls1: authenticate with c4:6e:1f:5b:04:f6
+
+* here it creates a chanctx - note it's already 11na-ht40
+
+[ 4028.413622] ath10k_pci 0000:03:00.0: mac chanctx add freq 5180 width 2 ptr ffff880104280b98
+[ 4028.413628] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4028.413634] ath10k_pci 0000:03:00.0: mac chanctx assign ptr ffff880104280b98 vdev_id 0
+[ 4028.413639] ath10k_pci 0000:03:00.0: mac vdev 0 start center_freq 5180 phymode 11na-ht40
+[ 4028.413647] ath10k_pci 0000:03:00.0: wmi vdev start id 0x0 flags: 0x0, freq 5180, mode 6, ch_flags: 0x6, max_power: 34
+[ 4028.421053] ath10k_pci 0000:03:00.0: WMI_VDEV_START_RESP_EVENTID
+
+* disable powersave mode
+
+[ 4028.421085] ath10k_pci 0000:03:00.0: mac vdev 0 psmode disable
+[ 4028.421095] ath10k_pci 0000:03:00.0: wmi set powersave id 0x0 mode 0
+
+* set txpower
+
+[ 4028.421110] ath10k_pci 0000:03:00.0: mac vdev_id 0 txpower 17
+[ 4028.421124] ath10k_pci 0000:03:00.0: mac txpower 17
+[ 4028.421130] ath10k_pci 0000:03:00.0: wmi pdev set param 3 value 34
+[ 4028.421140] ath10k_pci 0000:03:00.0: wmi pdev set param 4 value 34
+
+.. see what that change is
+
+[ 4028.421151] ath10k_pci 0000:03:00.0: mac chanctx change freq 5180 width 2 ptr ffff880104280b98 changed 10
+[ 4028.421162] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 3 value 100
+[ 4028.421187] ath10k_pci 0000:03:00.0: mac vdev 0 beacon_interval 100
+
+* and yes it indeed creates a peer to transmit frames to
+
+[ 4028.421195] ath10k_pci 0000:03:00.0: mac vdev 0 peer create c4:6e:1f:5b:04:f6 (new sta) sta 1 / 128 peer 1 / 144
+[ 4028.421202] ath10k_pci 0000:03:00.0: wmi peer create vdev_id 0 peer_addr c4:6e:1f:5b:04:f6
+[ 4028.421491] wls1: send auth to c4:6e:1f:5b:04:f6 (try 1/3)
+[ 4028.422642] wls1: authenticated
+[ 4028.424089] wls1: associate with c4:6e:1f:5b:04:f6 (try 1/3)
+[ 4028.425460] wls1: RX AssocResp from c4:6e:1f:5b:04:f6 (capab=0x511 status=0 aid=1)
+
+* then update WMI parameters
+
+[ 4028.425476] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4028.425484] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4028.425491] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4028.425571] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4028.425579] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4028.425617] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4028.425623] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4028.425664] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4028.425723] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4028.425730] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4028.425767] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4028.425773] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4028.425807] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4028.425859] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4028.425865] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+[ 4028.425902] ath10k_pci 0000:03:00.0: wmi pdev set wmm params
+[ 4028.425908] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 4 value 0
+[ 4028.425939] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 0 value 0
+[ 4028.425987] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 1 value 1
+[ 4028.425992] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 2 value 0
+
+* DTIM
+
+[ 4028.426031] ath10k_pci 0000:03:00.0: mac vdev 0 dtim_period 1
+[ 4028.426036] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 13 value 1
+
+* Slot time
+
+[ 4028.426071] ath10k_pci 0000:03:00.0: mac vdev 0 slot_time 2
+[ 4028.426075] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 7 value 2
+
+* association ID
+
+[ 4028.426112] ath10k_pci 0000:03:00.0: mac vdev 0 assoc bssid c4:6e:1f:5b:04:f6 aid 0
+[ 4028.426120] ath10k_pci 0000:03:00.0: ath10k_peer_assoc_h_crypto: rsn ie found
+[ 4028.426150] ath10k_pci 0000:03:00.0: ath10k_peer_assoc_h_crypto: wpa ie found
+[ 4028.426157] ath10k_pci 0000:03:00.0: mac ht peer c4:6e:1f:5b:04:f6 mcs cnt 16 nss 2
+[ 4028.426161] ath10k_pci 0000:03:00.0: mac peer c4:6e:1f:5b:04:f6 qos 1
+[ 4028.426167] ath10k_pci 0000:03:00.0: mac peer c4:6e:1f:5b:04:f6 phymode 11na-ht40
+
+* and this is the new association vdev request
+
+[ 4028.426173] ath10k_pci 0000:03:00.0: wmi peer assoc vdev 0 addr c4:6e:1f:5b:04:f6 (new)
+[ 4028.426181] ath10k_pci 0000:03:00.0: wmi vdev 0 peer 0xc4:6e:1f:5b:04:f6 set param 1 value 0
+[ 4028.426186] ath10k_pci 0000:03:00.0: mac vdev 0 up (associated) bssid c4:6e:1f:5b:04:f6 aid 1
+[ 4028.426192] ath10k_pci 0000:03:00.0: wmi mgmt vdev up id 0x0 assoc id 1 bssid c4:6e:1f:5b:04:f6
+[ 4028.426450] ath10k_pci 0000:03:00.0: received event id 36891 not implemented
+
+* and here the association is now finished
+
+[ 4028.426486] ath10k_pci 0000:03:00.0: wmi vdev 0 peer 0xc4:6e:1f:5b:04:f6 set param 255 value 1
+[ 4028.426493] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4028.426515] ath10k_pci 0000:03:00.0: mac chanctx change freq 5180 width 2 ptr ffff880104280b98 changed 2
+[ 4028.426526] wls1: associated
+[ 4028.426598] IPv6: ADDRCONF(NETDEV_CHANGE): wls1: link becomes ready
+[ 4028.427683] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+
+* and this is the key setup
+
+[ 4028.455513] ath10k_pci 0000:03:00.0: wmi vdev install key idx 0 cipher 4 len 16
+[ 4028.455616] ath10k_pci 0000:03:00.0: mac vdev 0 set keyidx 0
+[ 4028.455620] ath10k_pci 0000:03:00.0: wmi vdev id 0x0 set param 31 value 0
+[ 4028.455741] ath10k_pci 0000:03:00.0: wmi vdev install key idx 2 cipher 2 len 32
+[ 4028.455955] ath10k_pci 0000:03:00.0: mac vdev 0 psmode disable
+[ 4028.455959] ath10k_pci 0000:03:00.0: wmi set powersave id 0x0 mode 0
+[ 4028.455964] ath10k_pci 0000:03:00.0: wmi sta ps param vdev_id 0x0 param 3 value 100
+[ 4028.455967] ath10k_pci 0000:03:00.0: mac vdev 0 psmode enable
+[ 4028.455969] ath10k_pci 0000:03:00.0: wmi set powersave id 0x0 mode 1
+[ 4028.458350] ath10k_pci 0000:03:00.0: mac channel [0/25] freq 5180 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4028.458353] ath10k_pci 0000:03:00.0: mac channel [1/25] freq 5200 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4028.458355] ath10k_pci 0000:03:00.0: mac channel [2/25] freq 5220 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4028.458357] ath10k_pci 0000:03:00.0: mac channel [3/25] freq 5240 maxpower 34 regpower 34 antenna 0 mode 0
+[ 4028.458358] ath10k_pci 0000:03:00.0: mac channel [4/25] freq 5260 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458360] ath10k_pci 0000:03:00.0: mac channel [5/25] freq 5280 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458362] ath10k_pci 0000:03:00.0: mac channel [6/25] freq 5300 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458363] ath10k_pci 0000:03:00.0: mac channel [7/25] freq 5320 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458365] ath10k_pci 0000:03:00.0: mac channel [8/25] freq 5500 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458367] ath10k_pci 0000:03:00.0: mac channel [9/25] freq 5520 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458369] ath10k_pci 0000:03:00.0: mac channel [10/25] freq 5540 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458370] ath10k_pci 0000:03:00.0: mac channel [11/25] freq 5560 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458372] ath10k_pci 0000:03:00.0: mac channel [12/25] freq 5580 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458373] ath10k_pci 0000:03:00.0: mac channel [13/25] freq 5600 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458375] ath10k_pci 0000:03:00.0: mac channel [14/25] freq 5620 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458377] ath10k_pci 0000:03:00.0: mac channel [15/25] freq 5640 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458378] ath10k_pci 0000:03:00.0: mac channel [16/25] freq 5660 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458380] ath10k_pci 0000:03:00.0: mac channel [17/25] freq 5680 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458381] ath10k_pci 0000:03:00.0: mac channel [18/25] freq 5700 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458383] ath10k_pci 0000:03:00.0: mac channel [19/25] freq 5720 maxpower 46 regpower 46 antenna 0 mode 0
+[ 4028.458385] ath10k_pci 0000:03:00.0: mac channel [20/25] freq 5745 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4028.458386] ath10k_pci 0000:03:00.0: mac channel [21/25] freq 5765 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4028.458388] ath10k_pci 0000:03:00.0: mac channel [22/25] freq 5785 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4028.458390] ath10k_pci 0000:03:00.0: mac channel [23/25] freq 5805 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4028.458391] ath10k_pci 0000:03:00.0: mac channel [24/25] freq 5825 maxpower 60 regpower 60 antenna 0 mode 0
+[ 4028.458397] ath10k_pci 0000:03:00.0: wmi pdev regdomain rd 3a rd2g 3a rd5g 3a ctl2g 10 ctl5g 10 dfs_region 0
+[ 4028.458406] cfg80211: Regulatory domain changed to country: US
+[ 4028.458407] cfg80211:  DFS Master region: FCC
+[ 4028.458408] cfg80211:   (start_freq - end_freq @ bandwidth), (max_antenna_gain, max_eirp), (dfs_cac_time)
+[ 4028.458410] cfg80211:   (2402000 KHz - 2472000 KHz @ 40000 KHz), (N/A, 3000 mBm), (N/A)
+[ 4028.458411] cfg80211:   (5170000 KHz - 5250000 KHz @ 80000 KHz, 160000 KHz AUTO), (N/A, 1700 mBm), (N/A)
+[ 4028.458413] cfg80211:   (5250000 KHz - 5330000 KHz @ 80000 KHz, 160000 KHz AUTO), (N/A, 2300 mBm), (0 s)
+[ 4028.458414] cfg80211:   (5490000 KHz - 5730000 KHz @ 160000 KHz), (N/A, 2300 mBm), (0 s)
+[ 4028.458416] cfg80211:   (5735000 KHz - 5835000 KHz @ 80000 KHz), (N/A, 3000 mBm), (N/A)
+[ 4028.458417] cfg80211:   (57240000 KHz - 63720000 KHz @ 2160000 KHz), (N/A, 4000 mBm), (N/A)
+[ 4028.459774] wls1: Limiting TX power to 17 (17 - 0) dBm as advertised by c4:6e:1f:5b:04:f6
+[ 4028.465827] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4028.466698] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4029.032940] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4029.247215] ath10k_pci 0000:03:00.0: wmi event debug mesg len 160
+[ 4030.253359] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4030.773525] ath10k_pci 0000:03:00.0: wmi 10x start scan
+[ 4030.773658] ath10k_pci 0000:03:00.0: scan event started type 1 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state starting (1)
+[ 4030.773675] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4030.773684] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 1 noise_floor -106 rx_clear_count 7021817 cycle_count 875981020
+[ 4030.785913] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4030.823819] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4030.823831] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 0 noise_floor 0 rx_clear_count 7184562 cycle_count 880393326
+[ 4030.873830] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4030.873841] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5180 cmd_flags 1 noise_floor -106 rx_clear_count 7316288 cycle_count 884794743
+[ 4030.980419] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4030.980460] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 0 noise_floor 0 rx_clear_count 7439186 cycle_count 894161716
+[ 4030.989906] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5200 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4030.989924] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5200 cmd_flags 1 noise_floor -45 rx_clear_count 7451345 cycle_count 895003715
+[ 4031.120785] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.120823] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 0 noise_floor 0 rx_clear_count 7643829 cycle_count 906521052
+[ 4031.166904] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5220 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.166945] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5220 cmd_flags 1 noise_floor -105 rx_clear_count 7779529 cycle_count 910572255
+[ 4031.273232] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.273256] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 0 noise_floor 0 rx_clear_count 7838594 cycle_count 919939732
+[ 4031.297149] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5240 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.297177] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5240 cmd_flags 1 noise_floor -104 rx_clear_count 7850968 cycle_count 922039007
+[ 4031.403661] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.403696] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 0 noise_floor 0 rx_clear_count 8046237 cycle_count 931405780
+[ 4031.549701] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5260 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.549736] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5260 cmd_flags 1 noise_floor -103 rx_clear_count 8048228 cycle_count 944257159
+[ 4031.660132] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.660180] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 0 noise_floor 0 rx_clear_count 8272945 cycle_count 953978396
+[ 4031.806203] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5280 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.806250] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5280 cmd_flags 1 noise_floor -103 rx_clear_count 8273160 cycle_count 966829335
+[ 4031.916671] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4031.916707] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 0 noise_floor 0 rx_clear_count 8332458 cycle_count 976549428
+[ 4032.062595] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5300 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.062624] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5300 cmd_flags 1 noise_floor -103 rx_clear_count 8334480 cycle_count 989400447
+[ 4032.173172] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.173211] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 0 noise_floor 0 rx_clear_count 8561529 cycle_count 999121076
+[ 4032.301491] ath10k_pci 0000:03:00.0: mac monitor recalc started? 0 needed? 0 allowed? 1
+[ 4032.319108] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5320 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.319144] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5320 cmd_flags 1 noise_floor -103 rx_clear_count 8563940 cycle_count 1011972895
+[ 4032.429691] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.429744] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 0 noise_floor 0 rx_clear_count 8879125 cycle_count 1021693252
+[ 4032.575605] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5500 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.575636] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5500 cmd_flags 1 noise_floor -101 rx_clear_count 8881254 cycle_count 1034544015
+[ 4032.686138] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.686210] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 0 noise_floor 0 rx_clear_count 9111259 cycle_count 1044265076
+[ 4032.832192] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5520 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.832245] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5520 cmd_flags 1 noise_floor -103 rx_clear_count 9113916 cycle_count 1057115839
+[ 4032.942703] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4032.942751] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 0 noise_floor 0 rx_clear_count 9389866 cycle_count 1066836548
+[ 4033.088606] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5540 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.088624] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5540 cmd_flags 1 noise_floor -101 rx_clear_count 9390081 cycle_count 1079687751
+[ 4033.199163] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.199206] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 0 noise_floor 0 rx_clear_count 9686318 cycle_count 1089408636
+[ 4033.345231] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5560 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.345275] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5560 cmd_flags 1 noise_floor -104 rx_clear_count 9686556 cycle_count 1102259135
+[ 4033.455657] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.455703] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 0 noise_floor 0 rx_clear_count 9900752 cycle_count 1111980020
+[ 4033.601731] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5580 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.601769] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5580 cmd_flags 1 noise_floor -102 rx_clear_count 9902440 cycle_count 1124830959
+[ 4033.712173] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.712216] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 0 noise_floor 0 rx_clear_count 10110366 cycle_count 1134551316
+[ 4033.858251] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5600 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.858290] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5600 cmd_flags 1 noise_floor -104 rx_clear_count 10113274 cycle_count 1147402343
+[ 4033.988234] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4033.988276] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 0 noise_floor 0 rx_clear_count 10174082 cycle_count 1158842044
+[ 4034.134294] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5620 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.134344] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5620 cmd_flags 1 noise_floor -104 rx_clear_count 10176353 cycle_count 1171693775
+[ 4034.244608] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.244627] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 0 noise_floor 0 rx_clear_count 10378664 cycle_count 1181414572
+[ 4034.390680] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5640 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.390716] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5640 cmd_flags 1 noise_floor -105 rx_clear_count 10378879 cycle_count 1194265071
+[ 4034.501229] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.501259] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 0 noise_floor 0 rx_clear_count 10438408 cycle_count 1203986220
+[ 4034.647212] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5660 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.647249] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5660 cmd_flags 1 noise_floor -102 rx_clear_count 10438595 cycle_count 1216836895
+[ 4034.757745] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.757778] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 0 noise_floor 0 rx_clear_count 10560488 cycle_count 1226557956
+[ 4034.903814] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5680 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4034.903845] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5680 cmd_flags 1 noise_floor -105 rx_clear_count 10562546 cycle_count 1239409163
+[ 4035.014286] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.014318] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 0 noise_floor 0 rx_clear_count 10622065 cycle_count 1249130396
+[ 4035.160325] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5700 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.160372] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5700 cmd_flags 1 noise_floor -102 rx_clear_count 10622467 cycle_count 1261981247
+[ 4035.270687] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.270727] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 0 noise_floor 0 rx_clear_count 10695736 cycle_count 1271701692
+[ 4035.290883] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5720 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.290914] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5720 cmd_flags 1 noise_floor -105 rx_clear_count 10707895 cycle_count 1273480735
+[ 4035.421803] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.421842] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 0 noise_floor 0 rx_clear_count 10768666 cycle_count 1284997700
+[ 4035.467863] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5745 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.467878] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5745 cmd_flags 1 noise_floor -105 rx_clear_count 10823282 cycle_count 1289048639
+[ 4035.574253] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.574292] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 0 noise_floor 0 rx_clear_count 10882673 cycle_count 1298415588
+[ 4035.598214] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5765 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.598263] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5765 cmd_flags 1 noise_floor -106 rx_clear_count 11041658 cycle_count 1300514687
+[ 4035.729094] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.729147] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 0 noise_floor 0 rx_clear_count 11100873 cycle_count 1312031564
+[ 4035.775003] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5785 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.775047] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5785 cmd_flags 1 noise_floor -107 rx_clear_count 11141280 cycle_count 1316082415
+[ 4035.881586] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.881635] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 0 noise_floor 0 rx_clear_count 11208040 cycle_count 1325449804
+[ 4035.905436] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5805 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4035.905477] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5805 cmd_flags 1 noise_floor -107 rx_clear_count 11366814 cycle_count 1327548903
+[ 4036.036308] ath10k_pci 0000:03:00.0: scan event foreign channel type 8 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4036.036360] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 0 noise_floor 0 rx_clear_count 11427162 cycle_count 1339066308
+[ 4036.082355] ath10k_pci 0000:03:00.0: scan event bss channel type 4 reason 3 freq 5825 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4036.082400] ath10k_pci 0000:03:00.0: chan info err_code 0 freq 5825 cmd_flags 1 noise_floor -106 rx_clear_count 11439321 cycle_count 1343117159
+[ 4036.132450] ath10k_pci 0000:03:00.0: scan event completed type 2 reason 0 freq 5180 req_id 40961 scan_id 40960 vdev_id 0 state running (2)
+[ 4036.216963] Failed to recover vector for irq 29
