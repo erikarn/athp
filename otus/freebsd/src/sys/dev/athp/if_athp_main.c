@@ -1337,6 +1337,33 @@ athp_beacon_update(struct ieee80211vap *vap, int item)
 	setbit(bo->bo_flags, item);
 }
 
+static int
+athp_vap_wme_update(struct ieee80211vap *vap,
+    const struct wmeParams *wme_params)
+{
+	struct ath10k *ar = vap->iv_ic->ic_softc;
+
+	ath10k_warn(ar, "%s: called\n", __func__);
+	ATHP_CONF_LOCK(ar);
+	ath10k_update_wme_vap(vap, wme_params);
+	ATHP_CONF_UNLOCK(ar);
+
+	return (0);
+}
+
+#if 0
+static int
+athp_vap_update_slot(struct ieee80211vap *vap, int slot)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
+
+	return (0);
+}
+#endif
+
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     enum ieee80211_opmode opmode, int flags,
@@ -1395,6 +1422,10 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_update_beacon = athp_beacon_update;
 	vif->av_update_deftxkey = vap->iv_update_deftxkey;
 	vap->iv_update_deftxkey = athp_update_deftxkey;
+	vap->iv_wme_update = athp_vap_wme_update;
+#if 0
+	vap->iv_slot_update = athp_vap_update_slot;
+#endif
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,

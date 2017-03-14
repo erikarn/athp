@@ -6788,7 +6788,7 @@ exit:
  */
 static int ath10k_conf_tx(struct ath10k *ar,
 			  struct ieee80211vap *vif, u16 ac,
-			  struct wmeParams *wmep)
+			  const struct wmeParams *wmep)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_wmm_params_arg *p = NULL;
@@ -9192,6 +9192,30 @@ ath10k_update_wme(struct ieee80211com *ic)
 
 	return (ret == 0 ? 0 : ENXIO);
 }
+
+int
+ath10k_update_wme_vap(struct ieee80211vap *vap,
+    const struct wmeParams *wme_params)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	int ret = 0;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (arvif->is_setup == 0)
+		return (EINVAL);
+
+	/* now WMM */
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_BE, &wme_params[WME_AC_BE]);
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_BK, &wme_params[WME_AC_BK]);
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_VI, &wme_params[WME_AC_VI]);
+	ret |= ath10k_conf_tx(ar, vap, WME_AC_VO, &wme_params[WME_AC_VO]);
+
+	return (ret == 0 ? 0 : ENXIO);
+}
+
 
 /*
  * configure slot time, short/long preamble, beacon interval for
