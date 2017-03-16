@@ -520,7 +520,7 @@ athp_parent(struct ieee80211com *ic)
 
 	ath10k_warn(ar, "%s: called; nrunning=%d\n", __func__, ic->ic_nrunning);
 
-	/* XXX TODO: add conf lock */
+	/* XXX TODO: add conf lock - ath10k_start() grabs the lock */
 
 	/*
 	 * If nothing is yet running, power up the chip in preparation for
@@ -1383,7 +1383,8 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 
 	/* We have to bring up the hardware/driver state if it isn't yet */
 	/* XXX methodize */
-	if (TAILQ_EMPTY(&ic->ic_vaps)) {
+	/* XXX TODO: add conf lock - ath10k_start() grabs the lock */
+	if (TAILQ_EMPTY(&ic->ic_vaps) || (ar->sc_isrunning == 0)) {
 		ret = ath10k_start(ar);
 		if (ret != 0) {
 			ath10k_err(ar,
@@ -1391,6 +1392,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 			    __func__, ret);
 			return (NULL);
 		}
+		ar->sc_isrunning = 1;
 	}
 
 	/*
