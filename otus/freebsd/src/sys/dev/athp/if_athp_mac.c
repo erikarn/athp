@@ -1634,6 +1634,12 @@ ath10k_vdev_stop(struct ath10k_vif *arvif)
 
 /*
  * XXX TODO: this has been heavily customised for freebsd!
+ *
+ * XXX TODO: see why dtim_period / bcn_intval are 0 when the
+ * first association is attempted; it's quite possible not
+ * everything from the BSS STA setup path is initialised here.
+ * (see what linux ath10k does, in case it also indeed is
+ * doing setup like this.)
  */
 static int
 ath10k_vdev_start_restart(struct ath10k_vif *arvif,
@@ -1652,8 +1658,6 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.dtim_period = arvif->dtim_period;
 	arg.bcn_intval = arvif->beacon_interval;
 
-	ath10k_warn(ar, "%s: called; dtim=%d, intval=%d\n", __func__, arg.dtim_period, arg.bcn_intval);
-
 	arg.channel.freq = ieee80211_get_channel_center_freq(channel);
 	arg.channel.band_center_freq1 = ieee80211_get_channel_center_freq1(channel);
 	arg.channel.mode = chan_to_phymode(channel);
@@ -1661,6 +1665,10 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	arg.channel.max_power = channel->ic_maxpower;
 	arg.channel.max_reg_power = channel->ic_maxregpower * 2;
 	arg.channel.max_antenna_gain = channel->ic_maxantgain * 2;
+
+	ath10k_warn(ar, "%s: called; dtim=%d, intval=%d; restart=%d\n",
+	    __func__,
+	    arg.dtim_period, arg.bcn_intval, (int) restart);
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP) {
 		arg.ssid = arvif->u.ap.ssid;
@@ -1714,6 +1722,11 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 static int
 ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
+	struct ath10k *ar = arvif->ar;
+
+	if (arvif->is_started) {
+		ath10k_err(ar, "%s: XXX: notice, is already started\n", __func__);
+	}
 
 	return ath10k_vdev_start_restart(arvif, c, false);
 }
@@ -1721,6 +1734,11 @@ ath10k_vdev_start(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 static int
 ath10k_vdev_restart(struct ath10k_vif *arvif, struct ieee80211_channel *c)
 {
+	struct ath10k *ar = arvif->ar;
+
+	if (arvif->is_started == 0) {
+		ath10k_err(ar, "%s: XXX: notice, isn't already started\n", __func__);
+	}
 
 	return ath10k_vdev_start_restart(arvif, c, true);
 }
@@ -7688,7 +7706,7 @@ ath10k_vif_bring_up(struct ieee80211vap *vap, struct ieee80211_channel *c)
 		   c->ic_ieee, arvif->vdev_id);
 
 	if (WARN_ON(arvif->is_started)) {
-		ath10k_err(ar, "%s: failed; is already started!\n", __func__);
+		ath10k_err(ar, "%s: XXX: failed; is already started!\n", __func__);
 		return -EBUSY;
 	}
 
@@ -7744,7 +7762,9 @@ ath10k_vif_bring_down(struct ieee80211vap *vap)
 		   "mac chanctx unassign vdev_id %i\n",
 		   arvif->vdev_id);
 
-	WARN_ON(!arvif->is_started);
+	if (WARN_ON(!arvif->is_started)) {
+		ath10k_err(ar, "%s: XXX: notice, isn't already started\n", __func__);
+	}
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_MONITOR) {
 		WARN_ON(!arvif->is_up);

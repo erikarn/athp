@@ -130,7 +130,7 @@ MSI:
 
 (done) Suspend/resume, restarting VAPs after firmware panic:
 
-* when we suspend, we power down the NIC.  Upon resume, we need to transition
+* (done) when we suspend, we power down the NIC.  Upon resume, we need to transition
   through INIT, and this requires re-creating the ath10k state.  Same with
   firmware panics.
 
@@ -149,6 +149,23 @@ Regulatory:
 
 * Re-revisit all of the regulatory stuff - hardcoded txpower lists are bad.
   Hard-coded EEPROM regulatory code is bad.  Etc, etc.
+
+vdev start/restart:
+
+* The vdev start/restart path in if_athp_mac.c is sending, say, dtim/beacon intval=0
+  at the first couple of associations.  The cached arvif fields are not updated
+  before the device starts.
+
+  Check to see what linux ath10k is doing and see if those parameters should be
+  non-zero (where appropriate, especially intval) for the first vdev start
+  call.
+
+* Occasionally the first vdev start doesn't succeed; need to figure out why.
+  (The above may be the reason.)
+
+* Go look at when I should call vdev start (eg, after a vdev down?) and then
+  continue to call vdev restart (eg during parameter reconfiguration?);
+  right now I bet I'm doing it subtly wrong.
 
 WEP:
 
