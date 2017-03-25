@@ -853,12 +853,6 @@ struct amsdu_subframe_hdr {
 	__be16 len;
 } __packed;
 
-/*
- * XXX TODO: the net80211 rx_stats struct doesn't currently include
- * the RX rate/phy type information.
- *
- * XXX TODO: maybe at least just log what we decode here for now?
- */
 static void ath10k_htt_rx_h_rates(struct ath10k *ar,
 				  struct ieee80211_rx_stats *status,
 				  struct htt_rx_desc *rxd)
@@ -1804,19 +1798,11 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		TAILQ_REMOVE(amsdu, msdu, next);
 		/* Setup per-MSDU flags */
 
-		/*
-		 * XXX TODO: yes, now's the time to start telling net80211
-		 * about the start/end boundaries of A-MSDU decap RX tracking.
-		 * The crypto and RX BA code needs to know these things.
-		 */
-
 		status->c_pktflags &= ~(
 		    IEEE80211_RX_F_AMSDU
 		    | IEEE80211_RX_F_AMSDU_MORE);
-		/*
-		 * XXX TODO: actually check if this is an AMSDU or
-		 * just MSDU/MPDU?
-		 */
+
+		/* Note: For now we don't know if this is AMSDU or not */
 
 		if (TAILQ_EMPTY(amsdu))
 			status->c_pktflags &= ~IEEE80211_RX_F_AMSDU_MORE;
