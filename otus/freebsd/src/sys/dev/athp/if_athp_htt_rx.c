@@ -1802,7 +1802,8 @@ static void ath10k_htt_rx_h_deliver(struct ath10k *ar,
 		    IEEE80211_RX_F_AMSDU
 		    | IEEE80211_RX_F_AMSDU_MORE);
 
-		/* Note: For now we don't know if this is AMSDU or not */
+		/* Tell net80211 this may be part of a batch */
+		status->c_pktflags |= IEEE80211_RX_F_AMSDU;
 
 		if (TAILQ_EMPTY(amsdu))
 			status->c_pktflags &= ~IEEE80211_RX_F_AMSDU_MORE;
