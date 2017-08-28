@@ -3336,7 +3336,7 @@ static int ath10k_setup_peer_smps(struct ath10k *ar, struct ath10k_vif *arvif,
 {
 	int smps;
 
-	if (!ni->ni_flags & IEEE80211_NODE_HT)
+	if (! (ni->ni_flags & IEEE80211_NODE_HT))
 		return 0;
 
 	smps = ni->ni_htcap & IEEE80211_HTCAP_SMPS;
@@ -3843,7 +3843,7 @@ ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
 		else
 			continue;
 		ath10k_dbg(ar, ATH10K_DBG_REGULATORY,
-		   "%s: mac channel [%zd/%d] freq %d maxpower %d regpower %d"
+		   "%s: mac channel [%d/%d] freq %d maxpower %d regpower %d"
 		   " antenna %d mode %d ht40plus %d\n",
 		    __func__, j, arg.n_channels,
 		   ch->freq, ch->max_power, ch->max_reg_power,
