@@ -304,6 +304,7 @@ athp_taskq_entry_free(struct ath10k *ar, struct athp_taskq_entry *e)
 		ATHP_TASKQ_LOCK(h);
 		TAILQ_REMOVE(&h->list, e, node);
 		e->on_queue = 0;
+		ATHP_TASKQ_UNLOCK(h);
 	}
 
 	free(e, M_ATHPDEV_TASKQ);
