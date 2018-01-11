@@ -283,7 +283,7 @@ athp_taskq_entry_alloc(struct ath10k *ar, int nbytes)
 	if (h == NULL)
 		return (NULL);
 
-	e = malloc(sizeof(struct athp_taskq_entry) * nbytes, M_ATHPDEV_TASKQ,
+	e = malloc(sizeof(struct athp_taskq_entry) + nbytes, M_ATHPDEV_TASKQ,
 	    M_NOWAIT | M_ZERO);
 	if (e == NULL)
 		return (NULL);

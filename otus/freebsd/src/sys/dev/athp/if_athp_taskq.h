@@ -8,10 +8,12 @@ typedef void athp_taskq_cmd_cb(struct ath10k *, struct athp_taskq_entry *, int);
 
 struct athp_taskq_entry {
 	struct ath10k *ar;
-	int on_queue;
 	athp_taskq_cmd_cb *cb;
 	const char *cb_str;
 	TAILQ_ENTRY(athp_taskq_entry) node;
+	int on_queue;
+
+	/* XXX TODO: needs to be DWORD padded */
 };
 
 struct athp_taskq_head {
