@@ -1949,6 +1949,11 @@ athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		return (ENOTSUP);
 
 	/*
+	 * XXX TODO: do scan offload/powersave offload bits now that it IS
+	 * in net80211 so we can re-enable this.
+	 */
+
+	/*
 	 * XXX TODO: once scan offload/powersave offload in net80211 is
 	 * done, re-enable these - we may need it for eg testing if
 	 * a device is still there.
