@@ -151,7 +151,7 @@ static void ath10k_pci_ce_tasklet(void *arg)
 {
 	struct ath10k_pci_pipe *pipe = (struct ath10k_pci_pipe *) arg;
 
-	ath10k_dbg(pipe->ar, ATH10K_DBG_INTR, "%s: called; pipe=%d\n", __func__, pipe->pipe_num);
+	ath10k_dbg(pipe->ar, ATH10K_DBG_IRQ, "%s: called; pipe=%d\n", __func__, pipe->pipe_num);
 
 	trace_ath10k_intr(pipe->ar, pipe->pipe_num, 2);
 	ath10k_ce_per_engine_service(pipe->ar, pipe->pipe_num);
