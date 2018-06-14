@@ -204,6 +204,34 @@ athp_decode_transmit(const struct ath10k_trace_hdr *a)
 	    be32toh(a->val2));
 }
 
+static void
+athp_decode_htt_rx_t2h_msg(const struct ath10k_trace_hdr *a)
+{
+	struct ath10k_trace_htt_rx_t2h_msg *htt;
+
+	htt = (void *) ((char *) a) + sizeof(struct ath10k_trace_hdr);
+
+	printf("[%d.%06d] [%u] HTT_RX_T2H_IND: msg_type=%d\n",
+	    be32toh(a->tstamp_sec),
+	    be32toh(a->tstamp_usec),
+	    (uint32_t) be32toh(a->threadid),
+	    be32toh(htt->msg_type));
+}
+
+static void
+athp_decode_intr(const struct ath10k_trace_hdr *a)
+{
+	struct ath10k_trace_intr *htt;
+
+	htt = (void *) ((char *) a) + sizeof(struct ath10k_trace_hdr);
+
+	printf("[%d.%06d] [%u] INTR: pipe_id=%d, msgtype=%d\n",
+	    be32toh(a->tstamp_sec),
+	    be32toh(a->tstamp_usec),
+	    (uint32_t) be32toh(a->threadid),
+	    be32toh(htt->ce_id),
+	    be32toh(htt->intr_type));
+}
 
 int
 main(int argc, const char *argv[])
@@ -295,6 +323,12 @@ main(int argc, const char *argv[])
 			break;
 		case ATH10K_TRACE_EVENT_TRANSMIT:
 			athp_decode_transmit(a);
+			break;
+		case ATH10K_TRACE_EVENT_HTT_RX_T2H_MSG:
+			athp_decode_htt_rx_t2h_msg(a);
+			break;
+		case ATH10K_TRACE_EVENT_INTR:
+			athp_decode_intr(a);
 			break;
 		default:
 			printf("[%d.%06d] [%u] op: %d; len %d\n",
