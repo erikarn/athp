@@ -1163,6 +1163,7 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 		status->c_ieee = 0;
 		status->c_rate = 0;
 		status->c_phytype = 0;
+		status->c_vhtnss = 0;
 		//status->vht_nss = 0;
 		//status->vht_flag &= ~RX_VHT_FLAG_80MHZ;
 #if 0
@@ -1190,6 +1191,8 @@ static void ath10k_htt_rx_h_ppdu(struct ath10k *ar,
 		status->c_pktflags &= ~(
 		    IEEE80211_RX_F_SHORTGI
 		    );
+
+		/* XXX TODO: AMSDU? AMSDU_MORE? */
 
 		ath10k_htt_rx_h_signal(ar, status, rxd);
 		ath10k_htt_rx_h_signal_mimo(ar, status, rxd);
@@ -1274,13 +1277,13 @@ static void ath10k_process_rx(struct ath10k *ar,
 		   IEEE80211_IS_MULTICAST(ieee80211_get_DA(wh)) ?
 		    "mcast" : "ucast",
 		   (le16toh(*((uint16_t *) wh->i_seq))) >> 4,
-		   "", // status->flag & RX_FLAG_HT ? "ht" : "",
-		   "", // status->flag & RX_FLAG_VHT ? "vht" : "",
-		   "", // status->flag & RX_FLAG_40MHZ ? "40" : "",
-		   "", // status->vht_flag & RX_VHT_FLAG_80MHZ ? "80" : "",
+		   rx_status->c_pktflags & IEEE80211_RX_F_VHT ? "vht" : "",
+		   rx_status->c_pktflags & IEEE80211_RX_F_HT ? "ht" : "",
+		   rx_status->c_phytype == IEEE80211_RX_FW_40MHZ ? "40" : "",
+		   rx_status->c_phytype == IEEE80211_RX_FW_80MHZ ? "80" : "",
 		   rx_status->c_pktflags & IEEE80211_RX_F_SHORTGI ? "sgi " : "",
 		   rx_status->c_rate,
-		   0, /* status->vht_nss, */
+		   rx_status->c_vhtnss,
 		   rx_status->c_ieee,
 		   rx_status->c_freq,
 		   0, /* status->band, */
