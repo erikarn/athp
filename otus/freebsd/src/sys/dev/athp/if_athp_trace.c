@@ -331,3 +331,15 @@ trace_ath10k_transmit(struct ath10k *ar, int transmit, int ok)
 	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_TRANSMIT, NULL, 0,
 	    transmit, ok);
 }
+
+void
+trace_ath10k_intr(struct ath10k *ar, int ce_id, int intr_type)
+{
+	struct ath10k_trace_intr htt;
+
+	htt.ce_id = htobe32(ce_id);
+	htt.intr_type = htobe32(intr_type);
+
+	(void) ath10k_trace_queue(ar, ATH10K_TRACE_EVENT_INTR, (void *) &htt,
+	    sizeof(htt), 0, 0);
+}

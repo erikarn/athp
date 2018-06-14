@@ -151,13 +151,19 @@ static void ath10k_pci_ce_tasklet(void *arg)
 {
 	struct ath10k_pci_pipe *pipe = (struct ath10k_pci_pipe *) arg;
 
+	ath10k_dbg(pipe->ar, ATH10K_DBG_INTR, "%s: called; pipe=%d\n", __func__, pipe->pipe_num);
+
+	trace_ath10k_intr(pipe->ar, pipe->pipe_num, 2);
 	ath10k_ce_per_engine_service(pipe->ar, pipe->pipe_num);
+	trace_ath10k_intr(pipe->ar, pipe->pipe_num, 3);
 }
 
 static void ath10k_msi_err_tasklet(void *arg)
 {
 	struct ath10k_pci *ar_pci = arg;
 	struct ath10k *ar = &ar_pci->sc_sc;
+
+	trace_ath10k_intr(ar, 31, 2);
 
 	if (!ath10k_pci_has_fw_crashed(ar_pci)) {
 		ath10k_warn(ar, "received unsolicited fw crash interrupt\n");
@@ -167,6 +173,8 @@ static void ath10k_msi_err_tasklet(void *arg)
 	ath10k_pci_irq_disable(ar_pci);
 	ath10k_pci_fw_crashed_clear(ar_pci);
 	ath10k_pci_fw_crashed_dump(ar_pci);
+
+	trace_ath10k_intr(ar, 31, 3);
 }
 
 /*
@@ -183,6 +191,8 @@ static int ath10k_pci_per_engine_handler(void *arg)
 
 	if (ar->sc_invalid)
 		return (FILTER_STRAY);
+
+//	trace_ath10k_intr(pipe->ar, pipe->pipe_num, 1);
 
 #if 0
 	int ce_id = irq - ar_pci->pdev->irq - MSI_ASSIGN_CE_INITIAL;
@@ -213,6 +223,7 @@ static int ath10k_pci_msi_fw_handler(void *arg)
 
 	if (ar->sc_invalid)
 		return (FILTER_STRAY);
+//	trace_ath10k_intr(ar, 31, 1);
 
 	return (FILTER_SCHEDULE_THREAD);
 }
@@ -232,6 +243,8 @@ ath10k_pci_interrupt_handler(void *arg)
 	if ((ar_pci->num_msi_intrs == 0) && (! ath10k_pci_irq_pending(ar_pci)))
 		return (FILTER_STRAY);
 
+//	trace_ath10k_intr(ar, 0, 1);
+
 	if (ar_pci->num_msi_intrs == 0)
 		ath10k_pci_disable_and_clear_legacy_irq(ar_pci);
 
@@ -250,11 +263,14 @@ static void ath10k_pci_tasklet(void *arg)
 	if (ar->sc_invalid)
 		return;
 
+	trace_ath10k_intr(ar, 0, 2);
+
 	if (ath10k_pci_has_fw_crashed(ar_pci)) {
 		ath10k_err(ar, "%s: FIRMWARE CRASH\n", __func__);
 		ath10k_pci_irq_disable(ar_pci);
 		ath10k_pci_fw_crashed_clear(ar_pci);
 		ath10k_pci_fw_crashed_dump(ar_pci);
+		trace_ath10k_intr(ar, 0, 3);
 		return;
 	}
 
@@ -264,6 +280,7 @@ static void ath10k_pci_tasklet(void *arg)
 	/* Re-enable interrupts if required */
 	if (ar_pci->num_msi_intrs == 0)
 		ath10k_pci_enable_legacy_irq(ar_pci);
+	trace_ath10k_intr(ar, 0, 3);
 }
 
 static void ath10k_pci_free_irq(struct ath10k_pci *ar_pci);
