@@ -272,7 +272,8 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 	 * improves the average and stability. */
 	//ATHP_HTT_RX_LOCK(htt);
 	num_deficit = htt->rx_ring.fill_level - htt->rx_ring.fill_cnt;
-	num_to_fill = min(ATH10K_HTT_MAX_NUM_REFILL, num_deficit);
+//	num_to_fill = min(ATH10K_HTT_MAX_NUM_REFILL, num_deficit);
+	num_to_fill = min(2048, num_deficit);
 	num_deficit -= num_to_fill;
 	ret = ath10k_htt_rx_ring_fill_n(htt, num_to_fill);
 	if (ret == -ENOMEM) {
@@ -282,11 +283,13 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 		 * As long as enough buffers are left in the ring for
 		 * another A-MPDU rx, no special recovery is needed.
 		 */
+		ath10k_warn(ar, "%s: deferring refill (delay)?\n", __func__);
 		callout_reset(&htt->rx_ring.refill_retry_timer,
 		    HTT_RX_RING_REFILL_RETRY_MS * hz,
 		    ath10k_htt_rx_ring_refill_retry,
 		    htt);
 	} else if (num_deficit > 0) {
+		ath10k_warn(ar, "%s: deferring refill, deficit=%d, filled=%d (task)?\n", __func__, num_deficit, num_to_fill);
 		taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 	}
 	//ATHP_HTT_RX_UNLOCK(htt);
@@ -2088,7 +2091,8 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 	u8 *fw_desc;
 	int i, ret, mpdu_count = 0;
 
-	ATHP_HTT_RX_LOCK_ASSERT(htt);
+//	ATHP_HTT_RX_LOCK_ASSERT(htt);
+	ATHP_HTT_RX_UNLOCK_ASSERT(htt);
 
 	if (htt->rx_confused)
 		return;
@@ -2108,10 +2112,17 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 	for (i = 0; i < num_mpdu_ranges; i++)
 		mpdu_count += mpdu_ranges[i].mpdu_count;
 
+	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: mpdu_count=%d, num_mpdu_ranges=%d\n",
+	    __func__,
+	    mpdu_count,
+	    num_mpdu_ranges);
+
 	while (mpdu_count--) {
 		TAILQ_INIT(&amsdu);
+		ATHP_HTT_RX_LOCK(htt);
 		ret = ath10k_htt_rx_amsdu_pop(htt, &fw_desc,
 					      &fw_desc_len, &amsdu);
+		ATHP_HTT_RX_UNLOCK(htt);
 		if (ret < 0) {
 			ath10k_warn(ar, "rx ring became corrupted: %d\n", ret);
 			athp_buf_list_flush(ar, &ar->buf_rx, &amsdu);
@@ -2129,7 +2140,7 @@ static void ath10k_htt_rx_handler(struct ath10k_htt *htt,
 		ath10k_htt_rx_h_deliver(ar, &amsdu, rx_status);
 	}
 
-	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
+//	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 }
 
 static void ath10k_htt_rx_frag_handler(struct ath10k_htt *htt,
@@ -2574,7 +2585,7 @@ static void ath10k_htt_rx_in_ord_ind(struct ath10k *ar, struct athp_buf *skb)
 		}
 	}
 
-	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
+//	taskqueue_enqueue(ar->workqueue, &htt->rx_replenish_task);
 }
 
 void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct athp_buf *skb)
@@ -2747,6 +2758,7 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	struct htt_resp *resp;
 	struct athp_buf *skb;
 	athp_buf_head ah, af;
+	int do_replenish = 0;
 
 	TAILQ_INIT(&ah);
 	ATHP_HTT_TX_COMP_LOCK(htt);
@@ -2775,14 +2787,19 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	TAILQ_CONCAT(&ah, &htt->rx_compl_q, next);
 	ATHP_HTT_RX_COMP_UNLOCK(htt);
 
-	ATHP_HTT_RX_LOCK(htt);
+	/*
+	 * XXX TODO: it would be nice to extract this out of
+	 * being run inside the ATHP_HTT_RX_LOCK!
+	 *
+	 * XXX peregrine uses this path!
+	 */
 	while ((skb = TAILQ_FIRST(&ah))) {
 		TAILQ_REMOVE(&ah, skb, next);
 		resp = (struct htt_resp *)mbuf_skb_data(skb->m);
 		ath10k_htt_rx_handler(htt, &resp->rx_ind);
 		TAILQ_INSERT_TAIL(&af, skb, next);
+		do_replenish = 1;
 	}
-	ATHP_HTT_RX_UNLOCK(htt);
 
 	/* XXX maybe push ath_freebuf out of that lock? */
 	while ((skb = TAILQ_FIRST(&af))) {
@@ -2796,10 +2813,15 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	TAILQ_CONCAT(&ah, &htt->rx_in_ord_compl_q, next);
 	ATHP_HTT_RX_COMP_UNLOCK(htt);
 
+	/*
+	 * XXX TODO: it would be nice to extract this out of
+	 * being run inside the ATHP_HTT_RX_LOCK!
+	 */
 	ATHP_HTT_RX_LOCK(htt);
 	while ((skb = TAILQ_FIRST(&ah))) {
 		TAILQ_REMOVE(&ah, skb, next);
 		ath10k_htt_rx_in_ord_ind(ar, skb);
+		do_replenish = 1;
 		TAILQ_INSERT_TAIL(&af, skb, next);
 	}
 	ATHP_HTT_RX_UNLOCK(htt);
@@ -2808,6 +2830,13 @@ static void ath10k_htt_txrx_compl_task(void *arg, int npending)
 	while ((skb = TAILQ_FIRST(&af))) {
 		TAILQ_REMOVE(&af, skb, next);
 		athp_freebuf(ar, &ar->buf_rx, skb);
+	}
+
+	/* Replenish RX */
+	if (do_replenish) {
+		ATHP_HTT_RX_LOCK(htt);
+		ath10k_htt_rx_msdu_buff_replenish(htt);
+		ATHP_HTT_RX_UNLOCK(htt);
 	}
 
 	/* Reschedule if there's anything left to do */
