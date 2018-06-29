@@ -272,7 +272,8 @@ static void ath10k_htt_rx_msdu_buff_replenish(struct ath10k_htt *htt)
 	 * improves the average and stability. */
 	//ATHP_HTT_RX_LOCK(htt);
 	num_deficit = htt->rx_ring.fill_level - htt->rx_ring.fill_cnt;
-	num_to_fill = min(ATH10K_HTT_MAX_NUM_REFILL, num_deficit);
+//	num_to_fill = min(ATH10K_HTT_MAX_NUM_REFILL, num_deficit);
+	num_to_fill = min(2048, num_deficit);
 	num_deficit -= num_to_fill;
 	ret = ath10k_htt_rx_ring_fill_n(htt, num_to_fill);
 	if (ret == -ENOMEM) {
