@@ -1967,49 +1967,6 @@ athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 }
 
-/*
- * TODO: this doesn't yet take the regulatory domain into account.
- */
-static void
-athp_setup_channels(struct ath10k *ar)
-{
-	struct ieee80211com *ic = &ar->sc_ic;
-	struct ieee80211_channel *chans = ic->ic_channels;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
-	int *nchans = &ic->ic_nchans;
-	int ht40 = 0;
-
-	memset(bands, 0, sizeof(bands));
-
-	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
-		ht40 = 1;
-
-	if (ar->phy_capability & WHAL_WLAN_11G_CAPABILITY) {
-		setbit(bands, IEEE80211_MODE_11B);
-		setbit(bands, IEEE80211_MODE_11G);
-		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
-			setbit(bands, IEEE80211_MODE_11NG);
-		ieee80211_add_channel_list_2ghz(chans, IEEE80211_CHAN_MAX,
-		    nchans, chan_list_2ghz, nitems(chan_list_2ghz),
-		    bands, ht40);
-	}
-
-	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
-		setbit(bands, IEEE80211_MODE_11A);
-		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
-			ath10k_warn(ar, "%s: enabling HT/VHT rates\n", __func__);
-			setbit(bands, IEEE80211_MODE_11NA);
-			setbit(bands, IEEE80211_MODE_VHT_5GHZ);
-		}
-		/*
-		 * XXX TODO: need to pass in VHT80 flag.
-		 */
-		ieee80211_add_channel_list_5ghz(chans, IEEE80211_CHAN_MAX,
-		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
-		    bands, ht40);
-	}
-}
-
 static int
 athp_sysctl_reg_read(SYSCTL_HANDLER_ARGS)
 {
@@ -2221,6 +2178,14 @@ athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
 	    reg->ecm ? "ecm" : "");
 
 	/*
+	 * XXX TODO:
+	 *
+	 * Loop over the provided channel list and establish the per-channel
+	 * limits such as flags and maximum TX power.
+	 */
+	ath10k_warn(ar, "%s: nchans=%d\n", __func__, nchans);
+
+	/*
 	 * Program in the given channel set into the hardware.
 	 */
 	/* XXX locking! */
@@ -2232,6 +2197,52 @@ athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
 	IEEE80211_LOCK(ic);
 
 	return (0);
+}
+
+static void
+athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
+    struct ieee80211_channel chans[])
+{
+	struct ath10k *ar = ic->ic_softc;
+	uint8_t bands[IEEE80211_MODE_BYTES];
+	int ht40 = 0;
+
+	printf("%s: called; maxchans=%d\n", __func__, maxchans);
+
+	memset(bands, 0, sizeof(bands));
+
+	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
+		ht40 = 1;
+
+	*nchans = 0;
+
+	if (ar->phy_capability & WHAL_WLAN_11G_CAPABILITY) {
+		setbit(bands, IEEE80211_MODE_11B);
+		setbit(bands, IEEE80211_MODE_11G);
+		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
+			setbit(bands, IEEE80211_MODE_11NG);
+		ieee80211_add_channel_list_2ghz(chans, maxchans,
+		    nchans, chan_list_2ghz, nitems(chan_list_2ghz),
+		    bands, ht40);
+	}
+
+	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
+		setbit(bands, IEEE80211_MODE_11A);
+		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
+			ath10k_warn(ar, "%s: enabling HT/VHT rates\n", __func__);
+			setbit(bands, IEEE80211_MODE_11NA);
+			setbit(bands, IEEE80211_MODE_VHT_5GHZ);
+		}
+
+		/*
+		 * XXX TODO: need to pass in VHT80 flag.
+		 */
+		ieee80211_add_channel_list_5ghz(chans, maxchans,
+		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
+		    bands, ht40);
+	}
+
+	printf("%s: done; maxchans=%d, nchans=%d\n", __func__, maxchans, *nchans);
 }
 
 static void
@@ -2397,7 +2408,8 @@ athp_attach_net80211(struct ath10k *ar)
 	/* XXX 11ac bits */
 
 	/* Channels/regulatory */
-	athp_setup_channels(ar);
+	athp_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
+	    ic->ic_channels);
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
 
@@ -2425,9 +2437,7 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_node_free = athp_node_free;
 
 	ic->ic_setregdomain = athp_set_regdomain;
-#if 0
-	ic->ic_getradiocaps = athp_get_radiocaps;
-#endif
+	ic->ic_getradiocaps = athp_getradiocaps;
 
 	/* 11n methods */
 	ic->ic_update_chw = athp_update_chw;
