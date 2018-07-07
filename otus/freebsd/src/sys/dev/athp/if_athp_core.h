@@ -90,6 +90,24 @@ struct ath10k_sta {
 	 */
 	int is_in_peer_table;
 
+	/*
+	 * This is (for now!) the set of frames which we've been handled
+	 * to transmit to the given peer, but it's not yet in the peer
+	 * table.
+	 *
+	 * Until net80211 actually grows this kind of deferred work and
+	 * per-station queuing of things, we'll have to do it in the driver.
+	 *
+	 * When transmitting a frame we'll defer frames into this queue
+	 * if the peer table hasn't yet been updated, or if the queue
+	 * isn't empty.  Then we'll trigger sending frames from this queue.
+	 *
+	 * Frames won't be direct dispatched to the rest of the driver
+	 * unless the queue is empty and is_in_peer_table=1, which will
+	 * ensure frame ordering.
+	 */
+	struct mbufq sndq;
+
 	/* the following are protected by ar->data_lock */
 	u32 changed; /* IEEE80211_RC_* */
 	u32 bw;

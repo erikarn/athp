@@ -215,9 +215,21 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	}
 
 	arsta = ATHP_NODE(ni);
+
+	/*
+	 * XXX TODO: Check to see if the station has a frame deferred.
+	 * If so, we need to defer this frame and make sure we schedule
+	 * the taskqueue entry to defer.
+	 *
+	 * It's okay to just schedule it each frame we transmit because
+	 * this right now is only for the handful of frames being sent
+	 * during node setup.
+	 */
+
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
+		/* XXX TODO: defer frame */
 		athp_tx_exit(ar);
 		m_freem(m0);
 		return (ENXIO);
@@ -420,10 +432,21 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		return (ENXIO);
 	}
 
+	/*
+	 * XXX TODO: Check to see if the station has a frame deferred.
+	 * If so, we need to defer this frame and make sure we schedule
+	 * the taskqueue entry to defer.
+	 *
+	 * It's okay to just schedule it each frame we transmit because
+	 * this right now is only for the handful of frames being sent
+	 * during node setup.
+	 */
+
 	arsta = ATHP_NODE(ni);
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
+		/* XXX TODO: defer frame */
 		athp_tx_exit(ar);
 		return (ENXIO);
 	}
@@ -757,6 +780,15 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * turn this into a bit more of an async state change..
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
+
+			/*
+			 * XXX TODO: once the per-node send queue has been
+			 * implemented we can actively defer things here
+			 * and just wait until we have completed the peer
+			 * table update.  This will bring the STA behaviour
+			 * in line with HOSTAP mode.
+			 */
+
 			ATHP_CONF_LOCK(ar);
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			athp_bss_info_config(vap, bss_ni);
@@ -846,6 +878,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ath10k_tx_flush_locked(ar, vap, 0, 1);
 
 			/* This brings the interface down; delete the peer */
+			/*
+			 * XXX TODO: defer this too, to match AP?
+			 */
 			if (vif->is_stabss_setup == 1) {
 				ATHP_NODE(bss_ni)->is_in_peer_table = 0;
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
@@ -879,6 +914,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				    __func__, ret);
 				break;
 			}
+
+			/* XXX TODO: defer? */
+
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			ATHP_CONF_UNLOCK(ar);
@@ -1662,6 +1700,11 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	/* XXX TODO: set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
 	arsta->is_in_peer_table = 1;
+
+	/*
+	 * XXX TODO: now that this is done we can schedule any frames which
+	 * were queued whilst we were awaiting this completion.
+	 */
 }
 
 static void
@@ -1707,6 +1750,10 @@ athp_node_alloc(struct ieee80211vap *vap,
 	an = malloc(sizeof(struct ath10k_sta), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
 		return (NULL);
+
+	/*
+	 * XXX: TODO: initialise per-sta deferred queue.
+	 */
 
 	/*
 	 * Defer peer creation into the taskqueue.
@@ -1839,6 +1886,11 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	}
 }
 
+/*
+ * TODO: should extend the net80211 node free API to allow us to clean-up
+ * the node so it can happen async, separate from the node itself eventually
+ * being freed.
+ */
 static void
 athp_node_free(struct ieee80211_node *ni)
 {
@@ -1854,7 +1906,12 @@ athp_node_free(struct ieee80211_node *ni)
 
 	arsta = ATHP_NODE(ni);
 
-	/* XXX TODO: delete peer */
+	/*
+	 * XXX TODO: Free any deferrred frames that were queued to this
+	 * station that weren't sent out.
+	 */
+
+	/* Delete peer if it's not "our" hostap interface */
 	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
 		struct athp_taskq_entry *e;
 		struct athp_node_alloc_state *ku;
@@ -1863,6 +1920,9 @@ athp_node_free(struct ieee80211_node *ni)
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
+		/*
+		 * This prevents any further frames being send to the hardware.
+		 */
 		arsta->is_in_peer_table = 0;
 
 		/*
