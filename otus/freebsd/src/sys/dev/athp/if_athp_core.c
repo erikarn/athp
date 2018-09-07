@@ -1701,7 +1701,6 @@ ath10k_core_register_work(void *arg, int npending)
 			ath10k_err(ar, "could not probe fw (%d)\n", status);
 			pause_sig("pausing to wait for the ath cpu to be ready.", 1000);
 			ar->bmi.done_sent = false;
-			ath10k_core_stop(ar);
 		}
 		else
 			goto probe_worked;
