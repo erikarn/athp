@@ -1692,6 +1692,7 @@ err_power_down:
 
 static void
 clean_ath10k_core_probe_fw(struct ath10k * ar) {
+	//This function has been made to do cleanup to prevent memory leaks if any exist.
 	//First step tell bmi done has not been sent so it will re-setup bmi.
 	ar->bmi.done_sent = false;
 }
