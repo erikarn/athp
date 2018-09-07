@@ -1696,7 +1696,16 @@ ath10k_core_register_work(void *arg, int npending)
 	struct ath10k *ar = arg;
 	int status;
 
-	status = ath10k_core_probe_fw(ar);
+	
+	for(int i = 0; i < 6; i++) {
+		status = ath10k_core_probe_fw(ar);
+		if (status) {
+			ath10k_err(ar, "could not probe fw (%d)\n", status);
+		}
+		else
+			break;
+	}
+	
 	if (status) {
 		ath10k_err(ar, "could not probe fw (%d)\n", status);
 		goto err;
