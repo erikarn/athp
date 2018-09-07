@@ -1433,12 +1433,8 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		//ath10k_hif_stop(ar);
 		status = ath10k_htc_wait_target(&ar->htc);
 		if (status) {
-			ss_status = ath10k_hif_stop(ar);
-			if (ss_status) {
-				status = ss_status;
-				ath10k_err(ar, "could not stop HIF: %d\n", status);
-				goto err;
-			}
+			//No return hif_stop since hif_stop can't fail, or shouldn't.
+			ath10k_hif_stop(ar);
 			ss_status = ath10k_hif_start(ar);
 			if (ss_status) {
 				status = ss_status;
