@@ -1691,25 +1691,39 @@ err_power_down:
 }
 
 static void
+clean_ath10k_core_probe_fw(ath10k * ar) {
+	//First step tell bmi done has not been sent so it will re-setup bmi.
+	ar->bmi.done_sent = false;
+}
+
+static int
+attempt_ath10k_core_probe_fw(ath10k *ar, int anum) {
+	//anum is the number of attempts that have been tried.
+	//This is to reload the firmware multiple times because sometimes it fails for no reason,
+	//it may be a freebsd only issue.
+	int status = ath10k_core_probe_fw(ar);
+	if (status) {
+		ath10k_err(ar, "could not probe fw, clean up allocations and memory and retry. (%d)\n", status);
+		pause_sig("pausing to wait for the ath cpu to be ready.", 1000);
+		if(anum < ATH10K_FW_PROBE_RETRYS) {
+			clean_ath10k_core_probe_fw(ar);
+			return attempt_ath10k_core_probe_fw(ar, anum++);
+		}
+	}
+	return status;
+}
+
+static void
 ath10k_core_register_work(void *arg, int npending)
 {
 	struct ath10k *ar = arg;
 	int status;
-	for(int i = 0; i < 6; i++) {
-		status = ath10k_core_probe_fw(ar);
-		if (status) {
-			ath10k_err(ar, "could not probe fw (%d)\n", status);
-			pause_sig("pausing to wait for the ath cpu to be ready.", 1000);
-			ar->bmi.done_sent = false;
-		}
-		else
-			goto probe_worked;
-	}
-	if(status)
-	{
+
+	status = attempt_ath10k_core_probe_fw(ar, 0);
+	if (status) {
+		ath10k_err(ar, "could not probe fw (%d)\n", status);
 		goto err;
 	}
-probe_worked:
 	status = ath10k_mac_register(ar);
 	if (status) {
 		ath10k_err(ar, "could not register to mac80211 (%d)\n", status);
