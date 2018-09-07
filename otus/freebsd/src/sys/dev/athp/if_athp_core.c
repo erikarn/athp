@@ -1699,6 +1699,7 @@ ath10k_core_register_work(void *arg, int npending)
 		status = ath10k_core_probe_fw(ar);
 		if (status) {
 			ath10k_err(ar, "could not probe fw (%d)\n", status);
+			Sleep(500);
 		}
 		else
 			goto probe_worked;
