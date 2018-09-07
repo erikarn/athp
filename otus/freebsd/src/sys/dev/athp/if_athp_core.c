@@ -1426,7 +1426,32 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_htt_rx_detach;
 	}
 
-	status = ath10k_htc_wait_target(&ar->htc);
+	
+	for(int i = 0; i < 6; i++) {
+		int ss_status = 0;
+		//Retry starting hif until successfully attach to HTC
+		//ath10k_hif_stop(ar);
+		status = ath10k_htc_wait_target(&ar->htc);
+		if (status) {
+			ss_status = ath10k_hif_stop(ar);
+			if (ss_status) {
+				status = ss_status;
+				ath10k_err(ar, "could not stop HIF: %d\n", status);
+				goto err;
+			}
+			ss_status = ath10k_hif_start(ar);
+			if (ss_status) {
+				status = ss_status;
+				ath10k_err(ar, "could not start HIF: %d\n", status);
+				goto err_htt_rx_detach;
+			}
+			continue;
+		}
+		else
+		{
+			break;
+		}
+	}
 	if (status) {
 		ath10k_err(ar, "failed to connect to HTC: %d\n", status);
 		goto err_hif_stop;
