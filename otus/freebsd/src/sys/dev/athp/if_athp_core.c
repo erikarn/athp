@@ -1426,28 +1426,7 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_htt_rx_detach;
 	}
 
-	
-	for(int i = 0; i < 6; i++) {
-		int ss_status = 0;
-		//Retry starting hif until successfully attach to HTC
-		//ath10k_hif_stop(ar);
-		status = ath10k_htc_wait_target(&ar->htc);
-		if (status) {
-			//No return hif_stop since hif_stop can't fail, or shouldn't.
-			ath10k_hif_stop(ar);
-			ss_status = ath10k_hif_start(ar);
-			if (ss_status) {
-				status = ss_status;
-				ath10k_err(ar, "could not start HIF: %d\n", status);
-				goto err_htt_rx_detach;
-			}
-			continue;
-		}
-		else
-		{
-			break;
-		}
-	}
+	status = ath10k_htc_wait_target(&ar->htc);
 	if (status) {
 		ath10k_err(ar, "failed to connect to HTC: %d\n", status);
 		goto err_hif_stop;
@@ -1716,13 +1695,19 @@ ath10k_core_register_work(void *arg, int npending)
 {
 	struct ath10k *ar = arg;
 	int status;
-
-	status = ath10k_core_probe_fw(ar);
-	if (status) {
-		ath10k_err(ar, "could not probe fw (%d)\n", status);
+	for(int i = 0; i < 6; i++) {
+		status = ath10k_core_probe_fw(ar);
+		if (status) {
+			ath10k_err(ar, "could not probe fw (%d)\n", status);
+		}
+		else
+			goto probe_worked;
+	}
+	if(status)
+	{
 		goto err;
 	}
-
+probe_worked:
 	status = ath10k_mac_register(ar);
 	if (status) {
 		ath10k_err(ar, "could not register to mac80211 (%d)\n", status);
