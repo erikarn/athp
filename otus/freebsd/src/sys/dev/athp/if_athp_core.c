@@ -1691,13 +1691,13 @@ err_power_down:
 }
 
 static void
-clean_ath10k_core_probe_fw(ath10k * ar) {
+clean_ath10k_core_probe_fw(struct ath10k * ar) {
 	//First step tell bmi done has not been sent so it will re-setup bmi.
 	ar->bmi.done_sent = false;
 }
 
 static int
-attempt_ath10k_core_probe_fw(ath10k *ar, int anum) {
+attempt_ath10k_core_probe_fw(struct ath10k *ar, int anum) {
 	//anum is the number of attempts that have been tried.
 	//This is to reload the firmware multiple times because sometimes it fails for no reason,
 	//it may be a freebsd only issue.
