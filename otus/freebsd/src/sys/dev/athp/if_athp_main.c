@@ -510,13 +510,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	return (0);
 }
 /*
-* Handle the athp_parent call but attempt retries and starting the interface here
-*/
-static void
-net80211_athp_parent(struct ieee80211com *ic) {
-	athp_parent(ic, 0);
-}
-/*
  * Handle initial notifications about starting the interface here.
  */
 static void
@@ -598,6 +591,14 @@ athp_parent(struct ieee80211com *ic, int attempts)
 		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
 	}
+}
+
+/*
+* Handle the athp_parent call but attempt retries and starting the interface here
+*/
+static void
+net80211_athp_parent(struct ieee80211com *ic) {
+	athp_parent(ic, 0);
 }
 
 #if 0
