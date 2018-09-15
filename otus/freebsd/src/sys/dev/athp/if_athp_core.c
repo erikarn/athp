@@ -1690,23 +1690,29 @@ err_power_down:
 	return ret;
 }
 
+/*
+ This function has been made to do cleanup to prevent memory leaks if any exist.
+First step tell bmi done has not been sent so it will re-setup bmi.
+*/
 static void
-clean_ath10k_core_probe_fw(struct ath10k * ar) {
-	//This function has been made to do cleanup to prevent memory leaks if any exist.
-	//First step tell bmi done has not been sent so it will re-setup bmi.
+clean_ath10k_core_probe_fw(struct ath10k * ar) 
+{
 	ar->bmi.done_sent = false;
 }
 
+/*
+ anum is the number of attempts that have been tried.
+This is to reload the firmware multiple times because sometimes it fails for no reason,
+it may be a freebsd only issue.
+*/
 static int
-attempt_ath10k_core_probe_fw(struct ath10k *ar, int anum) {
-	//anum is the number of attempts that have been tried.
-	//This is to reload the firmware multiple times because sometimes it fails for no reason,
-	//it may be a freebsd only issue.
+attempt_ath10k_core_probe_fw(struct ath10k *ar, int anum) 
+{
 	int status = ath10k_core_probe_fw(ar);
 	if (status) {
 		ath10k_err(ar, "could not probe fw, clean up allocations and memory and retry. (%d)\n", status);
-		pause_sig("pausing to wait for the ath cpu to be ready.", 1000);
-		if(anum < ATH10K_FW_PROBE_RETRYS) {
+		tsleep(ar, 1, "pausing to wait for the ath cpu to be ready.", 250);
+		if(anum < ATH10K_FW_PROBE_RETRIES) {
 			clean_ath10k_core_probe_fw(ar);
 			return attempt_ath10k_core_probe_fw(ar, anum++);
 		}
