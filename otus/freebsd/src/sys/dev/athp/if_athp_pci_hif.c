@@ -1202,7 +1202,6 @@ err_ce:
 	ath10k_pci_ce_deinit(ar);
 
 err_sleep:
-	//ath10k_pci_sleep(ar_pci);
 	return ret;
 }
 
