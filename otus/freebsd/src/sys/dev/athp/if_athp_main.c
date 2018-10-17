@@ -532,12 +532,11 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 
 	return (0);
 }
-
 /*
  * Handle initial notifications about starting the interface here.
  */
 static void
-athp_parent(struct ieee80211com *ic)
+athp_parent(struct ieee80211com *ic, int attempts)
 {
 	struct ath10k *ar = ic->ic_softc;
 
@@ -563,6 +562,12 @@ athp_parent(struct ieee80211com *ic)
 				ath10k_err(ar,
 				    "%s: ath10k_start failed; ret=%d\n",
 				    __func__, ret);
+					if (attempts < 6) {
+						ath10k_err(ar,
+						"%s: ath10k_start failed, trying again; ret=%d\n",
+						__func__, ret);
+						athp_parent(ic, attempts++);
+					}
 				return;
 			}
 
@@ -609,6 +614,14 @@ athp_parent(struct ieee80211com *ic)
 		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
 	}
+}
+
+/*
+* Handle the athp_parent call but attempt retries and starting the interface here
+*/
+static void
+net80211_athp_parent(struct ieee80211com *ic) {
+	athp_parent(ic, 0);
 }
 
 #if 0
@@ -2484,7 +2497,7 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_set_channel = athp_set_channel;
 	ic->ic_transmit = athp_transmit;
 	ic->ic_send_mgmt = athp_send_mgmt;
-	ic->ic_parent = athp_parent;
+	ic->ic_parent = net80211_athp_parent;
 	ic->ic_vap_create = athp_vap_create;
 	ic->ic_vap_delete = athp_vap_delete;
 	ic->ic_wme.wme_update = athp_wme_update;
