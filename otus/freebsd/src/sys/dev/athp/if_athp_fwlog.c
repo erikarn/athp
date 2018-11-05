@@ -1550,7 +1550,7 @@ ath10k_fwlog_print_work(void *arg, int npending)
 void
 ath10k_handle_fwlog_msg(struct ath10k *ar, struct athp_buf *skb)
 {
-	if(ar != NULL && ar->fwlog_mtx != NULL) {
+	if(ar != NULL && mtx_initialized(ar->fwlog_mtx) != 0) {
 		ATHP_FWLOG_LOCK(ar);
 
 		if (ar->fwlog_tx_queue_len > ATH10K_FWLOG_MAX_EVT_QUEUE) {
@@ -1563,6 +1563,9 @@ ath10k_handle_fwlog_msg(struct ath10k *ar, struct athp_buf *skb)
 		ar->fwlog_tx_queue_len++;
 		taskqueue_enqueue(ar->workqueue, &ar->fwlog_tx_work);
 		ATHP_FWLOG_UNLOCK(ar);
+	}
+	else {
+		//log that mutext is being locked upon and has never been initialized.
 	}
 }
 
