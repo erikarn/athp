@@ -1550,7 +1550,7 @@ ath10k_fwlog_print_work(void *arg, int npending)
 void
 ath10k_handle_fwlog_msg(struct ath10k *ar, struct athp_buf *skb)
 {
-	if(ar != null && ar->fwlog_mtx != null) {
+	if(ar != NULL && ar->fwlog_mtx != NULL) {
 		ATHP_FWLOG_LOCK(ar);
 
 		if (ar->fwlog_tx_queue_len > ATH10K_FWLOG_MAX_EVT_QUEUE) {
