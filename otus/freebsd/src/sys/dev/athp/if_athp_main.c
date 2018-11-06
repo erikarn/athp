@@ -521,6 +521,7 @@ void athp_dma_deallocate(struct ath10k * ar) {
 int
 athp_dma_allocate(struct ath10k * ar)
 {
+	int ret;
 	ret = athp_descdma_alloc(ar, ar->beacon_buf,
 		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
 	if (ret != 0) {
