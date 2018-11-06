@@ -512,7 +512,8 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 /*
 * Remove the allocation of the beacon buffer one time
 */
-void athp_dma_deallocate(struct ath10k * ar) {
+void
+athp_dma_deallocate(struct ath10k * ar) {
 	athp_descdma_free(ar, ar->beacon_buf);
 }
 /*
