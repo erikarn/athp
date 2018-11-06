@@ -510,6 +510,30 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	return (0);
 }
 /*
+* Handle the dma allocations for the power up of the wifi card
+*/
+static int
+athp_dma_allocate(struct ath10k * ar)
+{
+	ret = athp_descdma_alloc(ar, &ar->beacon_buf,
+		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+	if (ret != 0) {
+		ath10k_warn(ar,
+			"%s: TODO: beacon_buf failed to allocate\n", __func__);
+		goto err;
+	}
+	return 1;
+err:
+	athp_dma_deallocate(ar);
+	return 0;
+}
+/*
+* Remove the allocation of the beacon buffer one time
+*/
+static void athp_dma_deallocate(struct ath10k * ar) {
+	athp_descdma_free(ar, &ar->beacon_buf);
+}
+/*
  * Handle initial notifications about starting the interface here.
  */
 static void
@@ -535,21 +559,28 @@ athp_parent(struct ieee80211com *ic, int attempts)
 
 			/* Power up */
 			ret = ath10k_start(ar);
-			if (ret != 0) {
-				ath10k_err(ar,
-				    "%s: ath10k_start failed; ret=%d\n",
-				    __func__, ret);
+			while(ret != 0) {
+				ret = ath10k_start(ar);
+				if (ret != 0) {
+					ath10k_err(ar,
+						"%s: ath10k_start failed; ret=%d\n",
+						__func__, ret);
 					if (attempts < 6) {
 						ath10k_err(ar,
 						"%s: ath10k_start failed, trying again; ret=%d\n",
 						__func__, ret);
-						athp_parent(ic, attempts++);
 					}
-				return;
+					else {
+						break;
+					}
+					attempts++;
+				}
 			}
 
 			ath10k_warn(ar, "%s: not yet running; start\n", __func__);
 			ieee80211_start_all(ic);
+
+			ret = athp_dma_allocate(ar);
 			ar->sc_isrunning = 1;
 		}
 	}
@@ -586,7 +617,7 @@ athp_parent(struct ieee80211com *ic, int attempts)
 			uvp->is_setup = 0;
 			ATHP_CONF_UNLOCK(ar);
 		}
-
+		athp_dma_deallocate(ar);
 		/* Everything is shutdown; power off the chip */
 		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
