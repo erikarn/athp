@@ -510,9 +510,15 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	return (0);
 }
 /*
+* Remove the allocation of the beacon buffer one time
+*/
+void athp_dma_deallocate(struct ath10k * ar) {
+	athp_descdma_free(ar, ar->beacon_buf);
+}
+/*
 * Handle the dma allocations for the power up of the wifi card
 */
-static int
+int
 athp_dma_allocate(struct ath10k * ar)
 {
 	ret = athp_descdma_alloc(ar, ar->beacon_buf,
@@ -526,12 +532,6 @@ athp_dma_allocate(struct ath10k * ar)
 err:
 	athp_dma_deallocate(ar);
 	return 0;
-}
-/*
-* Remove the allocation of the beacon buffer one time
-*/
-static void athp_dma_deallocate(struct ath10k * ar) {
-	athp_descdma_free(ar, ar->beacon_buf);
 }
 /*
  * Handle initial notifications about starting the interface here.
