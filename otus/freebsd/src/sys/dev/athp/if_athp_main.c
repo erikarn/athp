@@ -515,7 +515,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 static int
 athp_dma_allocate(struct ath10k * ar)
 {
-	ret = athp_descdma_alloc(ar, &ar->beacon_buf,
+	ret = athp_descdma_alloc(ar, ar->beacon_buf,
 		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
 	if (ret != 0) {
 		ath10k_warn(ar,
@@ -531,7 +531,7 @@ err:
 * Remove the allocation of the beacon buffer one time
 */
 static void athp_dma_deallocate(struct ath10k * ar) {
-	athp_descdma_free(ar, &ar->beacon_buf);
+	athp_descdma_free(ar, ar->beacon_buf);
 }
 /*
  * Handle initial notifications about starting the interface here.
