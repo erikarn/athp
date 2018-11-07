@@ -701,14 +701,14 @@ athp_attach_preinit(void *arg)
 * Remove the allocation of the beacon buffer one time
 */
 static void 
-athp_dma_deallocate(struct ath10k * ar) {
+athp_dma_deallocate_beacon(struct ath10k * ar) {
 	athp_descdma_free(ar, ar->beacon_buf);
 }
 /*
 * Handle the dma allocations for the power up of the wifi card
 */
 static int
-athp_dma_allocate(struct ath10k * ar)
+athp_dma_allocate_beacon(struct ath10k * ar)
 {
 	int ret = athp_descdma_alloc(ar, ar->beacon_buf,
 		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
@@ -803,6 +803,9 @@ athp_pci_attach(device_t dev)
 		    __func__);
 		goto bad0;
 	}
+
+	/* setup the dma beacon allocations here */
+	athp_dma_allocate_beacon(ar);
 
 	/*
 	 * Initialise HTT descriptors/memory.
@@ -1000,8 +1003,6 @@ athp_pci_attach(device_t dev)
 		    "%s: couldn't establish preinit hook\n", __func__);
 		goto bad4;
 	}
-	/* setup the dma allocations here */
-	athp_dma_allocate(ar);
 	return (0);
 
 	/* Fallthrough for setup failure */
@@ -1052,7 +1053,7 @@ athp_pci_detach(device_t dev)
 	ATHP_LOCK(ar);
 	ar->sc_invalid = 1;
 	ATHP_UNLOCK(ar);
-	athp_dma_deallocate(ar);
+	athp_dma_deallocate_beacon(ar);
 	/* Shutdown ioctl handler */
 	athp_ioctl_teardown(ar);
 
