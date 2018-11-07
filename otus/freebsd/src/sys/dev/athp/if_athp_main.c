@@ -510,29 +510,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	return (0);
 }
 /*
-* Remove the allocation of the beacon buffer one time
-*/
-static void 
-athp_dma_deallocate(struct ath10k * ar) {
-	athp_descdma_free(ar, ar->beacon_buf);
-}
-/*
-* Handle the dma allocations for the power up of the wifi card
-*/
-static int athp_dma_allocate(struct ath10k * ar)
-{
-	int ret = athp_descdma_alloc(ar, ar->beacon_buf,
-		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
-	if (ret != 0) {
-		ath10k_warn(ar,
-			"%s: TODO: beacon_buf failed to allocate\n", __func__);
-		
-		athp_descdma_free(ar, ar->beacon_buf);
-		return 0;
-	}
-	return 1;
-}
-/*
  * Handle initial notifications about starting the interface here.
  */
 static void
@@ -578,8 +555,6 @@ athp_parent(struct ieee80211com *ic, int attempts)
 
 			ath10k_warn(ar, "%s: not yet running; start\n", __func__);
 			ieee80211_start_all(ic);
-
-			ret = athp_dma_allocate(ar);
 			ar->sc_isrunning = 1;
 		}
 	}
@@ -616,7 +591,6 @@ athp_parent(struct ieee80211com *ic, int attempts)
 			uvp->is_setup = 0;
 			ATHP_CONF_UNLOCK(ar);
 		}
-		athp_dma_deallocate(ar);
 		/* Everything is shutdown; power off the chip */
 		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
@@ -2396,7 +2370,29 @@ athp_attach_11ac(struct ath10k *ar)
 	    __func__, m, ar->vht_cap_info);
 #endif
 }
-
+/*
+* Remove the allocation of the beacon buffer one time
+*/
+static void 
+athp_dma_deallocate(struct ath10k * ar) {
+	athp_descdma_free(ar, ar->beacon_buf);
+}
+/*
+* Handle the dma allocations for the power up of the wifi card
+*/
+static int athp_dma_allocate(struct ath10k * ar)
+{
+	int ret = athp_descdma_alloc(ar, ar->beacon_buf,
+		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+	if (ret != 0) {
+		ath10k_warn(ar,
+			"%s: TODO: beacon_buf failed to allocate\n", __func__);
+		
+		athp_descdma_free(ar, ar->beacon_buf);
+		return 0;
+	}
+	return 1;
+}
 /*
  * Attach time setup.
  *
@@ -2492,6 +2488,8 @@ athp_attach_net80211(struct ath10k *ar)
 		athp_attach_11ac(ar);
 	}
 
+	athp_dma_allocate(ar);
+
 	/* radiotap attach */
 	ieee80211_radiotap_attach(ic,
 	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu),
@@ -2520,7 +2518,7 @@ athp_detach_net80211(struct ath10k *ar)
 	/* stop/drain taskq entries */
 	athp_taskq_flush(ar, 0);
 	athp_taskq_free(ar);
-
+	athp_dma_deallocate(ar);
 	if (ic->ic_softc == ar)
 		ieee80211_ifdetach(ic);
 
