@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_buf.h"
 #include "if_athp_trace.h"
 #include "if_athp_ioctl.h"
+#include "if_athp_mac.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
