@@ -702,7 +702,7 @@ athp_attach_preinit(void *arg)
 */
 static void 
 athp_dma_deallocate_beacon(struct ath10k * ar) {
-	athp_descdma_free(ar, ar->beacon_buf);
+	athp_descdma_free(ar, &ar->beacon_buf);
 }
 /*
 * Handle the dma allocations for the power up of the wifi card
@@ -710,7 +710,7 @@ athp_dma_deallocate_beacon(struct ath10k * ar) {
 static int
 athp_dma_allocate_beacon(struct ath10k * ar)
 {
-	int ret = athp_descdma_alloc(ar, ar->beacon_buf,
+	int ret = athp_descdma_alloc(ar, &ar->beacon_buf,
 		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
 	if (ret != 0) {
 		ath10k_warn(ar,
