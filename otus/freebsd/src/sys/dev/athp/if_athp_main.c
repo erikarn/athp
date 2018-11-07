@@ -2371,29 +2371,6 @@ athp_attach_11ac(struct ath10k *ar)
 #endif
 }
 /*
-* Remove the allocation of the beacon buffer one time
-*/
-static void 
-athp_dma_deallocate(struct ath10k * ar) {
-	athp_descdma_free(ar, ar->beacon_buf);
-}
-/*
-* Handle the dma allocations for the power up of the wifi card
-*/
-static int athp_dma_allocate(struct ath10k * ar)
-{
-	int ret = athp_descdma_alloc(ar, ar->beacon_buf,
-		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
-	if (ret != 0) {
-		ath10k_warn(ar,
-			"%s: TODO: beacon_buf failed to allocate\n", __func__);
-		
-		athp_descdma_free(ar, ar->beacon_buf);
-		return 0;
-	}
-	return 1;
-}
-/*
  * Attach time setup.
  *
  * This needs to be deferred until interrupts are enabled;
@@ -2488,7 +2465,7 @@ athp_attach_net80211(struct ath10k *ar)
 		athp_attach_11ac(ar);
 	}
 
-	athp_dma_allocate(ar);
+	//athp_dma_allocate(ar);
 
 	/* radiotap attach */
 	ieee80211_radiotap_attach(ic,
@@ -2518,7 +2495,7 @@ athp_detach_net80211(struct ath10k *ar)
 	/* stop/drain taskq entries */
 	athp_taskq_flush(ar, 0);
 	athp_taskq_free(ar);
-	athp_dma_deallocate(ar);
+	//athp_dma_deallocate(ar);
 	if (ic->ic_softc == ar)
 		ieee80211_ifdetach(ic);
 
