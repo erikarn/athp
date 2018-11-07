@@ -716,7 +716,7 @@ athp_dma_allocate_beacon(struct ath10k * ar)
 		ath10k_warn(ar,
 			"%s: TODO: beacon_buf failed to allocate\n", __func__);
 		
-		athp_descdma_free(ar, ar->beacon_buf);
+		athp_descdma_free(ar, &ar->beacon_buf);
 		return 0;
 	}
 	return 1;

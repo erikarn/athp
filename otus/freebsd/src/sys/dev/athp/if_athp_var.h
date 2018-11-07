@@ -399,7 +399,7 @@ struct ath10k {
 
 	unsigned long long free_vdev_map;
 	struct ath10k_vif *monitor_arvif;
-	struct athp_descdma *beacon_buf;
+	struct athp_descdma beacon_buf;
 	bool monitor;
 	int monitor_vdev_id;
 	bool monitor_started;
