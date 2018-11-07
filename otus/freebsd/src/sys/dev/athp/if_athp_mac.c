@@ -5441,7 +5441,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	case IEEE80211_M_HOSTAP:
 		arvif->vdev_type = WMI_VDEV_TYPE_AP;
 		/* Need to setup the dma buffer for hostap mode since we allocate it in the power on state 'athp_parent' */
-		arvif->beacon_buf = &ar->beacon_buf;
+		arvif->beacon_buf = ar->beacon_buf;
 		break;
 	default:
 		ath10k_warn(ar, "%s: unsupported opmode (%d)\n", __func__, opmode);
