@@ -2428,7 +2428,7 @@ athp_attach_net80211(struct ath10k *ar)
 	    ic->ic_channels);
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
-
+	printf("%s: called; ieee80211_ifattach\n", __func__);
 	ieee80211_ifattach(ic);
 
 	/* required 802.11 methods */
@@ -2461,6 +2461,7 @@ athp_attach_net80211(struct ath10k *ar)
 
 	/* Initial 11n state; capabilities */
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
+		printf("%s: called; athp_attach_11n\n", __func__);
 		athp_attach_11n(ar);
 		athp_attach_11ac(ar);
 	}
@@ -2468,6 +2469,7 @@ athp_attach_net80211(struct ath10k *ar)
 	//athp_dma_allocate(ar);
 
 	/* radiotap attach */
+	printf("%s: called; ieee80211_radiotap_attach\n", __func__);
 	ieee80211_radiotap_attach(ic,
 	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu),
 	    ATH10K_TX_RADIOTAP_PRESENT,
@@ -2475,11 +2477,13 @@ athp_attach_net80211(struct ath10k *ar)
 	    ATH10K_RX_RADIOTAP_PRESENT);
 
 	// if (bootverbose)
-		ieee80211_announce(ic);
+	printf("%s: called; ieee80211_announce\n", __func__);
+	ieee80211_announce(ic);
 
 	/* Deferring work (eg crypto key updates) into net80211 taskqueue */
+	printf("%s: called; athp_taskq_init\n", __func__);
 	(void) athp_taskq_init(ar);
-
+	printf("%s: called; is returning\n", __func__);
 	return (0);
 }
 

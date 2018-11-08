@@ -1342,6 +1342,7 @@ ath10k_core_init_firmware_features(struct ath10k *ar)
 int
 ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 {
+	//ath10k_compl_init(&ar->wmi.tx_beacons_ready);
 	int status;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
@@ -1470,6 +1471,12 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_hif_stop;
 	}
 
+	status = ath10k_wmi_wait_for_tx_beacons_ready(ar);
+	if (status) {
+		ath10k_err(ar, "wmi tx beacons ready event not received\n");
+		goto err_hif_stop;
+	}
+
 	status = ath10k_wmi_wait_for_unified_ready(ar);
 	if (status) {
 		ath10k_err(ar, "wmi unified ready event not received\n");
@@ -1481,7 +1488,10 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 	 */
 	ar->htt.rx_ring.in_ord_rx = !!(test_bit(WMI_SERVICE_RX_FULL_REORDER,
 						ar->wmi.svc_map));
-
+	/* 
+	* added ath10k_wmi_wait_for_tx_beacons_ready above to wait for cmd_Send to basically finish so we don't have to locks trying to be held at the same time,
+	* causing a crash.
+	*/
 	status = ath10k_htt_rx_ring_refill(ar);
 	if (status) {
 		ath10k_err(ar, "failed to refill htt rx ring: %d\n", status);

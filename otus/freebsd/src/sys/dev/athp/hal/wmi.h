@@ -1973,6 +1973,7 @@ struct wmi_10x_service_ready_event {
 
 #define WMI_SERVICE_READY_TIMEOUT_MSEC (5000)
 #define WMI_UNIFIED_READY_TIMEOUT_MSEC (5000)
+#define WMI_TX_BEACONS_READY_TIMEOUT_MSEC (3000)
 
 struct wmi_ready_event {
 	__le32 sw_version;
