@@ -1471,12 +1471,6 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		goto err_hif_stop;
 	}
 
-	status = ath10k_wmi_wait_for_tx_beacons_ready(ar);
-	if (status) {
-		ath10k_err(ar, "wmi tx beacons ready event not received\n");
-		goto err_hif_stop;
-	}
-
 	status = ath10k_wmi_wait_for_unified_ready(ar);
 	if (status) {
 		ath10k_err(ar, "wmi unified ready event not received\n");

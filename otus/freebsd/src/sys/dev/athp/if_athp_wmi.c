@@ -1858,6 +1858,8 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		/* try to send pending beacons first. they take priority */
 		ath10k_wmi_tx_beacons_nowait(ar);
 
+		ath10k_wmi_wait_for_tx_beacons_ready(ar);
+
 		/* Try to send something */
 		ret = ath10k_wmi_cmd_send_nowait(ar, pbuf, cmd_id);
 
