@@ -685,6 +685,7 @@ athp_attach_preinit(void *arg)
 	/* XXX disable busmaster? */
 	mtx_destroy(&ar_pci->ps_mtx);
 	mtx_destroy(&ar_pci->ce_mtx);
+	mtx_destroy(&ar->sc_arvifs_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
@@ -779,6 +780,10 @@ athp_pci_attach(device_t dev)
 
 	sprintf(ar->sc_conf_mtx_buf, "%s:conf", device_get_nameunit(dev));
 	mtx_init(&ar->sc_conf_mtx, ar->sc_conf_mtx_buf, "athp conf",
+	    MTX_DEF | MTX_RECURSE);
+	
+	sprintf(ar->sc_arvifs_mtx_buf, "%s:arvifs", device_get_nameunit(dev));
+	mtx_init(&ar->sc_arvifs_mtx, ar->sc_arvifs_mtx_buf, "athp arvifs",
 	    MTX_DEF | MTX_RECURSE);
 
 	sprintf(ar_pci->ps_mtx_buf, "%s:ps", device_get_nameunit(dev));
@@ -1023,6 +1028,7 @@ bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&ar_pci->ps_mtx);
 	mtx_destroy(&ar_pci->ce_mtx);
+	mtx_destroy(&ar->sc_arvifs_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
@@ -1109,6 +1115,7 @@ athp_pci_detach(device_t dev)
 	/* Free locks */
 	mtx_destroy(&ar_pci->ps_mtx);
 	mtx_destroy(&ar_pci->ce_mtx);
+	mtx_destroy(&ar->sc_arvifs_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);

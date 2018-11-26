@@ -877,7 +877,7 @@ static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 	int num_peers = 0;
 	int ret;
 
-	ATHP_CONF_LOCK_ASSERT(ar);
+	ATHP_ARVIF_LOCK_ASSERT(ar);
 
 	num_peers = ar->num_peers;
 
@@ -2171,7 +2171,7 @@ static int ath10k_mac_num_vifs_started(struct ath10k *ar)
 	struct ath10k_vif *arvif;
 	int num = 0;
 
-	ATHP_CONF_LOCK_ASSERT(ar);
+	ATHP_ARVIF_LOCK_ASSERT(ar);
 
 	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		if (arvif->is_started)
@@ -4891,7 +4891,7 @@ void ath10k_halt(struct ath10k *ar)
 
 	ath10k_warn(ar, "%s: called\n", __func__);
 
-	ATHP_CONF_LOCK_ASSERT(ar);
+	ATHP_ARVIF_LOCK_ASSERT(ar);
 
 	clear_bit(ATH10K_CAC_RUNNING, &ar->dev_flags);
 	ar->filter_flags = 0;
@@ -5231,7 +5231,7 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 	struct ath10k_vif *arvif;
 	int ret, txpower = -1;
 
-	ATHP_CONF_LOCK_ASSERT(ar);
+	ATHP_ARVIF_LOCK_ASSERT(ar);
 
 	TAILQ_FOREACH(arvif, &ar->arvifs, next) {
 		WARN_ON(arvif->txpower < 0);
@@ -5515,7 +5515,9 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	}
 
 	ar->free_vdev_map &= ~(1LL << arvif->vdev_id);
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_INSERT_TAIL(&ar->arvifs, arvif, next);
+	ATHP_ARVIF_UNLOCK(ar);
 	//list_add(&arvif->list, &ar->arvifs);
 
 	/* It makes no sense to have firmware do keepalives. mac80211 already
@@ -5650,7 +5652,9 @@ err_peer_delete:
 err_vdev_delete:
 	ath10k_wmi_vdev_delete(ar, arvif->vdev_id);
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
+	ATHP_ARVIF_UNLOCK(ar);
 	arvif->vdev_id = 0;
 
 err:
@@ -5698,8 +5702,9 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 			    arvif->vdev_id, ret);
 
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
-
+	ATHP_ARVIF_UNLOCK(ar);
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP ||
 	    arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
 		ret = ath10k_wmi_peer_delete(arvif->ar, arvif->vdev_id,
@@ -8451,14 +8456,14 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 	struct ath10k_vif *vif;
 
 	/* XXX for now; may need to use another lock, or create a new one */
-	ATHP_CONF_LOCK(ar);
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		if (vif->vdev_id == vdev_id) {
-			ATHP_CONF_UNLOCK(ar);
+			ATHP_ARVIF_UNLOCK(ar);
 			return vif;
 		}
 	}
-	ATHP_CONF_UNLOCK(ar);
+	ATHP_ARVIF_UNLOCK(ar);
 
 	device_printf(ar->sc_dev, "%s: couldn't find vdev id %d\n",
 	    __func__, vdev_id);

@@ -1672,7 +1672,7 @@ int ath10k_wmi_wait_for_tx_beacons_ready(struct ath10k *ar)
 	unsigned long time_left;
 
 	time_left = ath10k_compl_wait(&ar->wmi.tx_beacons_ready,
-	    "wmi_tx_beacons_ready", &ar->sc_conf_mtx,
+	    "wmi_tx_beacons_ready", &ar->sc_arvifs_mtx,
 	    WMI_TX_BEACONS_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
@@ -1814,11 +1814,11 @@ static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 	 * Note: the reason for holding conf lock is that said
 	 * lock looks after the arvifs list.
 	 */
-	ATHP_CONF_LOCK(ar);
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		ath10k_wmi_tx_beacon_nowait(vif);
 	}
-	ATHP_CONF_UNLOCK(ar);
+	ATHP_ARVIF_UNLOCK(ar);
 	ath10k_compl_wakeup_one(&ar->wmi.tx_beacons_ready);
 }
 
