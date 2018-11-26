@@ -5203,7 +5203,7 @@ static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 	int ret;
 	u32 param;
 
-	ATHP_ARVIF_LOCK_ASSERT(ar);
+	ATHP_CONF_LOCK_ASSERT(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac txpower %d\n", txpower);
 
@@ -8950,10 +8950,10 @@ athp_vif_update_txpower(struct ieee80211vap *vap)
 
 	ni = ieee80211_ref_node(vap->iv_bss);
 
-	ATHP_ARVIF_LOCK(ar);
+	ATHP_CONF_LOCK(ar);
 	arvif->txpower = ieee80211_get_node_txpower(ni) / 2;
 	ret = ath10k_mac_txpower_recalc(ar);
-	ATHP_ARVIF_UNLOCK(ar);
+	ATHP_CONF_UNLOCK(ar);
 
 	ieee80211_free_node(ni);
 
