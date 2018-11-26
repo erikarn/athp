@@ -5358,7 +5358,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	vif->driver_flags |= IEEE80211_VIF_SUPPORTS_UAPSD;
 #endif
 	ATHP_CONF_LOCK(ar);
-	ATHP_ARVIF_LOCK(ar);
+
 	arvif->ar = ar;
 	arvif->vif = vif;
 
@@ -5515,8 +5515,9 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	}
 
 	ar->free_vdev_map &= ~(1LL << arvif->vdev_id);
-	
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_INSERT_TAIL(&ar->arvifs, arvif, next);
+	ATHP_ARVIF_UNLOCK(ar);
 	//list_add(&arvif->list, &ar->arvifs);
 
 	/* It makes no sense to have firmware do keepalives. mac80211 already
@@ -5639,7 +5640,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		ieee80211_wake_queue(ar->hw, arvif->vdev_id);
 	ATHP_HTT_TX_UNLOCK(&ar->htt);
 #endif
-	ATHP_ARVIF_UNLOCK(ar);
+
 	ATHP_CONF_UNLOCK(ar);
 	return 0;
 
@@ -5651,13 +5652,15 @@ err_peer_delete:
 err_vdev_delete:
 	ath10k_wmi_vdev_delete(ar, arvif->vdev_id);
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
+	ATHP_ARVIF_UNLOCK(ar);
 	arvif->vdev_id = 0;
 
 err:
 	/* This is no longer happening here check athp_parent */
 	//athp_descdma_free(ar, &arvif->beacon_buf);
-	ATHP_ARVIF_UNLOCK(ar);
+
 	ATHP_CONF_UNLOCK(ar);
 
 	return ret;
@@ -5684,12 +5687,15 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ath10k_warn(ar, "%s: called\n", __func__);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
-	ATHP_ARVIF_UNLOCK_ASSERT(ar);
 #if 0
 	cancel_work_sync(&arvif->ap_csa_work);
 #endif
 	callout_drain(&arvif->connection_loss_work);
+
+	ATHP_DATA_LOCK(ar);
 	ath10k_mac_vif_beacon_cleanup(arvif);
+	ATHP_DATA_UNLOCK(ar);
+
 	ret = ath10k_spectral_vif_stop(arvif);
 	if (ret)
 		ath10k_warn(ar, "failed to stop spectral for vdev %i: %d\n",
