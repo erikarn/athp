@@ -5616,7 +5616,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	}
 
 	/* XXX TODO: txpower default? */
-	arvif->txpower = 8;	/* 15dBm starting point */
+	arvif->txpower = 9;	/* 15dBm starting point */
 	ret = ath10k_mac_txpower_recalc(ar);
 	if (ret) {
 		ath10k_warn(ar, "failed to recalc tx power: %d\n", ret);
