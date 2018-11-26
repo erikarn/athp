@@ -1672,7 +1672,7 @@ int ath10k_wmi_wait_for_tx_beacons_ready(struct ath10k *ar)
 	unsigned long time_left;
 
 	time_left = ath10k_compl_wait(&ar->wmi.tx_beacons_ready,
-	    "wmi_tx_beacons_ready", &ar->sc_arvifs_mtx,
+	    "wmi_tx_beacons_ready", &ar->sc_conf_mtx,
 	    WMI_TX_BEACONS_READY_TIMEOUT_MSEC);
 	if (!time_left)
 		return -ETIMEDOUT;
