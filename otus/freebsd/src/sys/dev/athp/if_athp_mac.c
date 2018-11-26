@@ -877,8 +877,6 @@ static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 	int num_peers = 0;
 	int ret;
 
-	ATHP_ARVIF_LOCK_ASSERT(ar);
-
 	num_peers = ar->num_peers;
 
 	/* Each vdev consumes a peer entry as well */
@@ -5202,9 +5200,6 @@ static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 {
 	int ret;
 	u32 param;
-
-	ATHP_CONF_LOCK_ASSERT(ar);
-
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac txpower %d\n", txpower);
 
 	param = ar->wmi.pdev_param->txpower_limit2g;
@@ -5231,7 +5226,7 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 	struct ath10k_vif *arvif;
 	int ret, txpower = -1;
 
-	ATHP_ARVIF_LOCK_ASSERT(ar);
+	ATHP_ARVIF_LOCK(ar);
 
 	TAILQ_FOREACH(arvif, &ar->arvifs, next) {
 		WARN_ON(arvif->txpower < 0);
@@ -5241,7 +5236,7 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 		else
 			txpower = min(txpower, arvif->txpower);
 	}
-
+	ATHP_ARVIF_UNLOCK(ar);
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac txpower recalc: %d\n", txpower);
 
 	if (WARN_ON(txpower == -1))
