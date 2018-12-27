@@ -57,10 +57,12 @@ https://www.freebsd.org/doc/handbook/makeworld.html \
 
 You may also use my Sticky Note cheat sheet i'll paste it below: \
 How-To make freebsd kernel \
+```
 make kernel-toolchain \
 make kernel \
 make buildkernel KERNCONF=GENERIC \
 make installkernel KERNCONF=GENERIC \
+```
  \
 Once you have built this system the module file for the driver is in: \
 athp/otus/freebsd/src/sys/modules/ \
@@ -73,15 +75,19 @@ Behind a great developer of many things is a great set of sticky notes, enjoy! \
  \
 These are my favorite commands to use in the terminal \
  \
+ ```
 kldload athp_QCA988X_hw2.0_board.bin \
 kldload athp_QCA988X_hw2.0_firmware-2.bin \
 kldload athp_QCA988X_hw2.0_firmware-3.bin \
 kldload athp_QCA988X_hw2.0_firmware-4.bin \
 kldload athp_QCA988X_hw2.0_firmware-5.bin \
 kldload if_athp \
-
+```
+ifconfig commands to make the device become a station and hook in to a bridge \
+```
 ifconfig wlan0 create wlandev athp0 wlanmode hostap \
 ifconfig wlan0 ssid ath10kport channel 40 \
 ifconfig bridge0 addm wlan0 \
 ifconfig wlan0 down \
 ifconfig wlan0 up \
+```
