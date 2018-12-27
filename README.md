@@ -56,14 +56,13 @@ https://www.freebsd.org/doc/handbook/makeworld.html#updating-src-obtaining-src
 https://www.freebsd.org/doc/handbook/makeworld.html \
 
 You may also use my Sticky Note cheat sheet i'll paste it below: \
-How-To make freebsd kernel \
+How-To make freebsd kernel
 ```
 make kernel-toolchain
 make kernel
 make buildkernel KERNCONF=GENERIC
 make installkernel KERNCONF=GENERIC
 ```
- \
 Once you have built this system the module file for the driver is in: \
 athp/otus/freebsd/src/sys/modules/ \
 Your kernel files are in: athpfw with the extension .ko, these files would be put in /boot/kernel \
@@ -74,7 +73,6 @@ Once you have done this you may reboot, below is a list of my favorite commands 
 Behind a great developer of many things is a great set of sticky notes, enjoy! \
  \
 These are my favorite commands to use in the terminal \
- \
  ```
 kldload athp_QCA988X_hw2.0_board.bin
 kldload athp_QCA988X_hw2.0_firmware-2.bin
