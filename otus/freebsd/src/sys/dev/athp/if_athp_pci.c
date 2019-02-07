@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_buf.h"
 #include "if_athp_trace.h"
 #include "if_athp_ioctl.h"
+#include "if_athp_mac.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -684,6 +685,7 @@ athp_attach_preinit(void *arg)
 	/* XXX disable busmaster? */
 	mtx_destroy(&ar_pci->ps_mtx);
 	mtx_destroy(&ar_pci->ce_mtx);
+	mtx_destroy(&ar->sc_arvifs_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
@@ -694,6 +696,31 @@ athp_attach_preinit(void *arg)
 		taskqueue_free(ar_pci->pipe_taskq);
 	}
 	ath10k_core_destroy(ar);
+}
+
+/*
+* Remove the allocation of the beacon buffer one time
+*/
+static void 
+athp_dma_deallocate_beacon(struct ath10k * ar) {
+	athp_descdma_free(ar, &ar->beacon_buf);
+}
+/*
+* Handle the dma allocations for the power up of the wifi card
+*/
+static int
+athp_dma_allocate_beacon(struct ath10k * ar)
+{
+	int ret = athp_descdma_alloc(ar, &ar->beacon_buf,
+		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+	if (ret != 0) {
+		ath10k_warn(ar,
+			"%s: TODO: beacon_buf failed to allocate\n", __func__);
+		
+		athp_descdma_free(ar, &ar->beacon_buf);
+		return 0;
+	}
+	return 1;
 }
 
 static int
@@ -754,6 +781,10 @@ athp_pci_attach(device_t dev)
 	sprintf(ar->sc_conf_mtx_buf, "%s:conf", device_get_nameunit(dev));
 	mtx_init(&ar->sc_conf_mtx, ar->sc_conf_mtx_buf, "athp conf",
 	    MTX_DEF | MTX_RECURSE);
+	
+	sprintf(ar->sc_arvifs_mtx_buf, "%s:arvifs", device_get_nameunit(dev));
+	mtx_init(&ar->sc_arvifs_mtx, ar->sc_arvifs_mtx_buf, "athp arvifs",
+	    MTX_DEF | MTX_RECURSE);
 
 	sprintf(ar_pci->ps_mtx_buf, "%s:ps", device_get_nameunit(dev));
 	mtx_init(&ar_pci->ps_mtx, ar_pci->ps_mtx_buf, "athp ps", MTX_DEF);
@@ -777,6 +808,9 @@ athp_pci_attach(device_t dev)
 		    __func__);
 		goto bad0;
 	}
+
+	/* setup the dma beacon allocations here */
+	athp_dma_allocate_beacon(ar);
 
 	/*
 	 * Initialise HTT descriptors/memory.
@@ -974,7 +1008,6 @@ athp_pci_attach(device_t dev)
 		    "%s: couldn't establish preinit hook\n", __func__);
 		goto bad4;
 	}
-
 	return (0);
 
 	/* Fallthrough for setup failure */
@@ -995,6 +1028,7 @@ bad:
 	/* XXX disable busmaster? */
 	mtx_destroy(&ar_pci->ps_mtx);
 	mtx_destroy(&ar_pci->ce_mtx);
+	mtx_destroy(&ar->sc_arvifs_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
@@ -1025,7 +1059,7 @@ athp_pci_detach(device_t dev)
 	ATHP_LOCK(ar);
 	ar->sc_invalid = 1;
 	ATHP_UNLOCK(ar);
-
+	athp_dma_deallocate_beacon(ar);
 	/* Shutdown ioctl handler */
 	athp_ioctl_teardown(ar);
 
@@ -1081,6 +1115,7 @@ athp_pci_detach(device_t dev)
 	/* Free locks */
 	mtx_destroy(&ar_pci->ps_mtx);
 	mtx_destroy(&ar_pci->ce_mtx);
+	mtx_destroy(&ar->sc_arvifs_mtx);
 	mtx_destroy(&ar->sc_conf_mtx);
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
