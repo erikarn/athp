@@ -535,22 +535,17 @@ athp_parent(struct ieee80211com *ic, int attempts)
 
 			/* Power up */
 			ret = ath10k_start(ar);
-			while(ret != 0) {
-				ret = ath10k_start(ar);
-				if (ret != 0) {
-					ath10k_err(ar,
-						"%s: ath10k_start failed; ret=%d\n",
-						__func__, ret);
+			if (ret != 0) {
+				ath10k_err(ar,
+				    "%s: ath10k_start failed; ret=%d\n",
+				    __func__, ret);
 					if (attempts < 6) {
 						ath10k_err(ar,
 						"%s: ath10k_start failed, trying again; ret=%d\n",
 						__func__, ret);
+						athp_parent(ic, attempts++);
 					}
-					else {
-						break;
-					}
-					attempts++;
-				}
+				return;
 			}
 
 			ath10k_warn(ar, "%s: not yet running; start\n", __func__);
@@ -591,6 +586,7 @@ athp_parent(struct ieee80211com *ic, int attempts)
 			uvp->is_setup = 0;
 			ATHP_CONF_UNLOCK(ar);
 		}
+
 		/* Everything is shutdown; power off the chip */
 		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
@@ -2370,6 +2366,7 @@ athp_attach_11ac(struct ath10k *ar)
 	    __func__, m, ar->vht_cap_info);
 #endif
 }
+
 /*
  * Attach time setup.
  *
@@ -2428,7 +2425,7 @@ athp_attach_net80211(struct ath10k *ar)
 	    ic->ic_channels);
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, ar->mac_addr);
-	printf("%s: called; ieee80211_ifattach\n", __func__);
+
 	ieee80211_ifattach(ic);
 
 	/* required 802.11 methods */
@@ -2461,15 +2458,11 @@ athp_attach_net80211(struct ath10k *ar)
 
 	/* Initial 11n state; capabilities */
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
-		printf("%s: called; athp_attach_11n\n", __func__);
 		athp_attach_11n(ar);
 		athp_attach_11ac(ar);
 	}
 
-	//athp_dma_allocate(ar);
-
 	/* radiotap attach */
-	printf("%s: called; ieee80211_radiotap_attach\n", __func__);
 	ieee80211_radiotap_attach(ic,
 	    &ar->sc_txtapu.th.wt_ihdr, sizeof(ar->sc_txtapu),
 	    ATH10K_TX_RADIOTAP_PRESENT,
@@ -2477,13 +2470,11 @@ athp_attach_net80211(struct ath10k *ar)
 	    ATH10K_RX_RADIOTAP_PRESENT);
 
 	// if (bootverbose)
-	printf("%s: called; ieee80211_announce\n", __func__);
-	ieee80211_announce(ic);
+		ieee80211_announce(ic);
 
 	/* Deferring work (eg crypto key updates) into net80211 taskqueue */
-	printf("%s: called; athp_taskq_init\n", __func__);
 	(void) athp_taskq_init(ar);
-	printf("%s: called; is returning\n", __func__);
+
 	return (0);
 }
 
@@ -2499,7 +2490,7 @@ athp_detach_net80211(struct ath10k *ar)
 	/* stop/drain taskq entries */
 	athp_taskq_flush(ar, 0);
 	athp_taskq_free(ar);
-	//athp_dma_deallocate(ar);
+
 	if (ic->ic_softc == ar)
 		ieee80211_ifdetach(ic);
 

@@ -1550,23 +1550,18 @@ ath10k_fwlog_print_work(void *arg, int npending)
 void
 ath10k_handle_fwlog_msg(struct ath10k *ar, struct athp_buf *skb)
 {
-	if(ar != NULL && mtx_initialized(&ar->fwlog_mtx) != 0) {
-		ATHP_FWLOG_LOCK(ar);
+	ATHP_FWLOG_LOCK(ar);
 
-		if (ar->fwlog_tx_queue_len > ATH10K_FWLOG_MAX_EVT_QUEUE) {
-			ath10k_warn(ar, "reached fwlog queue limit\n");
-			athp_freebuf(ar, &ar->buf_rx, skb);
-			return;
-		}
+	if (ar->fwlog_tx_queue_len > ATH10K_FWLOG_MAX_EVT_QUEUE) {
+		ath10k_warn(ar, "reached fwlog queue limit\n");
+		athp_freebuf(ar, &ar->buf_rx, skb);
+		return;
+	}
 
-		TAILQ_INSERT_TAIL(&ar->fwlog_tx_queue, skb, next);
-		ar->fwlog_tx_queue_len++;
-		taskqueue_enqueue(ar->workqueue, &ar->fwlog_tx_work);
-		ATHP_FWLOG_UNLOCK(ar);
-	}
-	else {
-		//log that mutext is being locked upon and has never been initialized.
-	}
+	TAILQ_INSERT_TAIL(&ar->fwlog_tx_queue, skb, next);
+	ar->fwlog_tx_queue_len++;
+	taskqueue_enqueue(ar->workqueue, &ar->fwlog_tx_work);
+	ATHP_FWLOG_UNLOCK(ar);
 }
 
 void ath10k_fwlog_register(struct ath10k *ar)
