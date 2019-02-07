@@ -53,4 +53,39 @@ athp/otus/freebsd/src/sys/modules/
 
 Instructions on how to build and compile freebsd 12:
 https://www.freebsd.org/doc/handbook/makeworld.html#updating-src-obtaining-src
-https://www.freebsd.org/doc/handbook/makeworld.html
+https://www.freebsd.org/doc/handbook/makeworld.html \
+
+You may also use my Sticky Note cheat sheet i'll paste it below: \
+How-To make freebsd kernel
+```
+make kernel-toolchain
+make kernel
+make buildkernel KERNCONF=GENERIC
+make installkernel KERNCONF=GENERIC
+```
+Once you have built this system the module file for the driver is in: \
+athp/otus/freebsd/src/sys/modules/ \
+Your kernel files are in: athpfw with the extension .ko, these files would be put in /boot/kernel \
+The module files inside athpfw with the extension .bin will go in to /boot/modules \
+the files with the .ko extension inside athp will go inside /boot/kernel \
+
+Once you have done this you may reboot, below is a list of my favorite commands to get this all to work together for my system! :) \
+Behind a great developer of many things is a great set of sticky notes, enjoy! \
+ \
+These are my favorite commands to use in the terminal \
+ ```
+kldload athp_QCA988X_hw2.0_board.bin
+kldload athp_QCA988X_hw2.0_firmware-2.bin
+kldload athp_QCA988X_hw2.0_firmware-3.bin
+kldload athp_QCA988X_hw2.0_firmware-4.bin
+kldload athp_QCA988X_hw2.0_firmware-5.bin
+kldload if_athp
+```
+ifconfig commands to make the device become a station and hook in to a bridge \
+```
+ifconfig wlan0 create wlandev athp0 wlanmode hostap
+ifconfig wlan0 ssid ath10kport channel 40
+ifconfig bridge0 addm wlan0
+ifconfig wlan0 down
+ifconfig wlan0 up
+```

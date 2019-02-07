@@ -94,6 +94,11 @@ athp_mtx_assert(struct mtx *mtx, int op)
 #define	ATHP_CONF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
 #define	ATHP_CONF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
 
+#define	ATHP_ARVIF_LOCK(sc)		mtx_lock(&(sc)->sc_arvifs_mtx)
+#define	ATHP_ARVIF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_arvifs_mtx)
+#define	ATHP_ARVIF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_arvifs_mtx, MA_OWNED)
+#define	ATHP_ARVIF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_arvifs_mtx, MA_NOTOWNED)
+//sc_arvifs_mtx
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_data_mtx, MA_OWNED)
@@ -138,6 +143,7 @@ struct ath10k_wmi {
 	enum ath10k_htc_ep_id eid;
 	struct ath10k_compl service_ready;
 	struct ath10k_compl unified_ready;
+	struct ath10k_compl tx_beacons_ready;
 	struct ath10k_wait tx_credits_wq;
 	int is_init;
 	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
@@ -224,6 +230,8 @@ struct ath10k {
 	char				sc_dma_mtx_buf[16];
 	struct mtx			sc_conf_mtx;
 	char				sc_conf_mtx_buf[16];
+	struct mtx			sc_arvifs_mtx;
+	char				sc_arvifs_mtx_buf[16];
 	struct mtx			sc_data_mtx;
 	char				sc_data_mtx_buf[16];
 	int				sc_invalid;
@@ -399,6 +407,7 @@ struct ath10k {
 
 	unsigned long long free_vdev_map;
 	struct ath10k_vif *monitor_arvif;
+	struct athp_descdma beacon_buf;
 	bool monitor;
 	int monitor_vdev_id;
 	bool monitor_started;
