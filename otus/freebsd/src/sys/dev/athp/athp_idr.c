@@ -518,7 +518,7 @@ static int
 idr_alloc_locked(struct idr *idr, void *ptr, int start, int end)
 {
 	//int max = end > 0 ? end - 1 : INT_MAX;
-	int max = end > 0 ? end - 1 : (2^30);	/* XXX */
+	int max = end > 0 ? end - 1 : (1 << 30);	/* XXX */
 	int error;
 	int id;
 
