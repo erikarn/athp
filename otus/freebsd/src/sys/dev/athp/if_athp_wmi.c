@@ -2296,6 +2296,7 @@ static int ath10k_wmi_10_4_op_pull_mgmt_rx_ev(struct ath10k *ar,
 
 int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 {
+	struct epoch_tracker et;
 	struct ieee80211com *ic = &ar->sc_ic;
 	struct wmi_mgmt_rx_ev_arg arg = {};
 	struct ieee80211_rx_stats stat;
@@ -2455,6 +2456,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	 */
 	(void) ieee80211_add_rx_params(m, &stat);
 
+	NET_EPOCH_ENTER(et);
 	/*
 	 * Do node lookup for RX.
 	 */
@@ -2468,6 +2470,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		/* no node, global */
 		ieee80211_input_mimo_all(ic, m);
 	}
+	NET_EPOCH_EXIT(et);
 
 	/* ... now, the mbuf isn't ours */
 	m = NULL;

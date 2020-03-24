@@ -1237,6 +1237,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 			      struct ieee80211_rx_stats *rx_status,
 			      struct athp_buf *skb)
 {
+	struct epoch_tracker et;
 	struct ieee80211com *ic = &ar->sc_ic;
 	struct mbuf *m;
 	struct ieee80211_node *ni;
@@ -1331,6 +1332,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 	}
 
 	/* RX path to net80211 */
+	NET_EPOCH_ENTER(et);
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
 	if (ni != NULL) {
 		if (ni->ni_flags & IEEE80211_NODE_HT)
@@ -1340,6 +1342,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 	} else {
 		ieee80211_input_mimo_all(ic, m);
 	}
+	NET_EPOCH_EXIT(et);
 	/* skb/pbuf is now owned by the net80211 layer */
 }
 
