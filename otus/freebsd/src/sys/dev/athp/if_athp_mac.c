@@ -5357,7 +5357,6 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 #if 0
 	vif->driver_flags |= IEEE80211_VIF_SUPPORTS_UAPSD;
 #endif
-
 	ATHP_CONF_LOCK(ar);
 
 	arvif->ar = ar;
@@ -5441,6 +5440,8 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		break;
 	case IEEE80211_M_HOSTAP:
 		arvif->vdev_type = WMI_VDEV_TYPE_AP;
+		/* Need to setup the dma buffer for hostap mode since we allocate it in the power on state 'athp_parent' */
+		arvif->beacon_buf = ar->beacon_buf;
 		break;
 	default:
 		ath10k_warn(ar, "%s: unsupported opmode (%d)\n", __func__, opmode);
@@ -5476,6 +5477,10 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	 * beacon tx commands. Worst case for this approach is some beacons may
 	 * become corrupted, e.g. have garbled IEs or out-of-date TIM bitmap.
 	 */
+	/*
+	This is being moved to:
+	athp_parent
+	instead were it should be at otherwise we have to deal with locking that could possibly messup the entire add interface call.
 	if (opmode == IEEE80211_M_IBSS ||
 	    opmode == IEEE80211_M_HOSTAP) {
 		ret = athp_descdma_alloc(ar, &arvif->beacon_buf,
@@ -5485,7 +5490,7 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 			    "%s: TODO: beacon_buf failed to allocate\n", __func__);
 			goto err;
 		}
-	}
+	}*/
 	if (test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags))
 		arvif->nohwcrypt = true;
 
@@ -5649,7 +5654,8 @@ err_vdev_delete:
 	arvif->vdev_id = 0;
 
 err:
-	athp_descdma_free(ar, &arvif->beacon_buf);
+	/* This is no longer happening here check athp_parent */
+	//athp_descdma_free(ar, &arvif->beacon_buf);
 
 	ATHP_CONF_UNLOCK(ar);
 

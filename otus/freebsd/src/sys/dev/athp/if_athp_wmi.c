@@ -1667,6 +1667,19 @@ int ath10k_wmi_wait_for_service_ready(struct ath10k *ar)
 	return 0;
 }
 
+int ath10k_wmi_wait_for_tx_beacons_ready(struct ath10k *ar)
+{
+	unsigned long time_left;
+
+	time_left = ath10k_compl_wait(&ar->wmi.tx_beacons_ready,
+	    "wmi_tx_beacons_ready", &ar->sc_conf_mtx,
+	    WMI_TX_BEACONS_READY_TIMEOUT_MSEC);
+	if (!time_left)
+		return -ETIMEDOUT;
+	return 0;
+}
+
+
 int ath10k_wmi_wait_for_unified_ready(struct ath10k *ar)
 {
 	unsigned long time_left;
@@ -1806,6 +1819,7 @@ static void ath10k_wmi_tx_beacons_nowait(struct ath10k *ar)
 		ath10k_wmi_tx_beacon_nowait(vif);
 	}
 	ATHP_CONF_UNLOCK(ar);
+	ath10k_compl_wakeup_one(&ar->wmi.tx_beacons_ready);
 }
 
 static void ath10k_wmi_op_ep_tx_credits(struct ath10k *ar)
@@ -7001,7 +7015,7 @@ int ath10k_wmi_attach(struct ath10k *ar)
 
 	ath10k_compl_init(&ar->wmi.service_ready);
 	ath10k_compl_init(&ar->wmi.unified_ready);
-
+	ath10k_compl_init(&ar->wmi.tx_beacons_ready);
 	if (! ar->wmi.is_init) {
 		TASK_INIT(&ar->svc_rdy_work, 0, ath10k_wmi_event_service_ready_work, ar);
 	}

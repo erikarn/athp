@@ -138,6 +138,7 @@ struct ath10k_wmi {
 	enum ath10k_htc_ep_id eid;
 	struct ath10k_compl service_ready;
 	struct ath10k_compl unified_ready;
+	struct ath10k_compl tx_beacons_ready;
 	struct ath10k_wait tx_credits_wq;
 	int is_init;
 	DECLARE_BITMAP(svc_map, WMI_SERVICE_MAX);
@@ -399,6 +400,7 @@ struct ath10k {
 
 	unsigned long long free_vdev_map;
 	struct ath10k_vif *monitor_arvif;
+	struct athp_descdma beacon_buf;
 	bool monitor;
 	int monitor_vdev_id;
 	bool monitor_started;

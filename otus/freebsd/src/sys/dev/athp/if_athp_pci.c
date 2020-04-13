@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_buf.h"
 #include "if_athp_trace.h"
 #include "if_athp_ioctl.h"
+#include "if_athp_mac.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -696,6 +697,31 @@ athp_attach_preinit(void *arg)
 	ath10k_core_destroy(ar);
 }
 
+/*
+* Remove the allocation of the beacon buffer one time
+*/
+static void 
+athp_dma_deallocate_beacon(struct ath10k * ar) {
+	athp_descdma_free(ar, &ar->beacon_buf);
+}
+/*
+* Handle the dma allocations for the power up of the wifi card
+*/
+static int
+athp_dma_allocate_beacon(struct ath10k * ar)
+{
+	int ret = athp_descdma_alloc(ar, &ar->beacon_buf,
+		"beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+	if (ret != 0) {
+		ath10k_warn(ar,
+			"%s: TODO: beacon_buf failed to allocate\n", __func__);
+		
+		athp_descdma_free(ar, &ar->beacon_buf);
+		return 0;
+	}
+	return 1;
+}
+
 static int
 athp_pci_attach(device_t dev)
 {
@@ -777,6 +803,9 @@ athp_pci_attach(device_t dev)
 		    __func__);
 		goto bad0;
 	}
+
+	/* setup the dma beacon allocations here */
+	athp_dma_allocate_beacon(ar);
 
 	/*
 	 * Initialise HTT descriptors/memory.
@@ -974,7 +1003,6 @@ athp_pci_attach(device_t dev)
 		    "%s: couldn't establish preinit hook\n", __func__);
 		goto bad4;
 	}
-
 	return (0);
 
 	/* Fallthrough for setup failure */
@@ -1025,7 +1053,7 @@ athp_pci_detach(device_t dev)
 	ATHP_LOCK(ar);
 	ar->sc_invalid = 1;
 	ATHP_UNLOCK(ar);
-
+	athp_dma_deallocate_beacon(ar);
 	/* Shutdown ioctl handler */
 	athp_ioctl_teardown(ar);
 
