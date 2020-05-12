@@ -1520,7 +1520,6 @@ ath10k_fwlog_print_work(void *arg, int npending)
 	struct ath10k *ar = arg;
 	struct athp_buf *skb;
 
-	/* XXX locking? */
 	ATHP_FWLOG_LOCK(ar);
 	skb = TAILQ_FIRST(&ar->fwlog_tx_queue);
 	if (skb == NULL) {
@@ -1580,7 +1579,6 @@ void ath10k_fwlog_unregister(struct ath10k *ar)
 
 	taskqueue_drain(ar->workqueue, &ar->fwlog_tx_work);
 
-	/* Locking? */
 	ATHP_FWLOG_LOCK(ar);
 
 	for (;;) {
