@@ -214,7 +214,6 @@ struct ath10k {
 	/* FreeBSD specific bits up here */
 
 	struct ieee80211com		sc_ic;
-	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct mtx			sc_mtx;
 	char				sc_mtx_buf[16];
