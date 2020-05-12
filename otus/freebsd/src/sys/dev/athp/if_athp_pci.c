@@ -664,6 +664,7 @@ athp_attach_preinit(void *arg)
 	/* Setup ioctl handler */
 	athp_ioctl_setup(ar);
 
+	/* Delayed core registration; shuffled into a taskqueue */
 	ret = ath10k_core_register(ar);
 	if (ret == 0)
 		return;
