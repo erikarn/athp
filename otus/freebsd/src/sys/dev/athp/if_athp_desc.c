@@ -112,6 +112,8 @@ athp_load_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 
 /*
  * Allocate the descriptors and appropriate DMA tag/setup.
+ *
+ * Must not be called with any non-sleepable locks held.
  */
 int
 athp_descdma_alloc(struct ath10k *ar, struct athp_descdma *dd,
@@ -124,6 +126,9 @@ athp_descdma_alloc(struct ath10k *ar, struct athp_descdma *dd,
 
 	ath10k_dbg(ar, ATH10K_DBG_DESCDMA,
 	    "%s: %s DMA: %d bytes\n", __func__, name, (int) dd->dd_desc_len);
+
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s can sleep!",
+	    __func__);
 
 	/*
 	 * Setup DMA descriptor area.
@@ -211,12 +216,17 @@ athp_descdma_free(struct ath10k *ar, struct athp_descdma *dd)
  * Each copyengine ring has a different idea of what the maximum
  * buffer size is.  This allows the CE/PCI pipe code to have
  * a separate DMA tag for each with the relevant constraints.
+ *
+ * Must not be called with any non-sleepable locks held.
  */
 int
 athp_dma_head_alloc(struct ath10k *ar, struct athp_dma_head *dh,
     int buf_size, int align)
 {
 	int error;
+
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s can sleep!",
+	    __func__);
 
 	bzero(dh, sizeof(*dh));
 	ath10k_dbg(ar, ATH10K_DBG_BUSDMA, "%s: called; buf_size=%d\n",
@@ -316,11 +326,19 @@ athp_dma_mbuf_unload(struct ath10k *ar, struct athp_dma_head *dh,
 	dm->paddr = 0;
 }
 
+/*
+ * Setup a DMA map for the given dma mbuf.
+ *
+ * Must not be called with any non-sleepable locks held.
+ */
 void
 athp_dma_mbuf_setup(struct ath10k *ar, struct athp_dma_head *dh,
     struct athp_dma_mbuf *dm)
 {
 	int error;
+
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s can sleep!",
+	    __func__);
 
 	error = bus_dmamap_create(dh->tag, BUS_DMA_NOWAIT, &dm->map);
 	if (error != 0) {
