@@ -459,6 +459,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		m_freem(m0);
+		ieee80211_free_node(ni);
 		return (0);
 	}
 
@@ -476,6 +477,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		m_freem(m0);
+		ieee80211_free_node(ni);
 		return (0);
 	}
 	m0 = NULL;
