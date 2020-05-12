@@ -736,7 +736,18 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	if (vif->is_setup == 0) {
 		ath10k_warn(ar, "%s: adding interface\n", __func__);
 		/* XXX TODO - handle flags, like CLONE_BSSID, CLONE_MAC, etc */
+
 		/* call into driver; setup state */
+
+		/*
+		 * Allocate a beacon descriptor if required.
+		 * Do this work outside of any locking.
+		 */
+		ret = ath10k_mac_vif_beacon_alloc_desc(ar, vif, vap->iv_opmode);
+		if (ret != 0) {
+			goto skip2;
+		}
+
 		ret = ath10k_add_interface(ar, vap,
 		    vap->iv_opmode,
 		    vif->vap_f_flags,
@@ -746,7 +757,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ath10k_err(ar, "%s: ath10k_add_interface failed; ret=%d\n",
 			    __func__, ret);
 
-			goto skip2;
+			goto skip3;
 		}
 		ath10k_warn(ar, "%s: interface add done: vdev id=%d\n", __func__, vif->vdev_id);
 
@@ -906,6 +917,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		    ieee80211_state_name[nstate]);
 		break;
 	}
+
+skip3:
+	ath10k_mac_vif_beacon_free_desc(ar, vif);
 
 skip2:
 	IEEE80211_LOCK(ic);
@@ -1596,6 +1610,8 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * will have to check that we're running and error out as
 	 * appropriate.
 	 */
+
+	ath10k_mac_vif_beacon_free_desc(ar, uvp);
 
 	/*
 	 * Detaching the VAP at this point may generate other events,

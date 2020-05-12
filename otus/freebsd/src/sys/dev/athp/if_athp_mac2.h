@@ -21,7 +21,13 @@
 #ifndef	__IF_ATHP_MAC2_H__
 #define	__IF_ATHP_MAC2_H__
 
+extern	int ath10k_mac_vif_beacon_alloc_desc(struct ath10k *ar,
+	    struct ath10k_vif *arvif,
+	    enum ieee80211_opmode opmode);
+
 extern	void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif);
+extern	void ath10k_mac_vif_beacon_free_desc(struct ath10k *ar,
+	    struct ath10k_vif *arvif);
 extern	int ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	    enum ieee80211_opmode opmode, int flags,
 	    const uint8_t bssid[IEEE80211_ADDR_LEN],

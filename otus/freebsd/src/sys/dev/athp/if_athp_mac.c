@@ -1089,8 +1089,51 @@ static void ath10k_mac_vif_beacon_cleanup(struct ath10k_vif *arvif)
 	ATHP_DATA_LOCK_ASSERT(ar);
 
 	ath10k_mac_vif_beacon_free(arvif);
+}
+
+/*
+ * Free the descriptor map.  This must be called with no locks held.
+ */
+void
+ath10k_mac_vif_beacon_free_desc(struct ath10k *ar, struct ath10k_vif *arvif)
+{
 
 	athp_descdma_free(ar, &arvif->beacon_buf);
+}
+
+int
+ath10k_mac_vif_beacon_alloc_desc(struct ath10k *ar, struct ath10k_vif *arvif,
+    enum ieee80211_opmode opmode)
+{
+	int ret;
+
+	/* Some firmware revisions don't wait for beacon tx completion before
+	 * sending another SWBA event. This could lead to hardware using old
+	 * (freed) beacon data in some cases, e.g. tx credit starvation
+	 * combined with missed TBTT. This is very very rare.
+	 *
+	 * On non-IOMMU-enabled hosts this could be a possible security issue
+	 * because hw could beacon some random data on the air.  On
+	 * IOMMU-enabled hosts DMAR faults would occur in most cases and target
+	 * device would crash.
+	 *
+	 * Since there are no beacon tx completions (implicit nor explicit)
+	 * propagated to host the only workaround for this is to allocate a
+	 * DMA-coherent buffer for a lifetime of a vif and use it for all
+	 * beacon tx commands. Worst case for this approach is some beacons may
+	 * become corrupted, e.g. have garbled IEs or out-of-date TIM bitmap.
+	 */
+	if (opmode == IEEE80211_M_IBSS ||
+	    opmode == IEEE80211_M_HOSTAP) {
+		ret = athp_descdma_alloc(ar, &arvif->beacon_buf,
+		    "beacon buf", 4, ATH10K_BEACON_BUF_LEN);
+		if (ret != 0) {
+			ath10k_warn(ar,
+			    "%s: TODO: beacon_buf failed to allocate\n", __func__);
+			return ret;
+		}
+	}
+	return (0);
 }
 
 static inline int ath10k_vdev_setup_sync(struct ath10k *ar)
@@ -5460,32 +5503,6 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		vif->hw_queue[i] = arvif->vdev_id % (IEEE80211_MAX_QUEUES - 1);
 #endif
 
-	/* Some firmware revisions don't wait for beacon tx completion before
-	 * sending another SWBA event. This could lead to hardware using old
-	 * (freed) beacon data in some cases, e.g. tx credit starvation
-	 * combined with missed TBTT. This is very very rare.
-	 *
-	 * On non-IOMMU-enabled hosts this could be a possible security issue
-	 * because hw could beacon some random data on the air.  On
-	 * IOMMU-enabled hosts DMAR faults would occur in most cases and target
-	 * device would crash.
-	 *
-	 * Since there are no beacon tx completions (implicit nor explicit)
-	 * propagated to host the only workaround for this is to allocate a
-	 * DMA-coherent buffer for a lifetime of a vif and use it for all
-	 * beacon tx commands. Worst case for this approach is some beacons may
-	 * become corrupted, e.g. have garbled IEs or out-of-date TIM bitmap.
-	 */
-	if (opmode == IEEE80211_M_IBSS ||
-	    opmode == IEEE80211_M_HOSTAP) {
-		ret = athp_descdma_alloc(ar, &arvif->beacon_buf,
-		    "beacon buf", 4, ATH10K_BEACON_BUF_LEN);
-		if (ret != 0) {
-			ath10k_warn(ar,
-			    "%s: TODO: beacon_buf failed to allocate\n", __func__);
-			goto err;
-		}
-	}
 	if (test_bit(ATH10K_FLAG_HW_CRYPTO_DISABLED, &ar->dev_flags))
 		arvif->nohwcrypt = true;
 
