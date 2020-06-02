@@ -9200,37 +9200,6 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 }
 
 int
-ath10k_update_wme(struct ieee80211com *ic)
-{
-	struct ath10k *ar = ic->ic_softc;
-	struct ieee80211vap *vap;
-	struct ath10k_vif *arvif;
-	int ret = 0;
-
-	ATHP_CONF_LOCK_ASSERT(ar);
-
-	/* XXX locking - but we're already currently deferred by net80211 */
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		arvif = ath10k_vif_to_arvif(vap);
-
-		if (arvif->is_setup == 0)
-			continue;
-
-		/* now WMM */
-		ret |= ath10k_conf_tx(ar, vap, WME_AC_BE,
-		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE]);
-		ret |= ath10k_conf_tx(ar, vap, WME_AC_BK,
-		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BK]);
-		ret |= ath10k_conf_tx(ar, vap, WME_AC_VI,
-		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VI]);
-		ret |= ath10k_conf_tx(ar, vap, WME_AC_VO,
-		    &vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_VO]);
-	}
-
-	return (ret == 0 ? 0 : ENXIO);
-}
-
-int
 ath10k_update_wme_vap(struct ieee80211vap *vap,
     const struct wmeParams *wme_params)
 {
@@ -9274,7 +9243,7 @@ athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
 	int ret = 0;
 	u32 vdev_param;
 //	u32 pdev_param;
-	u32 slottime, preamble;
+	u32 preamble;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -9308,28 +9277,16 @@ athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
 		ath10k_warn(ar, "failed to set protection mode %d on vdev %i: %d\n",
 				arvif->use_cts_prot, arvif->vdev_id, ret);
 
-	/*
-	 * XXX TODO: ERP slot time should be done as part of the channel change,
-	 * as well as operating mode.  Sigh, will have to dig into this
-	 * in a lot more detail, as well as potentially dynamically updating
-	 * it in AP mode!
-	 */
-	if (IEEE80211_GET_SLOTTIME(vap->iv_ic) == IEEE80211_DUR_SHSLOT)
-		slottime = WMI_VDEV_SLOT_TIME_SHORT; /* 9us */
-	else
-		slottime = WMI_VDEV_SLOT_TIME_LONG; /* 20us */
-
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d slot_time %d\n",
-		   arvif->vdev_id, slottime);
-
-	vdev_param = ar->wmi.vdev_param->slot_time;
-	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
-					slottime);
+	/* ERP slot time configuration, per VAP */
+	ret = ath10k_update_slottime_vap(vap);
 	if (ret)
 		ath10k_warn(ar, "failed to set erp slot for vdev %d: %i\n",
-			    arvif->vdev_id, ret);
+		    arvif->vdev_id, ret);
 
-	/* And we don't track preamble length via a method yet; and it's not per-vap, sigh */
+	/*
+	 * And we don't track preamble length via a method yet;
+	 * XXX TODO: preamble/barker should be a callback and per-vap!
+	 * */
 	if (vap->iv_ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 		preamble = WMI_VDEV_PREAMBLE_SHORT;
 	else
@@ -9345,4 +9302,40 @@ athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *bss_ni)
 	if (ret)
 		ath10k_warn(ar, "failed to set preamble for vdev %d: %i\n",
 			    arvif->vdev_id, ret);
+}
+
+/*
+ * Update the slot time for the given VAP.
+ */
+int
+ath10k_update_slottime_vap(struct ieee80211vap *vap)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	uint32_t slottime;
+	uint32_t vdev_param;
+	int ret = 0;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	if (arvif->is_setup == 0)
+		return (EINVAL);
+
+	if (IEEE80211_VAP_GET_SLOTTIME(vap) == IEEE80211_DUR_SHSLOT)
+		slottime = WMI_VDEV_SLOT_TIME_SHORT; /* 9us */
+	else
+		slottime = WMI_VDEV_SLOT_TIME_LONG; /* 20us */
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d slot_time %d\n",
+		   arvif->vdev_id, slottime);
+
+	vdev_param = ar->wmi.vdev_param->slot_time;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					slottime);
+	if (ret)
+		ath10k_warn(ar, "failed to set erp slot for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+
+	return (ret == 0 ? 0 : ENXIO);
 }

@@ -1372,7 +1372,6 @@ athp_vap_wme_update(struct ieee80211vap *vap,
 {
 	struct ath10k *ar = vap->iv_ic->ic_softc;
 
-	ath10k_warn(ar, "%s: called\n", __func__);
 	ATHP_CONF_LOCK(ar);
 	ath10k_update_wme_vap(vap, wme_params);
 	ATHP_CONF_UNLOCK(ar);
@@ -1380,18 +1379,18 @@ athp_vap_wme_update(struct ieee80211vap *vap,
 	return (0);
 }
 
-#if 0
-static int
-athp_vap_update_slot(struct ieee80211vap *vap, int slot)
+static void
+athp_vap_update_slot(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 
-	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
+	ATHP_CONF_LOCK(ar);
+	ath10k_update_slottime_vap(vap);
+	ATHP_CONF_UNLOCK(ar);
 
-	return (0);
+	return;
 }
-#endif
 
 static struct ieee80211vap *
 athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
@@ -1454,9 +1453,7 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vif->av_update_deftxkey = vap->iv_update_deftxkey;
 	vap->iv_update_deftxkey = athp_update_deftxkey;
 	vap->iv_wme_update = athp_vap_wme_update;
-#if 0
-	vap->iv_slot_update = athp_vap_update_slot;
-#endif
+	vap->iv_updateslot = athp_vap_update_slot;
 
 	/* Complete setup - so we can correctly tear it down if we need to */
 	ieee80211_vap_attach(vap, ieee80211_media_change,
@@ -1629,29 +1626,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	free(uvp, M_80211_VAP);
 
 	ath10k_warn(ar, "%s: finished!\n", __func__);
-}
-
-static int
-athp_wme_update(struct ieee80211com *ic)
-{
-	struct ath10k *ar = ic->ic_softc;
-
-	ath10k_warn(ar, "%s: called\n", __func__);
-
-	/* Yes, aptly named.. */
-	ATHP_CONF_LOCK(ar);
-	ath10k_update_wme(ic);
-	ATHP_CONF_UNLOCK(ar);
-
-	return (0);
-}
-
-static void
-athp_update_slot(struct ieee80211com *ic)
-{
-	struct ath10k *ar = ic->ic_softc;
-
-	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
 }
 
 static void
@@ -2458,8 +2432,6 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_parent = net80211_athp_parent;
 	ic->ic_vap_create = athp_vap_create;
 	ic->ic_vap_delete = athp_vap_delete;
-	ic->ic_wme.wme_update = athp_wme_update;
-	ic->ic_updateslot = athp_update_slot;
 	ic->ic_update_promisc = athp_update_promisc;
 	ic->ic_update_mcast = athp_update_mcast;
 	ic->ic_node_alloc = athp_node_alloc;
