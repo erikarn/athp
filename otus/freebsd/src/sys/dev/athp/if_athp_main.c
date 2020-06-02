@@ -94,6 +94,15 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_ATHPDEV, "athpdev", "athp memory");
 
+struct athp_node_alloc_state {
+	struct ieee80211vap *vap;
+	struct ieee80211_node *ni;
+	uint32_t is_assoc;
+	uint32_t is_run;
+	uint32_t is_node_qos;
+	uint8_t peer_macaddr[ETH_ALEN];
+};
+
 /*
  * These are the net80211 facing implementation pieces.
  */
@@ -215,7 +224,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	}
 
 	arsta = ATHP_NODE(ni);
-	if (arsta->is_in_peer_table == 0) {
+	if (!arsta->is_in_peer_table) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
 		athp_tx_exit(ar);
@@ -421,7 +430,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	}
 
 	arsta = ATHP_NODE(ni);
-	if (arsta->is_in_peer_table == 0) {
+	if (!arsta->is_in_peer_table) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
 		athp_tx_exit(ar);
@@ -692,7 +701,7 @@ athp_vap_bss_update_queue(struct ath10k *ar, struct ieee80211vap *vap,
 	ku->is_run = is_run;
 
 	/* schedule */
-	(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb",
+	(void) athp_taskq_queue(ar, e, "athp_node_bss_update_cb",
 	    athp_node_bss_update_cb);
 
 	return (0);
@@ -784,7 +793,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
-			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			ATH10K_STA_IS_IN_PEER_TABLE(ar, ATHP_NODE(bss_ni), true);
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			ATHP_CONF_UNLOCK(ar);
@@ -873,7 +882,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
-				ATHP_NODE(bss_ni)->is_in_peer_table = 0;
+				ATH10K_STA_IS_IN_PEER_TABLE(ar, ATHP_NODE(bss_ni), false);
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
 			ATHP_CONF_UNLOCK(ar);
@@ -906,7 +915,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				break;
 			}
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
-			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			ATH10K_STA_IS_IN_PEER_TABLE(ar, ATHP_NODE(bss_ni), true);
 			ATHP_CONF_UNLOCK(ar);
 		}
 		break;
@@ -1692,7 +1701,13 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	/* XXX TODO: set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
-	arsta->is_in_peer_table = 1;
+	ATH10K_STA_IS_IN_PEER_TABLE(ar, arsta, true);
+
+	/*
+	 * Clear the taskq state given we have finished.  The "cancel" logic
+	 * can do with stale pointers, so we would not have to do this.
+	 */
+	arsta->alloc_taskq_e = NULL;
 }
 
 static void
@@ -1787,12 +1802,20 @@ athp_node_alloc(struct ieee80211vap *vap,
 			 */
 			ku->ni = (void *) an;
 
+			/*
+			 * Save the taskq entry so we can cancel it.  There
+			 * are cases when node_alloc and node_free were run but
+			 * neither *_cb() yet and running the alloc_cb after
+			 *  node_free will modify memory after free.
+			 */
+			an->alloc_taskq_e = e;
+
 			/* schedule */
 			(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb", athp_node_alloc_cb);
 		}
 	} else {
 		/* "our" node - we always have it for hostap mode */
-		an->is_in_peer_table = 1;
+		ATH10K_STA_IS_IN_PEER_TABLE(ar, an, true);
 	}
 
 	return (&an->an_node);
@@ -1894,7 +1917,7 @@ athp_node_free(struct ieee80211_node *ni)
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
-		arsta->is_in_peer_table = 0;
+		ATH10K_STA_IS_IN_PEER_TABLE(ar, arsta, false);
 
 		/*
 		 * Only do this for hostap mode.
@@ -1910,6 +1933,16 @@ athp_node_free(struct ieee80211_node *ni)
 			 * is gone.  But, we should likely wait until the transmit
 			 * queue is emptied here just to be sure.
 			 */
+
+			/*
+			 * Make sure the node_alloc cb has run or cancel it.
+			 * Otherwise we are risking to modify memory after free.
+			 * XXX-BZ double-check that nothing of
+			 * athp_node_free_cb() needs to be done.
+			 */
+			if (arsta->alloc_taskq_e != NULL &&
+			    athp_taskq_cancel(ar, arsta->alloc_taskq_e))
+				goto finish;
 
 			/*
 			 * Allocate a callback function state.
