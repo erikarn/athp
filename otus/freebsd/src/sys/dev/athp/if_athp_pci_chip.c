@@ -149,11 +149,8 @@ static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 	{ QCA99X0_2_0_DEVICE_ID, QCA99X0_HW_2_0_CHIP_ID_REV },
 };
 
-static void ath10k_pci_buffer_cleanup(struct ath10k_pci *ar);
 static int ath10k_pci_cold_reset(struct ath10k_pci *ar);
 static int ath10k_pci_wait_for_target_init(struct ath10k_pci *ar);
-static int ath10k_pci_request_irq(struct ath10k_pci *ar);
-static void ath10k_pci_free_irq(struct ath10k_pci *ar);
 static int ath10k_pci_qca99x0_chip_reset(struct ath10k_pci *ar);
 
 static bool
@@ -387,6 +384,7 @@ ath10k_pci_enable_legacy_irq(struct ath10k_pci *ar_pci)
 				PCIE_INTR_ENABLE_ADDRESS);
 }
 
+#if 0
 static inline const char *
 ath10k_pci_get_irq_method(struct ath10k_pci *ar_pci)
 {
@@ -399,7 +397,9 @@ ath10k_pci_get_irq_method(struct ath10k_pci *ar_pci)
 
 	return "legacy";
 }
+#endif
 
+#if 0
 static uint32_t
 ath10k_pci_targ_cpu_to_ce_addr(struct ath10k_pci *ar_pci, uint32_t addr)
 {
@@ -421,6 +421,7 @@ ath10k_pci_targ_cpu_to_ce_addr(struct ath10k_pci *ar_pci, uint32_t addr)
 	val |= 0x100000 | (addr & 0xfffff);
 	return val;
 }
+#endif
 
 static void
 ath10k_pci_irq_msi_fw_mask(struct ath10k_pci *ar_pci)

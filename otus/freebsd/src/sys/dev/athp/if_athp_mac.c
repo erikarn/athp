@@ -1084,7 +1084,9 @@ void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif)
 
 static void ath10k_mac_vif_beacon_cleanup(struct ath10k_vif *arvif)
 {
+#ifdef INVARIANTS
 	struct ath10k *ar = arvif->ar;
+#endif
 
 	ATHP_DATA_LOCK_ASSERT(ar);
 
@@ -2445,6 +2447,7 @@ void ath10k_mac_handle_beacon_miss(struct ath10k *ar, u32 vdev_id)
 #endif
 }
 
+#if 0
 static void
 ath10k_mac_vif_sta_connection_loss_work(void *arg)
 {
@@ -2460,6 +2463,7 @@ ath10k_mac_vif_sta_connection_loss_work(void *arg)
 	ath10k_warn(ar, "%s: called!\n", __func__);
 //	ieee80211_connection_loss(vif);
 }
+#endif
 
 /**********************/
 /* Station management */
@@ -7085,23 +7089,23 @@ ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 		goto skip;
 
 	while (! ieee80211_time_after(ticks, interval)) {
-			bool empty;
+		bool empty;
 
-			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
-			    "tx_flush", &ar->sc_conf_mtx,
-			    ATH10K_FLUSH_TIMEOUT_HZ);
+		time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
+		    "tx_flush", &ar->sc_conf_mtx,
+		    ATH10K_FLUSH_TIMEOUT_HZ);
 
-			ATHP_HTT_TX_LOCK(&ar->htt);
-			empty = (ar->htt.num_pending_tx == 0);
-			ATHP_HTT_TX_UNLOCK(&ar->htt);
+		ATHP_HTT_TX_LOCK(&ar->htt);
+		empty = (ar->htt.num_pending_tx == 0);
+		ATHP_HTT_TX_UNLOCK(&ar->htt);
 
-			skip = (ar->state == ATH10K_STATE_WEDGED) ||
-			       test_bit(ATH10K_FLAG_CRASH_FLUSH,
-					&ar->dev_flags);
+		skip = (ar->state == ATH10K_STATE_WEDGED) ||
+		       test_bit(ATH10K_FLAG_CRASH_FLUSH,
+				&ar->dev_flags);
 
-			if (empty || skip)
-				break;
-		}
+		if (empty || skip)
+			break;
+	}
 
 	if (time_left == 0 || skip)
 		ath10k_warn(ar, "failed to flush transmit queue (skip %i ar-state %i): %ld\n",
@@ -8971,7 +8975,9 @@ athp_vif_update_txpower(struct ieee80211vap *vap)
 int
 athp_vif_update_ap_ssid(struct ieee80211vap *vap, struct ieee80211_node *ni)
 {
+#ifdef INVARIANTS
 	struct ath10k *ar = vap->iv_ic->ic_softc;
+#endif
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 
 	ATHP_CONF_LOCK_ASSERT(ar);
@@ -9145,7 +9151,9 @@ athp_vif_ap_setup(struct ieee80211vap *vap, struct ieee80211_node *ni)
 int
 athp_vif_ap_stop(struct ieee80211vap *vap, struct ieee80211_node *ni)
 {
+#ifdef INVARIANTS
 	struct ath10k *ar = vap->iv_ic->ic_softc;
+#endif
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 
 	ATHP_CONF_LOCK_ASSERT(ar);

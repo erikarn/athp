@@ -123,7 +123,9 @@ static int
 __ath10k_pci_rx_post_buf(struct ath10k_pci_pipe *pipe)
 {
 	struct ath10k *ar = pipe->ar;
+#ifdef INVARIANTS
 	struct ath10k_pci *ar_pci = pipe->psc;
+#endif
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	struct athp_buf *pbuf;
 	int ret;
@@ -173,7 +175,9 @@ static void
 __ath10k_pci_rx_post_pipe(struct ath10k_pci_pipe *pipe)
 {
 	struct ath10k *ar = pipe->ar;
+#ifdef INVARIANTS
 	struct ath10k_pci *ar_pci = pipe->psc;
+#endif
 	struct ath10k_ce_pipe *ce_pipe = pipe->ce_hdl;
 	int ret, num;
 
@@ -227,7 +231,7 @@ ath10k_pci_rx_post(struct ath10k *ar)
  * This is the deferred RX post taskqueue entry.
  * It checks /all/ RX pipes.
  */
-static void
+void
 ath10k_pci_rx_replenish_retry(unsigned long ptr)
 {
 	struct ath10k *ar = (void *)ptr;
