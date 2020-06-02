@@ -1646,12 +1646,41 @@ athp_wme_update(struct ieee80211com *ic)
 	return (0);
 }
 
+struct update_slot_arg {
+	struct ieee80211com *ic;
+};
+
+static void
+athp_update_slot_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
+{
+	struct update_slot_arg *arg;
+
+	arg = athp_taskq_entry_to_ptr(e);
+
+	ATHP_CONF_LOCK(ar);
+	ath10k_bss_info_changed_slottime(arg->ic);
+	ATHP_CONF_UNLOCK(ar);
+}
+
 static void
 athp_update_slot(struct ieee80211com *ic)
 {
-	struct ath10k *ar = ic->ic_softc;
+	struct ath10k *ar;
+	struct athp_taskq_entry *e;
+	struct update_slot_arg *arg;
 
-	ath10k_warn(ar, "%s: TODO; need to update!\n", __func__);
+	ar = ic->ic_softc;
+	e = athp_taskq_entry_alloc(ar, sizeof(*arg));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate taskq entry, ic %p\n",
+		    __func__, ic);
+		return;
+	}
+	arg = athp_taskq_entry_to_ptr(e);
+	arg->ic = ic;
+
+	/* Schedule. */
+	(void) athp_taskq_queue(ar, e, "athp_update_slot", athp_update_slot_cb);
 }
 
 static void

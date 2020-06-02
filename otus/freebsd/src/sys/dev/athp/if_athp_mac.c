@@ -5768,6 +5768,35 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 	ATHP_HTT_TX_UNLOCK(&ar->htt);
 }
 
+void ath10k_bss_info_changed_slottime(struct ieee80211com *ic)
+{
+	struct ath10k *ar = ic->ic_softc;
+	struct ieee80211vap *vif;
+	struct ath10k_vif *arvif;
+	u32 vdev_param, slottime;
+	int ret;
+
+	vif = TAILQ_FIRST(&ic->ic_vaps);
+	if (vif == NULL)
+		return;
+	arvif = ath10k_vif_to_arvif(vif);
+
+	if (ic->ic_flags & IEEE80211_F_SHSLOT)
+		slottime = WMI_VDEV_SLOT_TIME_SHORT; /* 9us */
+	else
+		slottime = WMI_VDEV_SLOT_TIME_LONG; /* 20us */
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d slot_time %d\n",
+		   arvif->vdev_id, slottime);
+
+	vdev_param = ar->wmi.vdev_param->slot_time;
+	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param,
+					slottime);
+	if (ret)
+		ath10k_warn(ar, "failed to set erp slot for vdev %d: %i\n",
+			    arvif->vdev_id, ret);
+}
+
 #if 0
 
 /*

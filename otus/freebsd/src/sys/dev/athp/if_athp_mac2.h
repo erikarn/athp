@@ -90,4 +90,6 @@ extern	int ath10k_update_wme_vap(struct ieee80211vap *vap,
 	    const struct wmeParams *wme_params);
 extern	void athp_bss_info_config(struct ieee80211vap *vap, struct ieee80211_node *);
 
+extern	void ath10k_bss_info_changed_slottime(struct ieee80211com *);
+
 #endif
