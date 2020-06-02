@@ -11,7 +11,7 @@ CFLAGS+=	-I${SYSDIR}/compat/linuxkpi/common/include/
 SRCS    = if_athp_pci.c if_athp_main.c			\
 	  if_athp_debug.c				\
 	  if_athp_var.h					\
-	  bus_if.h device_if.h				\
+	  bus_if.h device_if.h pci_if.h			\
 	  opt_wlan.h
 
 # IDR from Linux
