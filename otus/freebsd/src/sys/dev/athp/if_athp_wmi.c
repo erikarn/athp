@@ -3534,28 +3534,24 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 		}
 
 		if (!arvif->beacon_buf.dd_desc) {
-#if 0
-			paddr = dma_map_single(arvif->ar->dev, bcn->data,
-					       bcn->len, DMA_TO_DEVICE);
-			ret = dma_mapping_error(arvif->ar->dev, paddr);
+			/*
+			 * Load the beacon as downstream on functions assume
+			 * it is dma mapped already.
+			 */
+			ret = athp_dma_mbuf_load(ar, &ar->buf_tx.dh,
+			    &bcn->mb, bcn->m);
 			if (ret) {
 				ath10k_warn(ar, "failed to map beacon: %d\n",
 					    ret);
-				dev_kfree_skb_any(bcn);
+				athp_freebuf(ar, &ar->buf_tx, bcn);
 				ret = -EIO;
 				goto skip;
 			}
 
+			/* DMA sync. */
+			athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx.dh, &bcn->mb);
+
 			ATH10K_SKB_CB(bcn)->paddr = paddr;
-#else
-			ath10k_warn(ar, "%s: we should have a beacon buffer!\n", __func__);
-#if 0
-			/* XXX-BZ This causes double-free panics and I do not
-			 * see why we unmap and release it to the inactive queue
-			 * but assign it further down to arvif->beacon. */
-			athp_freebuf(ar, &ar->buf_tx, bcn);
-#endif
-#endif
 		} else {
 			if (mbuf_skb_len(bcn->m) > 2048) {
 				ath10k_warn(ar, "trimming beacon %d -> %d bytes!\n",
