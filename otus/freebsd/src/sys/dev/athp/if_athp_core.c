@@ -1737,7 +1737,7 @@ ath10k_core_register_work(void *arg, int npending)
 		goto err_release_fw;
 	}
 
-	ath10k_fwlog_register(ar);
+	/* See athp_pci. ath10k_fwlog_register(ar); */
 
 	status = ath10k_debug_register(ar);
 	if (status) {
