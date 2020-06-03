@@ -3551,7 +3551,7 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 			/* DMA sync. */
 			athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx.dh, &bcn->mb);
 
-			ATH10K_SKB_CB(bcn)->paddr = paddr;
+			ATH10K_SKB_CB(bcn)->bcn.paddr = bcn->mb.paddr;
 		} else {
 			if (mbuf_skb_len(bcn->m) > 2048) {
 				ath10k_warn(ar, "trimming beacon %d -> %d bytes!\n",
