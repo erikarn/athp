@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include "if_athp_buf.h"
 #include "if_athp_trace.h"
 #include "if_athp_ioctl.h"
+#include "if_athp_fwlog.h"
 
 static device_probe_t athp_pci_probe;
 static device_attach_t athp_pci_attach;
@@ -716,6 +717,9 @@ athp_pci_attach(device_t dev)
 	    ATH10K_DBG_WMI_PRINT | ATH10K_DBG_MGMT | ATH10K_DBG_DATA | ATH10K_DBG_HTT;
 #endif
 	ar->sc_psc = ar_pci;
+
+	/* Attach the log to gather information early if tunable is set. */
+	ath10k_fwlog_register(ar);
 
 	/* Load-time tunable/sysctl tree */
 	athp_attach_sysctl(ar);
