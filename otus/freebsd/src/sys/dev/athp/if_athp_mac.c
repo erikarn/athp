@@ -6709,10 +6709,10 @@ exit:
 }
 #endif
 
+#if 0
 static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
 				u16 ac, bool enable)
 {
-#if 0
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_sta_uapsd_auto_trig_arg arg = {};
 	u32 prio = 0, acc = 0;
@@ -6814,11 +6814,10 @@ static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
 
 exit:
 	return ret;
-#else
 	ath10k_warn(ar, "%s: TODO!\n", __func__);
 	return (0);
-#endif
 }
+#endif
 
 /*
  * This is called only in the STA path for now, but yes, it should also
