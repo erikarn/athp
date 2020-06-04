@@ -118,7 +118,7 @@ struct ath10k_sta {
 #define	ATH10K_STA_IS_IN_PEER_TABLE(_ar, _p, _t) 			\
 	do {								\
 		ath10k_dbg(_ar, ATH10K_DBG_NODE, "%s:%d ni %p "		\
-		    is_in_peer_table %d -> %d\n", __func__, __LINE__,	\
+		    "is_in_peer_table %d -> %d\n", __func__, __LINE__,	\
 		    (_p), (_p)->is_in_peer_table, (_t));		\
 		(_p)->is_in_peer_table = (_t);				\
 	} while (0)
