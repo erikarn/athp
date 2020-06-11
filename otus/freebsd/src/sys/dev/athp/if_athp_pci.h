@@ -91,4 +91,7 @@ struct ath10k_pci {
 	struct callout		rx_post_retry;
 };
 
+int ath10k_pci_request_irq(struct ath10k_pci *);
+void ath10k_pci_free_irq(struct ath10k_pci *);
+
 #endif	/* __IF_ATHP_PCI_H__ */

@@ -284,8 +284,6 @@ static void ath10k_pci_tasklet(void *arg)
 	trace_ath10k_intr(ar, 0, 3);
 }
 
-static void ath10k_pci_free_irq(struct ath10k_pci *ar_pci);
-
 static int ath10k_pci_request_irq_msix(struct ath10k_pci *ar_pci)
 {
 	struct ath10k *ar = &ar_pci->sc_sc;
@@ -408,7 +406,7 @@ bad:
 	return (err);
 }
 
-static int ath10k_pci_request_irq(struct ath10k_pci *ar_pci)
+int ath10k_pci_request_irq(struct ath10k_pci *ar_pci)
 {
 	struct ath10k *ar = &ar_pci->sc_sc;
 
@@ -429,7 +427,7 @@ static int ath10k_pci_request_irq(struct ath10k_pci *ar_pci)
 	return -EINVAL;
 }
 
-static void ath10k_pci_free_irq(struct ath10k_pci *ar_pci)
+void ath10k_pci_free_irq(struct ath10k_pci *ar_pci)
 {
 	struct ath10k *ar = &ar_pci->sc_sc;
 	device_t dev = ar->sc_dev;

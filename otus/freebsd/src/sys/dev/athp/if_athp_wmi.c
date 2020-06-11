@@ -3264,6 +3264,7 @@ static void ath10k_wmi_update_tim(struct ath10k *ar,
 		   tim->tim_bitctl, pvm_len);
 }
 
+#if 0
 static void ath10k_wmi_update_noa(struct ath10k *ar, struct ath10k_vif *arvif,
 				  struct athp_buf *bcn,
 				  const struct wmi_p2p_noa_info *noa)
@@ -3287,6 +3288,7 @@ static void ath10k_wmi_update_noa(struct ath10k *ar, struct ath10k_vif *arvif,
 #endif
 	return;
 }
+#endif
 
 static int ath10k_wmi_op_pull_swba_ev(struct ath10k *ar, struct athp_buf *pbuf,
 				      struct wmi_swba_ev_arg *arg)
@@ -3581,12 +3583,12 @@ void ath10k_wmi_event_tbttoffset_update(struct ath10k *ar, struct athp_buf *pbuf
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "WMI_TBTTOFFSET_UPDATE_EVENTID\n");
 }
 
+#if 0
 static void ath10k_dfs_radar_report(struct ath10k *ar,
 				    struct wmi_phyerr_ev_arg *phyerr,
 				    const struct phyerr_radar_report *rr,
 				    u64 tsf)
 {
-#if 0
 	u32 reg0, reg1, tsf32l;
 	struct ieee80211_channel *ch;
 	struct pulse_event pe;
@@ -3672,17 +3674,16 @@ radar_detected:
 
 	ieee80211_radar_detected(ar->hw);
 
-#else
 	device_printf(ar->sc_dev, "%s: TODO: csa check! get beacon!\n", __func__);
-#endif
 }
+#endif
 
+#if 0
 static int ath10k_dfs_fft_report(struct ath10k *ar,
 				 struct wmi_phyerr_ev_arg *phyerr,
 				 const struct phyerr_fft_report *fftr,
 				 u64 tsf)
 {
-#if 0
 	u32 reg0, reg1;
 	u8 rssi, peak_mag;
 
@@ -3712,11 +3713,10 @@ static int ath10k_dfs_fft_report(struct ath10k *ar,
 		ATH10K_DFS_STAT_INC(ar, pulses_discarded);
 		return -EINVAL;
 	}
-#else
 	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
-#endif
 	return 0;
 }
+#endif
 
 void ath10k_wmi_event_dfs(struct ath10k *ar,
 			  struct wmi_phyerr_ev_arg *phyerr,

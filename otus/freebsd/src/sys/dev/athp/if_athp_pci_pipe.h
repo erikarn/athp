@@ -55,5 +55,6 @@ extern	void ath10k_pci_free_pipes(struct ath10k *ar);
 extern	int ath10k_pci_init_pipes(struct ath10k *ar);
 extern	void ath10k_pci_rx_post(struct ath10k *ar);
 extern	void ath10k_pci_flush(struct ath10k *ar);
+extern	void ath10k_pci_rx_replenish_retry(unsigned long);
 
 #endif /* __ATHP_PCI_PIPE_H__ */
