@@ -504,12 +504,14 @@ static int ath10k_install_peer_wep_keys(struct ath10k_vif *arvif,
 }
 
 /*
- * XXX NOTE: I think this is for clearing WEP keys.
+ * Clear all the peer keys for the given station.
+ *
+ * This is used in the hostapd code for the pairwise keys, not the
+ * group or WEP keys.
  */
 static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 				  const u8 *addr)
 {
-#if 0
 	struct ath10k *ar = arvif->ar;
 	struct ath10k_peer *peer;
 	int first_errno = 0;
@@ -519,9 +521,9 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	spin_lock_bh(&ar->data_lock);
+	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, arvif->vdev_id, addr);
-	spin_unlock_bh(&ar->data_lock);
+	ATHP_DATA_UNLOCK(ar);
 
 	if (!peer)
 		return -ENOENT;
@@ -531,8 +533,8 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 			continue;
 
 		/* key flags are not required to delete the key */
-		ret = ath10k_install_key(arvif, peer->keys[i],
-					 DISABLE_KEY, addr, flags);
+		ret = ath10k_install_key(arvif, peer->keys[i], DISABLE_KEY,
+		    addr, flags, peer->key_ciphers[i]);
 		if (ret < 0 && first_errno == 0)
 			first_errno = ret;
 
@@ -540,16 +542,13 @@ static int ath10k_clear_peer_keys(struct ath10k_vif *arvif,
 			ath10k_warn(ar, "failed to remove peer wep key %d: %d\n",
 				    i, ret);
 
-		spin_lock_bh(&ar->data_lock);
+		ATHP_DATA_LOCK(ar);
 		peer->keys[i] = NULL;
-		spin_unlock_bh(&ar->data_lock);
+		peer->key_ciphers[i] = IEEE80211_CIPHER_NONE;
+		ATHP_DATA_UNLOCK(ar);
 	}
 
 	return first_errno;
-#else
-	ath10k_warn(arvif->ar, "%s: TODO\n", __func__);
-	return (0);
-#endif
 }
 
 bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr,
