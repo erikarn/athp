@@ -3597,8 +3597,10 @@ void ath10k_bss_disassoc(struct ath10k *ar, struct ieee80211vap *vif, int is_run
 }
 
 /*
- * XXX adrian: I think this is the hostap side "add a new node"
+ * This is the "a new station has shown up" in hostap (and IBSS?) mode
  * method.
+ *
+ * It's called after the peer is added.
  */
 int ath10k_station_assoc(struct ath10k *ar,
 				struct ieee80211vap *vif,
@@ -7065,7 +7067,7 @@ void
 ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
     bool drop)
 {
-	bool skip;
+	bool skip, empty;
 	long time_left;
 	int interval;
 
@@ -7084,8 +7086,6 @@ ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 		goto skip;
 
 	while (! ieee80211_time_after(ticks, interval)) {
-			bool empty;
-
 			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
 			    "tx_flush", &ar->sc_conf_mtx,
 			    ATH10K_FLUSH_TIMEOUT_HZ);
@@ -7103,8 +7103,8 @@ ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 		}
 
 	if (time_left == 0 || skip)
-		ath10k_warn(ar, "failed to flush transmit queue (skip %i ar-state %i): %ld\n",
-			    skip, ar->state, time_left);
+		ath10k_warn(ar, "failed to flush transmit queue (skip %i ar-state %i pending %d empty %d): %ld\n",
+			    skip, ar->state, ar->htt.num_pending_tx, empty, time_left);
 
 skip:
 	return;
