@@ -100,55 +100,53 @@ MALLOC_DEFINE(M_ATHPDEV_TASKQ, "athp_taskq", "athp taskq");
  * are submitted to it in order.
  */
 
-#define	ATHP_TASKQ_LOCK(h)	(mtx_lock(&(h)->m))
-#define	ATHP_TASKQ_UNLOCK(h)	(mtx_unlock(&(h)->m))
-#define	ATHP_TASKQ_LOCK_ASSERT(h)	(mtx_assert(&(h)->m, MA_OWNED))
-#define	ATHP_TASKQ_UNLOCK_ASSERT(h)	(mtx_assert(&(h)->m, MA_NOTOWNED))
+#define	ATHP_TASKQ_LOCK(h)		mtx_lock(&(h)->m)
+#define	ATHP_TASKQ_UNLOCK(h)		mtx_unlock(&(h)->m)
+#define	ATHP_TASKQ_LOCK_ASSERT(h)	mtx_assert(&(h)->m, MA_OWNED)
+#define	ATHP_TASKQ_UNLOCK_ASSERT(h)	mtx_assert(&(h)->m, MA_NOTOWNED)
 
 static void
 athp_taskq_task(void *arg, int npending)
 {
 	struct ath10k *ar = arg;
-	struct ieee80211com *ic = &ar->sc_ic;
 	struct athp_taskq_entry *e;
 	struct athp_taskq_head *h;
-	int n = 0;
+	int n;
 
 	h = ar->sc_taskq_head;
 	if (h == NULL)
 		return;
 
-	ath10k_dbg(ar, ATH10K_DBG_TASKQ, "%s: called\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_TASKQ, "%s: called pending %d\n",
+	    __func__, npending);
 
-	/*
-	 * Run through the queue up to 4 at a time, and
-	 * run the callbacks.
-	 */
+	n = 0;
 	ATHP_TASKQ_LOCK(h);
+	/* Walk the queue, 4 a time, and run the callbacks. */
 	while ((n < 4) && (e = TAILQ_FIRST(&h->list)) != NULL) {
 		TAILQ_REMOVE(&h->list, e, node);
 		e->on_queue = 0;
-		ATHP_TASKQ_UNLOCK(h);
-		ath10k_dbg(ar, ATH10K_DBG_TASKQ, "%s: calling cb %s %p (ptr %p)\n",
-		    __func__,
-		    e->cb_str,
-		    e->cb,
-		    e);
-		e->cb(ar, e, 1);
-		athp_taskq_entry_free(ar, e);
+		TAILQ_INSERT_TAIL(&h->active_list, e, node);
 		n++;
-		ATHP_TASKQ_LOCK(h);
-	}
-
-	/* Whilst locked, see if there's any more work to do */
-	n = 0;
-	if (h->is_running && TAILQ_FIRST(&h->list) != NULL) {
-		n = 1;
 	}
 	ATHP_TASKQ_UNLOCK(h);
 
+	while ((e = TAILQ_FIRST(&h->active_list)) != NULL) {
+		ath10k_dbg(ar, ATH10K_DBG_TASKQ, "%s: calling cb %s %p (ptr %p)\n",
+		    __func__, e->cb_str, e->cb, e);
+		e->cb(ar, e, 1);
+		TAILQ_REMOVE(&h->active_list, e, node);
+		athp_taskq_entry_free(ar, e);
+	}
+
+	/* See if there's any more work to do. */
+	n = 0;
+	ATHP_TASKQ_LOCK(h);
+	if (h->is_running && TAILQ_FIRST(&h->list) != NULL)
+		n = 1;
+	ATHP_TASKQ_UNLOCK(h);
 	if (n)
-		ieee80211_runtask(ic, &h->run_task);
+		ieee80211_runtask(&ar->sc_ic, &h->run_task);
 }
 
 int
@@ -168,6 +166,7 @@ athp_taskq_init(struct ath10k *ar)
 
 	TASK_INIT(&h->run_task, 0, athp_taskq_task, ar);
 	TAILQ_INIT(&h->list);
+	TAILQ_INIT(&h->active_list);
 
 	ar->sc_taskq_head = h;
 
@@ -182,6 +181,8 @@ athp_taskq_free(struct ath10k *ar)
 	h = ar->sc_taskq_head;
 	if (h == NULL)
 		return;
+
+	/* XXX FIXME Someone dequeue all the entries and free them. */
 
 	ar->sc_taskq_head = NULL;
 
@@ -324,19 +325,15 @@ athp_taskq_queue(struct ath10k *ar, struct athp_taskq_entry *e,
 
 	ath10k_dbg(ar, ATH10K_DBG_TASKQ,
 	    "%s: queuing cb %s %p (ptr %p)\n",
-	    __func__,
-	    str,
-	    cb,
-	    e);
+	    __func__, str, cb, e);
 
 	e->ar = ar;
-	e->on_queue = 1;
 	e->cb = cb;
 	e->cb_str = str;
 
 	ATHP_TASKQ_LOCK(h);
-	e->on_queue = 1;
 	TAILQ_INSERT_TAIL(&h->list, e, node);
+	e->on_queue = 1;
 	if (h->is_running)
 		do_run = 1;
 	ATHP_TASKQ_UNLOCK(h);
@@ -345,4 +342,42 @@ athp_taskq_queue(struct ath10k *ar, struct athp_taskq_entry *e,
 		ieee80211_runtask(ic, &h->run_task);
 
 	return (0);
+}
+
+bool
+athp_taskq_cancel(struct ath10k *ar, struct athp_taskq_entry *e)
+{
+	struct athp_taskq_head *h;
+	struct athp_taskq_entry *le;
+	bool cancelled;
+
+	if (e == NULL)
+		return (false);
+
+	if (ar->sc_taskq_head== NULL)
+		return (false);
+	h = ar->sc_taskq_head;
+
+	/* We do not check e->on_queue in case it was a stale pointer. */
+
+	cancelled = false;
+	ATHP_TASKQ_LOCK(h);
+	TAILQ_FOREACH(le, &h->list, node) {
+		if (le == e) {
+			TAILQ_REMOVE(&h->list, e, node);
+			e->on_queue = 0;
+			cancelled = true;
+			break;
+		}
+	}
+	ATHP_TASKQ_UNLOCK(h);
+
+	/* Wait until the "active queue" is empty. */
+	while (!cancelled && !TAILQ_EMPTY(&h->active_list))
+		DELAY(10);
+
+	if (cancelled)
+		athp_taskq_entry_free(ar, e);
+
+	return (cancelled);
 }

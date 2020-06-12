@@ -89,7 +89,17 @@ struct ath10k_sta {
 	 * This is currently done via the callback queue to avoid
 	 * sleeping whilst holding net80211 locks, so..
 	 */
-	int is_in_peer_table;
+	bool is_in_peer_table;
+
+	/*
+	 * There can be a race in that node_alloc() and node_free()
+	 * are called before their respective call back functions.
+	 * This can lead to memory modified after free.  Store the
+	 * taskq entry in node_alloc() and in node_free() check if
+	 * we can cancel it (and if, do so).  If we can cancel it,
+	 * do not even bother to run the free callback function.
+	 */
+	struct athp_taskq_entry *alloc_taskq_e;
 
 	/* the following are protected by ar->data_lock */
 	u32 changed; /* IEEE80211_RC_* */
@@ -104,6 +114,14 @@ struct ath10k_sta {
 	bool aggr_mode;
 #endif
 };
+
+#define	ATH10K_STA_IS_IN_PEER_TABLE(_ar, _p, _t) 			\
+	do {								\
+		ath10k_dbg(_ar, ATH10K_DBG_NODE, "%s:%d ni %p "		\
+		    "is_in_peer_table %d -> %d\n", __func__, __LINE__,	\
+		    (_p), (_p)->is_in_peer_table, (_t));		\
+		(_p)->is_in_peer_table = (_t);				\
+	} while (0)
 
 #define ATH10K_VDEV_SETUP_TIMEOUT_HZ (50)
 

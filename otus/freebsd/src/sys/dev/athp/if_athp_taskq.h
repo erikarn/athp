@@ -18,6 +18,7 @@ struct athp_taskq_entry {
 
 struct athp_taskq_head {
 	TAILQ_HEAD(, athp_taskq_entry) list;
+	TAILQ_HEAD(, athp_taskq_entry) active_list;
 	int is_running;
 	struct task run_task;
 	struct mtx m;
@@ -34,6 +35,7 @@ extern	struct athp_taskq_entry * athp_taskq_entry_alloc(struct ath10k *, int);
 extern	void athp_taskq_entry_free(struct ath10k *, struct athp_taskq_entry *);
 extern	int athp_taskq_queue(struct ath10k *, struct athp_taskq_entry *,
 	    const char *str, athp_taskq_cmd_cb *cb);
+extern	bool athp_taskq_cancel(struct ath10k *, struct athp_taskq_entry *);
 
 static inline void *
 athp_taskq_entry_to_ptr(struct athp_taskq_entry *e)
