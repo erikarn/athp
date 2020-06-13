@@ -52,7 +52,8 @@ struct ath10k_skb_cb {
 typedef enum {
 	BUF_TYPE_NONE,
 	BUF_TYPE_RX,
-	BUF_TYPE_TX
+	BUF_TYPE_TX,
+	BUF_TYPE_TX_MGMT,
 } athp_buf_type_t;
 
 struct athp_buf {

@@ -193,7 +193,7 @@ athp_alloc_list(struct ath10k *ar, struct athp_buf_ring *br, int count, int btyp
 	for (i = 0; i < count; i++) {
 		athp_dma_mbuf_setup(ar, &br->dh, &br->br_list[i].mb);
 		br->br_list[i].btype = btype;
-		if (btype == BUF_TYPE_TX) {
+		if (btype == BUF_TYPE_TX || btype == BUF_TYPE_TX_MGMT) {
 			ret = athp_descdma_alloc(ar,
 			    &br->br_list[i].txbuf_dd,
 			    "htt_txbuf",
@@ -244,7 +244,8 @@ _athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br)
 
 	/* Sanity check */
 	if (br->btype != bf->btype) {
-		ath10k_err(ar, "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
+		ath10k_err(ar,
+		    "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
 		    __func__,
 		    bf,
 		    bf->btype,
@@ -262,7 +263,8 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 
 	/* Complain if the buffer has a noderef left */
 	if (cb->ni != NULL) {
-		ath10k_err(ar, "%s: TODO: pbuf=%p, mbuf=%p, ni is not null (%p) !\n",
+		ath10k_err(ar,
+		    "%s: TODO: pbuf=%p, mbuf=%p, ni is not null (%p) !\n",
 		    __func__,
 		    bf,
 		    bf->m,
@@ -272,7 +274,8 @@ athp_freebuf(struct ath10k *ar, struct athp_buf_ring *br,
 	ATHP_BUF_LOCK(ar);
 
 	if (br->btype != bf->btype) {
-		ath10k_err(ar, "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
+		ath10k_err(ar,
+		    "%s: ERROR: bf=%p, bf btype=%d, ring btype=%d\n",
 		    __func__,
 		    bf,
 		    bf->btype,
@@ -329,7 +332,8 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	//m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, bufsize);
 	m = m_getm2(NULL, bufsize, M_NOWAIT, MT_DATA, M_PKTHDR);
 	if (m == NULL) {
-		device_printf(ar->sc_dev, "%s: failed to allocate mbuf\n", __func__);
+		device_printf(ar->sc_dev, "%s: failed to allocate mbuf\n",
+		    __func__);
 		return (NULL);
 	}
 
@@ -339,7 +343,8 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	ATHP_BUF_UNLOCK(ar);
 	if (! bf) {
 		m_freem(m);
-		device_printf(ar->sc_dev, "%s: out of buffers? btype=%d\n", __func__, br->btype);
+		device_printf(ar->sc_dev, "%s: out of buffers? btype=%d\n",
+		    __func__, br->btype);
 		return (NULL);
 	}
 
@@ -347,7 +352,8 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	 * If it's a TX ring alloc, and it doesn't have a TX descriptor
 	 * allocated, then explode.
 	 */
-	if (br->btype == BUF_TYPE_TX && bf->txbuf_dd.dd_desc == NULL) {
+	if ((br->btype == BUF_TYPE_TX || br->btype == BUF_TYPE_TX_MGMT)
+	    && bf->txbuf_dd.dd_desc == NULL) {
 		device_printf(ar->sc_dev,
 		    "%s: requested TX buffer, no txbuf!\n", __func__);
 		m_freem(m);
@@ -356,7 +362,7 @@ athp_getbuf(struct ath10k *ar, struct athp_buf_ring *br, int bufsize)
 	}
 
 	/* Zero out the TX buffer side; re-init the pointers */
-	if (bf->btype == BUF_TYPE_TX) {
+	if (bf->btype == BUF_TYPE_TX || bf->btype == BUF_TYPE_TX_MGMT) {
 		bf->tx.htt.txbuf = bf->txbuf_dd.dd_desc;
 		bf->tx.htt.txbuf_paddr = bf->txbuf_dd.dd_desc_paddr;
 		bzero(bf->tx.htt.txbuf, sizeof(struct ath10k_htt_txbuf));
@@ -388,7 +394,8 @@ athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 	 * If it's a TX ring alloc, and it doesn't have a TX descriptor
 	 * allocated, then explode.
 	 */
-	if (br->btype == BUF_TYPE_TX && bf->txbuf_dd.dd_desc == NULL) {
+	if ((br->btype == BUF_TYPE_TX || br->btype == BUF_TYPE_TX_MGMT)
+	    && bf->txbuf_dd.dd_desc == NULL) {
 		device_printf(ar->sc_dev,
 		    "%s: requested TX buffer, no txbuf!\n", __func__);
 		athp_freebuf(ar, br, bf);
@@ -396,7 +403,7 @@ athp_getbuf_tx(struct ath10k *ar, struct athp_buf_ring *br)
 	}
 
 	/* Zero out the TX buffer side; re-init the pointers */
-	if (bf->btype == BUF_TYPE_TX) {
+	if (bf->btype == BUF_TYPE_TX || bf->btype == BUF_TYPE_TX_MGMT) {
 		bf->tx.htt.txbuf = bf->txbuf_dd.dd_desc;
 		bf->tx.htt.txbuf_paddr = bf->txbuf_dd.dd_desc_paddr;
 		bzero(bf->tx.htt.txbuf, sizeof(struct ath10k_htt_txbuf));
@@ -417,7 +424,7 @@ athp_buf_cb_clear(struct athp_buf *bf)
 	bzero(&bf->rx, sizeof(bf->rx));
 
 	/* Zero out the TX buffer side; re-init the pointers */
-	if (bf->btype == BUF_TYPE_TX) {
+	if (bf->btype == BUF_TYPE_TX || bf->btype == BUF_TYPE_TX_MGMT) {
 		bf->tx.htt.txbuf = bf->txbuf_dd.dd_desc;
 		bf->tx.htt.txbuf_paddr = bf->txbuf_dd.dd_desc_paddr;
 		bzero(bf->tx.htt.txbuf, sizeof(struct ath10k_htt_txbuf));
