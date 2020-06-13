@@ -635,8 +635,20 @@ athp_pci_setup_bufs(struct ath10k_pci *ar_pci)
 		return (ret);
 	}
 
+	/* Create dma tag for WMI/beacon TX buffers. 8 byte alignment, etc */
+	ret = athp_dma_head_alloc(ar, &ar->buf_tx_mgmt.dh, 0x4000, 4);
+	if (ret != 0) {
+		device_printf(ar->sc_dev, "%s: cannot allocate TX DMA tag\n",
+		    __func__);
+		athp_dma_head_free(ar, &ar->buf_rx.dh);
+		athp_dma_head_free(ar, &ar->buf_tx.dh);
+		return (ret);
+	}
+
+
 	athp_alloc_list(ar, &ar->buf_rx, ATHP_RX_LIST_COUNT, BUF_TYPE_RX);
 	athp_alloc_list(ar, &ar->buf_tx, ATHP_TX_LIST_COUNT, BUF_TYPE_TX);
+	athp_alloc_list(ar, &ar->buf_tx_mgmt, ATHP_MGMT_TX_LIST_COUNT, BUF_TYPE_TX_MGMT);
 
 	return (0);
 }
@@ -648,9 +660,11 @@ athp_pci_free_bufs(struct ath10k_pci *ar_pci)
 
 	athp_free_list(ar, &ar->buf_rx);
 	athp_free_list(ar, &ar->buf_tx);
+	athp_free_list(ar, &ar->buf_tx_mgmt);
 
 	athp_dma_head_free(ar, &ar->buf_rx.dh);
 	athp_dma_head_free(ar, &ar->buf_tx.dh);
+	athp_dma_head_free(ar, &ar->buf_tx_mgmt.dh);
 }
 
 static void
