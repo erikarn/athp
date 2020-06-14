@@ -1652,12 +1652,14 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	if (flush == 0) {
 		ath10k_warn(ar, "%s: flushing\n", __func__);
+		ieee80211_free_node(ku->ni);
 		return;
 	}
 
 	if (athp_peer_create(vap, ku->peer_macaddr) != 0) {
 		ath10k_err(ar, "%s: failed to create peer: %6D\n", __func__,
 		    ku->peer_macaddr, ":");
+		ieee80211_free_node(ku->ni);
 		return;
 	}
 
@@ -1667,6 +1669,7 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	/* XXX TODO: set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
 	arsta->is_in_peer_table = 1;
+	ieee80211_free_node(ku->ni);
 }
 
 static void
@@ -1712,64 +1715,62 @@ athp_node_alloc(struct ieee80211vap *vap,
 	an = malloc(sizeof(struct ath10k_sta), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
 		return (NULL);
+	return (&an->an_node);
+}
+
+static int
+athp_node_init(struct ieee80211_node *ni)
+{
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct athp_taskq_entry *e;
+	struct athp_node_alloc_state *ku;
 
 	/*
 	 * Defer peer creation into the taskqueue.
 	 * We need the peer entry to be created before we can transmit.
 	 */
-
-	/* XXX TODO: Create peer if it's not our MAC address */
-	if (memcmp(mac, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
-		struct athp_taskq_entry *e;
-		struct athp_node_alloc_state *ku;
-
-		/*
-		 * Only do this for hostap mode.
-		 *
-		 * STA mode nodes are added/removed as part of the state
-		 * transition.
-		 */
-		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
-			device_printf(ar->sc_dev,
-			    "%s: add peer for MAC %6D\n",
-			    __func__, mac, ":");
-
-			/*
-			 * Allocate a callback function state.
-			 */
-			e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
-			if (e == NULL) {
-				ath10k_err(ar, "%s: failed to allocate node\n",
-				    __func__);
-				free(an, M_80211_NODE);
-				return (NULL);
-			}
-			ku = athp_taskq_entry_to_ptr(e);
-
-			/* Which MAC to feed to the command */
-			memcpy(&ku->peer_macaddr, mac, ETH_ALEN);
-
-			/* XXX ugh */
-			ku->vap = vap;
-
-			/*
-			 * Ideally we'd take a reference here - but the rest
-			 * of the node state hasn't been setup yet.
-			 *
-			 * So, net80211 should split ic_node_alloc into
-			 * "alloc" and "driver setup".
-			 */
-			ku->ni = (void *) an;
-
-			/* schedule */
-			(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb", athp_node_alloc_cb);
-		}
-	} else {
+	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) == 0) {
 		/* "our" node - we always have it for hostap mode */
-		an->is_in_peer_table = 1;
+		ATHP_NODE(ni)->is_in_peer_table = 1;
+		return (0);
 	}
 
-	return (&an->an_node);
+	/*
+	 * Only do for hostap/ibss; for STA operation the peer
+	 * information is done as part of the state transition.
+	 */
+	if ((vap->iv_opmode != IEEE80211_M_HOSTAP) &&
+	    (vap->iv_opmode != IEEE80211_M_IBSS)) {
+		return (0);
+	}
+
+	device_printf(ar->sc_dev, "%s: add peer for MAC %6D\n", __func__,
+	    ni->ni_macaddr, ":");
+
+	/*
+	 * Allocate a callback function state.
+	 */
+	e = athp_taskq_entry_alloc(ar, sizeof(struct athp_node_alloc_state));
+	if (e == NULL) {
+		ath10k_err(ar, "%s: failed to allocate node\n", __func__);
+		return (ENOMEM);
+	}
+	ku = athp_taskq_entry_to_ptr(e);
+
+	/* Which MAC to feed to the command */
+	memcpy(&ku->peer_macaddr, ni->ni_macaddr, ETH_ALEN);
+
+	/* XXX ugh */
+	ku->vap = vap;
+
+	/* Take a reference so this isn't yanked out from under us */
+	ku->ni = ieee80211_ref_node(ni);
+
+	/* schedule */
+	(void) athp_taskq_queue(ar, e, "athp_node_alloc_cb", athp_node_alloc_cb);
+	return (0);
 }
 
 static void
@@ -2435,6 +2436,7 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_update_promisc = athp_update_promisc;
 	ic->ic_update_mcast = athp_update_mcast;
 	ic->ic_node_alloc = athp_node_alloc;
+	ic->ic_node_init = athp_node_init;
 	ic->ic_newassoc = athp_newassoc;
 	ar->sc_node_free = ic->ic_node_free;
 	ic->ic_node_free = athp_node_free;
