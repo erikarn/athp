@@ -131,7 +131,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	struct ath10k_skb_cb *skb_cb;
 	struct athp_buf *msdu;
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_HTT_TX,
 		   "htt tx completion msdu_id %u discard %d no_ack %d success %d\n",
 		   tx_done->msdu_id, !!tx_done->discard,
 		   !!tx_done->no_ack, !!tx_done->success);
@@ -279,12 +279,17 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 	struct ath10k *ar = htt->ar;
 	struct ath10k_peer *peer;
 
+	ath10k_warn(ar, "%s: called; peer_id=%d\n", __func__, ev->peer_id);
+
 	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, ev->vdev_id, ev->addr);
 	if (!peer) {
 		peer = malloc(sizeof(*peer), M_ATHPDEV, M_NOWAIT | M_ZERO);
-		if (!peer)
+		if (!peer) {
+			ath10k_err(ar, "%s: Failed to allocate ath10k_peer\n",
+			    __func__);
 			goto exit;
+		}
 
 		peer->vdev_id = ev->vdev_id;
 		ether_addr_copy(peer->addr, ev->addr);
@@ -292,7 +297,7 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 		ath10k_wait_wakeup_one(&ar->peer_mapping_wq);
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer map vdev %d peer %6D id %d\n",
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_WMI, "htt peer map vdev %d peer %6D id %d\n",
 		   ev->vdev_id, ev->addr, ":", ev->peer_id);
 
 	set_bit(ev->peer_id, peer->peer_ids);
@@ -306,15 +311,17 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 	struct ath10k *ar = htt->ar;
 	struct ath10k_peer *peer;
 
+	ath10k_warn(ar, "%s: called; peer_id=%d\n", __func__, ev->peer_id);
+
 	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find_by_id(ar, ev->peer_id);
 	if (!peer) {
-		ath10k_warn(ar, "peer-unmap-event: unknown peer id %d\n",
+		ath10k_err(ar, "peer-unmap-event: unknown peer id %d\n",
 			    ev->peer_id);
 		goto exit;
 	}
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt peer unmap vdev %d peer %6D id %d\n",
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_WMI, "htt peer unmap vdev %d peer %6D id %d\n",
 		   peer->vdev_id, peer->addr, ":", ev->peer_id);
 
 	clear_bit(ev->peer_id, peer->peer_ids);
