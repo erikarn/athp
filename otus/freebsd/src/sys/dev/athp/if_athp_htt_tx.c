@@ -135,7 +135,8 @@ int ath10k_htt_tx_alloc_msdu_id(struct ath10k_htt *htt, struct athp_buf *skb)
 	ret = idr_alloc(&htt->pending_tx, skb, 0,
 			htt->max_num_pending_tx, M_NOWAIT);
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx alloc msdu_id %d (of %d)\n",
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_HTT_TX,
+	    "htt tx alloc msdu_id %d (of %d)\n",
 	    ret, htt->max_num_pending_tx);
 
 	return ret;
@@ -147,7 +148,8 @@ void ath10k_htt_tx_free_msdu_id(struct ath10k_htt *htt, u16 msdu_id)
 
 	ATHP_HTT_TX_LOCK_ASSERT(htt);
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "htt tx free msdu_id %u\n", (unsigned int) msdu_id);
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_HTT_TX,
+	    "htt tx free msdu_id %u\n", (unsigned int) msdu_id);
 
 	idr_remove(&htt->pending_tx, msdu_id);
 }
@@ -534,12 +536,14 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
 	ATHP_HTT_TX_UNLOCK(htt);
 	if (res < 0) {
+		ath10k_err(ar, "%s: Failed to get msdu id (%d)", __func__, res);
 		goto err_tx_dec;
 	}
 	msdu_id = res;
 
 	txdesc = ath10k_htc_alloc_skb(ar, len);
 	if (!txdesc) {
+		ath10k_err(ar, "%s: Failed to allocate htc skb (%d)", __func__, res);
 		res = -ENOMEM;
 		goto err_free_msdu_id;
 	}
@@ -553,6 +557,7 @@ int ath10k_htt_mgmt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	res = athp_dma_mbuf_load(ar, &ar->buf_tx.dh, &msdu->mb, msdu->m);
 	if (res) {
 		res = -EIO;
+		ath10k_err(ar, "%s: Failed athp_dma_mbuf_load (%d)", __func__, res);
 		goto err_free_txdesc;
 	}
 	/* Ok, we're not modifying the msdu further, so sync here */
@@ -639,6 +644,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
 	ATHP_HTT_TX_UNLOCK(htt);
 	if (res < 0) {
+		ath10k_err(ar, "%s: Failed to allocate MSDU id (%d)", __func__, res);
 		goto err_tx_dec;
 	}
 	msdu_id = res;
@@ -676,6 +682,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	/* XXX TODO: ADRIAN: figure out what I'm missing! */
 	res = athp_dma_mbuf_load(ar, &ar->buf_tx.dh, &msdu->mb, msdu->m);
 	if (res) {
+		ath10k_err(ar, "%s: Failed to mbuf load (%d)", __func__, res);
 		res = -EIO;
 		goto err_free_txbuf;
 	}
@@ -784,12 +791,14 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	skb_cb->htt.txbuf->cmd_tx.freq = __cpu_to_le16(skb_cb->htt.freq);
 
 	trace_ath10k_htt_tx(ar, msdu_id, mbuf_skb_len(msdu->m), vdev_id, tid);
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		   "htt tx flags0 %u flags1 %u len %d id %hu frags_paddr %08x, msdu_paddr %08x vdev %hhu tid %hhu freq %hu\n",
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_HTT_TX,
+		   "htt tx %6D: flags0 %u flags1 %u len %d id %hu frags_paddr %08x, msdu_paddr %08x vdev %hhu tid %hhu freq %hu\n",
+		   skb_cb->ni->ni_macaddr, ":",
 		   (unsigned) flags0, (unsigned) flags1, mbuf_skb_len(msdu->m), msdu_id, frags_paddr,
 		   (u32)msdu->mb.paddr, vdev_id, tid, skb_cb->htt.freq);
-	ath10k_dbg(ar, ATH10K_DBG_HTT,
-		    "htt tx frags[0] paddr/len 0x%08x/0x%08x frags[1] paddr/len 0x%08x/0x%08x\n",
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_HTT_TX,
+		    "htt tx %6D: frags[0] paddr/len 0x%08x/0x%08x frags[1] paddr/len 0x%08x/0x%08x\n",
+		   skb_cb->ni->ni_macaddr, ":",
 		    le32_to_cpu(frags[0].dword_addr.paddr),
 		    le32_to_cpu(frags[0].dword_addr.len),
 		    le32_to_cpu(frags[1].dword_addr.paddr),
@@ -813,7 +822,8 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	sg_items[1].paddr = msdu->mb.paddr;
 	sg_items[1].len = prefetch_len;
 
-	ath10k_dbg(ar, ATH10K_DBG_HTT, "%s: paddr=%x, %x (%d)\n", __func__, sg_items[0].paddr, sg_items[1].paddr, prefetch_len);
+	ath10k_dbg(ar, ATH10K_DBG_HTT | ATH10K_DBG_HTT_TX, "%s: %6D: paddr=%x, %x (%d)\n",
+	    __func__, skb_cb->ni->ni_macaddr, ":", sg_items[0].paddr, sg_items[1].paddr, prefetch_len);
 
 	res = ath10k_hif_tx_sg(htt->ar,
 			       htt->ar->htc.endpoint[htt->eid].ul_pipe_id,
