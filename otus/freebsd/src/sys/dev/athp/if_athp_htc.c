@@ -108,7 +108,7 @@ static void
 ath10k_htc_control_tx_complete(struct ath10k *ar, struct athp_buf *pbuf)
 {
 
-	athp_freebuf(ar, &ar->buf_tx, pbuf);
+	athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 }
 
 static struct athp_buf *
@@ -116,7 +116,7 @@ ath10k_htc_build_tx_ctrl_skb(struct ath10k *ar)
 {
 	struct athp_buf *pbuf;
 
-	pbuf = athp_getbuf(ar, &ar->buf_tx, ATH10K_HTC_CONTROL_BUFFER_SIZE);
+	pbuf = athp_getbuf(ar, &ar->buf_tx_mgmt, ATH10K_HTC_CONTROL_BUFFER_SIZE);
 	if (! pbuf) {
 		device_printf(ar->sc_dev, "%s: athp_getbuf failed!\n",
 		    __func__);
@@ -146,8 +146,8 @@ static inline void ath10k_htc_restore_tx_skb(struct ath10k_htc *htc,
 {
 	struct ath10k *ar = htc->ar;
 
-	athp_dma_mbuf_post_xmit(ar, &ar->buf_tx.dh, &pbuf->mb);
-	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &pbuf->mb);
+	athp_dma_mbuf_post_xmit(ar, &ar->buf_tx_mgmt.dh, &pbuf->mb);
+	athp_dma_mbuf_unload(ar, &ar->buf_tx_mgmt.dh, &pbuf->mb);
 
 	/* Remove the htc header */
 	mbuf_skb_pull(pbuf->m, sizeof(struct ath10k_htc_hdr));
@@ -165,7 +165,7 @@ static void ath10k_htc_notify_tx_completion(struct ath10k_htc_ep *ep,
 
 	if (!ep->ep_ops.ep_tx_complete) {
 		ath10k_warn(ar, "no tx handler for eid %d\n", ep->eid);
-		athp_freebuf(ar, &ar->buf_tx, pbuf);
+		athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 		return;
 	}
 
@@ -217,6 +217,7 @@ int ath10k_htc_send(struct ath10k_htc *htc,
 		ATHP_HTC_TX_LOCK(htc);
 		if (ep->tx_credits < credits) {
 			ATHP_HTC_TX_UNLOCK(htc);
+			ath10k_err(ar, "htc ep %d out of TX credits (%d < %d)\n", eid, ep->tx_credits, credits);
 			ret = -EAGAIN;
 			goto err_pull;
 		}
@@ -235,7 +236,7 @@ int ath10k_htc_send(struct ath10k_htc *htc,
 	 * Everything should be set now in the outbound mbuf,
 	 * so load and sync.
 	 */
-	ret = athp_dma_mbuf_load(ar, &ar->buf_tx.dh, &pbuf->mb, pbuf->m);
+	ret = athp_dma_mbuf_load(ar, &ar->buf_tx_mgmt.dh, &pbuf->mb, pbuf->m);
 	if (ret != 0) {
 		/* Failed to load, so fail */
 		ath10k_warn(ar, "Failed to mbuf load: %d\n", ret);
@@ -243,7 +244,7 @@ int ath10k_htc_send(struct ath10k_htc *htc,
 	}
 
 	/* DMA sync */
-	athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx.dh, &pbuf->mb);
+	athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx_mgmt.dh, &pbuf->mb);
 
 	sg_item.transfer_id = ep->eid;
 	sg_item.transfer_context = pbuf;
@@ -260,7 +261,7 @@ int ath10k_htc_send(struct ath10k_htc *htc,
 	return 0;
 
 err_unmap:
-	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &pbuf->mb);
+	athp_dma_mbuf_unload(ar, &ar->buf_tx_mgmt.dh, &pbuf->mb);
 err_credits:
 	if (ep->tx_credit_flow_enabled) {
 		ATHP_HTC_TX_LOCK(htc);
@@ -794,7 +795,7 @@ int ath10k_htc_connect_service(struct ath10k_htc *htc,
 
 	status = ath10k_htc_send(htc, ATH10K_HTC_EP_0, pbuf);
 	if (status) {
-		athp_freebuf(ar, &ar->buf_tx, pbuf);
+		athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 		return status;
 	}
 
@@ -902,7 +903,7 @@ struct athp_buf *ath10k_htc_alloc_skb(struct ath10k *ar, int size)
 {
 	struct athp_buf *pbuf;
 
-	pbuf = athp_getbuf(ar, &ar->buf_tx, size + sizeof(struct ath10k_htc_hdr));
+	pbuf = athp_getbuf(ar, &ar->buf_tx_mgmt, size + sizeof(struct ath10k_htc_hdr));
 	if (! pbuf)
 		return NULL;
 
@@ -940,7 +941,7 @@ int ath10k_htc_start(struct ath10k_htc *htc)
 
 	status = ath10k_htc_send(htc, ATH10K_HTC_EP_0, pbuf);
 	if (status) {
-		athp_freebuf(ar, &ar->buf_tx, pbuf);
+		athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 		return status;
 	}
 

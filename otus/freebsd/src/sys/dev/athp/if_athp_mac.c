@@ -1075,7 +1075,7 @@ void ath10k_mac_vif_beacon_free(struct ath10k_vif *arvif)
 		    arvif->beacon_state != ATH10K_BEACON_SENT))
 		return;
 
-	athp_freebuf(ar, &ar->buf_tx, arvif->beacon);
+	athp_freebuf(ar, &ar->buf_tx_mgmt, arvif->beacon);
 
 	arvif->beacon = NULL;
 	arvif->beacon_state = ATH10K_BEACON_SCHEDULED;

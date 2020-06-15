@@ -866,7 +866,7 @@ ath10k_wmi_beacon_send_ref_nowait(struct ath10k *ar, u32 vdev_id,
 					 ar->wmi.cmd->pdev_send_bcn_cmdid);
 	if (ret) {
 		/* XXX TODO: should just embed which list in pbuf */
-		athp_freebuf(ar, &ar->buf_tx, pbuf);
+		athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 		return ret;
 	}
 

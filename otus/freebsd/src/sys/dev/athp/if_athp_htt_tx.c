@@ -257,7 +257,7 @@ void ath10k_htt_tx_free(struct ath10k_htt *htt)
 void ath10k_htt_htc_tx_complete(struct ath10k *ar, struct athp_buf *pbuf)
 {
 
-	athp_freebuf(ar, &ar->buf_tx, pbuf);
+	athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 }
 
 int ath10k_htt_h2t_ver_req_msg(struct ath10k_htt *htt)

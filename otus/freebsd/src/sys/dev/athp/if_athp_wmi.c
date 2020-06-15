@@ -1701,7 +1701,7 @@ struct athp_buf *ath10k_wmi_alloc_skb(struct ath10k *ar, u32 len)
 static void ath10k_wmi_htc_tx_complete(struct ath10k *ar, struct athp_buf *pbuf)
 {
 
-	athp_freebuf(ar, &ar->buf_tx, pbuf);
+	athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 }
 
 int ath10k_wmi_cmd_send_nowait(struct ath10k *ar, struct athp_buf *pbuf,
@@ -1850,12 +1850,15 @@ int ath10k_wmi_cmd_send(struct ath10k *ar, struct athp_buf *pbuf, u32 cmd_id)
 		if (ret && test_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags))
 			ret = -ESHUTDOWN;
 
-		if (ret != -EAGAIN)
+		if (ret != -EAGAIN) {
 			break;
+		}
 	}
+	if (ret != 0)
+		ath10k_err(ar, "%s: failed (%d)\n", __func__, ret);
 
 	if (ret)
-		athp_freebuf(ar, &ar->buf_tx, pbuf);
+		athp_freebuf(ar, &ar->buf_tx_mgmt, pbuf);
 
 	return ret;
 }
@@ -3489,14 +3492,14 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 		(void) ieee80211_beacon_update(ni, m, 0);
 		ieee80211_free_node(ni);
 
-		bcn = athp_getbuf_tx(ar, &ar->buf_tx);
+		bcn = athp_getbuf_tx(ar, &ar->buf_tx_mgmt);
 		if (bcn == NULL) {
 			ath10k_warn(ar, "%s: couldn't allocate beacon pbuf\n", __func__);
 			m_freem(m);
 			continue;
 		}
 
-		athp_buf_give_mbuf(ar, &ar->buf_tx, bcn, m);
+		athp_buf_give_mbuf(ar, &ar->buf_tx_mgmt, bcn, m);
 
 		/* Note: net80211 currently increases the seqno for beacons */
 
@@ -3526,7 +3529,7 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 			case ATH10K_BEACON_SENDING:
 				ath10k_warn(ar, "SWBA overrun on vdev %d, skipped new beacon\n",
 					    arvif->vdev_id);
-				athp_freebuf(ar, &ar->buf_tx, bcn);
+				athp_freebuf(ar, &ar->buf_tx_mgmt, bcn);
 				goto skip;
 			}
 
@@ -3538,18 +3541,18 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 			 * Load the beacon as downstream on functions assume
 			 * it is dma mapped already.
 			 */
-			ret = athp_dma_mbuf_load(ar, &ar->buf_tx.dh,
+			ret = athp_dma_mbuf_load(ar, &ar->buf_tx_mgmt.dh,
 			    &bcn->mb, bcn->m);
 			if (ret) {
 				ath10k_warn(ar, "failed to map beacon: %d\n",
 					    ret);
-				athp_freebuf(ar, &ar->buf_tx, bcn);
+				athp_freebuf(ar, &ar->buf_tx_mgmt, bcn);
 				ret = -EIO;
 				goto skip;
 			}
 
 			/* DMA sync. */
-			athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx.dh, &bcn->mb);
+			athp_dma_mbuf_pre_xmit(ar, &ar->buf_tx_mgmt.dh, &bcn->mb);
 
 			ATH10K_SKB_CB(bcn)->bcn.paddr = bcn->mb.paddr;
 		} else {
