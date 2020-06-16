@@ -7128,28 +7128,30 @@ ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 		goto skip;
 
 	while (! ieee80211_time_after(ticks, interval)) {
-			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
-			    "tx_flush", &ar->sc_conf_mtx,
-			    ATH10K_FLUSH_TIMEOUT_HZ);
-			ath10k_info(ar,
-			    "%s: checking; pending_tx=%d, time_left=%ld\n",
-			    __func__, ar->htt.num_pending_tx, time_left);
+		time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
+		    "tx_flush", &ar->sc_conf_mtx,
+		    ATH10K_FLUSH_TIMEOUT_HZ);
+		ath10k_info(ar,
+		    "%s: checking; pending_tx=%d, time_left=%ld\n",
+		    __func__, ar->htt.num_pending_tx, time_left);
 
-			ATHP_HTT_TX_LOCK(&ar->htt);
-			empty = (ar->htt.num_pending_tx == 0);
-			ATHP_HTT_TX_UNLOCK(&ar->htt);
+		ATHP_HTT_TX_LOCK(&ar->htt);
+		empty = (ar->htt.num_pending_tx == 0);
+		ATHP_HTT_TX_UNLOCK(&ar->htt);
 
-			skip = (ar->state == ATH10K_STATE_WEDGED) ||
-			       test_bit(ATH10K_FLAG_CRASH_FLUSH,
-					&ar->dev_flags);
+		skip = (ar->state == ATH10K_STATE_WEDGED) ||
+			    test_bit(ATH10K_FLAG_CRASH_FLUSH,
+			    &ar->dev_flags);
 
-			if (empty || skip)
-				break;
+		if (empty || skip)
+			break;
 		}
 
 	if (time_left == 0 || skip)
-		ath10k_warn(ar, "failed to flush transmit queue (skip %i ar-state %i pending %d empty %d): %ld\n",
-			    skip, ar->state, ar->htt.num_pending_tx, empty, time_left);
+		ath10k_warn(ar, "failed to flush transmit queue (skip %i "
+		    "ar-state %i pending %d empty %d): %ld\n",
+		    skip, ar->state, ar->htt.num_pending_tx, empty,
+		    time_left);
 
 skip:
 	return;
