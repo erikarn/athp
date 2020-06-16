@@ -2854,13 +2854,13 @@ static u32 ath10k_wmi_tlv_prepare_peer_qos(u8 uapsd_queues, u8 sp)
 {
 	u32 peer_qos = 0;
 
-	if (uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_VO)
+	if (uapsd_queues & WME_CAPINFO_UAPSD_VO)
 		peer_qos |= WMI_TLV_TDLS_PEER_QOS_AC_VO;
-	if (uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_VI)
+	if (uapsd_queues & WME_CAPINFO_UAPSD_VI)
 		peer_qos |= WMI_TLV_TDLS_PEER_QOS_AC_VI;
-	if (uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_BK)
+	if (uapsd_queues & WME_CAPINFO_UAPSD_BK)
 		peer_qos |= WMI_TLV_TDLS_PEER_QOS_AC_BK;
-	if (uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_BE)
+	if (uapsd_queues & WME_CAPINFO_UAPSD_BE)
 		peer_qos |= WMI_TLV_TDLS_PEER_QOS_AC_BE;
 
 	peer_qos |= SM(sp, WMI_TLV_TDLS_PEER_SP);

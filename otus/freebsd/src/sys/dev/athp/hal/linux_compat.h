@@ -155,26 +155,6 @@ typedef uint64_t	__be64;
 #define	IEEE80211_IS_DISASSOC(a)	ieee80211_is_disassoc(a)
 #define	IEEE80211_IS_QOS(a)		ieee80211_is_data_qos(a)
 
-/* XXX temp uAPSD */
-/* U-APSD queue for WMM IEs sent by AP */
-#define IEEE80211_WMM_IE_AP_QOSINFO_UAPSD       (1<<7)
-#define IEEE80211_WMM_IE_AP_QOSINFO_PARAM_SET_CNT_MASK  0x0f
-
-/* U-APSD queues for WMM IEs sent by STA */
-#define IEEE80211_WMM_IE_STA_QOSINFO_AC_VO      (1<<0)
-#define IEEE80211_WMM_IE_STA_QOSINFO_AC_VI      (1<<1)
-#define IEEE80211_WMM_IE_STA_QOSINFO_AC_BK      (1<<2)
-#define IEEE80211_WMM_IE_STA_QOSINFO_AC_BE      (1<<3)
-#define IEEE80211_WMM_IE_STA_QOSINFO_AC_MASK    0x0f
-
-/* U-APSD max SP length for WMM IEs sent by STA */
-#define IEEE80211_WMM_IE_STA_QOSINFO_SP_ALL     0x00
-#define IEEE80211_WMM_IE_STA_QOSINFO_SP_2       0x01
-#define IEEE80211_WMM_IE_STA_QOSINFO_SP_4       0x02
-#define IEEE80211_WMM_IE_STA_QOSINFO_SP_6       0x03
-#define IEEE80211_WMM_IE_STA_QOSINFO_SP_MASK    0x03
-#define IEEE80211_WMM_IE_STA_QOSINFO_SP_SHIFT   5
-
 /* Crpyto length definitions we don't have? Hm */
 #define IEEE80211_WEP_IV_LEN            4
 #define IEEE80211_WEP_ICV_LEN           4
