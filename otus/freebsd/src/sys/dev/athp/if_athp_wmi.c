@@ -1760,6 +1760,9 @@ static void ath10k_wmi_tx_beacon_nowait(struct ath10k_vif *arvif)
 		arvif->beacon_state = ATH10K_BEACON_SENDING;
 		ATHP_DATA_UNLOCK(ar);
 
+		if (cb->bcn.deliver_cab != 0)
+			ath10k_warn(ar, "%s: dtim_zero=%d, deliver_cab=%d\n", __func__, cb->bcn.dtim_zero, cb->bcn.deliver_cab);
+
 		ret = ath10k_wmi_beacon_send_ref_nowait(arvif->ar,
 							arvif->vdev_id,
 							mbuf_skb_data(bcn->m), mbuf_skb_len(bcn->m),

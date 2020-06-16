@@ -1442,6 +1442,14 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
 	vap->iv_ampdu_limit = IEEE80211_HTCAP_MAXRXAMPDU_64K;
 
+	/* U-APSD configuration */
+	vap->iv_uapsdinfo = WME_CAPINFO_UAPSD_EN
+	    | WME_CAPINFO_UAPSD_VO
+	    | WME_CAPINFO_UAPSD_VI
+	    | WME_CAPINFO_UAPSD_BK
+	    | WME_CAPINFO_UAPSD_BE
+	    | (1 << WME_CAPINFO_UAPSD_MAXSP_SHIFT);
+
 	/* Override vap methods */
 	vif->av_newstate = vap->iv_newstate;
 	vap->iv_newstate = athp_vap_newstate;
@@ -2390,7 +2398,8 @@ athp_attach_net80211(struct ath10k *ar)
 	    IEEE80211_C_SHSLOT |
 	    IEEE80211_C_MONITOR |
 	    IEEE80211_C_WPA |
-	    IEEE80211_C_TXPMGT;
+	    IEEE80211_C_TXPMGT |
+	    IEEE80211_C_UAPSD;
 
 	/* XXX crypto capabilities */
 	if (ar->sc_conf_crypt_mode == ATH10K_CRYPT_MODE_HW) {

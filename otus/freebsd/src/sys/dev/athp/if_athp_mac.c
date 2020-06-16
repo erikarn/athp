@@ -2993,74 +2993,87 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 #endif
 #undef MS
 
-#if 0
+/*
+ * Called to configure the initial U-APSD and QoS parameters
+ * in AP mode.
+ *
+ * In AP/IBSS/etc modes the station supplied U-APSD parameters
+ * are stored in ni->ni_uapsd.
+ */
 static int ath10k_peer_assoc_qos_ap(struct ath10k *ar,
-				    struct ath10k_vif *arvif,
-				    struct ieee80211_sta *sta)
+				    struct ieee80211vap *vif,
+				    struct ieee80211_node *ni)
 {
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	u32 uapsd = 0;
 	u32 max_sp = 0;
 	int ret = 0;
 
+	ath10k_warn(ar, "%s: is_qos=%d is_uapsd=%d, ni_uapsd=0x%x\n",
+	    __func__,
+	    !! (ni->ni_flags & IEEE80211_NODE_QOS),
+	    !! (ni->ni_flags & IEEE80211_NODE_UAPSD),
+	    ni->ni_uapsd);
+
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (sta->wme && sta->uapsd_queues) {
-		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac uapsd_queues 0x%x max_sp %d\n",
-			   sta->uapsd_queues, sta->max_sp);
+	if ((ni->ni_flags & IEEE80211_NODE_QOS) &&
+	    (ni->ni_flags & IEEE80211_NODE_UAPSD)) {
+		ath10k_warn(ar,
+		    "%s: mac ni_uapsd 0x%x max_sp %d\n",
+		    __func__,
+		    ni->ni_uapsd, WME_UAPSD_MAXSP(ni->ni_uapsd));
 
-		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_VO)
+		if (ni->ni_uapsd & WME_CAPINFO_UAPSD_VO)
 			uapsd |= WMI_AP_PS_UAPSD_AC3_DELIVERY_EN |
 				 WMI_AP_PS_UAPSD_AC3_TRIGGER_EN;
-		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_VI)
+		if (ni->ni_uapsd & WME_CAPINFO_UAPSD_VI)
 			uapsd |= WMI_AP_PS_UAPSD_AC2_DELIVERY_EN |
 				 WMI_AP_PS_UAPSD_AC2_TRIGGER_EN;
-		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_BK)
+		if (ni->ni_uapsd & WME_CAPINFO_UAPSD_BK)
 			uapsd |= WMI_AP_PS_UAPSD_AC1_DELIVERY_EN |
 				 WMI_AP_PS_UAPSD_AC1_TRIGGER_EN;
-		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_BE)
+		if (ni->ni_uapsd & WME_CAPINFO_UAPSD_BE)
 			uapsd |= WMI_AP_PS_UAPSD_AC0_DELIVERY_EN |
 				 WMI_AP_PS_UAPSD_AC0_TRIGGER_EN;
+		/*
+		 * If MAXSP is above the WMI configuration limit,
+		 * just set it to 0 (unlimited).
+		 */
+		if (WME_UAPSD_MAXSP(ni->ni_uapsd) < MAX_WMI_AP_PS_PEER_PARAM_MAX_SP)
+			max_sp = WME_UAPSD_MAXSP(ni->ni_uapsd);
 
-		if (sta->max_sp < MAX_WMI_AP_PS_PEER_PARAM_MAX_SP)
-			max_sp = sta->max_sp;
-
-		ret = ath10k_wmi_set_ap_ps_param(ar, arvif->vdev_id,
-						 sta->addr,
-						 WMI_AP_PS_PEER_PARAM_UAPSD,
-						 uapsd);
+		ret = ath10k_wmi_set_ap_ps_param(ar, arvif->vdev_id, ni->ni_macaddr,
+		    WMI_AP_PS_PEER_PARAM_UAPSD, uapsd);
 		if (ret) {
-			ath10k_warn(ar, "failed to set ap ps peer param uapsd for vdev %i: %d\n",
-				    arvif->vdev_id, ret);
-			return ret;
+			ath10k_warn(ar,
+			    "failed to set ap ps peer param uapsd for vdev %i: %d\n",
+			    arvif->vdev_id, ret);
+			goto finish;
 		}
 
-		ret = ath10k_wmi_set_ap_ps_param(ar, arvif->vdev_id,
-						 sta->addr,
-						 WMI_AP_PS_PEER_PARAM_MAX_SP,
-						 max_sp);
+		ret = ath10k_wmi_set_ap_ps_param(ar, arvif->vdev_id, ni->ni_macaddr,
+		    WMI_AP_PS_PEER_PARAM_MAX_SP, max_sp);
 		if (ret) {
 			ath10k_warn(ar, "failed to set ap ps peer param max sp for vdev %i: %d\n",
-				    arvif->vdev_id, ret);
-			return ret;
+			    arvif->vdev_id, ret);
+			goto finish;
 		}
 
-		/* TODO setup this based on STA listen interval and
-		   beacon interval. Currently we don't know
-		   sta->listen_interval - mac80211 patch required.
-		   Currently use 10 seconds */
-		ret = ath10k_wmi_set_ap_ps_param(ar, arvif->vdev_id, sta->addr,
-						 WMI_AP_PS_PEER_PARAM_AGEOUT_TIME,
-						 10);
+		/*
+		 * Default to 10 seconds for ageout of buffered frames.
+		 */
+		ret = ath10k_wmi_set_ap_ps_param(ar, arvif->vdev_id, ni->ni_macaddr,
+		    WMI_AP_PS_PEER_PARAM_AGEOUT_TIME, 10);
 		if (ret) {
 			ath10k_warn(ar, "failed to set ap ps peer param ageout time for vdev %i: %d\n",
-				    arvif->vdev_id, ret);
-			return ret;
+			    arvif->vdev_id, ret);
+			goto finish;
 		}
 	}
-
-	return 0;
+finish:
+	return ret;
 }
-#endif
 
 #if 0
 static u16
@@ -3232,6 +3245,20 @@ static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
 		break;
 	}
 #else
+	if (vif->iv_opmode == IEEE80211_M_HOSTAP) {
+		if (ni->ni_flags & IEEE80211_NODE_UAPSD) {
+			ath10k_warn(ar,
+			    "%s: hostap+uapsd station node; enabling\n",
+			    __func__);
+			arg->peer_flags |= WMI_PEER_APSD;
+			arg->peer_rate_caps |= WMI_RC_UAPSD_FLAG;
+		}
+	}
+
+	/*
+	 * XXX TODO: For IBSS does the peer node have the right information?
+	 */
+
 	if (ni->ni_flags & IEEE80211_NODE_QOS)
 		arg->peer_flags |= WMI_PEER_QOS;
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac peer %6D qos %d\n",
@@ -3638,16 +3665,12 @@ int ath10k_station_assoc(struct ath10k *ar,
 			return ret;
 		}
 
-#if 0
-		ret = ath10k_peer_assoc_qos_ap(ar, arvif, sta);
+		ret = ath10k_peer_assoc_qos_ap(ar, vif, sta);
 		if (ret) {
 			ath10k_warn(ar, "failed to set qos params for STA %6D for vdev %i: %d\n",
 				    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 			return ret;
 		}
-#else
-		ath10k_warn(ar, "%s: TODO: assoc_qos_ap\n", __func__);
-#endif
 		if (! (sta->ni_flags & IEEE80211_NODE_QOS)) {
 			arvif->num_legacy_stations++;
 			ret  = ath10k_recalc_rtscts_prot(arvif);
@@ -6706,41 +6729,55 @@ exit:
 }
 #endif
 
-static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
-				u16 ac, bool enable)
+/*
+ * Configure U-APSD parameters for STA mode.
+ *
+ * Since this is STA mode, the QoS and UAPSD flags
+ * come from the vap, not from the bss node.
+ */
+static int
+ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211_node *ni,
+    u16 ac)
 {
-#if 0
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
 	struct wmi_sta_uapsd_auto_trig_arg arg = {};
 	u32 prio = 0, acc = 0;
 	u32 value = 0;
 	int ret = 0;
+	int is_uapsd = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	if (arvif->vdev_type != WMI_VDEV_TYPE_STA)
+	if (vap->iv_opmode != IEEE80211_M_STA)
 		return 0;
 
+	is_uapsd = !! (vap->iv_flags_ext & IEEE80211_FEXT_UAPSD);
+
+	/*
+	 * XXX TODO: why are these not yanked from the WME
+	 * BSS configuration we've received from the AP?
+	 */
 	switch (ac) {
-	case IEEE80211_AC_VO:
+	case WME_AC_VO:
 		value = WMI_STA_PS_UAPSD_AC3_DELIVERY_EN |
 			WMI_STA_PS_UAPSD_AC3_TRIGGER_EN;
 		prio = 7;
 		acc = 3;
 		break;
-	case IEEE80211_AC_VI:
+	case WME_AC_VI:
 		value = WMI_STA_PS_UAPSD_AC2_DELIVERY_EN |
 			WMI_STA_PS_UAPSD_AC2_TRIGGER_EN;
 		prio = 5;
 		acc = 2;
 		break;
-	case IEEE80211_AC_BE:
+	case WME_AC_BE:
 		value = WMI_STA_PS_UAPSD_AC1_DELIVERY_EN |
 			WMI_STA_PS_UAPSD_AC1_TRIGGER_EN;
 		prio = 2;
 		acc = 1;
 		break;
-	case IEEE80211_AC_BK:
+	case WME_AC_BK:
 		value = WMI_STA_PS_UAPSD_AC0_DELIVERY_EN |
 			WMI_STA_PS_UAPSD_AC0_TRIGGER_EN;
 		prio = 0;
@@ -6748,11 +6785,16 @@ static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
 		break;
 	}
 
-	if (enable)
+	if (is_uapsd)
 		arvif->u.sta.uapsd |= value;
 	else
 		arvif->u.sta.uapsd &= ~value;
 
+	/*
+	 * XXX TODO: why aren't these all done in one hit,
+	 * rather than a bunch of different configuration calls
+	 * as we get called for each WME AC?
+	 */
 	ret = ath10k_wmi_set_sta_ps_param(ar, arvif->vdev_id,
 					  WMI_STA_PS_PARAM_UAPSD,
 					  arvif->u.sta.uapsd);
@@ -6811,24 +6853,24 @@ static int ath10k_conf_tx_uapsd(struct ath10k *ar, struct ieee80211vap *vif,
 
 exit:
 	return ret;
-#else
-	ath10k_warn(ar, "%s: TODO!\n", __func__);
-	return (0);
-#endif
 }
 
 /*
- * This is called only in the STA path for now, but yes, it should also
- * be called in the AP path.  Double-check what the semantics there
- * should be.
+ * This is called in both the STA and AP paths.
+ *
+ * It configures the transmit parameters for the BSS or STA.
+ * Per-peer information in AP (and mesh/ibss) modes
+ * go via ath10k_peer_assoc_qos_ap().
+ *
+ * Note: some information is stored in the BSS node, ni.
  */
 static int ath10k_conf_tx(struct ath10k *ar,
-			  struct ieee80211vap *vif, u16 ac,
+			  struct ieee80211_node *ni, u16 ac,
 			  const struct wmeParams *wmep)
 {
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct wmi_wmm_params_arg *p = NULL;
-//	struct wmeParams *wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
+	struct ieee80211vap *vif = ni->ni_vap;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	int ret;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
@@ -6871,6 +6913,10 @@ static int ath10k_conf_tx(struct ath10k *ar,
 	    p->aifs,
 	    p->txop);
 
+	/*
+	 * This is configuring the VAP WME parameters, not the per-node
+	 * parameters.
+	 */
 	if (ar->wmi.ops->gen_vdev_wmm_conf) {
 		ret = ath10k_wmi_vdev_wmm_conf(ar, arvif->vdev_id,
 					       &arvif->wmm_params);
@@ -6890,13 +6936,9 @@ static int ath10k_conf_tx(struct ath10k *ar,
 		}
 	}
 
-#if 0
-	ret = ath10k_conf_tx_uapsd(ar, vif, ac, params->uapsd);
+	ret = ath10k_conf_tx_uapsd(ar, ni, ac);
 	if (ret)
 		ath10k_warn(ar, "failed to set sta uapsd: %d\n", ret);
-#else
-	ath10k_warn(ar, "%s: TODO: set sta uapsd\n", __func__);
-#endif
 exit:
 	return ret;
 }
@@ -7089,6 +7131,9 @@ ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 			time_left = ath10k_wait_wait(&ar->htt.empty_tx_wq,
 			    "tx_flush", &ar->sc_conf_mtx,
 			    ATH10K_FLUSH_TIMEOUT_HZ);
+			ath10k_info(ar,
+			    "%s: checking; pending_tx=%d, time_left=%ld\n",
+			    __func__, ar->htt.num_pending_tx, time_left);
 
 			ATHP_HTT_TX_LOCK(&ar->htt);
 			empty = (ar->htt.num_pending_tx == 0);
@@ -9198,6 +9243,15 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 	}
 }
 
+/*
+ * Update the WME/UAPSD configuration for a BSS.
+ *
+ * For AP operation this sets up the BSS WME configuration.
+ * For STA operation this sets up the BSS WME and UAPSD
+ * configuration.
+ *
+ * AP peers are configured via ath10k_peer_assoc_qos_ap().
+ */
 int
 ath10k_update_wme_vap(struct ieee80211vap *vap,
     const struct wmeParams *wme_params)
@@ -9205,6 +9259,7 @@ ath10k_update_wme_vap(struct ieee80211vap *vap,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ieee80211_node *ni;
 	int ret = 0;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
@@ -9212,11 +9267,15 @@ ath10k_update_wme_vap(struct ieee80211vap *vap,
 	if (arvif->is_setup == 0)
 		return (EINVAL);
 
+	ni = ieee80211_ref_node(vap->iv_bss);
+
 	/* now WMM */
-	ret |= ath10k_conf_tx(ar, vap, WME_AC_BE, &wme_params[WME_AC_BE]);
-	ret |= ath10k_conf_tx(ar, vap, WME_AC_BK, &wme_params[WME_AC_BK]);
-	ret |= ath10k_conf_tx(ar, vap, WME_AC_VI, &wme_params[WME_AC_VI]);
-	ret |= ath10k_conf_tx(ar, vap, WME_AC_VO, &wme_params[WME_AC_VO]);
+	ret |= ath10k_conf_tx(ar, ni, WME_AC_BE, &wme_params[WME_AC_BE]);
+	ret |= ath10k_conf_tx(ar, ni, WME_AC_BK, &wme_params[WME_AC_BK]);
+	ret |= ath10k_conf_tx(ar, ni, WME_AC_VI, &wme_params[WME_AC_VI]);
+	ret |= ath10k_conf_tx(ar, ni, WME_AC_VO, &wme_params[WME_AC_VO]);
+
+	ieee80211_free_node(ni);
 
 	return (ret == 0 ? 0 : ENXIO);
 }
