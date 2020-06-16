@@ -2115,7 +2115,7 @@ athp_attach_sysctl(struct ath10k *ar)
 	struct sysctl_ctx_list *ctx = device_get_sysctl_ctx(ar->sc_dev);
 	struct sysctl_oid_list *child = SYSCTL_CHILDREN(tree);
 
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "debug",
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "debug",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_debug, "debug control");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "hwcrypt_mode",
@@ -2131,29 +2131,29 @@ athp_attach_sysctl(struct ath10k *ar)
 	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_fw_stats, "I", "");
 
 	/* statistics */
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_rx_msdu_invalid_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_msdu_invalid_len, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_short_len", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_rx_pkt_short_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_pkt_short_len, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_rx_pkt_zero_len", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_rx_pkt_zero_len", CTLFLAG_RD,
 	    &ar->sc_stats.rx_pkt_zero_len, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_crypto_encap", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_xmit_fail_crypto_encap", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_crypto_encap, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_mbuf_defrag", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_xmit_fail_mbuf_defrag", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_mbuf_defrag, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_get_pbuf", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_xmit_fail_get_pbuf", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_get_pbuf, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_xmit_fail_htt_xmit", CTLFLAG_RD,
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_xmit_fail_htt_xmit", CTLFLAG_RD,
 	    &ar->sc_stats.xmit_fail_htt_xmit, "");
 
 	/* trace stats */
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_trace_sent_ok",
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_trace_sent_ok",
 	    CTLFLAG_RD, &ar->sc_trace.num_sent, "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "stats_trace_sent_lost",
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "stats_trace_sent_lost",
 	    CTLFLAG_RD, &ar->sc_trace.num_lost, "");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "trace_enable",
 	    CTLTYPE_INT | CTLFLAG_RW, ar, 0, athp_sysctl_trace_enable, "I", "");
-	SYSCTL_ADD_QUAD(ctx, child, OID_AUTO, "trace_mask",
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "trace_mask",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_trace.trace_mask, "trace mask");
 
@@ -2417,10 +2417,6 @@ athp_attach_net80211(struct ath10k *ar)
 	    | IEEE80211_FEXT_FRAG_OFFLOAD
 //	    | IEEE80211_FEXT_SEQNO_OFFLOAD
 	    ;
-
-	/* XXX 11n bits */
-
-	/* XXX 11ac bits */
 
 	/* Channels/regulatory */
 	athp_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
