@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 
 #include "hal/linux_compat.h"
 #include "hal/targaddrs.h"
+#include "hal/chip_id.h"
 #include "hal/core.h"
 #include "hal/hw.h"
 #include "hal/htc.h"
@@ -120,11 +121,6 @@ static unsigned int ath10k_pci_reset_mode = ATH10K_PCI_RESET_AUTO;
 /* how long wait to wait for target to initialise, in ms */
 #define ATH10K_PCI_TARGET_WAIT 3000
 #define ATH10K_PCI_NUM_WARM_RESET_ATTEMPTS 3
-
-#define QCA988X_2_0_DEVICE_ID	(0x003c)
-#define QCA6164_2_1_DEVICE_ID	(0x0041)
-#define QCA6174_2_1_DEVICE_ID	(0x003e)
-#define QCA99X0_2_0_DEVICE_ID	(0x0040)
 
 static const struct athp_pci_supp_chip athp_pci_supp_chips[] = {
 	/*
