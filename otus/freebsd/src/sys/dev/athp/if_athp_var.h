@@ -68,6 +68,7 @@ struct athp_keyidx_update {
 static inline void
 athp_mtx_assert(struct mtx *mtx, int op)
 {
+#ifdef	INVARIANTS
 	int ret;
 
 	ret = mtx_owned(mtx);
@@ -79,6 +80,10 @@ athp_mtx_assert(struct mtx *mtx, int op)
 	printf("%s: failed assertion check (%s)", __func__,
 	    op == MA_OWNED ? "owned" : "not-owned");
 	kdb_backtrace();
+#else
+	(void) mtx;
+	(void) op;
+#endif	/* INVARIANTS */
 }
 
 #define	ATHP_NODE(ni)		((struct ath10k_sta *)(ni))
