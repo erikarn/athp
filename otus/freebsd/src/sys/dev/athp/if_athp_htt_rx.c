@@ -102,7 +102,7 @@ static int ath10k_htt_rx_get_csum_state(struct athp_buf *skb);
 static void ath10k_htt_txrx_compl_task(void *arg, int npending);
 static void ath10k_htt_rx_ring_refill_retry(void *arg);
 
-#define	SKB_RX_HASH(skb)		(((skb) >> 6) & ~(ATHP_RX_SKB_HASH_BUCKET_COUNT-1))
+#define	SKB_RX_HASH(skb)		(((skb) >> 6) & (ATHP_RX_SKB_HASH_BUCKET_COUNT-1))
 
 static struct athp_buf *
 ath10k_htt_rx_find_skb_paddr(struct ath10k *ar, u32 paddr)
