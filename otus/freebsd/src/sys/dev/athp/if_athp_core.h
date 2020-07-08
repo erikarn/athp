@@ -65,6 +65,15 @@ ath10k_bus_str(enum ath10k_bus bus)
 	return "unknown";
 }
 
+struct athp_crypto_key {
+	int is_active;
+	uint32_t cipher;
+	ieee80211_keyix hw_keyidx;
+	uint32_t flags;
+	char key[IEEE80211_KEYBUF_SIZE+IEEE80211_MICBUF_SIZE];
+	uint8_t keylen;
+};
+
 #define ATH10K_MAX_NUM_PEER_IDS (1 << 11) /* htt rx_desc limit */
 
 struct ath10k_peer {
@@ -74,8 +83,7 @@ struct ath10k_peer {
 	DECLARE_BITMAP(peer_ids, ATH10K_MAX_NUM_PEER_IDS);
 
 	/* protected by ar->data_lock */
-	const struct ieee80211_key *keys[WMI_MAX_KEY_INDEX + 1];
-	uint32_t key_ciphers[WMI_MAX_KEY_INDEX + 1];
+	struct athp_crypto_key keys[WMI_MAX_KEY_INDEX + 1];
 };
 
 struct ath10k_sta {
@@ -153,8 +161,7 @@ struct ath10k_vif {
 	u32 aid;
 	u8 bssid[ETH_ALEN];
 
-	const struct ieee80211_key *wep_keys[WMI_MAX_KEY_INDEX + 1];
-	uint32_t wep_key_ciphers[WMI_MAX_KEY_INDEX + 1];
+	struct athp_crypto_key wep_keys[WMI_MAX_KEY_INDEX + 1];
 	s8 def_wep_key_idx;
 
 	u16 tx_seq_no;

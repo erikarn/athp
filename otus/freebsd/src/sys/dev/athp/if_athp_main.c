@@ -978,6 +978,32 @@ athp_key_alloc(struct ieee80211vap *vap, struct ieee80211_key *k,
 	    "%s: k=%p, keyix=%d; mac=%6D\n",
 	    __func__, k, k->wk_keyix, k->wk_macaddr, ":");
 
+	/*
+	 * This is a total hack which quite honestly needs to be
+	 * set on fire a bit and moved into net80211.
+	 *
+	 * The WEP keys and group keys are stored in iv_nw_keys[].
+	 * They're numbered 0..3.  The per-peer pairwise key(s)
+	 * are stored in the node, NOT not in the vap array.
+	 * So this bit of pointer arithmetic is basically to see
+	 * if the key falls inside the range of WEP/group keys,
+	 * or outside (and is thus a pairwise key.)
+	 *
+	 * It's terrible logic and needs to be set on fire quite
+	 * rapidly.
+	 *
+	 * So, for group and WEP keys they're simply stored in
+	 * the keyix 0..3.  For pairwise keys they're actually
+	 * programmed in keyix 0 (as net80211 only supports a
+	 * single pairwise key right now), but with a different
+	 * flag.
+	 *
+	 * This magic value of ATHP_PAIRWISE_KEY_IDX is to avoid
+	 * having to extend net80211 too much, but what we SHOULD
+	 * do in the shorter term is to store separate flags
+	 * in our per-vap and per-node shadow key table in order
+	 * to avoid a magic keyix.
+	 */
 	if (!(&vap->iv_nw_keys[0] <= k &&
 	     k < &vap->iv_nw_keys[IEEE80211_WEP_NKID])) {
 		ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
@@ -1057,15 +1083,16 @@ athp_key_update_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	ATHP_CONF_LOCK(ar);
 	ret = ath10k_set_key(ar, ku->wmi_add, &arvif->av_vap,
-	    ku->wmi_macaddr, ku->k, ku->cipher);
+	    ku->wmi_macaddr, &ku->key);
 	ATHP_CONF_UNLOCK(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
-	    "%s: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; ret=%d,"
+	    "%s: keyidx=%d, wmi_add=%d, flags=0x%08x, ret=%d,"
 	    " wmimac=%6D\n",
 	    __func__,
-	    ku->k->wk_keyix, ku->wmi_add,
-	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
+	    ku->key.hw_keyidx,
+	    ku->wmi_add,
+	    ku->key.flags,
 	    ret, ku->wmi_macaddr, ":");
 }
 
@@ -1171,15 +1198,21 @@ athp_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	ku->wmi_add = SET_KEY;
 
 	/* XXX ugh */
-	ku->k = k;
-	ku->cipher = k->wk_cipher->ic_cipher;
 	ku->vap = vap;
 
+	/* XXX methodize? */
+	ku->key.cipher = k->wk_cipher->ic_cipher;
+	ku->key.hw_keyidx = k->wk_keyix;
+	ku->key.flags = k->wk_flags;
+	ku->key.keylen = k->wk_keylen;
+	ku->key.is_active = 1;
+	memcpy(ku->key.key, k->wk_key, sizeof(k->wk_key));
+
 	ath10k_dbg(ar, ATH10K_DBG_KEYCACHE,
-	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, mac=%6D; wmimac=%6D, bss_ni mac=%6D\n",
+	    "%s: scheduling: keyix=%d, wmi_add=%d, flags=0x%08x, wmimac=%6D, bss_ni mac=%6D\n",
 	    __func__,
-	    ku->k->wk_keyix, ku->wmi_add,
-	    ku->k->wk_flags, ku->k->wk_macaddr, ":",
+	    ku->key.hw_keyidx, ku->wmi_add,
+	    ku->key.flags,
 	    ku->wmi_macaddr, ":", ni->ni_macaddr, ":");
 
 	/* schedule */
@@ -1275,8 +1308,14 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 
 	/* XXX ugh */
 	ku->vap = vap;
-	ku->k = k;
-	ku->cipher = k->wk_cipher->ic_cipher;
+
+	/* XXX methodize? */
+	ku->key.cipher = k->wk_cipher->ic_cipher;
+	ku->key.hw_keyidx = k->wk_keyix;
+	ku->key.flags = k->wk_flags;
+	ku->key.keylen = k->wk_keylen;
+	ku->key.is_active = 1;
+	memcpy(ku->key.key, k->wk_key, sizeof(k->wk_key));
 
 	/* schedule */
 	(void) athp_taskq_queue(ar, e, "athp_key_del", athp_key_update_cb);
@@ -1285,6 +1324,12 @@ athp_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	return (1);
 }
 
+/*
+ * Update the default key index.
+ *
+ * This is used for WEP - RSN modes currently only support a single
+ * TX key.
+ */
 static void
 athp_update_deftxkey(struct ieee80211vap *vap, ieee80211_keyix deftxkey)
 {
