@@ -3369,6 +3369,13 @@ static void ath10k_peer_assoc_h_phymode(struct ath10k *ar,
 
 /*
  * Configure the phymode for this node.
+ *
+ * This isn't the channel per se; it's the operating mode of the
+ * node itself.  For example, if the AP is operating in VHT40
+ * and a HT20 node comes along, phymode should be HT20.
+ * Otherwise the NIC will transmit management frames via legacy rates
+ * fine - but data will be transmitted as VHT and the receiver
+ * will get super angry at you.
  */
 static void
 ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
@@ -3376,9 +3383,7 @@ ath10k_peer_assoc_h_phymode_freebsd(struct ath10k *ar,
     struct ieee80211_node *ni,
     struct wmi_peer_assoc_complete_arg *arg)
 {
-	struct ieee80211com *ic = &ar->sc_ic;
-	struct ieee80211_channel *c = ic->ic_curchan; /* XXX ni->ni_chan? */
-	//struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	struct ieee80211_channel *c = ni->ni_chan;
 	enum wmi_phy_mode phymode = MODE_UNKNOWN;
 
 	phymode = chan_to_phymode(c);
