@@ -45,10 +45,16 @@
  */
 struct athp_key_update {
 	struct ieee80211vap *vap;
-	const struct ieee80211_key *k;
 	uint8_t wmi_macaddr[ETH_ALEN];
 	int wmi_add;
-	uint32_t cipher;
+	/*
+	 * This is a private copy of the net80211 key, which ideally
+	 * will eventually be completely removed from this driver
+	 * path.  The net80211 key may be recycled or freed (if it's
+	 * in a recycled node) by the time the deferred callback is
+	 * run.
+	 */
+	struct athp_crypto_key key;
 };
 
 struct athp_node_alloc_state {
