@@ -513,15 +513,22 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 }
 /*
  * Handle initial notifications about starting the interface here.
+ *
+ * XXX TODO: need a way to tell net80211 that we failed here!
  */
 static void
-athp_parent(struct ieee80211com *ic, int attempts)
+athp_parent(struct ieee80211com *ic)
 {
 	struct ath10k *ar = ic->ic_softc;
+	int ret;
 
 	ath10k_warn(ar, "%s: called; nrunning=%d\n", __func__, ic->ic_nrunning);
 
-	/* XXX TODO: add conf lock - ath10k_start() grabs the lock */
+	/*
+	 * XXX TODO: add conf lock - ath10k_start() grabs the lock;
+	 * make a locked version which expects the conf lock
+	 * passed in.
+	 */
 
 	/*
 	 * If nothing is yet running, power up the chip in preparation for
@@ -529,28 +536,28 @@ athp_parent(struct ieee80211com *ic, int attempts)
 	 * occurs will re-create the arvif entry.
 	 */
 	if (ic->ic_nrunning > 0) {
-		/* Track if we're running already */
-		if (ar->sc_isrunning == 0) {
-			int ret;
-
+		/*
+		 * Don't start firmware if we're already running firmware.
+		 */
+		if (ar->state == ATH10K_STATE_OFF) {
 			ath10k_warn(ar, "%s: powering up\n", __func__);
-
-			/* Power up */
 			ret = ath10k_start(ar);
 			if (ret != 0) {
 				ath10k_err(ar,
 				    "%s: ath10k_start failed; ret=%d\n",
 				    __func__, ret);
-					if (attempts < 6) {
-						ath10k_err(ar,
-						"%s: ath10k_start failed, trying again; ret=%d\n",
-						__func__, ret);
-						athp_parent(ic, attempts++);
-					}
 				return;
 			}
+		} else if (ar->state != ATH10K_STATE_ON) {
+			/* Unexpected state; log */
+			ath10k_err(ar,
+			    "%s: unexpected state during restart (%d)\n",
+			    __func__, ar->state);
+			return;
+		}
 
-			ath10k_warn(ar, "%s: not yet running; start\n", __func__);
+		if (ar->sc_isrunning == 0) {
+			ath10k_warn(ar, "%s: start vaps\n", __func__);
 			ieee80211_start_all(ic);
 			ar->sc_isrunning = 1;
 		}
@@ -593,14 +600,6 @@ athp_parent(struct ieee80211com *ic, int attempts)
 		ath10k_warn(ar, "%s: powering down\n", __func__);
 		ath10k_stop(ar);
 	}
-}
-
-/*
-* Handle the athp_parent call but attempt retries and starting the interface here
-*/
-static void
-net80211_athp_parent(struct ieee80211com *ic) {
-	athp_parent(ic, 0);
 }
 
 #if 0
@@ -1455,9 +1454,10 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 #endif
 
 	/* We have to bring up the hardware/driver state if it isn't yet */
+
 	/* XXX methodize */
 	/* XXX TODO: add conf lock - ath10k_start() grabs the lock */
-	if (TAILQ_EMPTY(&ic->ic_vaps) || (ar->sc_isrunning == 0)) {
+	if (ar->state == ATH10K_STATE_OFF) {
 		ret = ath10k_start(ar);
 		if (ret != 0) {
 			ath10k_err(ar,
@@ -1465,7 +1465,6 @@ athp_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 			    __func__, ret);
 			return (NULL);
 		}
-		ar->sc_isrunning = 1;
 	}
 
 	/*
@@ -2480,7 +2479,7 @@ athp_attach_net80211(struct ath10k *ar)
 	ic->ic_set_channel = athp_set_channel;
 	ic->ic_transmit = athp_transmit;
 	ic->ic_send_mgmt = athp_send_mgmt;
-	ic->ic_parent = net80211_athp_parent;
+	ic->ic_parent = athp_parent;
 	ic->ic_vap_create = athp_vap_create;
 	ic->ic_vap_delete = athp_vap_delete;
 	ic->ic_update_promisc = athp_update_promisc;
