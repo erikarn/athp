@@ -1760,12 +1760,18 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	ath10k_warn(ar, "%s: added node for mac %6D (%p)\n", __func__,
 	    ku->peer_macaddr, ":", ku->ni);
 
-	/* XXX TODO: set "node" xmit flag to 1 */
+	/* Set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
 	arsta->is_in_peer_table = 1;
 	ieee80211_free_node(ku->ni);
 }
 
+/*
+ * Deferred node free task entry.
+ *
+ * This handles disassociating the station and sending a peer free WMI
+ * command.
+ */
 static void
 athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 {
@@ -1774,6 +1780,9 @@ athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	ku = athp_taskq_entry_to_ptr(e);
 	vap = ku->vap;
+
+	ath10k_warn(ar, "%s: deleted node for mac %6D (%p)\n", __func__,
+	    ku->peer_macaddr, ":", ku->ni);
 
 	if (flush == 0) {
 		ath10k_warn(ar, "%s: flushing\n", __func__);
@@ -1791,9 +1800,39 @@ athp_node_free_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 		ath10k_err(ar, "%s: failed to delete peer: %6D\n", __func__,
 		    ku->peer_macaddr, ":");
 	}
+}
 
-	ath10k_warn(ar, "%s: deleted node for mac %6D (%p)\n", __func__,
-	    ku->peer_macaddr, ":", ku->ni);
+/*
+ * Flush any frames that are still in the transmit queue.
+ */
+static void
+athp_node_flush_deferred_tx(struct ieee80211_node *ni)
+{
+	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct mbuf *m;
+
+	ath10k_warn(ar, "%s: mac=%6D: flushing deferred tx\n",
+	    __func__, ni->ni_macaddr, ":");
+
+	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
+		ieee80211_tx_complete(ni, m, 1);
+	}
+}
+
+/*
+ * Task which will attempt to transmit any frames in the deferred queue.
+ */
+static void
+athp_node_deferred_tx(void *arg, int npending)
+{
+	struct ieee80211_node *ni = arg;
+	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+
+	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
+	    __func__, ni->ni_macaddr, ":");
+	/* XXX TODO */
 }
 
 static struct ieee80211_node *
@@ -1820,6 +1859,9 @@ athp_node_init(struct ieee80211_node *ni)
 	struct ath10k *ar = ic->ic_softc;
 	struct athp_taskq_entry *e;
 	struct athp_node_alloc_state *ku;
+
+	mbufq_init(&ATHP_NODE(ni)->deferred_txq, 128);
+	TASK_INIT(&ATHP_NODE(ni)->deferred_tq, 0, athp_node_deferred_tx, ni);
 
 	/*
 	 * Defer peer creation into the taskqueue.
@@ -1939,6 +1981,11 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	}
 }
 
+/*
+ * Called to free a node.
+ *
+ * XXX TODO: locking? Especially around arsta->is_in_peer_table ?
+ */
 static void
 athp_node_free(struct ieee80211_node *ni)
 {
@@ -1954,7 +2001,13 @@ athp_node_free(struct ieee80211_node *ni)
 
 	arsta = ATHP_NODE(ni);
 
-	/* XXX TODO: delete peer */
+	/* Finish any deferred transmit; free any other frames */
+	ieee80211_draintask(ic, &arsta->deferred_tq);
+	athp_node_flush_deferred_tx(ni);
+
+	/*
+	 * Queue a deferred peer deletion if we need to.
+	 */
 	if (memcmp(ni->ni_macaddr, ni->ni_vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
 		struct athp_taskq_entry *e;
 		struct athp_node_alloc_state *ku;
