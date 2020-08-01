@@ -174,87 +174,87 @@ athp_tx_exit(struct ath10k *ar)
 }
 
 /*
- * Raw frame transmission - this is "always" 802.11.
+ * Shared routine to attempt to queue the given frame to
+ * the hardware.
  *
- * Free the mbuf if we fail, but don't deref the node.
- * That's the callers job.
+ * + If the frame is queued ok, then it returns 0.
+ * + If the frame can't be queued but the mbuf shouldn't
+ *   be tossed (eg peer table isn't setup, or out of
+ *   athp tx bufs) then ENOBUFS is returned, and the mbuf
+ *   and ieee80211_node reference isn't freed.
+ * + If any other error is returned, the mbuf and
+ *   ieee80211_node references have been freed.
  *
- * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
+ * XXX TODO: re-add the transmit tracing bits here!
  */
 static int
-athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
-    const struct ieee80211_bpf_params *params)
+athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 {
-	struct ieee80211com *ic = ni->ni_ic;
-	struct ieee80211vap *vap = ni->ni_vap;
-	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
-	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
+	struct ieee80211vap *vap;
+	struct ath10k_vif *arvif;
 	struct athp_buf *pbuf;
 	struct ath10k_skb_cb *cb;
-	struct ieee80211_frame *wh;
-	struct ath10k_sta *arsta;
+	struct ieee80211_node *ni;
 	struct mbuf *m = NULL;
+	struct ieee80211_frame *wh;
 	int is_wep, is_qos;
+	uint32_t seqno;
 
 	/*
-	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
-	 * does with the reset, xmit refcounts.  Otherwise we end up
-	 * queuing frames during a transition down, which causes panics.
+	 * Get header contents for doing some crypto checks.
 	 */
-	athp_tx_enter(ar);
-	if (athp_tx_disabled(ar)) {
-		athp_tx_exit(ar);
-		m_freem(m0);
-		return (ENXIO);
-	}
+	wh = mtod(m0, struct ieee80211_frame *);
+	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
+	is_qos = !! IEEE80211_IS_QOS(wh);
+	seqno = le16_to_cpu(*(uint16_t *) &wh->i_seq[0]);
 
-	if (! arvif->is_setup) {
-		athp_tx_exit(ar);
-		m_freem(m0);
-		return (ENXIO);
-	}
+	/*
+	 * Get the target node.
+	 */
+	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
+	vap = ni->ni_vap;
+	arvif = ath10k_vif_to_arvif(vap);
 
+	/*
+	 * Note: this routine should only be called if
+	 * the node is in the peer table, so this should be
+	 * treated as an error.
+	 */
 	arsta = ATHP_NODE(ni);
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
-		athp_tx_exit(ar);
-		m_freem(m0);
-		return (ENXIO);
+		/* Don't free the node/ref */
+		return (ENOBUFS);
 	}
 
 	if (arvif->is_dying == 1) {
-		m_freem(m0);
-		athp_tx_exit(ar);
-		return (ENXIO);
-	}
-
-	wh = mtod(m0, struct ieee80211_frame *);
-	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
-	is_qos = IEEE80211_IS_QOS(wh);
-
-	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p, len=%d, fc0=0x%x, fc1=0x%x, ni.macaddr=%6D, is_wep=%d, is_qos=%d\n",
-	    __func__,
-	    ni, m0, m0->m_pkthdr.len, wh->i_fc[0], wh->i_fc[1], ni->ni_macaddr, ":", is_wep, is_qos);
-
-	/* Allocate a TX mbuf */
-	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
-	if (pbuf == NULL) {
-		ar->sc_stats.xmit_fail_get_pbuf++;
-//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
-		m_freem(m0);
-		athp_tx_exit(ar);
+		/* Don't free the node/ref */
 		return (ENOBUFS);
 	}
 
 	/*
-	 * Note - this may change the buffer.
+	 * Allocate a TX mbuf.
+	 *
+	 * Do this early so we error out whilst we can tell the upper layer
+	 * we can't queue this and before we potentially modify the mbuf.
+	 */
+	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
+	if (pbuf == NULL) {
+		ar->sc_stats.xmit_fail_get_pbuf++;
+//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+		/* Don't free the node/ref */
+		return (ENOBUFS);
+	}
+
+	/*
+	 * At this point the buffer may be modified.
 	 */
 	if (! athp_tx_tag_crypto(ar, ni, m0)) {
 		ar->sc_stats.xmit_fail_crypto_encap++;
-		m_freem(m0);
-		athp_tx_exit(ar);
+		ieee80211_free_mbuf(m0);
+		ieee80211_free_node(ni);
 		return (ENXIO);
 	}
 
@@ -269,14 +269,27 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	if (m == NULL) {
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
 //		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
-		m_freem(m0);
 		athp_tx_exit(ar);
-		return (ENOBUFS);
+		trace_ath10k_transmit(ar, 0, 0);
+		ieee80211_free_mbuf(m0);
+		ieee80211_free_node(ni);
+		return (ENXIO);
 	}
+
+	/*
+	 * We're not longer using the original mbuf, so make sure we
+	 * don't try to touch it.
+	 */
 	m0 = NULL;
+
+	ath10k_dbg(ar, ATH10K_DBG_XMIT,
+	    "%s: called; ni=%p, m=%p; pbuf=%p, ni.macaddr=%6D; iswep=%d, isqos=%d, seqno=0x%04x\n",
+	    __func__, ni, m, pbuf, ni->ni_macaddr, ":", is_wep, is_qos, seqno);
 
 	/* Put the mbuf into the given pbuf */
 	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
+
+	m->m_pkthdr.rcvif = NULL;
 
 	/* The node reference is ours to free upon xmit, so .. */
 	cb = ATH10K_SKB_CB(pbuf);
@@ -291,6 +304,83 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 
 	/* Transmit */
 	ath10k_tx(ar, ni, pbuf);
+
+	return (0);
+}
+
+
+
+/*
+ * Raw frame transmission - this is "always" 802.11.
+ *
+ * Free the mbuf if we fail, but don't deref the node.
+ * That's the callers job.
+ */
+static int
+athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
+    const struct ieee80211_bpf_params *params)
+{
+	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vap);
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
+	int ret;
+
+	/*
+	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
+	 * does with the reset, xmit refcounts.  Otherwise we end up
+	 * queuing frames during a transition down, which causes panics.
+	 */
+	athp_tx_enter(ar);
+	if (athp_tx_disabled(ar)) {
+		athp_tx_exit(ar);
+		ieee80211_free_mbuf(m0);
+		return (ENXIO);
+	}
+
+	if (! arvif->is_setup) {
+		athp_tx_exit(ar);
+		ieee80211_free_mbuf(m0);
+		return (ENXIO);
+	}
+
+	arsta = ATHP_NODE(ni);
+	if (arsta->is_in_peer_table == 0) {
+		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
+		athp_tx_exit(ar);
+		ieee80211_free_mbuf(m0);
+		return (ENXIO);
+	}
+
+	if (arvif->is_dying == 1) {
+		ieee80211_free_mbuf(m0);
+		athp_tx_exit(ar);
+		return (ENXIO);
+	}
+
+	ret = athp_transmit_frame(ar, m0);
+	if (ret == ENOBUFS) {
+		/*
+		 * Don't free the reference, net80211 will do this for us.
+		 */
+		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
+		ieee80211_free_mbuf(m0);
+		return (ret);
+	}
+	if (ret != 0) {
+		/*
+		 * An error; but the mbuf was modified and so it and
+		 * the reference was freed.
+		 *
+		 * XXX TODO: increment OERRORS?
+		 */
+		return (0);
+	}
+
+	/* At this point we transmitted OK */
 
 	athp_tx_exit(ar);
 
@@ -384,23 +474,17 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	struct ath10k_sta *arsta;
 	struct ieee80211vap *vap;
 	struct ath10k_vif *arvif;
-	struct athp_buf *pbuf;
-	struct ath10k_skb_cb *cb;
 	struct ieee80211_node *ni;
-	struct mbuf *m = NULL;
-	struct ieee80211_frame *wh;
-	int is_wep, is_qos;
-	uint32_t seqno;
+	int ret;
 
-	wh = mtod(m0, struct ieee80211_frame *);
-	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
-	is_qos = !! IEEE80211_IS_QOS(wh);
-	seqno = le16_to_cpu(*(uint16_t *) &wh->i_seq[0]);
+	trace_ath10k_transmit(ar, 1, 0);
 
+	/*
+	 * Get the target node.
+	 */
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
-	trace_ath10k_transmit(ar, 1, 0);
 
 	/*
 	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
@@ -435,80 +519,38 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	}
 
 	/*
-	 * Allocate a TX mbuf.
-	 *
-	 * Do this early so we error out whilst we can tell the upper layer
-	 * we can't queue this and before we potentially modify the mbuf.
+	 * Attempt to queue the frame.
+	 * If we get back 0, we're ok.  If we get back ENOBUFS
+	 * then we get to queue the buffer or free it.
+	 * If we get back any other error, it's freed for us.
 	 */
-	pbuf = athp_getbuf_tx(ar, &ar->buf_tx);
-	if (pbuf == NULL) {
-		ar->sc_stats.xmit_fail_get_pbuf++;
-//		ath10k_err(ar, "%s: failed to get TX pbuf\n", __func__);
+	ret = athp_transmit_frame(ar, m0);
+	if (ret == ENOBUFS) {
+		/*
+		 * Don't free the buffer or reference,
+		 * net80211 will do this for us.
+		 */
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
-		return (ENOBUFS);
+		return (ret);
 	}
 
 	/*
-	 * At this point the buffer may be modified, so we can't
-	 * return an error up the stack as the interface expects
-	 * the mbuf hasn't been modified.
+	 * Error which modified the output buffer;
+	 * so it was freed for us.  We have to tell
+	 * the caller that we succeeded.
 	 */
-	if (! athp_tx_tag_crypto(ar, ni, m0)) {
-		ar->sc_stats.xmit_fail_crypto_encap++;
+	if (ret != 0) {
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
-		m_freem(m0);
-		ieee80211_free_node(ni);
+		/* XXX TODO; increment OERRORS? */
 		return (0);
 	}
 
-	/*
-	 * For now, the ath10k linux side doesn't handle multi-segment
-	 * mbufs.  The firmware/hardware supports it, but the tx path
-	 * assumes everything is a single linear mbuf.
-	 *
-	 * So, try to defrag.  If we fail, return ENOBUFS.
-	 */
-	m = m_defrag(m0, M_NOWAIT);
-	if (m == NULL) {
-		ar->sc_stats.xmit_fail_mbuf_defrag++;
-//		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
-		athp_tx_exit(ar);
-		trace_ath10k_transmit(ar, 0, 0);
-		m_freem(m0);
-		ieee80211_free_node(ni);
-		return (0);
-	}
-	m0 = NULL;
-
-	ath10k_dbg(ar, ATH10K_DBG_XMIT,
-	    "%s: called; ni=%p, m=%p; pbuf=%p, ni.macaddr=%6D; iswep=%d, isqos=%d, seqno=0x%04x\n",
-	    __func__, ni, m, pbuf, ni->ni_macaddr, ":", is_wep, is_qos, seqno);
-
-	/* Put the mbuf into the given pbuf */
-	athp_buf_give_mbuf(ar, &ar->buf_tx, pbuf, m);
-
-	m->m_pkthdr.rcvif = NULL;
-
-	/* The node reference is ours to free upon xmit, so .. */
-	cb = ATH10K_SKB_CB(pbuf);
-	cb->ni = ni;
-
-	if (ieee80211_radiotap_active_vap(vap)) {
-		ar->sc_txtapu.th.wt_flags = 0;
-		if (is_wep)
-			ar->sc_txtapu.th.wt_flags |= IEEE80211_RADIOTAP_F_WEP;
-		ieee80211_radiotap_tx(vap, m);
-	}
-
-	/* Transmit */
-	ath10k_tx(ar, ni, pbuf);
+	/* Transmit completed ok */
 
 	athp_tx_exit(ar);
-
 	trace_ath10k_transmit(ar, 0, 1);
-
 	return (0);
 }
 /*
