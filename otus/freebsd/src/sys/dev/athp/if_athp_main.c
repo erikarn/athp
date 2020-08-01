@@ -1964,6 +1964,10 @@ athp_node_deferred_tx(void *arg, int npending)
 			    __func__, ni->ni_macaddr, ":", ret);
 		}
 	}
+
+	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
+	    __func__, ni->ni_macaddr, ":");
+	/* XXX TODO */
 }
 
 static struct ieee80211_node *
@@ -2132,6 +2136,9 @@ athp_node_free(struct ieee80211_node *ni)
 
 	arsta = ATHP_NODE(ni);
 
+	/* Finish any deferred transmit; free any other frames */
+	ieee80211_draintask(ic, &arsta->deferred_tq);
+	athp_node_flush_deferred_tx(ni);
 
 	/*
 	 * Queue a deferred peer deletion if we need to.
