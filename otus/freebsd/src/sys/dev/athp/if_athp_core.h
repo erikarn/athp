@@ -90,8 +90,6 @@ struct ath10k_sta {
 	/* This must always be the first entry */
 	struct ieee80211_node an_node;
 
-//	struct ath10k_vif *arvif;
-
 	/*
 	 * This is set if the node is programmed into the peer table.
 	 * This is currently done via the callback queue to avoid
@@ -99,18 +97,16 @@ struct ath10k_sta {
 	 */
 	int is_in_peer_table;
 
-	/* the following are protected by ar->data_lock */
-	u32 changed; /* IEEE80211_RC_* */
-	u32 bw;
-	u32 nss;
-	u32 smps;
-
-	struct task update_wk;
-
-#ifdef CONFIG_MAC80211_DEBUGFS
-	/* protected by conf_mutex */
-	bool aggr_mode;
-#endif
+	/*
+	 * These control deferring transmit if any frames are queued
+	 * between getting a node creation and when we get the node
+	 * programmed in.  Later it will also be used for deferring
+	 * transmit if we need it for other reasons - eg crypto key
+	 * updates (just to be "better"); firmware telling us to
+	 * temporarily transmitting data for this node, etc, etc.
+	 */
+	struct mbufq deferred_txq;
+	struct task deferred_tq;
 };
 
 #define ATH10K_VDEV_SETUP_TIMEOUT_HZ (50)
