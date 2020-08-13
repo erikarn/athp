@@ -377,6 +377,8 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		 *
 		 * XXX TODO: increment OERRORS?
 		 */
+		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
 	}
 
