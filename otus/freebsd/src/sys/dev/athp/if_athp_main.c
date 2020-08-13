@@ -465,8 +465,6 @@ finish:
  *
  * Unlike the raw path - if we fail, we don't free the buffer.
  *
- * XXX TODO: use ieee80211_free_mbuf() so fragment lists get freed.
- *
  * XXX TODO: handle fragmented frame list
  */
 static int
