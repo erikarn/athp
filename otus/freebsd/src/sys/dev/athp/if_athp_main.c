@@ -2305,14 +2305,14 @@ athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
 {
 	struct ath10k *ar = ic->ic_softc;
 	uint8_t bands[IEEE80211_MODE_BYTES];
-	int ht40 = 0;
+	int cbw_flags = 0;
 
 	printf("%s: called; maxchans=%d\n", __func__, maxchans);
 
 	memset(bands, 0, sizeof(bands));
 
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
-		ht40 = 1;
+		cbw_flags |= NET80211_CBW_FLAG_HT40;
 
 	*nchans = 0;
 
@@ -2323,7 +2323,7 @@ athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
 			setbit(bands, IEEE80211_MODE_11NG);
 		ieee80211_add_channel_list_2ghz(chans, maxchans,
 		    nchans, chan_list_2ghz, nitems(chan_list_2ghz),
-		    bands, ht40);
+		    bands, cbw_flags);
 	}
 
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
@@ -2332,14 +2332,12 @@ athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
 			ath10k_warn(ar, "%s: enabling HT/VHT rates\n", __func__);
 			setbit(bands, IEEE80211_MODE_11NA);
 			setbit(bands, IEEE80211_MODE_VHT_5GHZ);
+			cbw_flags |= NET80211_CBW_FLAG_VHT80;
+			/* XXX FIXME VHT160, VHT80_80 with driver update. */
 		}
-
-		/*
-		 * XXX TODO: need to pass in VHT80 flag.
-		 */
 		ieee80211_add_channel_list_5ghz(chans, maxchans,
 		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
-		    bands, ht40);
+		    bands, cbw_flags);
 	}
 
 	printf("%s: done; maxchans=%d, nchans=%d\n", __func__, maxchans, *nchans);
