@@ -527,7 +527,7 @@ unlock:
 int
 ath10k_fw_stats_open(struct ath10k *ar)
 {
-	void *buf = NULL;
+	char *buf;
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
