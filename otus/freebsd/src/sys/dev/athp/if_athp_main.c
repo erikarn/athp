@@ -1967,7 +1967,22 @@ athp_node_deferred_tx(void *arg, int npending)
 
 	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
 	    __func__, ni->ni_macaddr, ":");
-	/* XXX TODO */
+
+	/* XXX TODO locking, methodize */
+	if (ATHP_NODE(ni)->is_in_peer_table == 0) {
+		ath10k_err(ar, "%s: mac=%6D: called, but peer isn't in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
+		return;
+	}
+
+	/* XXX TODO: locking */
+	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
+		ret = athp_transmit_frame(ar, m);
+		if (ret != 0) {
+			ath10k_err(ar, "%s: mac=%6D: failed to send mbuf (errno %d)\n",
+			    __func__, ni->ni_macaddr, ":", ret);
+		}
+	}
 }
 
 static struct ieee80211_node *
