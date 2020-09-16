@@ -174,6 +174,45 @@ athp_tx_exit(struct ath10k *ar)
 }
 
 /*
+ * Queue a single frame to the deferred transmit queue.
+ *
+ * This will do the following:
+ *
+ * + Queue a frame to the deferred queue
+ * + If the node has been added, queue the taskqueue
+ *
+ * If the mbuf can be queued then it'll return 0 and
+ * consume the mbuf.
+ *
+ * If the mbuf can't be queued it'll return an errno and
+ * the mbuf won't be consumed.
+ *
+ * XXX TODO: locking!
+ */
+static int
+athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
+{
+	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
+	int ret;
+
+	arsta = ATHP_NODE(ni);
+
+	ret = mbufq_enqueue(&arsta->deferred_txq, m);
+	if (ret != 0) {
+		/* XXX TODO: stats; logging */
+		return ret;
+	}
+
+	/* Only enqueue if we've added the peer */
+	if (arsta->is_in_peer_table)
+		taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
+
+	return 0;
+}
+
+/*
  * Shared routine to attempt to queue the given frame to
  * the hardware.
  *
@@ -349,15 +388,45 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
+		/* XXX locking; fold into deferred pass too */
+		ret = athp_node_deferred_tx_queue(ni, m0);
+		if (ret != 0) {
+			trace_ath10k_transmit(ar, 0, 1);
+			ieee80211_free_mbuf(m0);
+			return ret;
+		}
 		athp_tx_exit(ar);
-		ieee80211_free_mbuf(m0);
-		return (ENXIO);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (0);
 	}
 
 	if (arvif->is_dying == 1) {
+		trace_ath10k_transmit(ar, 0, 1);
 		ieee80211_free_mbuf(m0);
 		athp_tx_exit(ar);
 		return (ENXIO);
+	}
+
+	/*
+	 * Check to see if the node deferred transmit queue
+	 * isn't empty.  If it's empty then at tihs point we can
+	 * direct dispatch.  Else, we need to also defer this one.
+	 *
+	 * XXX locking, methodize
+	 */
+	if (mbufq_len(&arsta->deferred_txq) != 0) {
+		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
+		  __func__, ni->ni_macaddr, ":");
+		/* XXX locking; fold into deferred pass too */
+		ret = athp_node_deferred_tx_queue(ni, m0);
+		if (ret != 0) {
+			trace_ath10k_transmit(ar, 0, 1);
+			ieee80211_free_mbuf(m0);
+			return ret;
+		}
+		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (0);
 	}
 
 	ret = athp_transmit_frame(ar, m0);
@@ -508,8 +577,16 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
+		/* XXX locking; fold into deferred pass too */
+		ret = athp_node_deferred_tx_queue(ni, m0);
+		if (ret != 0) {
+			trace_ath10k_transmit(ar, 0, 1);
+			ieee80211_free_mbuf(m0);
+			return ret;
+		}
 		athp_tx_exit(ar);
-		return (ENXIO);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (0);
 	}
 
 	if (arvif->is_dying == 1) {
@@ -517,6 +594,29 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
+
+	/*
+	 * Check to see if the node deferred transmit queue
+	 * isn't empty.  If it's empty then at tihs point we can
+	 * direct dispatch.  Else, we need to also defer this one.
+	 *
+	 * XXX locking, methodize
+	 */
+	if (mbufq_len(&arsta->deferred_txq) != 0) {
+		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
+		  __func__, ni->ni_macaddr, ":");
+		/* XXX locking; fold into deferred pass too */
+		ret = athp_node_deferred_tx_queue(ni, m0);
+		if (ret != 0) {
+			trace_ath10k_transmit(ar, 0, 1);
+			ieee80211_free_mbuf(m0);
+			return ret;
+		}
+		athp_tx_exit(ar);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (0);
+	}
+
 
 	/*
 	 * Attempt to queue the frame.
@@ -828,6 +928,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
+			taskqueue_enqueue(ar->workqueue, &ATHP_NODE(bss_ni)->deferred_tq);
 			ATHP_CONF_UNLOCK(ar);
 		}
 
@@ -839,6 +940,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			(void) athp_vif_update_ap_ssid(vap, bss_ni);
 
 			/* TODO: Should we do vif_restart before ap_setup? */
+			/* XXX TODO: ic_curchan? */
 			ret = ath10k_vif_restart(ar, vap, bss_ni, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
@@ -864,6 +966,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 			if (ostate == IEEE80211_S_INIT) {
 				ATHP_CONF_LOCK(ar);
+				/* XXX TODO: ic_curchan? */
 				ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 				ATHP_CONF_UNLOCK(ar);
 				if (ret != 0) {
@@ -937,7 +1040,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
-			/* XXX note: can we use bss_ni->ic_chan? */
+			/* XXX TODO: can we use bss_ni->ic_chan? */
 			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
@@ -948,6 +1051,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			}
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			taskqueue_enqueue(ar->workqueue, &ATHP_NODE(bss_ni)->deferred_tq);
 			ATHP_CONF_UNLOCK(ar);
 		}
 		break;
@@ -1763,6 +1867,7 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	/* Set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
 	arsta->is_in_peer_table = 1;
+	taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
 	ieee80211_free_node(ku->ni);
 }
 
@@ -1829,10 +1934,27 @@ athp_node_deferred_tx(void *arg, int npending)
 	struct ieee80211_node *ni = arg;
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
+	struct mbuf *m;
+	int ret;
 
 	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
 	    __func__, ni->ni_macaddr, ":");
-	/* XXX TODO */
+
+	/* XXX TODO locking, methodize */
+	if (ATHP_NODE(ni)->is_in_peer_table == 0) {
+		ath10k_err(ar, "%s: mac=%6D: called, but peer isn't in peer table!\n",
+		    __func__, ni->ni_macaddr, ":");
+		return;
+	}
+
+	/* XXX TODO: locking */
+	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
+		ret = athp_transmit_frame(ar, m);
+		if (ret != 0) {
+			ath10k_err(ar, "%s: mac=%6D: failed to send mbuf (errno %d)\n",
+			    __func__, ni->ni_macaddr, ":", ret);
+		}
+	}
 }
 
 static struct ieee80211_node *
