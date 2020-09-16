@@ -550,9 +550,6 @@ ath10k_fw_stats_open(struct ath10k *ar)
 	}
 
 	ath10k_fw_stats_fill(ar, &ar->debug.fw_stats, buf);
-#if 0
-	file->private_data = buf;
-#endif
 
 	ATHP_CONF_UNLOCK(ar);
 
