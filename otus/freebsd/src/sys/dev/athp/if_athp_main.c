@@ -373,12 +373,14 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	 */
 	athp_tx_enter(ar);
 	if (athp_tx_disabled(ar)) {
+		ath10k_err(ar, "%s: tx_disabled\n", __func__);
 		athp_tx_exit(ar);
 		ieee80211_free_mbuf(m0);
 		return (ENXIO);
 	}
 
 	if (! arvif->is_setup) {
+		ath10k_err(ar, "%s: arvif isn't setup\n", __func__);
 		athp_tx_exit(ar);
 		ieee80211_free_mbuf(m0);
 		return (ENXIO);
@@ -391,16 +393,19 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		/* XXX locking; fold into deferred pass too */
 		ret = athp_node_deferred_tx_queue(ni, m0);
 		if (ret != 0) {
+			ath10k_err(ar, "%s: mac=%6D: frame NOT queued (%d)\n", __func__, ni->ni_macaddr, ":", ret);
 			trace_ath10k_transmit(ar, 0, 1);
 			ieee80211_free_mbuf(m0);
 			return ret;
 		}
+		ath10k_warn(ar, "%s: mac=%6D: frame queued\n", __func__, ni->ni_macaddr, ":");
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
 	}
 
 	if (arvif->is_dying == 1) {
+		ath10k_err(ar, "%s: arvif is dying\n", __func__);
 		trace_ath10k_transmit(ar, 0, 1);
 		ieee80211_free_mbuf(m0);
 		athp_tx_exit(ar);
@@ -1921,6 +1926,8 @@ athp_node_flush_deferred_tx(struct ieee80211_node *ni)
 	    __func__, ni->ni_macaddr, ":");
 
 	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
+		ath10k_warn(ar, "%s: mac=%6D: flushing frame\n",
+		    __func__, ni->ni_macaddr, ":");
 		ieee80211_tx_complete(ni, m, 1);
 	}
 }
@@ -1949,6 +1956,8 @@ athp_node_deferred_tx(void *arg, int npending)
 
 	/* XXX TODO: locking */
 	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
+		ath10k_warn(ar, "%s: mac=%6D: dequeuing frame\n",
+		    __func__, ni->ni_macaddr, ":");
 		ret = athp_transmit_frame(ar, m);
 		if (ret != 0) {
 			ath10k_err(ar, "%s: mac=%6D: failed to send mbuf (errno %d)\n",
@@ -2123,9 +2132,6 @@ athp_node_free(struct ieee80211_node *ni)
 
 	arsta = ATHP_NODE(ni);
 
-	/* Finish any deferred transmit; free any other frames */
-	ieee80211_draintask(ic, &arsta->deferred_tq);
-	athp_node_flush_deferred_tx(ni);
 
 	/*
 	 * Queue a deferred peer deletion if we need to.
@@ -2184,6 +2190,15 @@ athp_node_free(struct ieee80211_node *ni)
 			    athp_node_free_cb);
 		}
 	}
+
+	/* Finish any deferred transmit; free any other frames */
+	/* XXX TODO: locking */
+	/* XXX TODO: stopping further enqueue */
+	athp_node_flush_deferred_tx(ni);
+
+	while (taskqueue_cancel(ar->workqueue, &arsta->deferred_tq, NULL) != 0)
+		taskqueue_drain(ar->workqueue, &arsta->deferred_tq);
+
 finish:
 	ar->sc_node_free(ni);
 }
