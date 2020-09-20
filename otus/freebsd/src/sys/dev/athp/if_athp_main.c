@@ -2027,8 +2027,10 @@ athp_ampdu_enable(struct ieee80211_node *ni, struct ieee80211_tx_ampdu *tap)
 }
 
 /*
- * XXX TODO: we don't need to send probe requests, and I don't think
- * we send association requests either?  Should check.
+ * Which management frames we should or shouldn't send.
+ *
+ * Note - this is for management frames, not for data frames or
+ * control frames!
  */
 static int
 athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
@@ -2038,33 +2040,21 @@ athp_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 	struct ath10k *ar = ic->ic_softc;
 
 	/* Don't send probe requests - I think the firmware does it during scanning */
-	/* XXX TODO: maybe only don't do it when we're scanning? */
 	if (type == IEEE80211_FC0_SUBTYPE_PROBE_REQ)
-		return (ENOTSUP);
-
-	/* Scanning sends out QoS-NULL frames too, which we don't want */
-	if (type == IEEE80211_FC0_SUBTYPE_QOS_NULL)
-		return (ENOTSUP);
-	if (type == IEEE80211_FC0_SUBTYPE_NODATA)
-		return (ENOTSUP);
-
-	/*
-	 * XXX TODO: do scan offload/powersave offload bits now that it IS
-	 * in net80211 so we can re-enable this.
-	 */
-
-	/*
-	 * XXX TODO: once scan offload/powersave offload in net80211 is
-	 * done, re-enable these - we may need it for eg testing if
-	 * a device is still there.
-	 */
+		goto unsupported;
 
 	/* Send the rest */
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
 	    "%s: sending type=0x%x (%d)\n", __func__, type, type);
 
 	return (ieee80211_send_mgmt(ni, type, arg));
-
+unsupported:
+	ath10k_warn(ar, "%s: %6D: not sending mgmt frame; type=0x%x, arg=0x%x\n",
+	    __func__,
+	    ni->ni_macaddr, ":",
+	    type,
+	    arg);
+	return (ENOTSUP);
 }
 
 static int
