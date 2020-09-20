@@ -2132,7 +2132,6 @@ athp_node_free(struct ieee80211_node *ni)
 
 	arsta = ATHP_NODE(ni);
 
-
 	/*
 	 * Queue a deferred peer deletion if we need to.
 	 */
