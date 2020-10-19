@@ -3859,7 +3859,7 @@ static int ath10k_update_channel_list(struct ath10k *ar)
  * Note: this is the FreeBSD specific implementation of
  * the channel list function.
  */
-int
+static int
 ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
     struct ieee80211_channel *chans)
 {
@@ -3975,7 +3975,7 @@ ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
  */
 void
 ath10k_regd_update(struct ath10k *ar, int nchans,
-    struct ieee80211_channel *chans)
+    struct ieee80211_channel *chans, struct ieee80211_regdomain *reg)
 {
 #if 0
 	struct reg_dmn_pair_mapping *regpair;
@@ -4017,11 +4017,12 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 					    regpair->reg_2ghz_ctl,
 					    regpair->reg_5ghz_ctl,
 					    wmi_dfs_reg);
-#else
 	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x0, 0x0, 0x0, /* CUS223E bringup code, regdomain 0 */
 	    0x1ff, 0x1ff, /* DEBUG_REG_DMN */
 	    wmi_dfs_reg);
 #endif
+	ret = ath10k_wmi_pdev_set_regdomain(ar, reg->regdomain, reg->regdomain,
+	    reg->regdomain, 0x1ff, 0x1ff, wmi_dfs_reg);
 	if (ret)
 		ath10k_warn(ar, "failed to set pdev regdomain: %d\n", ret);
 }
@@ -5211,7 +5212,7 @@ int ath10k_start(struct ath10k *ar)
 	ar->ani_enabled = true;
 
 	ar->num_started_vdevs = 0;
-	ath10k_regd_update(ar, ic->ic_nchans, ic->ic_channels);
+	ath10k_regd_update(ar, ic->ic_nchans, ic->ic_channels, &ic->ic_regdomain);
 
 	ath10k_spectral_start(ar);
 	ath10k_thermal_set_throttling(ar);
