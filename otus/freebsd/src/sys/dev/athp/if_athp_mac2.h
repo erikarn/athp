@@ -34,10 +34,9 @@ extern	int ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 	    const uint8_t mac[IEEE80211_ADDR_LEN]);
 extern	void ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif);
 
-extern	int ath10k_update_channel_list_freebsd(struct ath10k *ar,
-	    int nchans, struct ieee80211_channel *chans);
 extern	void ath10k_regd_update(struct ath10k *ar,
-	    int nchans, struct ieee80211_channel *chans);
+	    int nchans, struct ieee80211_channel *chans,
+	    struct ieee80211_regdomain *);
 
 /* key management */
 extern	bool ath10k_mac_is_peer_wep_key_set(struct ath10k *ar, const u8 *addr, u8 keyidx);
