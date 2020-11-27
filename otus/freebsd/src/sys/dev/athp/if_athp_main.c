@@ -206,7 +206,9 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 	}
 
 	/* Only enqueue if we've added the peer */
+	/* XXX TODO: locking? */
 	if (arsta->is_in_peer_table)
+		/* XXX TODO: methodize */
 		taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
 
 	return 0;
@@ -261,6 +263,7 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 	 * treated as an error.
 	 */
 	arsta = ATHP_NODE(ni);
+	/* XXX TODO: locking?  */
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
@@ -268,6 +271,7 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 		return (ENOBUFS);
 	}
 
+	/* XXX TODO: locking? */
 	if (arvif->is_dying == 1) {
 		/* Don't free the node/ref */
 		return (ENOBUFS);
@@ -387,6 +391,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	}
 
 	arsta = ATHP_NODE(ni);
+	/* XXX TODO: locking?  */
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
@@ -404,6 +409,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		return (0);
 	}
 
+	/* XXX TODO: locking?  */
 	if (arvif->is_dying == 1) {
 		ath10k_err(ar, "%s: arvif is dying\n", __func__);
 		trace_ath10k_transmit(ar, 0, 1);
@@ -572,6 +578,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		return (ENXIO);
 	}
 
+	/* XXX TODO: locking?  */
 	if (! arvif->is_setup) {
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
@@ -579,6 +586,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	}
 
 	arsta = ATHP_NODE(ni);
+	/* XXX TODO: locking?  */
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
@@ -594,6 +602,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		return (0);
 	}
 
+	/* XXX TODO: locking?  */
 	if (arvif->is_dying == 1) {
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
@@ -930,9 +939,11 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
+			/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
+			/* XXX TODO: methodize */
 			taskqueue_enqueue(ar->workqueue, &ATHP_NODE(bss_ni)->deferred_tq);
 			ATHP_CONF_UNLOCK(ar);
 		}
@@ -1022,6 +1033,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
+				/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
 				ATHP_NODE(bss_ni)->is_in_peer_table = 0;
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
@@ -1055,7 +1067,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				break;
 			}
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
+			/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			/* XXX TODO: methodize */
 			taskqueue_enqueue(ar->workqueue, &ATHP_NODE(bss_ni)->deferred_tq);
 			ATHP_CONF_UNLOCK(ar);
 		}
@@ -1871,7 +1885,9 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 
 	/* Set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
+	/* XXX TODO: locking? */
 	arsta->is_in_peer_table = 1;
+	/* XXX TODO: methodize */
 	taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
 	ieee80211_free_node(ku->ni);
 }
@@ -2000,6 +2016,7 @@ athp_node_init(struct ieee80211_node *ni)
 	 */
 	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) == 0) {
 		/* "our" node - we always have it for hostap mode */
+		/* XXX TODO locking */
 		ATHP_NODE(ni)->is_in_peer_table = 1;
 		return (0);
 	}
@@ -2143,6 +2160,7 @@ athp_node_free(struct ieee80211_node *ni)
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
+		/* XXX TODO locking */
 		arsta->is_in_peer_table = 0;
 
 		/*
@@ -2363,6 +2381,7 @@ athp_sysctl_simulate_fw_hang(SYSCTL_HANDLER_ARGS)
 	case 4:
 		/* hw restart */
 		ath10k_info(ar, "simulating core restart\n");
+		/* XXX TODO: methodize */
 		taskqueue_enqueue(ar->workqueue, &ar->restart_work);
 		break;
 	default:
