@@ -174,6 +174,24 @@ athp_tx_exit(struct ath10k *ar)
 }
 
 /*
+ * Schedule a deferred transmit for the given node.
+ *
+ * This is done once the firmware peer has been created
+ * for a given node.  Any traffic sent to that node
+ * before hand will be blackholed and hang the firmware
+ * transmit path.
+ */
+static void
+athp_node_schedule_deferred_tx(struct ieee80211_node *ni)
+{
+	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta = ATHP_NODE(ni);
+
+	taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
+}
+
+/*
  * Queue a single frame to the deferred transmit queue.
  *
  * This will do the following:
@@ -187,7 +205,7 @@ athp_tx_exit(struct ath10k *ar)
  * If the mbuf can't be queued it'll return an errno and
  * the mbuf won't be consumed.
  *
- * XXX TODO: locking!
+ * Call with the data lock held.
  */
 static int
 athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
@@ -196,6 +214,8 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *arsta;
 	int ret;
+
+	ATHP_DATA_LOCK_ASSERT(ar);
 
 	arsta = ATHP_NODE(ni);
 
@@ -208,8 +228,7 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 	/* Only enqueue if we've added the peer */
 	/* XXX TODO: locking? */
 	if (arsta->is_in_peer_table)
-		/* XXX TODO: methodize */
-		taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
+		athp_node_schedule_deferred_tx(ni);
 
 	return 0;
 }
@@ -943,8 +962,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
-			/* XXX TODO: methodize */
-			taskqueue_enqueue(ar->workqueue, &ATHP_NODE(bss_ni)->deferred_tq);
+			athp_node_schedule_deferred_tx(bss_ni);
 			ATHP_CONF_UNLOCK(ar);
 		}
 
@@ -1069,8 +1087,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
 			/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
-			/* XXX TODO: methodize */
-			taskqueue_enqueue(ar->workqueue, &ATHP_NODE(bss_ni)->deferred_tq);
+			athp_node_schedule_deferred_tx(bss_ni);
 			ATHP_CONF_UNLOCK(ar);
 		}
 		break;
@@ -1857,6 +1874,20 @@ athp_update_mcast(struct ieee80211com *ic)
 
 }
 
+/*
+ * Callback to schedule peer allocation to the firmware.
+ *
+ * This sends the node creation command to the firmware and waits
+ * for its completion.
+ *
+ * If it completes OK, then any pending transmit is scheduled
+ * for said node.
+ *
+ * XXX NOTE: There is no "I failed!" callback here back into
+ * net80211 to inform it that node creation failed, so traffic
+ * will be queued and silently discarded until the net80211 node
+ * is deleted or times out.
+ */
 static void
 athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 {
@@ -1883,12 +1914,11 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	ath10k_warn(ar, "%s: added node for mac %6D (%p)\n", __func__,
 	    ku->peer_macaddr, ":", ku->ni);
 
-	/* Set "node" xmit flag to 1 */
 	arsta = ATHP_NODE(ku->ni);
 	/* XXX TODO: locking? */
 	arsta->is_in_peer_table = 1;
-	/* XXX TODO: methodize */
-	taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
+	/* Schedule any pending transmit on this node */
+	athp_node_schedule_deferred_tx(ku->ni);
 	ieee80211_free_node(ku->ni);
 }
 
@@ -2007,6 +2037,7 @@ athp_node_init(struct ieee80211_node *ni)
 	struct athp_taskq_entry *e;
 	struct athp_node_alloc_state *ku;
 
+	/* XXX TODO: make sysctl configurable at runtime for new peers */
 	mbufq_init(&ATHP_NODE(ni)->deferred_txq, 128);
 	TASK_INIT(&ATHP_NODE(ni)->deferred_tq, 0, athp_node_deferred_tx, ni);
 
