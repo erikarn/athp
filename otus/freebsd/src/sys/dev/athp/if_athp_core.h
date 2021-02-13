@@ -99,12 +99,6 @@ struct ath10k_sta {
 	 */
 	int is_in_peer_table;
 
-	/* the following are protected by ar->data_lock */
-	u32 changed; /* IEEE80211_RC_* */
-	u32 bw;
-	u32 nss;
-	u32 smps;
-
 	struct task update_wk;
 
 #ifdef CONFIG_MAC80211_DEBUGFS
