@@ -1,7 +1,7 @@
 #!/bin/sh
 
 X_SRCDIR=${X_SRCDIR:="/home/adrian/work/freebsd/head/src/"}
-X_KERNDIR=${X_KERNDIR:="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/amd64.amd64/sys/VICTORIA-2/"}
+X_KERNDIR=${X_KERNDIR:="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/amd64.amd64/sys/VANESSA/"}
 X_KMODOWN=${X_KMODOWN:="adrian"}
 X_KMODGRP=${X_KMODGRP:="adrian"}
 
