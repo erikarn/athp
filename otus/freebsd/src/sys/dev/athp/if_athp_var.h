@@ -94,6 +94,12 @@ athp_mtx_assert(struct mtx *mtx, int op)
 
 #define	ATHP_NODE(ni)		((struct ath10k_sta *)(ni))
 
+/*
+ * This is a legacy lock from when I started this as a freebsd driver,
+ * before I ported over ath10k from linux to FreeBSD-ify.
+ *
+ * It isn't used anywhere and the aim is to delete it at some point.
+ */
 #define	ATHP_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	ATHP_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
 #define	ATHP_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_mtx, MA_OWNED)
@@ -101,21 +107,46 @@ athp_mtx_assert(struct mtx *mtx, int op)
 
 #define	ATHP_FW_VER_STR		128
 
+/*
+ * This lock protects configuring the NIC state - target manipulation,
+ * firmware, calibration, VAP create/delete, associate/diassociation,
+ * key programming, scanning, etc.
+ *
+ * This is the top level lock - nothing must acquire this lock whilst
+ * holding other locks.
+ */
 #define	ATHP_CONF_LOCK(sc)		mtx_lock(&(sc)->sc_conf_mtx)
 #define	ATHP_CONF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_conf_mtx)
 #define	ATHP_CONF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_conf_mtx, MA_OWNED)
 #define	ATHP_CONF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_conf_mtx, MA_NOTOWNED)
 
+/*
+ * This lock protects specific data path objects - the peer table,
+ * peer crypto keys, beacon state, deferred transmit queues.
+ *
+ * This can be acquired after ATHP_CONF is locked.
+ */
 #define	ATHP_DATA_LOCK(sc)		mtx_lock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_data_mtx)
 #define	ATHP_DATA_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_data_mtx, MA_OWNED)
 #define	ATHP_DATA_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_data_mtx, MA_NOTOWNED)
 
+/*
+ * This lock protects athp_buf lists, used for DMA - WMI and packet
+ * transfers.
+ *
+ * It is a leaf lock that can be acquired whilst holding other locks,
+ * but no locks can be acquired whilst this lock is held.
+ */
 #define	ATHP_BUF_LOCK(sc)		mtx_lock(&(sc)->sc_buf_mtx)
 #define	ATHP_BUF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_buf_mtx)
 #define	ATHP_BUF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_buf_mtx, MA_OWNED)
 #define	ATHP_BUF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_buf_mtx, MA_NOTOWNED)
 
+/*
+ * This lock serialises access to the busdma resources where they require
+ * serialisation.
+ */
 #define	ATHP_DMA_LOCK(sc)		mtx_lock(&(sc)->sc_dma_mtx)
 #define	ATHP_DMA_UNLOCK(sc)		mtx_unlock(&(sc)->sc_dma_mtx)
 #define	ATHP_DMA_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_dma_mtx, MA_OWNED)
