@@ -1041,9 +1041,8 @@ athp_pci_detach(device_t dev)
 	ath10k_warn(ar, "%s: called\n", __func__);
 
 	/* Signal things we're going down.. */
-	ATHP_LOCK(ar);
+	/* XXX TODO: lock? */
 	ar->sc_invalid = 1;
-	ATHP_UNLOCK(ar);
 
 	/* Shutdown ioctl handler */
 	athp_ioctl_teardown(ar);
