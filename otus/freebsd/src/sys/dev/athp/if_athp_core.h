@@ -129,6 +129,8 @@ struct ath10k_vif {
 
 	int is_dying;	/* set if we're in the process of being torn down */
 
+	int tx_is_disabled;	/* set if TX has been disabled for this VAP */
+
 	/* net80211 side state passed in during vap creation - need to keep it cached */
 	uint32_t vap_f_flags;
 	uint8_t vap_f_bssid[ETH_ALEN];

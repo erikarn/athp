@@ -142,35 +142,89 @@ athp_tx_tag_crypto(struct ath10k *ar, struct ieee80211_node *ni,
 	return (1);
 }
 
+/*
+ * Disable further transmit.
+ *
+ * This is called to disable transmit on the given VAP; any further
+ * attempts to transmit will fail an athp_tx_disabled() check.
+ *
+ * Must be called with the CONF lock held.
+ */
 static void
 athp_tx_disable(struct ath10k *ar, struct ieee80211vap *vap)
 {
+	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
 
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	vif->tx_is_disabled = 1;
 }
 
+/*
+ * Re-enable further transmit.
+ *
+ * This is called to enable transmit on the given VAP.
+ *
+ * Must be called with the CONF lock held.
+ */
 static void
 athp_tx_enable(struct ath10k *ar, struct ieee80211vap *vap)
 {
+	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
 
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	vif->tx_is_disabled = 0;
 }
 
+/*
+ * Check if transmit is currently disabled.
+ *
+ * This is called to check if transmit is possible.
+ * It's called by the transmit paths to ensure that we
+ * haven't had transmit paused.
+ *
+ * Must be called with the CONF lock held.
+ */
 static int
-athp_tx_disabled(struct ath10k *ar)
+athp_tx_disabled(struct ath10k *ar, struct ieee80211vap *vap)
 {
-	return (0);
+	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
 
+	ATHP_CONF_LOCK_ASSERT(ar);
+	if (vif->tx_is_disabled) {
+		ath10k_warn(ar, "%s: called, disabled=1\n", __func__);
+	}
+	return (vif->tx_is_disabled);
 }
 
 static void
 athp_tx_enter(struct ath10k *ar)
 {
-
+	ATHP_CONF_LOCK_ASSERT(ar);
 }
 
 static void
 athp_tx_exit(struct ath10k *ar)
 {
+	ATHP_CONF_LOCK_ASSERT(ar);
+}
 
+/*
+ * Return if this VAP is dying - ie, it's on its way out!
+ *
+ * Must be called with the CONF lock held.
+ */
+static int
+athp_vap_is_dying(struct ieee80211vap *vap)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_vif *vif = ath10k_vif_to_arvif(vap);
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	return (vif->is_dying);
 }
 
 /*
@@ -226,7 +280,7 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 	}
 
 	/* Only enqueue if we've added the peer */
-	/* XXX TODO: locking? */
+	/* XXX TODO: DATA lock? */
 	if (arsta->is_in_peer_table)
 		athp_node_schedule_deferred_tx(ni);
 
@@ -282,7 +336,7 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 	 * treated as an error.
 	 */
 	arsta = ATHP_NODE(ni);
-	/* XXX TODO: locking?  */
+	/* XXX TODO: locking? DATA_LOCK ? */
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
@@ -290,11 +344,17 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 		return (ENOBUFS);
 	}
 
+	/*
+	 * Don't do this here; the caller should do the locking and
+	 * check first!
+	 */
+#if 0
 	/* XXX TODO: locking? */
-	if (arvif->is_dying == 1) {
+	if (athp_vap_is_dying(vap)) {
 		/* Don't free the node/ref */
 		return (ENOBUFS);
 	}
+#endif
 
 	/*
 	 * Allocate a TX mbuf.
@@ -389,15 +449,17 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct ath10k_sta *arsta;
 	int ret;
 
+	ATHP_CONF_LOCK(ar);
 	/*
 	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
 	 * does with the reset, xmit refcounts.  Otherwise we end up
 	 * queuing frames during a transition down, which causes panics.
 	 */
 	athp_tx_enter(ar);
-	if (athp_tx_disabled(ar)) {
+	if (athp_tx_disabled(ar, vap)) {
 		ath10k_err(ar, "%s: tx_disabled\n", __func__);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		ieee80211_free_mbuf(m0);
 		return (ENXIO);
 	}
@@ -405,36 +467,47 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	if (! arvif->is_setup) {
 		ath10k_err(ar, "%s: arvif isn't setup\n", __func__);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		ieee80211_free_mbuf(m0);
 		return (ENXIO);
 	}
 
+	if (athp_vap_is_dying(vap)) {
+		ath10k_err(ar, "%s: arvif is dying\n", __func__);
+		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
+		trace_ath10k_transmit(ar, 0, 1);
+		ieee80211_free_mbuf(m0);
+		return (ENXIO);
+	}
+
+	ATHP_CONF_UNLOCK(ar);
+
 	arsta = ATHP_NODE(ni);
-	/* XXX TODO: locking?  */
+
+	ATHP_DATA_LOCK(ar);
+
+	/* XXX TODO: locking; we're using DATA_LOCK here */
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
-		/* XXX locking; fold into deferred pass too */
 		ret = athp_node_deferred_tx_queue(ni, m0);
 		if (ret != 0) {
 			ath10k_err(ar, "%s: mac=%6D: frame NOT queued (%d)\n", __func__, ni->ni_macaddr, ":", ret);
+			ATHP_DATA_UNLOCK(ar);
 			trace_ath10k_transmit(ar, 0, 1);
 			ieee80211_free_mbuf(m0);
 			return ret;
 		}
 		ath10k_warn(ar, "%s: mac=%6D: frame queued\n", __func__, ni->ni_macaddr, ":");
+		ATHP_DATA_UNLOCK(ar);
+
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
+
 		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
-	}
-
-	/* XXX TODO: locking?  */
-	if (arvif->is_dying == 1) {
-		ath10k_err(ar, "%s: arvif is dying\n", __func__);
-		trace_ath10k_transmit(ar, 0, 1);
-		ieee80211_free_mbuf(m0);
-		athp_tx_exit(ar);
-		return (ENXIO);
 	}
 
 	/*
@@ -442,29 +515,43 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	 * isn't empty.  If it's empty then at tihs point we can
 	 * direct dispatch.  Else, we need to also defer this one.
 	 *
-	 * XXX locking, methodize
+	 * XXX TODO: methodize, simplify!
 	 */
 	if (mbufq_len(&arsta->deferred_txq) != 0) {
 		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
 		  __func__, ni->ni_macaddr, ":");
-		/* XXX locking; fold into deferred pass too */
 		ret = athp_node_deferred_tx_queue(ni, m0);
 		if (ret != 0) {
+			ATHP_DATA_UNLOCK(ar);
+
+			ATHP_CONF_LOCK(ar);
+			athp_tx_exit(ar);
+			ATHP_CONF_UNLOCK(ar);
+
 			trace_ath10k_transmit(ar, 0, 1);
 			ieee80211_free_mbuf(m0);
 			return ret;
 		}
+
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
+
 		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
 	}
 
+	ATHP_DATA_UNLOCK(ar);
+
 	ret = athp_transmit_frame(ar, m0);
+
 	if (ret == ENOBUFS) {
 		/*
 		 * Don't free the reference, net80211 will do this for us.
 		 */
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		ieee80211_free_mbuf(m0);
 		return (ret);
@@ -476,14 +563,17 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 		 *
 		 * XXX TODO: increment OERRORS?
 		 */
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
 	}
 
 	/* At this point we transmitted OK */
-
+	ATHP_CONF_LOCK(ar);
 	athp_tx_exit(ar);
+	ATHP_CONF_UNLOCK(ar);
 
 	return (0);
 }
@@ -590,42 +680,60 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	 * does with the reset, xmit refcounts.  Otherwise we end up
 	 * queuing frames during a transition down, which causes panics.
 	 */
+	ATHP_CONF_LOCK(ar);
 	athp_tx_enter(ar);
-	if (athp_tx_disabled(ar)) {
+	if (athp_tx_disabled(ar, vap)) {
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
 
-	/* XXX TODO: locking?  */
+	/* XXX TODO: methodize is_setup!  */
 	if (! arvif->is_setup) {
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ENXIO);
 	}
 
+	if (athp_vap_is_dying(vap)) {
+		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
+		trace_ath10k_transmit(ar, 0, 0);
+		return (ENXIO);
+	}
+
+	ATHP_CONF_UNLOCK(ar);
+
 	arsta = ATHP_NODE(ni);
-	/* XXX TODO: locking?  */
+
+	ATHP_DATA_LOCK(ar);
+
+	/* XXX TODO: locking; we're using DATA_LOCK here */
 	if (arsta->is_in_peer_table == 0) {
 		ath10k_warn(ar, "%s: node %6D not yet in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
-		/* XXX locking; fold into deferred pass too */
 		ret = athp_node_deferred_tx_queue(ni, m0);
+		ATHP_DATA_UNLOCK(ar);
+
 		if (ret != 0) {
+
+			ATHP_CONF_LOCK(ar);
+			athp_tx_exit(ar);
+			ATHP_CONF_UNLOCK(ar);
+
 			trace_ath10k_transmit(ar, 0, 1);
 			ieee80211_free_mbuf(m0);
 			return ret;
 		}
+
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
+
 		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
-	}
-
-	/* XXX TODO: locking?  */
-	if (arvif->is_dying == 1) {
-		athp_tx_exit(ar);
-		trace_ath10k_transmit(ar, 0, 0);
-		return (ENXIO);
 	}
 
 	/*
@@ -633,23 +741,33 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	 * isn't empty.  If it's empty then at tihs point we can
 	 * direct dispatch.  Else, we need to also defer this one.
 	 *
-	 * XXX locking, methodize
+	 * XXX TODO methodize
 	 */
 	if (mbufq_len(&arsta->deferred_txq) != 0) {
 		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
 		  __func__, ni->ni_macaddr, ":");
-		/* XXX locking; fold into deferred pass too */
+		/* XXX fold into deferred pass too */
 		ret = athp_node_deferred_tx_queue(ni, m0);
+		ATHP_DATA_UNLOCK(ar);
+
 		if (ret != 0) {
+
+			ATHP_CONF_LOCK(ar);
+			athp_tx_exit(ar);
+			ATHP_CONF_UNLOCK(ar);
+
 			trace_ath10k_transmit(ar, 0, 1);
 			ieee80211_free_mbuf(m0);
 			return ret;
 		}
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (0);
 	}
 
+	ATHP_DATA_UNLOCK(ar);
 
 	/*
 	 * Attempt to queue the frame.
@@ -663,7 +781,9 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		 * Don't free the buffer or reference,
 		 * net80211 will do this for us.
 		 */
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		return (ret);
 	}
@@ -674,15 +794,18 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	 * the caller that we succeeded.
 	 */
 	if (ret != 0) {
+		ATHP_CONF_LOCK(ar);
 		athp_tx_exit(ar);
+		ATHP_CONF_UNLOCK(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		/* XXX TODO; increment OERRORS? */
 		return (0);
 	}
 
 	/* Transmit completed ok */
-
+	ATHP_CONF_LOCK(ar);
 	athp_tx_exit(ar);
+	ATHP_CONF_UNLOCK(ar);
 	trace_ath10k_transmit(ar, 0, 1);
 	return (0);
 }
@@ -882,7 +1005,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	enum ieee80211_state ostate = vap->iv_state;
 	int ret;
 	int error = 0;
-	struct ieee80211_node *bss_ni;
+	struct ieee80211_node *bss_ni = NULL;
 
 	ath10k_warn(ar, "%s: %s -> %s (is_setup=%d) (is_dying=%d)\n",
 	    __func__,
@@ -896,14 +1019,19 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	 * this stuff - don't bother creating an interface, don't do the
 	 * rest of the routine.
 	 */
-	if (vif->is_dying) {
-		goto skip;
-	}
 
 	/* Grab bss node ref before unlocking */
 	bss_ni = ieee80211_ref_node(vap->iv_bss);
 
 	IEEE80211_UNLOCK(ic);
+
+	/* XXX locking! How much of the below can we do under CONF lock? */
+	ATHP_CONF_LOCK(ar);
+	if (athp_vap_is_dying(vap)) {
+		ATHP_CONF_UNLOCK(ar);
+		goto skip;
+	}
+	ATHP_CONF_UNLOCK(ar);
 
 	/*
 	 * If it isn't setup, this is our initial chance to actually add
@@ -938,6 +1066,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		ath10k_warn(ar, "%s: interface add done: vdev id=%d\n", __func__, vif->vdev_id);
 
 		/* Get here - we're okay */
+		/* XXX locking! */
 		vif->is_setup = 1;
 	}
 
@@ -947,6 +1076,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (ostate == IEEE80211_S_RUN)
 			break;
 
+		ATHP_CONF_LOCK(ar);
 		/*
 		 * Station mode - we can't defer BSS updates for now
 		 * as net80211/wpa_supplicant sends frames immediately
@@ -957,20 +1087,17 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * turn this into a bit more of an async state change..
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			ATHP_CONF_LOCK(ar);
-			/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
+			/* XXX TODO: locking? Use ATHP_DATA_LOCK here? */
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			athp_node_schedule_deferred_tx(bss_ni);
-			ATHP_CONF_UNLOCK(ar);
 		}
 
 		/*
 		 * Hostap - need to ensure we've set the SSID right first.
 		 */
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
-			ATHP_CONF_LOCK(ar);
 			(void) athp_vif_update_ap_ssid(vap, bss_ni);
 
 			/* TODO: Should we do vif_restart before ap_setup? */
@@ -991,26 +1118,26 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				    __func__, ret);
 				break;
 			}
-
-			ATHP_CONF_UNLOCK(ar);
 		}
 
 		/* For now, only start vdev on INIT->RUN */
 		/* This should be ok for monitor, but not for station */
 		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 			if (ostate == IEEE80211_S_INIT) {
-				ATHP_CONF_LOCK(ar);
 				/* XXX TODO: ic_curchan? */
 				ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
-				ATHP_CONF_UNLOCK(ar);
 				if (ret != 0) {
 					ath10k_err(ar,
 					    "%s: ath10k_vif_bring_up failed; ret=%d\n",
 					    __func__, ret);
+					ATHP_CONF_UNLOCK(ar);
 					break;
 				}
 			}
 		}
+
+		ATHP_CONF_UNLOCK(ar);
+
 		break;
 
 	/* Transitioning to SCAN from RUN - is fine, you don't need to delete anything */
@@ -1020,52 +1147,46 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 		ath10k_warn(ar, "%s: pausing/flushing queues\n", __func__);
 
-		athp_tx_disable(ar, vap);
-
-		/* Wait for xmit to finish before continuing */
 		ATHP_CONF_LOCK(ar);
+		athp_tx_disable(ar, vap);
+		/* Wait for xmit to finish before continuing */
 		ath10k_tx_flush_locked(ar, vap, 0, 1);
 		/* Delete any existing association */
 		ath10k_bss_update(ar, vap, bss_ni, 0, 0);
-		ATHP_CONF_UNLOCK(ar);
-
 		athp_tx_enable(ar, vap);
+		ATHP_CONF_UNLOCK(ar);
 
 		break;
 
 	case IEEE80211_S_INIT:
 
+		ATHP_CONF_LOCK(ar);
 		athp_tx_disable(ar, vap);
 
 		if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 			/* Monitor mode - explicit down */
-			ATHP_CONF_LOCK(ar);
 			ath10k_vif_bring_down(vap);
-			ATHP_CONF_UNLOCK(ar);
 		}
 
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			ATHP_CONF_LOCK(ar);
 			/* Wait for xmit to finish before continuing */
 			ath10k_tx_flush_locked(ar, vap, 0, 1);
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
-				/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
+				/* XXX TODO: locking? Maybe use DATA_LOCK here? */
 				ATHP_NODE(bss_ni)->is_in_peer_table = 0;
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
-			ATHP_CONF_UNLOCK(ar);
 		}
 
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
-			ATHP_CONF_LOCK(ar);
 			ath10k_tx_flush_locked(ar, vap, 0, 1);
 			ret = athp_vif_ap_stop(vap, bss_ni);
-			ATHP_CONF_UNLOCK(ar);
 		}
 
 		athp_tx_enable(ar, vap);
+		ATHP_CONF_UNLOCK(ar);
 
 		break;
 
@@ -1085,7 +1206,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				break;
 			}
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
-			/* XXX TODO: locking? Using ATHP_CONF_LOCK here */
+			/* XXX TODO: locking? Maybe use DATA_LOCK here? */
 			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
 			athp_node_schedule_deferred_tx(bss_ni);
 			ATHP_CONF_UNLOCK(ar);
@@ -1106,9 +1227,9 @@ skip3:
 
 skip2:
 	IEEE80211_LOCK(ic);
-	ieee80211_free_node(bss_ni);
 
 skip:
+	ieee80211_free_node(bss_ni);
 	error = vif->av_newstate(vap, nstate, arg);
 	return (error);
 }
@@ -1775,7 +1896,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 */
 	ATHP_CONF_LOCK(ar);
 	uvp->is_dying = 1;
-	ATHP_CONF_UNLOCK(ar);
 
 	/*
 	 * Ideally we'd stop both TX and RX so we can ensure nothing
@@ -1787,10 +1907,11 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * set it up earlier.
 	 */
 	if (uvp->is_setup) {
-
 		/* Wait for active xmit to finish before continuing */
-		ath10k_tx_flush(ar, vap, 0, 1);
+		ath10k_tx_flush_locked(ar, vap, 0, 1);
 
+		/* XXX unlock/relock! Ew! */
+		ATHP_CONF_UNLOCK(ar);
 		/*
 		 * Flush/stop any pending taskq operations.
 		 *
@@ -1801,13 +1922,12 @@ athp_vap_delete(struct ieee80211vap *vap)
 		 * That all needs to, like, die.
 		 */
 		athp_taskq_flush(ar, 0);
-
 		ATHP_CONF_LOCK(ar);
 		ath10k_vdev_stop(uvp);
 		ath10k_remove_interface(ar, vap);
 		uvp->is_setup = 0;
-		ATHP_CONF_UNLOCK(ar);
 	}
+	ATHP_CONF_UNLOCK(ar);
 
 	/*
 	 * If this is a firmware panic or we had some highly confused
@@ -1843,7 +1963,6 @@ athp_vap_delete(struct ieee80211vap *vap)
 	 * will have to check that we're running and error out as
 	 * appropriate.
 	 */
-
 	ath10k_mac_vif_beacon_free_desc(ar, uvp);
 
 	/*
@@ -1915,7 +2034,7 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	    ku->peer_macaddr, ":", ku->ni);
 
 	arsta = ATHP_NODE(ku->ni);
-	/* XXX TODO: locking? */
+	/* XXX TODO: locking? Use DATA_LOCK here? */
 	arsta->is_in_peer_table = 1;
 	/* Schedule any pending transmit on this node */
 	athp_node_schedule_deferred_tx(ku->ni);
@@ -1993,14 +2112,14 @@ athp_node_deferred_tx(void *arg, int npending)
 	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
 	    __func__, ni->ni_macaddr, ":");
 
-	/* XXX TODO locking, methodize */
+	/* XXX TODO locking (DATA_LOCK?), methodize */
 	if (ATHP_NODE(ni)->is_in_peer_table == 0) {
 		ath10k_err(ar, "%s: mac=%6D: called, but peer isn't in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
 		return;
 	}
 
-	/* XXX TODO: locking */
+	/* XXX TODO: locking (DATA_LOCK?) */
 	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
 		ath10k_warn(ar, "%s: mac=%6D: dequeuing frame\n",
 		    __func__, ni->ni_macaddr, ":");
@@ -2047,7 +2166,7 @@ athp_node_init(struct ieee80211_node *ni)
 	 */
 	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) == 0) {
 		/* "our" node - we always have it for hostap mode */
-		/* XXX TODO locking */
+		/* XXX TODO locking - DATA_LOCK? */
 		ATHP_NODE(ni)->is_in_peer_table = 1;
 		return (0);
 	}
@@ -2191,7 +2310,7 @@ athp_node_free(struct ieee80211_node *ni)
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
-		/* XXX TODO locking */
+		/* XXX TODO locking - DATA_LOCK ? */
 		arsta->is_in_peer_table = 0;
 
 		/*
