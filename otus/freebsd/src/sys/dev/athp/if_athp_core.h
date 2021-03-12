@@ -97,8 +97,6 @@ struct ath10k_sta {
 	 */
 	int is_in_peer_table;
 
-	struct task update_wk;
-
 	/*
 	 * These control deferring transmit if any frames are queued
 	 * between getting a node creation and when we get the node
