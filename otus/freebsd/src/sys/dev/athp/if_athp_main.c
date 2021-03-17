@@ -1029,7 +1029,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	ATHP_CONF_LOCK(ar);
 	if (athp_vap_is_dying(vap)) {
 		ATHP_CONF_UNLOCK(ar);
-		goto skip;
+		goto skip2;
 	}
 	ATHP_CONF_UNLOCK(ar);
 
@@ -1227,8 +1227,6 @@ skip3:
 
 skip2:
 	IEEE80211_LOCK(ic);
-
-skip:
 	ieee80211_free_node(bss_ni);
 	error = vif->av_newstate(vap, nstate, arg);
 	return (error);
