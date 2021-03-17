@@ -4958,10 +4958,8 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 void ath10k_drain_tx(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
-#if 0
-	/* make sure rcu-protected mac80211 tx path itself is drained */
-	synchronize_net();
-#endif
+
+	ATHP_CONF_UNLOCK_ASSERT(ar);
 
 	ATHP_DATA_LOCK(ar);
 	ath10k_offchan_tx_purge(ar);
@@ -7138,6 +7136,12 @@ ath10k_tx_flush(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 	ATHP_CONF_UNLOCK(ar);
 }
 
+/*
+ * Called to wait until the HTT TX side has finished sending frames.
+ *
+ * Must be called with the CONF lock held and no other locks, as it will
+ * sleep.
+ */
 void
 ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
     bool drop)
@@ -7145,13 +7149,6 @@ ath10k_tx_flush_locked(struct ath10k *ar, struct ieee80211vap *vif, u32 queues,
 	bool skip, empty;
 	long time_left;
 	int interval;
-
-#if 0
-	/* mac80211 doesn't care if we really xmit queued frames or not
-	 * we'll collect those frames either way if we stop/delete vdevs */
-	if (drop)
-		return;
-#endif
 
 	interval = ticks + ((ATH10K_FLUSH_TIMEOUT_HZ * hz) / 1000);
 

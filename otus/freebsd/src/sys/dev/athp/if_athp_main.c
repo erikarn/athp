@@ -280,7 +280,6 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 	}
 
 	/* Only enqueue if we've added the peer */
-	/* XXX TODO: DATA lock? */
 	if (arsta->is_in_peer_table)
 		athp_node_schedule_deferred_tx(ni);
 
@@ -343,18 +342,6 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 		/* Don't free the node/ref */
 		return (ENOBUFS);
 	}
-
-	/*
-	 * Don't do this here; the caller should do the locking and
-	 * check first!
-	 */
-#if 0
-	/* XXX TODO: locking? */
-	if (athp_vap_is_dying(vap)) {
-		/* Don't free the node/ref */
-		return (ENOBUFS);
-	}
-#endif
 
 	/*
 	 * Allocate a TX mbuf.
@@ -2105,20 +2092,26 @@ athp_node_deferred_tx(void *arg, int npending)
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct mbuf *m;
+	struct mbufq mq;
 	int ret;
 
 	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
 	    __func__, ni->ni_macaddr, ":");
 
-	/* XXX TODO locking (DATA_LOCK?), methodize */
+	mbufq_init(&mq, 128); /* limit isn't important here */
+
+	ATHP_DATA_LOCK(ar);
+	/* XXX TODO methodize */
 	if (ATHP_NODE(ni)->is_in_peer_table == 0) {
 		ath10k_err(ar, "%s: mac=%6D: called, but peer isn't in peer table!\n",
 		    __func__, ni->ni_macaddr, ":");
+		ATHP_DATA_UNLOCK(ar);
 		return;
 	}
+	mbufq_concat(&mq, &ATHP_NODE(ni)->deferred_txq);
+	ATHP_DATA_UNLOCK(ar);
 
-	/* XXX TODO: locking (DATA_LOCK?) */
-	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
+	while ((m = mbufq_dequeue(&mq)) != NULL) {
 		ath10k_warn(ar, "%s: mac=%6D: dequeuing frame\n",
 		    __func__, ni->ni_macaddr, ":");
 		ret = athp_transmit_frame(ar, m);
@@ -2164,7 +2157,6 @@ athp_node_init(struct ieee80211_node *ni)
 	 */
 	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) == 0) {
 		/* "our" node - we always have it for hostap mode */
-		/* XXX TODO locking - DATA_LOCK? */
 		ATHP_NODE(ni)->is_in_peer_table = 1;
 		return (0);
 	}
@@ -2280,13 +2272,12 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 /*
  * Called to free a node.
  *
- * XXX TODO: locking? Especially around arsta->is_in_peer_table ?
+ * This will schedule deferred firmware work to clean up the node, but
+ * the node struct iself gets freed at tihs point.
  */
 static void
 athp_node_free(struct ieee80211_node *ni)
 {
-
-	/* XXX TODO */
 	struct ieee80211com *ic = ni->ni_vap->iv_ic;
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *arsta;
@@ -2308,8 +2299,9 @@ athp_node_free(struct ieee80211_node *ni)
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
-		/* XXX TODO locking - DATA_LOCK ? */
+		ATHP_DATA_LOCK(ar);
 		arsta->is_in_peer_table = 0;
+		ATHP_DATA_UNLOCK(ar);
 
 		/*
 		 * Only do this for hostap mode.
@@ -2318,12 +2310,12 @@ athp_node_free(struct ieee80211_node *ni)
 		 * transition.
 		 */
 		if (ni->ni_vap->iv_opmode == IEEE80211_M_HOSTAP) {
+
 			/*
-			 * Note: when deleting a peer, we need to make sure that no
-			 * frames have been scheduled to said peer.  net80211
-			 * shouldn't delete nodes until the last transmit reference
-			 * is gone.  But, we should likely wait until the transmit
-			 * queue is emptied here just to be sure.
+			 * Note: when deleting a peer, we need to make sure
+			 * that no frames have been scheduled to said peer.
+			 * net80211 shouldn't delete nodes until the last
+			 * transmit reference is gone.
 			 */
 
 			/*
@@ -2347,7 +2339,6 @@ athp_node_free(struct ieee80211_node *ni)
 			 * At this stage we can't store a pointer to the node
 			 * because, well, we are /freeing/ the node.
 			 */
-//			ku->ni = (void *) ni;
 			ku->is_node_qos = !! (ni->ni_flags & IEEE80211_NODE_QOS);
 
 			/* schedule */
@@ -2357,7 +2348,6 @@ athp_node_free(struct ieee80211_node *ni)
 	}
 
 	/* Finish any deferred transmit; free any other frames */
-	/* XXX TODO: locking */
 	/* XXX TODO: stopping further enqueue */
 	athp_node_flush_deferred_tx(ni);
 
@@ -2365,6 +2355,7 @@ athp_node_free(struct ieee80211_node *ni)
 		taskqueue_drain(ar->workqueue, &arsta->deferred_tq);
 
 finish:
+	/* At this point the node is freed for real */
 	ar->sc_node_free(ni);
 }
 
