@@ -898,8 +898,10 @@ static int ath10k_peer_create(struct ath10k *ar, u32 vdev_id, const u8 *addr,
 	num_peers = ar->num_peers;
 
 	/* Each vdev consumes a peer entry as well */
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		num_peers++;
+	ATHP_ARVIF_UNLOCK(ar);
 
 	if (num_peers >= ar->max_num_peers)
 		return -ENOBUFS;
@@ -2232,9 +2234,11 @@ static int ath10k_mac_num_vifs_started(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		if (arvif->is_started)
 			num++;
+	ATHP_ARVIF_UNLOCK(ar);
 
 	return num;
 }
@@ -5001,9 +5005,11 @@ void ath10k_halt(struct ath10k *ar)
 	ath10k_core_stop(ar);
 	ath10k_hif_power_down(ar);
 
-	ATHP_DATA_LOCK(ar);
+	ATHP_DATA_LOCK(ar); /* For the beacon cleanup */
+	ATHP_ARVIF_LOCK(ar); /* for list */
 	TAILQ_FOREACH(arvif, &ar->arvifs, next)
 		ath10k_mac_vif_beacon_cleanup(arvif);
+	ATHP_ARVIF_UNLOCK(ar);
 	ATHP_DATA_UNLOCK(ar);
 }
 
@@ -5275,6 +5281,7 @@ static int ath10k_config_ps(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+	ATHP_ARVIF_LOCK(ar);
 	list_for_each_entry(arvif, &ar->arvifs, list) {
 		ret = ath10k_mac_vif_setup_ps(arvif);
 		if (ret) {
@@ -5282,6 +5289,7 @@ static int ath10k_config_ps(struct ath10k *ar)
 			break;
 		}
 	}
+	ATHP_ARVIF_UNLOCK(ar);
 
 	return ret;
 }
@@ -5325,6 +5333,7 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_FOREACH(arvif, &ar->arvifs, next) {
 		WARN_ON(arvif->txpower < 0);
 
@@ -5333,6 +5342,7 @@ static int ath10k_mac_txpower_recalc(struct ath10k *ar)
 		else
 			txpower = min(txpower, arvif->txpower);
 	}
+	ATHP_ARVIF_UNLOCK(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac txpower recalc: %d\n", txpower);
 
@@ -5575,9 +5585,10 @@ ath10k_add_interface(struct ath10k *ar, struct ieee80211vap *vif,
 		goto err;
 	}
 
+	ATHP_ARVIF_LOCK(ar);
 	ar->free_vdev_map &= ~(1LL << arvif->vdev_id);
 	TAILQ_INSERT_TAIL(&ar->arvifs, arvif, next);
-	//list_add(&arvif->list, &ar->arvifs);
+	ATHP_ARVIF_UNLOCK(ar);
 
 	/* It makes no sense to have firmware do keepalives. mac80211 already
 	 * takes care of this with idle connection polling.
@@ -5710,8 +5721,10 @@ err_peer_delete:
 
 err_vdev_delete:
 	ath10k_wmi_vdev_delete(ar, arvif->vdev_id);
+	ATHP_ARVIF_LOCK(ar);
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
+	ATHP_ARVIF_UNLOCK(ar);
 	arvif->vdev_id = 0;
 
 err:
@@ -5757,8 +5770,10 @@ ath10k_remove_interface(struct ath10k *ar, struct ieee80211vap *vif)
 		ath10k_warn(ar, "failed to stop spectral for vdev %i: %d\n",
 			    arvif->vdev_id, ret);
 
+	ATHP_ARVIF_LOCK(ar);
 	ar->free_vdev_map |= 1LL << arvif->vdev_id;
 	TAILQ_REMOVE(&ar->arvifs, arvif, next);
+	ATHP_ARVIF_UNLOCK(ar);
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP ||
 	    arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
@@ -7074,14 +7089,13 @@ static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw)
  * Both RTS and Fragmentation threshold are interface-specific
  * in ath10k, but device-specific in mac80211.
  */
-
 static int ath10k_set_rts_threshold(struct ieee80211_hw *hw, u32 value)
 {
 	struct ath10k *ar = hw->priv;
 	struct ath10k_vif *arvif;
 	int ret = 0;
 
-	ATHP_CONF_LOCK(ar);
+	ATHP_ARVIF_LOCK(ar);
 	list_for_each_entry(arvif, &ar->arvifs, list) {
 		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %d rts threshold %d\n",
 			   arvif->vdev_id, value);
@@ -7093,7 +7107,7 @@ static int ath10k_set_rts_threshold(struct ieee80211_hw *hw, u32 value)
 			break;
 		}
 	}
-	ATHP_CONF_UNLOCK(ar);
+	ATHP_ARVIF_UNLOCK(ar);
 
 	return ret;
 }
@@ -8526,15 +8540,14 @@ ath10k_get_arvif(struct ath10k *ar, u32 vdev_id)
 {
 	struct ath10k_vif *vif;
 
-	/* XXX for now; may need to use another lock, or create a new one */
-	ATHP_CONF_LOCK(ar);
+	ATHP_ARVIF_LOCK(ar);
 	TAILQ_FOREACH(vif, &ar->arvifs, next) {
 		if (vif->vdev_id == vdev_id) {
-			ATHP_CONF_UNLOCK(ar);
+			ATHP_ARVIF_UNLOCK(ar);
 			return vif;
 		}
 	}
-	ATHP_CONF_UNLOCK(ar);
+	ATHP_ARVIF_UNLOCK(ar);
 
 	device_printf(ar->sc_dev, "%s: couldn't find vdev id %d\n",
 	    __func__, vdev_id);
@@ -8547,9 +8560,6 @@ ath10k_mac_register(struct ath10k *ar)
 	int ret;
 
 	device_printf(ar->sc_dev, "%s: called\n", __func__);
-
-	/* for now .. */
-//	TAILQ_INIT(&ar->arvifs);
 
 	ret = athp_attach_net80211(ar);
 	if (ret != 0)

@@ -784,6 +784,10 @@ athp_pci_attach(device_t dev)
 	mtx_init(&ar->sc_data_mtx, ar->sc_data_mtx_buf, "athp data",
 	    MTX_DEF);
 
+	sprintf(ar->sc_arvif_mtx_buf, "%s:arvif", device_get_nameunit(dev));
+	mtx_init(&ar->sc_arvif_mtx, ar->sc_arvif_mtx_buf, MTX_NETWORK_LOCK,
+	    MTX_DEF);
+
 	/*
 	 * Initialise ath10k BMI/PCIDIAG bits.
 	 */
@@ -1018,6 +1022,7 @@ bad:
 	mtx_destroy(&ar->sc_data_mtx);
 	mtx_destroy(&ar->sc_buf_mtx);
 	mtx_destroy(&ar->sc_dma_mtx);
+	mtx_destroy(&ar->sc_arvif_mtx);
 	mtx_destroy(&ar->sc_mtx);
 	if (ar_pci->pipe_taskq) {
 		taskqueue_drain_all(ar_pci->pipe_taskq);

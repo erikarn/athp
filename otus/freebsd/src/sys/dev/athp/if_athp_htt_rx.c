@@ -1001,12 +1001,15 @@ ath10k_htt_rx_h_vdev_channel(struct ath10k *ar, u32 vdev_id)
 	struct cfg80211_chan_def def;
 
 	ATHP_HTT_RX_LOCK_ASSERT(htt);
-
+	ATHP_ARVIF_LOCK(ar);
 	list_for_each_entry(arvif, &ar->arvifs, list) {
 		if (arvif->vdev_id == vdev_id &&
-		    ath10k_mac_vif_chan(arvif->vif, &def) == 0)
+		    ath10k_mac_vif_chan(arvif->vif, &def) == 0) {
+			ATHP_ARVIF_UNLOCK(ar);
 			return def.chan;
+		}
 	}
+	ATHP_ARVIF_UNLOCK(ar);
 #else
 	return 0;
 #endif

@@ -108,6 +108,18 @@ athp_mtx_assert(struct mtx *mtx, int op)
 #define	ATHP_FW_VER_STR		128
 
 /*
+ * This lock protects the arvif list.
+ *
+ * This is PURELY to map vdev_id -> vap pointer.
+ * Once this is done better (eg in net80211?) then
+ * let's toss this.
+ */
+#define	ATHP_ARVIF_LOCK(sc)		mtx_lock(&(sc)->sc_arvif_mtx)
+#define	ATHP_ARVIF_UNLOCK(sc)		mtx_unlock(&(sc)->sc_arvif_mtx)
+#define	ATHP_ARVIF_LOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_arvif_mtx, MA_OWNED)
+#define	ATHP_ARVIF_UNLOCK_ASSERT(sc)	athp_mtx_assert(&(sc)->sc_arvif_mtx, MA_NOTOWNED)
+
+/*
  * This lock protects configuring the NIC state - target manipulation,
  * firmware, calibration, VAP create/delete, associate/diassociation,
  * key programming, scanning, etc.
@@ -268,6 +280,8 @@ struct ath10k {
 	char				sc_conf_mtx_buf[16];
 	struct mtx			sc_data_mtx;
 	char				sc_data_mtx_buf[16];
+	struct mtx			sc_arvif_mtx;
+	char				sc_arvif_mtx_buf[16];
 	int				sc_invalid;
 	uint64_t			sc_debug;
 	int				sc_isrunning;
