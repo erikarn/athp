@@ -198,12 +198,26 @@ athp_tx_disabled(struct ath10k *ar, struct ieee80211vap *vap)
 	return (vif->tx_is_disabled);
 }
 
+/*
+ * Called during a transmit action.
+ *
+ * This should eventually be used to make sure other code that may
+ * do things like tear down the transmit path underneath us doesn't
+ * run.
+ */
 static void
 athp_tx_enter(struct ath10k *ar)
 {
 	ATHP_CONF_LOCK_ASSERT(ar);
 }
 
+/*
+ * Called to complete transmit action.
+ *
+ * This should eventually be used to make sure other code that may
+ * do things like tear down the transmit path underneath us doesn't
+ * run.
+ */
 static void
 athp_tx_exit(struct ath10k *ar)
 {
@@ -284,6 +298,25 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 		athp_node_schedule_deferred_tx(ni);
 
 	return 0;
+}
+
+/*
+ * Return true if the deferred transmit queue is empty.
+ *
+ * Must be called with the DATA_LOCK held.
+ */
+static int
+athp_node_deferred_tx_queue_is_empty(struct ieee80211_node *ni)
+{
+	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
+
+	ATHP_DATA_LOCK_ASSERT(ar);
+
+	arsta = ATHP_NODE(ni);
+
+	return (mbufq_len(&arsta->deferred_txq) == 0);
 }
 
 /*
@@ -437,12 +470,9 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	int ret;
 
 	ATHP_CONF_LOCK(ar);
-	/*
-	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
-	 * does with the reset, xmit refcounts.  Otherwise we end up
-	 * queuing frames during a transition down, which causes panics.
-	 */
+
 	athp_tx_enter(ar);
+
 	if (athp_tx_disabled(ar, vap)) {
 		ath10k_err(ar, "%s: tx_disabled\n", __func__);
 		athp_tx_exit(ar);
@@ -499,17 +529,17 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 
 	/*
 	 * Check to see if the node deferred transmit queue
-	 * isn't empty.  If it's empty then at tihs point we can
+	 * isn't empty.  If it's empty then at this point we can
 	 * direct dispatch.  Else, we need to also defer this one.
 	 *
 	 * XXX TODO: methodize, simplify!
 	 */
-	if (mbufq_len(&arsta->deferred_txq) != 0) {
+	if (athp_node_deferred_tx_queue_is_empty(ni) != 0) {
 		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
 		  __func__, ni->ni_macaddr, ":");
 		ret = athp_node_deferred_tx_queue(ni, m0);
+		ATHP_DATA_UNLOCK(ar);
 		if (ret != 0) {
-			ATHP_DATA_UNLOCK(ar);
 
 			ATHP_CONF_LOCK(ar);
 			athp_tx_exit(ar);
@@ -662,11 +692,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
 
-	/*
-	 * XXX TODO: need some driver entry/exit and barrier, like ath(4)
-	 * does with the reset, xmit refcounts.  Otherwise we end up
-	 * queuing frames during a transition down, which causes panics.
-	 */
 	ATHP_CONF_LOCK(ar);
 	athp_tx_enter(ar);
 	if (athp_tx_disabled(ar, vap)) {
@@ -725,12 +750,12 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 
 	/*
 	 * Check to see if the node deferred transmit queue
-	 * isn't empty.  If it's empty then at tihs point we can
+	 * isn't empty.  If it's empty then at this point we can
 	 * direct dispatch.  Else, we need to also defer this one.
 	 *
 	 * XXX TODO methodize
 	 */
-	if (mbufq_len(&arsta->deferred_txq) != 0) {
+	if (athp_node_deferred_tx_queue_is_empty(ni) != 0) {
 		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
 		  __func__, ni->ni_macaddr, ":");
 		/* XXX fold into deferred pass too */
