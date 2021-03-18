@@ -534,7 +534,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	 *
 	 * XXX TODO: methodize, simplify!
 	 */
-	if (athp_node_deferred_tx_queue_is_empty(ni) != 0) {
+	if (athp_node_deferred_tx_queue_is_empty(ni) == 0) {
 		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
 		  __func__, ni->ni_macaddr, ":");
 		ret = athp_node_deferred_tx_queue(ni, m0);
@@ -755,7 +755,7 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 	 *
 	 * XXX TODO methodize
 	 */
-	if (athp_node_deferred_tx_queue_is_empty(ni) != 0) {
+	if (athp_node_deferred_tx_queue_is_empty(ni) == 0) {
 		ath10k_warn(ar, "%s node %6D queuing deferred frame\n",
 		  __func__, ni->ni_macaddr, ":");
 		/* XXX fold into deferred pass too */
