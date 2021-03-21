@@ -260,6 +260,44 @@ athp_node_schedule_deferred_tx(struct ieee80211_node *ni)
 }
 
 /*
+ * Return whether the peer is in the peer table.
+ *
+ * This must be called with the DATA lock held.
+ */
+static int
+athp_node_is_in_peer_table(struct ieee80211_node *ni)
+{
+//	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+//	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
+
+//	ATHP_CONF_LOCK_ASSERT(ar);
+
+	arsta = ATHP_NODE(ni);
+
+	return arsta->is_in_peer_table;
+}
+
+/*
+ * Set the peer table flag to either 1 or 0.
+ *
+ * This must be called with the DATA lock held.
+ */
+static void
+athp_node_set_is_in_peer_table(struct ieee80211_node *ni, int val)
+{
+	struct ieee80211com *ic = ni->ni_vap->iv_ic;
+	struct ath10k *ar = ic->ic_softc;
+	struct ath10k_sta *arsta;
+
+	ATHP_CONF_LOCK_ASSERT(ar);
+
+	arsta = ATHP_NODE(ni);
+
+	arsta->is_in_peer_table = val;
+}
+
+/*
  * Queue a single frame to the deferred transmit queue.
  *
  * This will do the following:
@@ -289,7 +327,11 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 
 	ret = mbufq_enqueue(&arsta->deferred_txq, m);
 	if (ret != 0) {
-		/* XXX TODO: stats; logging */
+		ath10k_err(ar,
+		    "%s: failed to enqueue into deferred_txq (%d)\n",
+		    __func__,
+		    ret);
+		trace_ath10k_transmit(ar, 0, 0);
 		return ret;
 	}
 
@@ -332,6 +374,7 @@ athp_node_deferred_tx_queue_is_empty(struct ieee80211_node *ni)
  *   ieee80211_node references have been freed.
  *
  * XXX TODO: re-add the transmit tracing bits here!
+ * XXX TODO: ensure none of the locks are held at this point?
  */
 static int
 athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
@@ -410,7 +453,6 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 	m = m_defrag(m0, M_NOWAIT);
 	if (m == NULL) {
 		ar->sc_stats.xmit_fail_mbuf_defrag++;
-//		ath10k_err(ar, "%s: failed to m_defrag\n", __func__);
 		athp_tx_exit(ar);
 		trace_ath10k_transmit(ar, 0, 0);
 		ieee80211_free_mbuf(m0);
@@ -730,7 +772,6 @@ athp_transmit(struct ieee80211com *ic, struct mbuf *m0)
 		ATHP_DATA_UNLOCK(ar);
 
 		if (ret != 0) {
-
 			ATHP_CONF_LOCK(ar);
 			athp_tx_exit(ar);
 			ATHP_CONF_UNLOCK(ar);
@@ -1099,8 +1140,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * turn this into a bit more of an async state change..
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			/* XXX TODO: locking? Use ATHP_DATA_LOCK here? */
-			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			athp_node_set_is_in_peer_table(bss_ni, 1);
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
 			athp_node_schedule_deferred_tx(bss_ni);
@@ -1186,8 +1226,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 			/* This brings the interface down; delete the peer */
 			if (vif->is_stabss_setup == 1) {
-				/* XXX TODO: locking? Maybe use DATA_LOCK here? */
-				ATHP_NODE(bss_ni)->is_in_peer_table = 0;
+				athp_node_set_is_in_peer_table(bss_ni, 0);
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
 			}
 		}
@@ -1218,8 +1257,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 				break;
 			}
 			ath10k_bss_update(ar, vap, bss_ni, 1, 0);
-			/* XXX TODO: locking? Maybe use DATA_LOCK here? */
-			ATHP_NODE(bss_ni)->is_in_peer_table = 1;
+			athp_node_set_is_in_peer_table(bss_ni, 1);
 			athp_node_schedule_deferred_tx(bss_ni);
 			ATHP_CONF_UNLOCK(ar);
 		}
@@ -2022,7 +2060,6 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 {
 	struct athp_node_alloc_state *ku;
 	struct ieee80211vap *vap;
-	struct ath10k_sta *arsta;
 
 	ku = athp_taskq_entry_to_ptr(e);
 	vap = ku->vap;
@@ -2043,9 +2080,9 @@ athp_node_alloc_cb(struct ath10k *ar, struct athp_taskq_entry *e, int flush)
 	ath10k_warn(ar, "%s: added node for mac %6D (%p)\n", __func__,
 	    ku->peer_macaddr, ":", ku->ni);
 
-	arsta = ATHP_NODE(ku->ni);
-	/* XXX TODO: locking? Use DATA_LOCK here? */
-	arsta->is_in_peer_table = 1;
+	ATHP_CONF_LOCK(ar);
+	athp_node_set_is_in_peer_table(ku->ni, 1);
+	ATHP_CONF_UNLOCK(ar);
 	/* Schedule any pending transmit on this node */
 	athp_node_schedule_deferred_tx(ku->ni);
 	ieee80211_free_node(ku->ni);
@@ -2182,7 +2219,9 @@ athp_node_init(struct ieee80211_node *ni)
 	 */
 	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) == 0) {
 		/* "our" node - we always have it for hostap mode */
-		ATHP_NODE(ni)->is_in_peer_table = 1;
+		ATHP_CONF_LOCK(ar);
+		athp_node_set_is_in_peer_table(ni, 1);
+		ATHP_CONF_UNLOCK(ar);
 		return (0);
 	}
 
@@ -2324,9 +2363,9 @@ athp_node_free(struct ieee80211_node *ni)
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
-		ATHP_DATA_LOCK(ar);
-		arsta->is_in_peer_table = 0;
-		ATHP_DATA_UNLOCK(ar);
+		ATHP_CONF_LOCK(ar);
+		athp_node_set_is_in_peer_table(ni, 0);
+		ATHP_CONF_UNLOCK(ar);
 
 		/*
 		 * Only do this for hostap mode.
