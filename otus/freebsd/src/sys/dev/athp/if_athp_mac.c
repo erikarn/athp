@@ -2837,12 +2837,17 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 	htcap_filt = vif->iv_htcaps & htcap_mask;
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
-	    "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x\n",
+	    "%s: filt=0x%08x, iv_htcaps=0x%08x, mask=0x%08x, ni_htcap=0x%08x\n",
 	    __func__,
 	    htcap_filt,
 	    vif->iv_htcaps,
-	    htcap_mask);
+	    htcap_mask,
+	    sta->ni_htcap);
 
+	/*
+	 * What the heck was I thinking here? This sets HTCAP_LDPC at least
+	 * based on our vap settings, and then we are supposed to clear it?
+	 */
 	htcap = (sta->ni_htcap & ~(htcap_mask)) | htcap_filt;
 
 	/* MAX_AMSDU - only if both sides can do it */
@@ -2881,16 +2886,23 @@ static void ath10k_peer_assoc_h_ht(struct ath10k *ar,
 		if (stbc_rem < stbc)
 			stbc = stbc_rem;
 		htcap |= (stbc << IEEE80211_HTCAP_RXSTBC_S) & IEEE80211_HTCAP_RXSTBC;
-
 	}
+
+	/*
+	 * XXX TODO: figure out why this keeps choosing to do LDPC
+	 * when the remote side explicitly states it can't support it!
+	 */
+	htcap &= ~(IEEE80211_HTCAP_LDPC);
+#if 0
+	/* LDPC - only if both sides do it */
+	if ((vif->iv_htcaps & IEEE80211_HTCAP_LDPC) &&
+	    (sta->ni_htcap & IEEE80211_HTCAP_LDPC))
+		arg->peer_flags |= WMI_PEER_LDPC;
+#endif
 
 	arg->peer_ht_caps = htcap;
 	arg->peer_rate_caps |= WMI_RC_HT_FLAG;
 
-	/* LDPC - only if both sides do it */
-	if ((vif->iv_htcaps & IEEE80211_HTCAP_LDPC) &&
-	    (htcap & IEEE80211_HTCAP_LDPC))
-		arg->peer_flags |= WMI_PEER_LDPC;
 
 	/* 40MHz operation */
 	if (IEEE80211_IS_CHAN_HT40(sta->ni_chan)) {
