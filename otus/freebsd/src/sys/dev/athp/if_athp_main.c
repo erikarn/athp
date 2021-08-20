@@ -2693,7 +2693,7 @@ athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
 	IEEE80211_UNLOCK(ic);
 	ATHP_CONF_LOCK(ar);
 	if (ar->state == ATH10K_STATE_ON)
-		(void) ath10k_regd_update(ar, nchans, chans);
+		(void) ath10k_regd_update(ar, nchans, chans, reg);
 	ATHP_CONF_UNLOCK(ar);
 	IEEE80211_LOCK(ic);
 
