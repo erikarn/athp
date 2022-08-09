@@ -20,21 +20,21 @@ Date:   Thu Sep 17 14:29:07 2015 +0300
 
 ===
 
-* pci/pcie - includes a lot of SoC futzing to do things like cold/warm reset, etc
-* legacy interrupts require magic, check pci.c
-* copy engine pipe config
-* copy engine basics
-* bmi
-* .. at this point we should be able to load in firmware
+* (done) pci/pcie - includes a lot of SoC futzing to do things like cold/warm reset, etc
+* (done) legacy interrupts require magic, check pci.c
+* (done) copy engine pipe config
+* (done) copy engine basics
+* (done) bmi
+* (done) .. at this point we should be able to load in firmware
 
 Then:
 
-* finish off copy engine bits
-* htt
-* wmi
-* whatever missing pieces for tx/rx dma at this point (should've been done above, but..)
-* send/recieve commands to firmware
-* data!
+* (done) finish off copy engine bits
+* (done) htt
+* (done) wmi
+* (done) whatever missing pieces for tx/rx dma at this point (should've been done above, but..)
+* (done) send/recieve commands to firmware
+* (done) data!
 
 Notes:
 
