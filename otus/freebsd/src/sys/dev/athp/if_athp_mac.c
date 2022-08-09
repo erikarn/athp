@@ -3767,116 +3767,16 @@ int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vif,
 	return ret;
 }
 
-#if 0
-
 /**************/
 /* Regulatory */
 /**************/
-
-static int ath10k_update_channel_list(struct ath10k *ar)
-{
-	struct ieee80211_hw *hw = ar->hw;
-	struct ieee80211_supported_band **bands;
-	enum ieee80211_band band;
-	struct ieee80211_channel *channel;
-	struct wmi_scan_chan_list_arg arg = {0};
-	struct wmi_channel_arg *ch;
-	bool passive;
-	int len;
-	int ret;
-	int i;
-
-	ATHP_CONF_LOCK_ASSERT(ar);
-
-	bands = hw->wiphy->bands;
-	for (band = 0; band < IEEE80211_NUM_BANDS; band++) {
-		if (!bands[band])
-			continue;
-
-		for (i = 0; i < bands[band]->n_channels; i++) {
-			if (bands[band]->channels[i].flags &
-			    IEEE80211_CHAN_DISABLED)
-				continue;
-
-			arg.n_channels++;
-		}
-	}
-
-	len = sizeof(struct wmi_channel_arg) * arg.n_channels;
-	arg.channels = kzalloc(len, GFP_KERNEL);
-	if (!arg.channels)
-		return -ENOMEM;
-
-	ch = arg.channels;
-	for (band = 0; band < IEEE80211_NUM_BANDS; band++) {
-		if (!bands[band])
-			continue;
-
-		for (i = 0; i < bands[band]->n_channels; i++) {
-			channel = &bands[band]->channels[i];
-
-			if (channel->flags & IEEE80211_CHAN_DISABLED)
-				continue;
-
-			ch->allow_ht   = true;
-
-			/* FIXME: when should we really allow VHT? */
-			ch->allow_vht = true;
-
-			ch->allow_ibss =
-				!(channel->flags & IEEE80211_CHAN_NO_IR);
-
-			ch->ht40plus =
-				!(channel->flags & IEEE80211_CHAN_NO_HT40PLUS);
-
-			ch->chan_radar =
-				!!(channel->flags & IEEE80211_CHAN_RADAR);
-
-			passive = channel->flags & IEEE80211_CHAN_NO_IR;
-			ch->passive = passive;
-
-			ch->freq = channel->center_freq;
-			ch->band_center_freq1 = channel->center_freq;
-			ch->min_power = 0;
-			ch->max_power = channel->max_power * 2;
-			ch->max_reg_power = channel->max_reg_power * 2;
-			ch->max_antenna_gain = channel->max_antenna_gain * 2;
-			ch->reg_class_id = 0; /* FIXME */
-
-			/* FIXME: why use only legacy modes, why not any
-			 * HT/VHT modes? Would that even make any
-			 * difference? */
-			if (channel->band == IEEE80211_BAND_2GHZ)
-				ch->mode = MODE_11G;
-			else
-				ch->mode = MODE_11A;
-
-			if (WARN_ON_ONCE(ch->mode == MODE_UNKNOWN))
-				continue;
-
-			ath10k_dbg(ar, ATH10K_DBG_WMI,
-				   "mac channel [%zd/%d] freq %d maxpower %d regpower %d antenna %d mode %d\n",
-				    ch - arg.channels, arg.n_channels,
-				   ch->freq, ch->max_power, ch->max_reg_power,
-				   ch->max_antenna_gain, ch->mode);
-
-			ch++;
-		}
-	}
-
-	ret = ath10k_wmi_scan_chan_list(ar, &arg);
-	kfree(arg.channels);
-
-	return ret;
-}
-#endif
 
 /*
  * Note: this is the FreeBSD specific implementation of
  * the channel list function.
  */
 int
-ath10k_update_channel_list_freebsd(struct ath10k *ar, int nchans,
+ath10k_update_channel_list(struct ath10k *ar, int nchans,
     struct ieee80211_channel *chans)
 {
 	uint8_t reported[IEEE80211_CHAN_BYTES];
@@ -3993,18 +3893,12 @@ void
 ath10k_regd_update(struct ath10k *ar, int nchans,
     struct ieee80211_channel *chans)
 {
-#if 0
-	struct reg_dmn_pair_mapping *regpair;
-#endif
 	int ret;
 	enum wmi_dfs_region wmi_dfs_reg;
-#if 0
-	enum nl80211_dfs_regions nl_dfs_reg;
-#endif
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ret = ath10k_update_channel_list_freebsd(ar, nchans, chans);
+	ret = ath10k_update_channel_list(ar, nchans, chans);
 
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
