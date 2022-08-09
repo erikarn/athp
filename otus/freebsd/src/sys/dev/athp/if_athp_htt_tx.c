@@ -765,6 +765,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	flags1 |= SM((u16)tid, HTT_DATA_TX_DESC_FLAGS1_EXT_TID);
 
 	/* XXX TODO: ADRIAN: L3/L4 offload */
+	(void) ext_desc;
 #if 0
 	if (msdu->ip_summed == CHECKSUM_PARTIAL &&
 	    !test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {

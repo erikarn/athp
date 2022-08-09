@@ -158,6 +158,7 @@ void ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	ATHP_HTT_TX_UNLOCK(htt);
 
 	skb_cb = ATH10K_SKB_CB(msdu);
+	(void) skb_cb;
 
 	athp_dma_mbuf_unload(ar, &ar->buf_tx.dh, &msdu->mb);
 

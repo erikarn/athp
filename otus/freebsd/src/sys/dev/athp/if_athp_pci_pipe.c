@@ -506,6 +506,13 @@ ath10k_pci_alloc_pipes(struct ath10k *ar)
 		} else {
 			sz = pipe->buf_sz;
 		}
+
+		(void) sz;
+
+		/*
+		 * XXX TODO: see where this logic got pushed to and
+		 * ensure we've cleaned it all up.
+		 */
 #if 0
 		ret = athp_dma_head_alloc(ar, &pipe->dmatag, sz, 4);
 		if (ret) {
@@ -524,12 +531,16 @@ void
 ath10k_pci_free_pipes(struct ath10k *ar)
 {
 	int i;
-	struct ath10k_pci *ar_pci = ar->sc_psc;
-	struct ath10k_pci_pipe *pipe;
+//	struct ath10k_pci *ar_pci = ar->sc_psc;
+//	struct ath10k_pci_pipe *pipe;
 
 	for (i = 0; i < CE_COUNT(ar); i++) {
-		pipe = &ar_pci->pipe_info[i];
+//		pipe = &ar_pci->pipe_info[i];
 		ath10k_ce_free_pipe(ar, i);
+		/*
+		 * XXX TODO: again, figure out where this is now done
+		 * and ensure it's all cleaned up.
+		 */
 #if 0
 		athp_dma_head_free(ar, &pipe->dmatag);
 #endif

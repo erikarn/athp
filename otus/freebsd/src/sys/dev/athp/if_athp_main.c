@@ -404,6 +404,7 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 	ni = (struct ieee80211_node *) m0->m_pkthdr.rcvif;
 	vap = ni->ni_vap;
 	arvif = ath10k_vif_to_arvif(vap);
+	(void) arvif;
 
 	/*
 	 * Note: this routine should only be called if
@@ -1392,7 +1393,6 @@ static void
 athp_key_change_default_tx_cb(struct ath10k *ar, struct athp_taskq_entry *e,
     int flush)
 {
-	struct ath10k_vif *arvif;
 	struct athp_keyidx_update *ku;
 
 	ku = athp_taskq_entry_to_ptr(e);
@@ -1400,8 +1400,6 @@ athp_key_change_default_tx_cb(struct ath10k *ar, struct athp_taskq_entry *e,
 	/* Yes, it's badly named .. */
 	if (flush == 0)
 		return;
-
-	arvif = ath10k_vif_to_arvif(ku->vap);
 
 	/* If it's -1, then we don't tell firmware (yet) */
 	if (ku->keyidx == IEEE80211_KEYIX_NONE) {
@@ -2541,7 +2539,7 @@ static int
 athp_sysctl_simulate_fw_hang(SYSCTL_HANDLER_ARGS)
 {
 	struct ath10k *ar = arg1;
-	int error, val, ret;
+	int error, val, ret = 0;
 
 	val = (ar->sc_trace.active);
 
@@ -2589,6 +2587,10 @@ athp_sysctl_simulate_fw_hang(SYSCTL_HANDLER_ARGS)
 		break;
 	default:
 		return (EINVAL);
+	}
+
+	if (ret != 0) {
+		ath10k_err(ar, "Call failed: %d\n", ret);
 	}
 
 	return (0);

@@ -2333,6 +2333,9 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	phy_mode = __le32_to_cpu(arg.phy_mode);
 	rate = __le32_to_cpu(arg.rate);
 
+	(void) buf_len;
+	(void) phy_mode;
+
 	memset(&stat, 0, sizeof(stat));
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
@@ -2739,6 +2742,8 @@ static int ath10k_wmi_main_op_pull_fw_stats(struct ath10k *ar,
 	num_vdev_stats = __le32_to_cpu(ev->num_vdev_stats);
 	num_peer_stats = __le32_to_cpu(ev->num_peer_stats);
 
+	(void) num_vdev_stats;
+
 	TAILQ_INIT(&stats->pdevs);
 	TAILQ_INIT(&stats->vdevs);
 	TAILQ_INIT(&stats->peers);
@@ -2797,6 +2802,8 @@ static int ath10k_wmi_10x_op_pull_fw_stats(struct ath10k *ar,
 	num_pdev_stats = __le32_to_cpu(ev->num_pdev_stats);
 	num_vdev_stats = __le32_to_cpu(ev->num_vdev_stats);
 	num_peer_stats = __le32_to_cpu(ev->num_peer_stats);
+
+	(void) num_vdev_stats;
 
 	TAILQ_INIT(&stats->pdevs);
 	TAILQ_INIT(&stats->vdevs);
@@ -2864,6 +2871,8 @@ static int ath10k_wmi_10_2_op_pull_fw_stats(struct ath10k *ar,
 	num_pdev_ext_stats = __le32_to_cpu(ev->num_pdev_ext_stats);
 	num_vdev_stats = __le32_to_cpu(ev->num_vdev_stats);
 	num_peer_stats = __le32_to_cpu(ev->num_peer_stats);
+
+	(void) num_vdev_stats;
 
 	TAILQ_INIT(&stats->pdevs);
 	TAILQ_INIT(&stats->vdevs);
@@ -2947,6 +2956,8 @@ static int ath10k_wmi_10_2_4_op_pull_fw_stats(struct ath10k *ar,
 	num_pdev_ext_stats = __le32_to_cpu(ev->num_pdev_ext_stats);
 	num_vdev_stats = __le32_to_cpu(ev->num_vdev_stats);
 	num_peer_stats = __le32_to_cpu(ev->num_peer_stats);
+
+	(void) num_vdev_stats;
 
 	TAILQ_INIT(&stats->pdevs);
 	TAILQ_INIT(&stats->vdevs);
@@ -3185,6 +3196,8 @@ static void ath10k_wmi_update_tim(struct ath10k *ar,
 	ies = mbuf_skb_data(bcn->m);
 	ies += ieee80211_anyhdrsize(hdr);
 	ies += 12; /* fixed parameters */
+
+	(void) ies;
 
 	/*
 	 * Only need to do this for certain modes.
@@ -3439,6 +3452,7 @@ void ath10k_wmi_event_host_swba(struct ath10k *ar, struct athp_buf *pbuf)
 
 		tim_info = &arg.tim_info[i];
 		noa_info = arg.noa_info[i];
+		(void) noa_info;
 
 		ath10k_dbg(ar, ATH10K_DBG_MGMT,
 			   "mgmt event bcn_info %d tim_len %d mcast %d changed %d num_ps_pending %d bitmap 0x%08x%08x%08x%08x\n",

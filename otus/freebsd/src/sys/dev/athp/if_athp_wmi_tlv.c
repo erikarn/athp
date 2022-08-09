@@ -287,6 +287,7 @@ static int ath10k_wmi_tlv_event_bcn_tx_status(struct ath10k *ar,
 	}
 
 	arvif = ath10k_get_arvif(ar, vdev_id);
+	(void) arvif;
 #if 0
 	if (arvif && arvif->is_up && arvif->vif->csa_active)
 		ieee80211_queue_work(sc->hw, &arvif->ap_csa_work);
@@ -1757,7 +1758,9 @@ ath10k_wmi_tlv_op_gen_vdev_start(struct ath10k *ar,
 	tlv = (void *) ptr;
 	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_ARRAY_STRUCT);
 	tlv->len = 0;
+
 	noa = (void *)tlv->value;
+	(void) noa;
 
 	/* Note: This is a nested TLV containing:
 	 * [wmi_tlv][wmi_p2p_noa_descriptor][wmi_tlv]..

@@ -632,7 +632,6 @@ int ath10k_ce_revoke_recv_next(struct ath10k_ce_pipe *ce_state,
 	unsigned int sw_index;
 	unsigned int write_index;
 	int ret;
-	struct ath10k *ar;
 	struct ath10k_pci *ar_pci;
 
 	dest_ring = ce_state->dest_ring;
@@ -640,7 +639,6 @@ int ath10k_ce_revoke_recv_next(struct ath10k_ce_pipe *ce_state,
 	if (!dest_ring)
 		return -EIO;
 
-	ar = ce_state->ar;
 	ar_pci = ce_state->psc;
 
 	ATHP_PCI_CE_LOCK(ar_pci);
