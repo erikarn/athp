@@ -1084,6 +1084,9 @@ static bool ath10k_htt_rx_h_channel(struct ath10k *ar,
 	status->c_ieee = ieee80211_mhz2ieee(ch, band);
 	status->r_flags |= IEEE80211_R_IEEE | IEEE80211_R_FREQ;
 
+	status->r_flags |= IEEE80211_R_BAND;
+	status->c_band = band;
+
 	return true;
 }
 

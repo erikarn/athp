@@ -2372,11 +2372,13 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	stat.r_flags |= IEEE80211_R_RSSI
 	    | IEEE80211_R_IEEE
 	    | IEEE80211_R_FREQ
+	    | IEEE80211_R_BAND
 	    | IEEE80211_R_NF;
 	stat.c_ieee = channel;
 	stat.c_freq = ieee80211_ieee2mhz(channel, band);
 	stat.c_rssi = snr;
 	stat.c_nf = ATH10K_DEFAULT_NOISE_FLOOR;
+	stat.c_band = band;
 
 	/*
 	 * XXX TODO: yes, it'd be nice to communicate the rate
@@ -2421,8 +2423,8 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 		ath10k_mac_handle_beacon(ar, pbuf);
 
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
-		   "event mgmt rx chan %d snr %d, rate %u isprot %d isauth %d\n",
-		       stat.c_ieee, stat.c_rssi, rate,
+		   "event mgmt rx chan %d freq %d snr %d, rate %u isprot %d isauth %d\n",
+		       stat.c_ieee, stat.c_freq, stat.c_rssi, rate,
 		       ieee80211_is_protected(hdr),
 		       ieee80211_is_auth(hdr));
 
