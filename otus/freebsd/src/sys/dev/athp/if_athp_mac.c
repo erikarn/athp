@@ -4135,7 +4135,7 @@ static u8 ath10k_tx_h_get_tid(struct ieee80211_frame *hdr)
 	if (IEEE80211_IS_MGMT(hdr))
 		return HTT_DATA_TX_EXT_TID_MGMT;
 
-	if (! IEEE80211_IS_QOS(hdr))
+	if (! IEEE80211_IS_QOSDATA(hdr))
 		return HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
 	//if (!is_unicast_ether_addr(ieee80211_get_DA(hdr)))
@@ -4250,7 +4250,8 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
-	if (! IEEE80211_IS_QOS(hdr))
+	/* Note: QOS? or QOSDATA? */
+	if (! IEEE80211_IS_QOSDATA(hdr))
 		return;
 
 	/*
@@ -4787,11 +4788,8 @@ static int ath10k_start_scan(struct ath10k *ar,
  */
 void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *skb)
 {
-//	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211vap *vif = ni->ni_vap;
-//	struct ieee80211_sta *sta = control->sta;
 	struct ieee80211_frame *hdr;
-//	__le16 fc = hdr->frame_control;
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
@@ -4807,7 +4805,7 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 	ATH10K_SKB_CB(skb)->htt.nohwcrypt = !ath10k_tx_h_use_hwcrypto(vif, skb);
 	ATH10K_SKB_CB(skb)->vdev_id = ath10k_tx_h_get_vdev_id(ar, vif);
 	ATH10K_SKB_CB(skb)->txmode = ath10k_tx_h_get_txmode(ar, vif, ni, skb);
-	ATH10K_SKB_CB(skb)->is_protected = ieee80211_has_protected(hdr);
+	ATH10K_SKB_CB(skb)->is_protected = IEEE80211_IS_PROTECTED(hdr);
 
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
 	    "%s: tid=%d, nohwcrypt=%d, vdev=%d, txmode=%d, is_protected=%d\n",

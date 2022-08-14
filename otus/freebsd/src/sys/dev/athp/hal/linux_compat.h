@@ -149,11 +149,9 @@ typedef uint64_t	__be64;
 
 #define	IS_ALIGNED(ptr, a)	((ptr) % (a) == 0)
 
-#define	IEEE80211_HAS_PROT(a)		ieee80211_is_protected(a)
 #define	IEEE80211_IS_ACTION(a)		ieee80211_is_action(a)
 #define	IEEE80211_IS_DEAUTH(a)		ieee80211_is_deauth(a)
 #define	IEEE80211_IS_DISASSOC(a)	ieee80211_is_disassoc(a)
-#define	IEEE80211_IS_QOS(a)		ieee80211_is_data_qos(a)
 
 /* Crpyto length definitions we don't have? Hm */
 #define IEEE80211_WEP_IV_LEN            4
@@ -229,11 +227,6 @@ static inline int ieee80211_get_qos_ctl_len(struct ieee80211_frame *hdr)
                 return 24;
 }
 
-static inline int ieee80211_has_protected(struct ieee80211_frame *hdr)
-{
-	return !! (hdr->i_fc[1] & IEEE80211_FC1_PROTECTED);
-}
-
 /*
  * data ftype, nullfunc stype.
  */
@@ -278,14 +271,6 @@ static inline bool ieee80211_is_beacon(struct ieee80211_frame *wh)
 	    (subtype == IEEE80211_FC0_SUBTYPE_BEACON));
 }
 
-
-static inline bool ieee80211_is_protected(struct ieee80211_frame *wh)
-{
-
-	return !! (wh->i_fc[1] & IEEE80211_FC1_PROTECTED);
-}
-
-
 static inline bool ieee80211_is_auth(struct ieee80211_frame *wh)
 {
 	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
@@ -320,22 +305,6 @@ static inline bool ieee80211_is_disassoc(struct ieee80211_frame *wh)
 
 	return ((type == IEEE80211_FC0_TYPE_MGT) &&
 	    (subtype == IEEE80211_FC0_SUBTYPE_DISASSOC));
-}
-
-/*
- * type is data, QOS_DATA bit is set.
- */
-static inline bool ieee80211_is_data_qos(struct ieee80211_frame *wh)
-{
-	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
-	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
-
-	if (type != IEEE80211_FC0_TYPE_DATA)
-		return (false);
-	if ((subtype & IEEE80211_FC0_SUBTYPE_QOS) == 0)
-		return (false);
-
-	return (true);
 }
 
 #endif	/* __LINUX_COMPAT_H__ */

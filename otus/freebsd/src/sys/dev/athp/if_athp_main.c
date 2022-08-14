@@ -395,7 +395,7 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 	 */
 	wh = mtod(m0, struct ieee80211_frame *);
 	is_wep = !! wh->i_fc[1] & IEEE80211_FC1_PROTECTED;
-	is_qos = !! IEEE80211_IS_QOS(wh);
+	is_qos = !! IEEE80211_IS_QOSDATA(wh);
 	seqno = le16_to_cpu(*(uint16_t *) &wh->i_seq[0]);
 
 	/*

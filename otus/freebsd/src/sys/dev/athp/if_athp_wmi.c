@@ -1887,7 +1887,7 @@ ath10k_wmi_op_gen_mgmt_tx(struct ath10k *ar, struct athp_buf *msdu)
 	if ((IEEE80211_IS_ACTION(hdr) ||
 	     IEEE80211_IS_DEAUTH(hdr) ||
 	     IEEE80211_IS_DISASSOC(hdr)) &&
-	     IEEE80211_HAS_PROT(hdr)) {
+	     IEEE80211_IS_PROTECTED(hdr)) {
 		len += IEEE80211_CCMP_MIC_LEN;
 		buf_len += IEEE80211_CCMP_MIC_LEN;
 	}
@@ -2202,7 +2202,7 @@ static void ath10k_wmi_handle_wep_reauth(struct ath10k *ar,
 	u8 *addr, keyidx;
 
 	if (!ieee80211_is_auth(hdr) ||
-	    !ieee80211_has_protected(hdr))
+	    ! IEEE80211_IS_PROTECTED(hdr))
 		return;
 
 	hdrlen = ieee80211_anyhdrsize(hdr);
@@ -2398,13 +2398,13 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	/* FW delivers WEP Shared Auth frame with Protected Bit set and
 	 * encrypted payload. However in case of PMF it delivers decrypted
 	 * frames with Protected Bit set. */
-	if (ieee80211_has_protected(hdr) &&
+	if (IEEE80211_IS_PROTECTED(hdr) &&
 	    !ieee80211_is_auth(hdr)) {
 		ath10k_warn(ar,
 		    "%s: rx; prot=%d, auth=%d, action=%d, deauth=%d, "
 		    "disassoc=%d\n",
 		    __func__,
-		    ieee80211_has_protected(hdr),
+		    IEEE80211_IS_PROTECTED(hdr),
 		    ieee80211_is_auth(hdr),
 		    ieee80211_is_action(hdr),
 		    ieee80211_is_deauth(hdr),
@@ -2425,7 +2425,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	ath10k_dbg(ar, ATH10K_DBG_MGMT,
 		   "event mgmt rx chan %d freq %d snr %d, rate %u isprot %d isauth %d\n",
 		       stat.c_ieee, stat.c_freq, stat.c_rssi, rate,
-		       ieee80211_is_protected(hdr),
+		       IEEE80211_IS_PROTECTED(hdr),
 		       ieee80211_is_auth(hdr));
 
 	/*

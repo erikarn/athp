@@ -1226,7 +1226,7 @@ static char *ath10k_get_tid(struct ieee80211_frame *hdr, char *out, size_t size)
 	u8 *qc;
 	int tid;
 
-	if (! IEEE80211_IS_QOS(hdr))
+	if (! IEEE80211_IS_QOSDATA(hdr))
 		return "";
 
 	qc = ieee80211_get_qos_ctl(hdr);
@@ -1761,7 +1761,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 	    "peeridxinvalid=%d, isdecrypt=%d, isprot=%d\n",
 	    __func__,
 	    enctype, qos[0], has_fcs_err, has_crypto_err, has_tkip_err,
-	    has_peer_idx_invalid, is_decrypted, ieee80211_has_protected(hdr));
+	    has_peer_idx_invalid, is_decrypted, IEEE80211_IS_PROTECTED(hdr));
 
 	/* Clear per-MPDU flags while leaving per-PPDU flags intact. */
 	status->c_pktflags &= ~(
@@ -2422,7 +2422,7 @@ static void ath10k_htt_rx_h_rx_offload_prot(struct ath10k *ar,
 	struct ieee80211_frame *hdr;
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
-	if (!ieee80211_has_protected(hdr))
+	if (!IEEE80211_IS_PROTECTED(hdr))
 		return;
 
 	/* Offloaded frames are already decrypted but firmware insists they are

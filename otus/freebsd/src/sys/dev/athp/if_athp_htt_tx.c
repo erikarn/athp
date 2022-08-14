@@ -670,7 +670,7 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 	if ((IEEE80211_IS_ACTION(hdr) ||
 	     IEEE80211_IS_DEAUTH(hdr) ||
 	     IEEE80211_IS_DISASSOC(hdr)) &&
-	     IEEE80211_HAS_PROT(hdr)) {
+	     IEEE80211_IS_PROTECTED(hdr)) {
 		mbuf_skb_put(msdu->m, IEEE80211_CCMP_MIC_LEN);
 	} else if (!skb_cb->htt.nohwcrypt &&
 		   skb_cb->txmode == ATH10K_HW_TXRX_RAW) {
