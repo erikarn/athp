@@ -12,6 +12,8 @@ SUBDIR+= athp_QCA6174_hw2.1_board
 SUBDIR+= athp_QCA6174_hw2.1_firmware-5
 
 SUBDIR+= athp_QCA6174_hw3.0_board
+SUBDIR+= athp_QCA6174_hw3.0_board-2
 SUBDIR+= athp_QCA6174_hw3.0_firmware-4
+SUBDIR+= athp_QCA6174_hw3.0_firmware-6
 
 .include <bsd.subdir.mk>
