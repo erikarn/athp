@@ -114,9 +114,7 @@ static driver_t athp_driver = {
 	.size = sizeof(struct ath10k_pci)
 };
 
-static devclass_t athp_devclass;
-
-DRIVER_MODULE(athp, pci, athp_driver, athp_devclass, NULL, 0);
+DRIVER_MODULE(athp, pci, athp_driver, NULL, NULL);
 MODULE_DEPEND(athp, wlan, 1, 1, 1);
 MODULE_DEPEND(athp, firmware, 1, 1, 1);
 MODULE_DEPEND(athp, alq, 1, 1, 1);

@@ -33,24 +33,11 @@
 /* Minimal set of bits needed for compilation */
 
 /* Ethernet */
-#define	ETH_ALEN		ETHER_ADDR_LEN
+#define	ETHER_ADDR_LEN		6
+#define	ETH_ALEN		6
 #define	ether_addr_copy(d, s)	memcpy((d), (s), ETHER_ADDR_LEN)
 
 #if 1
-/* math */
-static inline unsigned long
-roundup_pow_of_two(unsigned long n)
-{
-
-	return 1UL << flsl(n - 1);
-}
-
-/* XXX TODO: only for 32 bit values */
-static inline int
-ilog2(uint32_t val)
-{
-	return fls(val);
-}
 
 static inline int
 is_power_of_2(unsigned long n)
@@ -327,15 +314,8 @@ static inline bool ieee80211_is_disassoc(struct ieee80211_frame *wh)
  */
 static inline bool ieee80211_is_data_qos(struct ieee80211_frame *wh)
 {
-	uint8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
-	uint8_t subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 
-	if (type != IEEE80211_FC0_TYPE_DATA)
-		return (false);
-	if ((subtype & IEEE80211_FC0_SUBTYPE_QOS) == 0)
-		return (false);
-
-	return (true);
+	return !! IEEE80211_IS_QOS_ANY(wh);
 }
 
 #endif	/* __LINUX_COMPAT_H__ */

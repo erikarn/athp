@@ -2820,7 +2820,13 @@ athp_attach_11ac(struct ath10k *ar)
 	int i;
 
 	/* Grab VHT capability information from firmware */
-	ic->ic_vhtcaps = ar->vht_cap_info;
+	/* TODO: this is now ic_vht_cap.vht_cap_info */
+	ic->ic_vht_cap.vht_cap_info = ar->vht_cap_info;
+
+	/* Always support VHT40/VHT80 */
+	ic->ic_vht_conf |= IEEE80211_FVHT_USEVHT40;
+	ic->ic_vht_conf |= IEEE80211_FVHT_USEVHT80;
+
 	ic->ic_flags_ext |= IEEE80211_FEXT_VHT;
 
 	/*
@@ -2845,10 +2851,10 @@ athp_attach_11ac(struct ath10k *ar)
 		else
 			m = m | (IEEE80211_VHT_MCS_NOT_SUPPORTED << (i*2));
 	}
-	ic->ic_vht_mcsinfo.rx_mcs_map = m;
-	ic->ic_vht_mcsinfo.rx_highest = 0;
-	ic->ic_vht_mcsinfo.tx_mcs_map = m;
-	ic->ic_vht_mcsinfo.tx_highest = 0;
+	ic->ic_vht_cap.supp_mcs.rx_mcs_map = m;
+	ic->ic_vht_cap.supp_mcs.rx_highest = 0;
+	ic->ic_vht_cap.supp_mcs.tx_mcs_map = m;
+	ic->ic_vht_cap.supp_mcs.tx_highest = 0;
 #if 0
 	device_printf(ar->sc_dev, "%s: MCS map=0x%04x; vhtcap=0x%08x\n",
 	    __func__, m, ar->vht_cap_info);

@@ -1,12 +1,12 @@
 #!/bin/sh
 
-X_SRCDIR=${X_SRCDIR:="/home/adrian/work/freebsd/head/src/"}
-X_KERNDIR=${X_KERNDIR:="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/amd64.amd64/sys/VANESSA/"}
+X_SRCDIR=${X_SRCDIR:="/home/adrian/work/freebsd/head/freebsd-src/"}
+X_KERNDIR=${X_KERNDIR:="/home/adrian/work/freebsd/head/freebsd-obj/home/adrian/work/freebsd/head/freebsd-src/amd64.amd64/sys/FRANCINE/"}
 X_KMODOWN=${X_KMODOWN:="adrian"}
 X_KMODGRP=${X_KMODGRP:="adrian"}
 
 # This allows for -HEAD includes for net80211 ..
-env CFLAGS="-I../../../sys/" \
+# env CFLAGS="-I../../../sys/" \
 make -j2 \
 	MODULES_OVERRIDE="" \
 	DEBUG_FLAGS="-g" \

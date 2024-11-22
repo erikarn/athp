@@ -3166,7 +3166,7 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 				    struct ieee80211_node *sta,
 				    struct wmi_peer_assoc_complete_arg *arg)
 {
-	struct ieee80211_ie_vhtcap vhtcap;
+	struct ieee80211_vht_cap vhtcap;
 //	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct cfg80211_chan_def def;
 //	enum ieee80211_band band;
@@ -4293,7 +4293,7 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
 		cb->htt.tid = HTT_DATA_TX_EXT_TID_NON_QOS_MCAST_BCAST;
 
 	/* Strip the subtype from the field */
-	hdr->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
+	hdr->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS_MASK_ANY;
 }
 
 /*
