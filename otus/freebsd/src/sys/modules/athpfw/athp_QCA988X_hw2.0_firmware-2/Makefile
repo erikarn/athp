@@ -1,11 +1,6 @@
 # $FreeBSD$
 
-KMOD=	athp_QCA988X_hw2.0_firmware-2.bin
-FIRMWS=	athp_QCA988X_hw2.0_firmware-2.bin:athp_QCA988X_hw2.0_firmware-2.bin:1
-
-CLEANFILES=	board.bin
-
-athp_QCA988X_hw2.0_firmware-2.bin: ${.CURDIR}/../../../contrib/dev/athp/QCA988X_hw2.0/firmware-2.bin
-	cp ${.CURDIR}/../../../contrib/dev/athp/QCA988X_hw2.0/firmware-2.bin ${.TARGET}
+FWNAME=		firmware-2.bin
+FWSUBDIR=	QCA988X_hw2.0
 
 .include <bsd.kmod.mk>
