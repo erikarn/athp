@@ -256,6 +256,7 @@ athp_node_schedule_deferred_tx(struct ieee80211_node *ni)
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *arsta = ATHP_NODE(ni);
 
+	ath10k_warn(ar, "%s: called\n", __func__);
 	taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
 }
 
@@ -324,6 +325,9 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 	ATHP_DATA_LOCK_ASSERT(ar);
 
 	arsta = ATHP_NODE(ni);
+
+	device_printf(ar->sc_dev, "%s: called; MAC %6D\n", __func__,
+	    ni->ni_macaddr, ":");
 
 	ret = mbufq_enqueue(&arsta->deferred_txq, m);
 	if (ret != 0) {
@@ -511,6 +515,9 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *arsta;
 	int ret;
+
+	device_printf(ar->sc_dev, "%s: called; MAC %6D\n", __func__,
+	    ni->ni_macaddr, ":");
 
 	ATHP_CONF_LOCK(ar);
 
@@ -2206,6 +2213,9 @@ athp_node_init(struct ieee80211_node *ni)
 	struct ath10k *ar = ic->ic_softc;
 	struct athp_taskq_entry *e;
 	struct athp_node_alloc_state *ku;
+
+	device_printf(ar->sc_dev, "%s: called; MAC %6D\n", __func__,
+	    ni->ni_macaddr, ":");
 
 	/* XXX TODO: make sysctl configurable at runtime for new peers */
 	mbufq_init(&ATHP_NODE(ni)->deferred_txq, 128);
