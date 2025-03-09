@@ -2822,11 +2822,6 @@ athp_attach_11ac(struct ath10k *ar)
 	/* Grab VHT capability information from firmware */
 	/* TODO: this is now ic_vht_cap.vht_cap_info */
 	ic->ic_vht_cap.vht_cap_info = ar->vht_cap_info;
-
-	/* Always support VHT40/VHT80 */
-	ic->ic_vht_conf |= IEEE80211_FVHT_USEVHT40;
-	ic->ic_vht_conf |= IEEE80211_FVHT_USEVHT80;
-
 	ic->ic_flags_ext |= IEEE80211_FEXT_VHT;
 
 	/*
