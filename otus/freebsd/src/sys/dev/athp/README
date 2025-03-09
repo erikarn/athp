@@ -185,6 +185,15 @@ vdev start/restart:
   continue to call vdev restart (eg during parameter reconfiguration?);
   right now I bet I'm doing it subtly wrong.
 
+* STA mode association works fine the first time, but if I need to reassociate
+  to a different network, I hit
+
+  ath10k_vif_bring_up: XXX failed; is already started!
+
+  .. and TX will timeout.
+
+  This is telling me that I'm not tearing down the STA mode BSS first.
+
 WEP:
 
 * We need to actually, yes, plumb in WEP keys
