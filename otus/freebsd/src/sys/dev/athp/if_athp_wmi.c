@@ -2362,7 +2362,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct athp_buf *pbuf)
 	}
 
 	if (rx_status & WMI_RX_STATUS_ERR_MIC)
-		stat.c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
+		stat.c_pktflags |= IEEE80211_RX_F_FAIL_MMIC;
 
 	if (channel <= 14)
 		band = IEEE80211_CHAN_2GHZ;

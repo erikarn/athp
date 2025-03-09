@@ -1298,7 +1298,7 @@ static void ath10k_process_rx(struct ath10k *ar,
 		   rx_status->c_pktflags,
 		   !!(rx_status->c_pktflags & IEEE80211_RX_F_DECRYPTED),
 		   !!(rx_status->c_pktflags & IEEE80211_RX_F_FAIL_FCSCRC),
-		   !!(rx_status->c_pktflags & IEEE80211_RX_F_FAIL_MIC),
+		   !!(rx_status->c_pktflags & IEEE80211_RX_F_FAIL_MMIC),
 		   !!(rx_status->c_pktflags & IEEE80211_RX_F_AMSDU_MORE));
 
 	/* mmm configurable */
@@ -1766,7 +1766,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 	/* Clear per-MPDU flags while leaving per-PPDU flags intact. */
 	status->c_pktflags &= ~(
 		    IEEE80211_RX_F_FAIL_FCSCRC
-		    | IEEE80211_RX_F_FAIL_MIC
+		    | IEEE80211_RX_F_FAIL_MMIC
 		    | IEEE80211_RX_F_DECRYPTED
 		    | IEEE80211_RX_F_IV_STRIP
 		    | IEEE80211_RX_F_MMIC_STRIP
@@ -1776,7 +1776,7 @@ static void ath10k_htt_rx_h_mpdu(struct ath10k *ar,
 		status->c_pktflags |= IEEE80211_RX_F_FAIL_FCSCRC;
 
 	if (has_tkip_err)
-		status->c_pktflags |= IEEE80211_RX_F_FAIL_MIC;
+		status->c_pktflags |= IEEE80211_RX_F_FAIL_MMIC;
 
 	if (is_decrypted)
 		status->c_pktflags |= IEEE80211_RX_F_DECRYPTED
