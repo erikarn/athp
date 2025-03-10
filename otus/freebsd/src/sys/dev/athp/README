@@ -220,10 +220,10 @@ WEP:
 
 Hostap (and also STA too, as part of unifying node handling):
 
-* We need to buffer frames to a node until the firmware has finished plumbing
-  up a node via the async callback driven path.  We can't just sleep; net80211
-  currently holds a TX lock during all of this.  So, we'll have to append
-  frames to a buffer queue and then flush it when the node is plumbed up.
+* (done) We need to buffer frames to a node until the firmware has finished
+  plumbing up a node via the async callback driven path.  We can't just sleep;
+  net80211 currently holds a TX lock during all of this.  So, we'll have to
+  append frames to a buffer queue and then flush it when the node is plumbed up.
 
 * BSS changes - not sure what to do here yet.  Do we get notification that our
   BSS changed?
