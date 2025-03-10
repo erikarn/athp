@@ -1219,8 +1219,6 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		break;
 
 	case IEEE80211_S_INIT:
-
-
 		ATHP_CONF_LOCK(ar);
 		athp_tx_disable(ar, vap);
 
@@ -1260,6 +1258,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ATHP_CONF_LOCK(ar);
 			/* XXX TODO: can we use bss_ni->ic_chan? */
+			ath10k_vif_bring_down(vap);
 			ret = ath10k_vif_bring_up(vap, ic->ic_curchan);
 			if (ret != 0) {
 				ATHP_CONF_UNLOCK(ar);
