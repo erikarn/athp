@@ -1220,6 +1220,7 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 	case IEEE80211_S_INIT:
 
+
 		ATHP_CONF_LOCK(ar);
 		athp_tx_disable(ar, vap);
 
@@ -1236,6 +1237,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 			if (vif->is_stabss_setup == 1) {
 				athp_node_set_is_in_peer_table(bss_ni, 0);
 				ath10k_bss_update(ar, vap, bss_ni, 0, 0);
+				/* Note: don't make this a failure */
+				/* XXX TODO: migrate this into ath10k_bss_update? */
+				ath10k_vif_bring_down(vap);
 			}
 		}
 

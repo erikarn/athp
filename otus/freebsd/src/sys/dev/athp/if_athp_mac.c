@@ -8756,6 +8756,8 @@ ath10k_bss_update(struct ath10k *ar, struct ieee80211vap *vap,
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
+	/* TODO: should I put a call to ath10k_vif_bring_down here during !is_assoc !is_run? */
+
 #if 0
 	ath10k_warn(ar, "%s: called; vap=%p, ni=%p, is_assoc=%d, is_run=%d\n",
 	    __func__,
