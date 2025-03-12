@@ -696,9 +696,6 @@ ath10k_htt_tx(struct ath10k_htt *htt, struct athp_buf *msdu)
 		/* pass through */
 	case ATH10K_HW_TXRX_ETHERNET:
 		if (ar->hw_params.continuous_frag_desc) {
-			ath10k_err(ar,
-			    "%s: TODO! This hasn't been checkd/tested yet!\n",
-			    __func__);
 			memset(&htt->frag_desc.vaddr[msdu_id], 0,
 			       sizeof(struct htt_msdu_ext_desc));
 			frags = (struct htt_data_tx_desc_frag *)
