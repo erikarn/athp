@@ -49,23 +49,43 @@ struct ath10k_htt_txbuf {
 
 #define	ATHP_HTT_TX_LOCK(htt)		mtx_lock(&(htt)->tx_lock)
 #define	ATHP_HTT_TX_UNLOCK(htt)		mtx_unlock(&(htt)->tx_lock)
+#ifdef	INVARIANTS
 #define	ATHP_HTT_TX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_lock, MA_OWNED)
 #define	ATHP_HTT_TX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_lock, MA_NOTOWNED)
+#else
+#define	ATHP_HTT_TX_LOCK_ASSERT(htt)	(void) (htt)
+#define	ATHP_HTT_TX_UNLOCK_ASSERT(htt)	(void) (htt)
+#endif
 
 #define	ATHP_HTT_TX_COMP_LOCK(htt)		mtx_lock(&(htt)->tx_comp_lock)
 #define	ATHP_HTT_TX_COMP_UNLOCK(htt)		mtx_unlock(&(htt)->tx_comp_lock)
+#ifdef	INVARIANTS
 #define	ATHP_HTT_TX_COMP_LOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_comp_lock, MA_OWNED)
 #define	ATHP_HTT_TX_COMP_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->tx_comp_lock, MA_NOTOWNED)
+#else
+#define	ATHP_HTT_TX_COMP_LOCK_ASSERT(htt)	(void) (htt)
+#define	ATHP_HTT_TX_COMP_UNLOCK_ASSERT(htt)	(void) (htt)
+#endif
 
 #define	ATHP_HTT_RX_LOCK(htt)		mtx_lock(&(htt)->rx_ring.lock)
 #define	ATHP_HTT_RX_UNLOCK(htt)		mtx_unlock(&(htt)->rx_ring.lock)
+#ifdef	INVARIANTS
 #define	ATHP_HTT_RX_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_OWNED)
 #define	ATHP_HTT_RX_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.lock, MA_NOTOWNED)
+#else
+#define	ATHP_HTT_RX_LOCK_ASSERT(htt)	(void) (htt)
+#define	ATHP_HTT_RX_UNLOCK_ASSERT(htt)	(void) (htt)
+#endif
 
 #define	ATHP_HTT_RX_COMP_LOCK(htt)		mtx_lock(&(htt)->rx_ring.comp_lock)
 #define	ATHP_HTT_RX_COMP_UNLOCK(htt)		mtx_unlock(&(htt)->rx_ring.comp_lock)
+#ifdef	INVARIANTS
 #define	ATHP_HTT_RX_COMP_LOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.comp_lock, MA_OWNED)
 #define	ATHP_HTT_RX_COMP_UNLOCK_ASSERT(htt)	mtx_assert(&(htt)->rx_ring.comp_lock, MA_NOTOWNED)
+#else
+#define	ATHP_HTT_RX_COMP_LOCK_ASSERT(htt)	(void) (htt)
+#define	ATHP_HTT_RX_COMP_UNLOCK_ASSERT(htt)	(void) (htt)
+#endif
 
 #define	ATHP_RX_SKB_HASH_BUCKET_COUNT	32
 

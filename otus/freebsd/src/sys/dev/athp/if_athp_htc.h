@@ -102,8 +102,13 @@ struct ath10k_htc {
 #define	ATHP_HTC_TX_LOCK_FREE(ht)	mtx_destroy(&ht->tx_lock)
 #define	ATHP_HTC_TX_LOCK(ht)		mtx_lock(&ht->tx_lock)
 #define	ATHP_HTC_TX_UNLOCK(ht)		mtx_unlock(&ht->tx_lock)
+#ifdef	INVARIANTS
 #define	ATHP_HTC_TX_LOCK_ASSERT(ht)	mtx_assert(&ht->tx_lock, MA_OWNED)
 #define	ATHP_HTC_TX_UNLOCK_ASSERT(ht)	mtx_unlock(&ht->tx_lock, MA_NOTOWNED)
+#else
+#define	ATHP_HTC_TX_LOCK_ASSERT(ht)	(void) ht
+#define	ATHP_HTC_TX_UNLOCK_ASSERT(ht)	(void) ht
+#endif
 
 extern	int ath10k_htc_init(struct ath10k *ar);
 extern	int ath10k_htc_wait_target(struct ath10k_htc *htc);

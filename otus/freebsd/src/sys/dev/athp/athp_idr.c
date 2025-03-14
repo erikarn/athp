@@ -209,7 +209,9 @@ idr_find_locked(struct idr *idr, int id)
 	struct idr_layer *il;
 	void *res;
 
+#ifdef	INVARIANTS
 	mtx_assert(&idr->lock, MA_OWNED);
+#endif
 	il = idr_find_layer_locked(idr, id);
 	if (il != NULL)
 		res = il->ary[id & IDR_MASK];
@@ -313,7 +315,9 @@ idr_get_new_locked(struct idr *idr, void *ptr, int *idp)
 	int idx;
 	int id;
 
+#ifdef	INVARIANTS
 	mtx_assert(&idr->lock, MA_OWNED);
+#endif
 
 	error = -EAGAIN;
 	/*
@@ -400,8 +404,9 @@ idr_get_new_above_locked(struct idr *idr, void *ptr, int starting_id, int *idp)
 	int idx, sidx;
 	int id;
 
+#ifdef	INVARIANTS
 	mtx_assert(&idr->lock, MA_OWNED);
-
+#endif
 	error = -EAGAIN;
 	/*
 	 * Compute the layers required to support starting_id and the mask
@@ -522,8 +527,9 @@ idr_alloc_locked(struct idr *idr, void *ptr, int start, int end)
 	int error;
 	int id;
 
+#ifdef	INVARIANTS
 	mtx_assert(&idr->lock, MA_OWNED);
-
+#endif
 	if (unlikely(start < 0))
 		return (-EINVAL);
 	if (unlikely(max < start))

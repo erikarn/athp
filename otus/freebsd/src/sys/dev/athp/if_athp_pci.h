@@ -21,13 +21,23 @@
 
 #define	ATHP_PCI_PS_LOCK(psc)		mtx_lock(&(psc)->ps_mtx)
 #define	ATHP_PCI_PS_UNLOCK(psc)		mtx_unlock(&(psc)->ps_mtx)
+#ifdef	INVARIANTS
 #define	ATHP_PCI_PS_LOCK_ASSERT(psc)	mtx_assert(&(psc)->ps_mtx, MA_OWNED)
 #define	ATHP_PCI_PS_UNLOCK_ASSERT(psc)	mtx_assert(&(psc)->ps_mtx, MA_NOTOWNED)
+#else
+#define	ATHP_PCI_PS_LOCK_ASSERT(psc)	(void) (psc)
+#define	ATHP_PCI_PS_UNLOCK_ASSERT(psc)	(void) (psc)
+#endif
 
 #define	ATHP_PCI_CE_LOCK(psc)		mtx_lock(&(psc)->ce_mtx)
 #define	ATHP_PCI_CE_UNLOCK(psc)		mtx_unlock(&(psc)->ce_mtx)
+#ifdef	INVARIANTS
 #define	ATHP_PCI_CE_LOCK_ASSERT(psc)	mtx_assert(&(psc)->ce_mtx, MA_OWNED)
 #define	ATHP_PCI_CE_UNLOCK_ASSERT(psc)	mtx_assert(&(psc)->ce_mtx, MA_NOTOWNED)
+#else
+#define	ATHP_PCI_CE_LOCK_ASSERT(psc)	(void) (psc)
+#define	ATHP_PCI_CE_UNLOCK_ASSERT(psc)	(void) (psc)
+#endif
 
 #define	ath10k_pci_priv(ar)		((ar)->sc_psc)
 
