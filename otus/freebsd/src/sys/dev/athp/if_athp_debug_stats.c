@@ -20,9 +20,6 @@
  * ath10k vdev/pdev statistics routines (from debug.c.)
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_wlan.h"
 
 #include <sys/param.h>
