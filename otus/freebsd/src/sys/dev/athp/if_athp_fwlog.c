@@ -1504,12 +1504,17 @@ static void ath10k_fwlog_parse_msg(struct ath10k *ar, u8 *data, int len)
 		if (moduleid >= WLAN_MODULE_ID_MAX)
 			return;
 
+		if (moduleid > 63)
+			goto next;
+		if ((ar->sc_fwlog_modulemask & (1ULL << moduleid)) == 0)
+			goto next;
+
 		ath10k_fwlog_print(ar, moduleid, vapid, debugid,
 			           timestamp, numargs,
 			           (((u32 *)buffer) +
 				   2 + count));
+	next:
 		count += numargs + 2;
-
 	}
 }
 

@@ -298,6 +298,7 @@ struct ath10k {
 	char				sc_arvif_mtx_buf[16];
 	int				sc_invalid;
 	uint64_t			sc_debug;
+	uint64_t			sc_fwlog_modulemask;
 	int				sc_isrunning;
 
 	struct {

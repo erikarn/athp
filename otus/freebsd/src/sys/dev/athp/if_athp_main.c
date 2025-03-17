@@ -2620,6 +2620,10 @@ athp_attach_sysctl(struct ath10k *ar)
 	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "debug",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_debug, "debug control");
+	SYSCTL_ADD_UQUAD(ctx, child, OID_AUTO, "fwlog_modulemask",
+	    CTLFLAG_RW | CTLFLAG_RWTUN,
+	    &ar->sc_fwlog_modulemask, "FW log module mask for printing");
+
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "hwcrypt_mode",
 	    CTLFLAG_RW | CTLFLAG_RWTUN,
 	    &ar->sc_conf_crypt_mode, 0, "software/hardware crypt mode");
