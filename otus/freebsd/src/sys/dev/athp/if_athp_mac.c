@@ -6840,13 +6840,9 @@ static int ath10k_conf_tx(struct ath10k *ar,
 	 */
 	p->txop = IEEE80211_TXOP_TO_US(wmep->wmep_txopLimit);
 
-	ath10k_warn(ar, "%s: ac=%d, cwmin=%d, cwmax=%d, aifs=%d, txop=%d\n",
-	    __func__,
-	    ac,
-	    p->cwmin,
-	    p->cwmax,
-	    p->aifs,
-	    p->txop);
+	ath10k_dbg(ar, ATH10K_DBG_BSS_CONF,
+	    "%s: ac=%d, cwmin=%d, cwmax=%d, aifs=%d, txop=%d\n",
+	    __func__, ac, p->cwmin, p->cwmax, p->aifs, p->txop);
 
 	/*
 	 * This is configuring the VAP WME parameters, not the per-node
@@ -6878,6 +6874,10 @@ exit:
 	return ret;
 }
 
+/*
+ * Note: remain on channel has to do with P2P off-channel
+ * work like P2P setup.
+ */
 #if 0
 
 #define ATH10K_ROC_TIMEOUT_HZ (2)
@@ -6985,7 +6985,9 @@ static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw)
 
 	return 0;
 }
+#endif
 
+#if 0
 /*
  * Both RTS and Fragmentation threshold are interface-specific
  * in ath10k, but device-specific in mac80211.
