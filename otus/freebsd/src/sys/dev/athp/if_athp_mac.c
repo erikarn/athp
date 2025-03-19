@@ -5947,10 +5947,12 @@ int
 ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int passive_ms)
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+	struct ieee80211com *ic = vif->iv_ic;
 //	struct cfg80211_scan_request *req = &hw_req->req;
 	struct wmi_start_scan_arg arg;
+	u8 *p;
 	int ret = 0;
-//	int i;
+	int i, nchans;
 
 	ATHP_CONF_LOCK(ar);
 
@@ -5983,30 +5985,49 @@ ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int p
 	arg.dwell_time_active = active_ms;
 	arg.dwell_time_passive = passive_ms;
 
-#if 0
-	if (req->ie_len) {
-		arg.ie_len = req->ie_len;
-		memcpy(arg.ie, req->ie, arg.ie_len);
-	}
+	/* Information Elements (IE). */
+	arg.ie_len = sizeof(arg.ie);
+	p = arg.ie;
+	ret = ieee80211_probereq_ie(vif, ic, &p, &arg.ie_len, "", -1);
+	if (ret != 0)
+		ath10k_warn(ar, "%s: ieee80211_probereq_ie() error %d\n",
+		    __func__, ret);
 
-	if (req->n_ssids) {
-		arg.n_ssids = req->n_ssids;
-		for (i = 0; i < arg.n_ssids; i++) {
-			arg.ssids[i].len  = req->ssids[i].ssid_len;
-			arg.ssids[i].ssid = req->ssids[i].ssid;
+	/* Channels. */
+	if (ic->ic_nchans > 0) {
+
+		for (i = nchans = 0; nchans < nitems(arg.channels) &&
+		    i < ic->ic_nchans; i++) {
+			struct ieee80211_channel *c;
+
+			c = &ic->ic_channels[i];
+			/* XXX-BZ Partial copy from net80211::sweepchannels(). */
+			if (IEEE80211_IS_CHAN_DTURBO(c) || IEEE80211_IS_CHAN_HT(c) ||
+			    IEEE80211_IS_CHAN_VHT(c))
+				continue;
+			if (vif->iv_des_mode != IEEE80211_MODE_AUTO &&
+			    vif->iv_des_mode != ieee80211_chan2mode(c))
+				continue;
+			if (isclr(vif->iv_ic->ic_chan_active, c->ic_ieee) ||
+			    (vif->iv_des_chan != IEEE80211_CHAN_ANYC &&
+			    c->ic_freq != vif->iv_des_chan->ic_freq))
+				continue;
+			arg.channels[nchans++] = ieee80211_get_channel_center_freq(c);
 		}
-	} else {
-		arg.scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
 	}
 
-	if (req->n_channels) {
-		arg.n_channels = req->n_channels;
-		for (i = 0; i < arg.n_channels; i++)
-			arg.channels[i] = req->channels[i]->center_freq;
+	/* SSIDs. */
+	if (vif->iv_scanreq_nssid == 0) {
+		arg.scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
+	} else {
+		arg.n_ssids = (vif->iv_scanreq_nssid >
+		    WLAN_SCAN_PARAMS_MAX_SSID) ? WLAN_SCAN_PARAMS_MAX_SSID :
+		    vif->iv_scanreq_nssid;
+		for (i = 0; i < arg.n_ssids; i++) {
+			arg.ssids[i].len  = vif->iv_scanreq_ssid[i].len;
+			arg.ssids[i].ssid = vif->iv_scanreq_ssid[i].ssid;
+		}
 	}
-#else
-	ath10k_warn(ar, "%s: TODO: add scan request from net80211!\n", __func__);
-#endif
 
 	ret = ath10k_start_scan(ar, &arg);
 	if (ret) {
