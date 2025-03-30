@@ -1,2 +1,11 @@
 
 otus/freebsd/src/sys/.vscode/c_cpp_properties.json
+*.o
+*.ko
+*.fwo
+otus/freebsd/src/sys/modules/athpfw/*/*.c
+otus/freebsd/src/sys/modules/athpfw/*/*.h
+otus/freebsd/src/sys/modules/*/*/*.bin
+otus/freebsd/src/sys/modules/*/*/machine
+otus/freebsd/src/sys/modules/*/*/x86
+otus/freebsd/src/sys/modules/*/*/export_syms
