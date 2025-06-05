@@ -1906,8 +1906,8 @@ ath10k_wmi_op_gen_mgmt_tx(struct ath10k *ar, struct athp_buf *msdu)
 	memcpy(cmd->buf, mbuf_skb_data(msdu->m), mbuf_skb_len(msdu->m));
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi mgmt tx skb %p len %d ftype %02x stype %02x\n",
-		   msdu, mbuf_skb_len(pbuf->m), fc & IEEE80211_FCTL_FTYPE,
-		   fc & IEEE80211_FCTL_STYPE);
+		   msdu, mbuf_skb_len(pbuf->m), fc & IEEE80211_FC0_TYPE_MASK,
+		   fc & IEEE80211_FC0_SUBTYPE_MASK);
 	trace_ath10k_tx_hdr(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 	trace_ath10k_tx_payload(ar, mbuf_skb_data(pbuf->m), mbuf_skb_len(pbuf->m));
 	return pbuf;

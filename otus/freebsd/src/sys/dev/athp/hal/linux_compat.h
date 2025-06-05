@@ -159,10 +159,6 @@ typedef uint64_t	__be64;
 #define IEEE80211_GCMP_MIC_LEN          16
 #define IEEE80211_GCMP_PN_LEN           6
 
-/* XXX TODO: get rid of these; so far they're just used for debugging echos */
-#define IEEE80211_FCTL_FTYPE            0x000c
-#define IEEE80211_FCTL_STYPE            0x00f0
-
 /*
  * mac80211 style routines, but they take an ieee80211_frame pointer.
  * Should reimplement, move into net80211.
