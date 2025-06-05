@@ -253,7 +253,7 @@ athp_node_schedule_deferred_tx(struct ieee80211_node *ni)
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *arsta = ATHP_NODE(ni);
 
-	ath10k_warn(ar, "%s: called\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_DEFERRED_TX, "%s: called\n", __func__);
 	taskqueue_enqueue(ar->workqueue, &arsta->deferred_tq);
 }
 
@@ -323,8 +323,8 @@ athp_node_deferred_tx_queue(struct ieee80211_node *ni, struct mbuf *m)
 
 	arsta = ATHP_NODE(ni);
 
-	device_printf(ar->sc_dev, "%s: called; MAC %6D\n", __func__,
-	    ni->ni_macaddr, ":");
+	ath10k_dbg(ar, ATH10K_DBG_DEFERRED_TX, "%s: called; MAC %6D\n",
+	    __func__, ni->ni_macaddr, ":");
 
 	ret = mbufq_enqueue(&arsta->deferred_txq, m);
 	if (ret != 0) {
@@ -513,7 +513,7 @@ athp_raw_xmit(struct ieee80211_node *ni, struct mbuf *m0,
 	struct ath10k_sta *arsta;
 	int ret;
 
-	device_printf(ar->sc_dev, "%s: called; MAC %6D\n", __func__,
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; MAC %6D\n", __func__,
 	    ni->ni_macaddr, ":");
 
 	ATHP_CONF_LOCK(ar);
@@ -1940,7 +1940,7 @@ athp_vap_delete(struct ieee80211vap *vap)
 //	struct ieee80211vap *v;
 //	int n;
 
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called\n", __func__);
 
 	/*
 	 * Mark the VAP as dying.  This is to ensure we don't
@@ -2162,7 +2162,8 @@ athp_node_deferred_tx(void *arg, int npending)
 	struct mbufq mq;
 	int ret;
 
-	ath10k_warn(ar, "%s: mac=%6D: called to transmit frames\n",
+	ath10k_dbg(ar, ATH10K_DBG_DEFERRED_TX,
+	    "%s: mac=%6D: called to transmit frames\n",
 	    __func__, ni->ni_macaddr, ":");
 
 	mbufq_init(&mq, 128); /* limit isn't important here */
@@ -2197,7 +2198,8 @@ athp_node_alloc(struct ieee80211vap *vap,
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *an;
 
-	device_printf(ar->sc_dev, "%s: called; mac=%6D\n", __func__, mac, ":");
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; mac=%6D\n", __func__,
+	    mac, ":");
 
 	an = malloc(sizeof(struct ath10k_sta), M_80211_NODE, M_NOWAIT | M_ZERO);
 	if (! an)
@@ -2214,7 +2216,7 @@ athp_node_init(struct ieee80211_node *ni)
 	struct athp_taskq_entry *e;
 	struct athp_node_alloc_state *ku;
 
-	device_printf(ar->sc_dev, "%s: called; MAC %6D\n", __func__,
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; MAC %6D\n", __func__,
 	    ni->ni_macaddr, ":");
 
 	/* XXX TODO: make sysctl configurable at runtime for new peers */
@@ -2242,8 +2244,8 @@ athp_node_init(struct ieee80211_node *ni)
 		return (0);
 	}
 
-	device_printf(ar->sc_dev, "%s: add peer for MAC %6D\n", __func__,
-	    ni->ni_macaddr, ":");
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: add peer for MAC %6D\n",
+	    __func__, ni->ni_macaddr, ":");
 
 	/*
 	 * Allocate a callback function state.
@@ -2305,15 +2307,14 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
 	if (vap->iv_opmode != IEEE80211_M_HOSTAP)
 		return;
 
-	device_printf(ar->sc_dev,
-	    "%s: called; mac=%6D; isnew=%d\n",
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; mac=%6D; isnew=%d\n",
 	    __func__, ni->ni_macaddr, ":", isnew);
 
 	if (memcmp(ni->ni_macaddr, vap->iv_myaddr, ETHER_ADDR_LEN) != 0) {
 		struct athp_taskq_entry *e;
 		struct athp_node_alloc_state *ku;
 
-		device_printf(ar->sc_dev,
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
 		    "%s: add association state for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
@@ -2345,7 +2346,7 @@ athp_newassoc(struct ieee80211_node *ni, int isnew)
  * Called to free a node.
  *
  * This will schedule deferred firmware work to clean up the node, but
- * the node struct iself gets freed at tihs point.
+ * the node struct iself gets freed at this point.
  */
 static void
 athp_node_free(struct ieee80211_node *ni)
@@ -2354,7 +2355,7 @@ athp_node_free(struct ieee80211_node *ni)
 	struct ath10k *ar = ic->ic_softc;
 	struct ath10k_sta *arsta;
 
-	device_printf(ar->sc_dev,
+	ath10k_dbg(ar, ATH10K_DBG_MISC,
 	    "%s: called; mac=%6D\n",
 	    __func__, ni->ni_macaddr, ":");
 
@@ -2367,7 +2368,7 @@ athp_node_free(struct ieee80211_node *ni)
 		struct athp_taskq_entry *e;
 		struct athp_node_alloc_state *ku;
 
-		device_printf(ar->sc_dev,
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
 		    "%s: delete peer for MAC %6D\n",
 		    __func__, ni->ni_macaddr, ":");
 
@@ -2724,8 +2725,6 @@ athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
 	uint8_t bands[IEEE80211_MODE_BYTES];
 	int cbw_flags = 0;
 
-	printf("%s: called; maxchans=%d\n", __func__, maxchans);
-
 	memset(bands, 0, sizeof(bands));
 
 	if (ar->ht_cap_info & WMI_HT_CAP_ENABLED)
@@ -2756,8 +2755,6 @@ athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
 		    nchans, chan_list_5ghz, nitems(chan_list_5ghz),
 		    bands, cbw_flags);
 	}
-
-	printf("%s: done; maxchans=%d, nchans=%d\n", __func__, maxchans, *nchans);
 }
 
 static void
@@ -2820,10 +2817,13 @@ athp_attach_11n(struct ath10k *ar)
 	/* Streams */
 	ic->ic_txstream = ar->num_rf_chains;
 	ic->ic_rxstream = ar->num_rf_chains;
+
+#if 0
 	device_printf(ar->sc_dev, "%s: %d tx streams, %d rx streams\n",
 	    __func__,
 	    ic->ic_txstream,
 	    ic->ic_rxstream);
+#endif
 }
 
 static void
@@ -2881,8 +2881,6 @@ int
 athp_attach_net80211(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
-
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* Setup net80211 state */
 	ic->ic_softc = ar;
@@ -2981,8 +2979,6 @@ int
 athp_detach_net80211(struct ath10k *ar)
 {
 	struct ieee80211com *ic = &ar->sc_ic;
-
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
 
 	/* XXX Drain tasks from net80211 queue */
 

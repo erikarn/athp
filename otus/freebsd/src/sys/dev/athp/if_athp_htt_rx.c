@@ -1910,7 +1910,7 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	TAILQ_FOREACH(pbuf, amsdu, next) {
 		total_len += mbuf_skb_len(pbuf->m);
 	}
-	ath10k_warn(ar,
+	ath10k_dbg(ar, ATH10K_DBG_MISC,
 	    "%s: nframes=%d; msdu len=%d, desclen=%d, totallen=%d\n", __func__,
 	    athp_buf_list_count(amsdu),
 	    total_len,
@@ -1932,7 +1932,8 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	 */
 	np = athp_getbuf(ar, &ar->buf_rx, total_len);
 	if (np == NULL) {
-		printf("%s: failed to allocate buffer of %d bytes\n",
+		ath10k_warn(ar,
+		    "%s: failed to allocate buffer of %d bytes\n",
 		    __func__,
 		    total_len);
 		return (-ENOMEM);
@@ -1965,7 +1966,8 @@ ath10k_unchain_msdu_freebsd(struct ath10k *ar, athp_buf_head *amsdu)
 	 */
 	TAILQ_FOREACH(pbuf, amsdu, next) {
 		/* XXX mbuf_skb_put is not setting the data pointer along */
-		printf("%s: copying %d bytes..\n",
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
+		    "%s: copying %d bytes..\n",
 		    __func__,
 		    mbuf_skb_len(pbuf->m));
 		m_append(np->m,
