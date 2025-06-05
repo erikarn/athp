@@ -321,6 +321,10 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 	arg.vdev_id = arvif->vdev_id;
 	arg.key_idx = k->hw_keyidx;
 	arg.key_len = k->keylen;
+	/*
+	 * TODO: add a net80211 accessor here for key data and potential
+	 * TKIP MIC
+	 */
 	arg.key_data = k->key;
 	arg.key_flags = flags;
 	arg.macaddr = macaddr;
@@ -355,6 +359,10 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		 *
 		 * The key+mic format is the same as mac80211 and what
 		 * is expected by the firmware.
+		 */
+		/*
+		 * TODO: we need to SEPARATELY extract the key/MIC out
+		 * otherwise this may break when we add larger key sizes!
 		 */
 		arg.key_len += 16;
 		arg.key_cipher = WMI_CIPHER_TKIP;
