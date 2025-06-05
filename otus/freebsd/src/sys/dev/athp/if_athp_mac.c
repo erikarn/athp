@@ -5948,9 +5948,12 @@ ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int p
 {
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 //	struct cfg80211_scan_request *req = &hw_req->req;
+	struct ieee80211com *ic = &ar->sc_ic;
+	struct ieee80211_scan_state *ss = ic->ic_scan;
 	struct wmi_start_scan_arg arg;
 	int ret = 0;
 //	int i;
+	int nssid;
 
 	ATHP_CONF_LOCK(ar);
 
@@ -5983,30 +5986,65 @@ ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int p
 	arg.dwell_time_active = active_ms;
 	arg.dwell_time_passive = passive_ms;
 
+	/* How many to scan */
+	nssid = MIN(ss->ss_nssid, WLAN_SCAN_PARAMS_MAX_SSID);
+
+	/* Set passive if required */
+	if ((ss->ss_flags & IEEE80211_SCAN_ACTIVE) == 0)
+		arg.scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
+
+	/* Populate SSID list if needed */
+	if (nssid > 0) {
+		int i;
+
+		/* TODO: Note that hal/wmi.h:wmi_ssid has a 32 byte limit */
+		arg.n_ssids = nssid;
+		for (i = 0; i < nssid; i++) {
+			arg.ssids[i].len = MIN(ss->ss_ssid[i].len, 32);
+			arg.ssids[i].ssid = ss->ss_ssid[i].ssid;
+		}
+	}
+
+	/* Scan channel list */
+	/* Note: wmi_start_scan_arg has space for 64 channels */
+	if (ss->ss_last > 0) {
+		int i, nchans = 0;
+
+		for (i = 0; nchans < 64 && i < ss->ss_last; i++) {
+			const struct ieee80211_channel *c = ss->ss_chans[i];
+			if (!IEEE80211_IS_CHAN_2GHZ(c) && !IEEE80211_IS_CHAN_5GHZ(c)) {
+				ath10k_dbg(ar, ATH10K_DBG_SCAN,
+				    "%s: skipping channel (freq=%d, ieee=%d, flags=0x%08x)\n",
+				    __func__,
+				    c->ic_freq, c->ic_ieee, c->ic_flags);
+				continue;
+			}
+			ath10k_dbg(ar, ATH10K_DBG_SCAN,
+			    "%s: adding channel %d (%d MHz) to the list\n",
+			    __func__,
+			    c->ic_ieee, c->ic_freq);
+			arg.channels[nchans] = ieee80211_get_channel_center_freq(c);
+			nchans++;
+		}
+		arg.n_channels = nchans;
+		ath10k_dbg(ar, ATH10K_DBG_SCAN, "%s: %d channels\n", __func__, arg.n_channels);
+	}
+
+	/* TODO: BSSID list - not supported by net80211 */
+
+	/*
+	 * TODO: custom IE - not in the scan req? is it needed for WPA1?
+	 * iv_wpa_ie? Or something else?
+	 */
+
 #if 0
 	if (req->ie_len) {
 		arg.ie_len = req->ie_len;
 		memcpy(arg.ie, req->ie, arg.ie_len);
 	}
-
-	if (req->n_ssids) {
-		arg.n_ssids = req->n_ssids;
-		for (i = 0; i < arg.n_ssids; i++) {
-			arg.ssids[i].len  = req->ssids[i].ssid_len;
-			arg.ssids[i].ssid = req->ssids[i].ssid;
-		}
-	} else {
-		arg.scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
-	}
-
-	if (req->n_channels) {
-		arg.n_channels = req->n_channels;
-		for (i = 0; i < arg.n_channels; i++)
-			arg.channels[i] = req->channels[i]->center_freq;
-	}
-#else
-	ath10k_warn(ar, "%s: TODO: add scan request from net80211!\n", __func__);
 #endif
+
+	ath10k_warn(ar, "%s: TODO: add optional probereq IE from net80211?\n", __func__);
 
 	ret = ath10k_start_scan(ar, &arg);
 	if (ret) {
