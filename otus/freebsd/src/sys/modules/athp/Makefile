@@ -100,4 +100,8 @@ SRCS    += if_athp_thermal.c
 # Firmware statistics support
 SRCS    += if_athp_debug_stats.c
 
+# regulatory stuff
+.PATH: ${.CURDIR}/../../dev/athp/regd
+SRCS	+= regd.c
+
 .include <bsd.kmod.mk>
