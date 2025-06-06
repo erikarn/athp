@@ -6064,7 +6064,8 @@ ath10k_hw_scan(struct ath10k *ar, struct ieee80211vap *vif, int active_ms, int p
 	}
 #endif
 
-	ath10k_warn(ar, "%s: TODO: add optional probereq IE from net80211?\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_MISC,
+	    "%s: TODO: add optional probereq IE from net80211?\n", __func__);
 
 	ret = ath10k_start_scan(ar, &arg);
 	if (ret) {

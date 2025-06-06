@@ -1932,7 +1932,8 @@ static void ath10k_wmi_event_scan_started(struct ath10k *ar)
 		if (ar->scan.is_roc)
 			ieee80211_ready_on_channel(ar->hw);
 #else
-		device_printf(ar->sc_dev, "%s: TODO: ready_on_channel\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
+		    "%s: TODO: ready_on_channel\n", __func__);
 #endif
 
 		ath10k_compl_wakeup_one(&ar->scan.started);
