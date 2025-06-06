@@ -212,11 +212,6 @@ static inline int ieee80211_get_qos_ctl_len(struct ieee80211_frame *hdr)
                 return 24;
 }
 
-static inline int ieee80211_has_protected(struct ieee80211_frame *hdr)
-{
-	return !! (hdr->i_fc[1] & IEEE80211_FC1_PROTECTED);
-}
-
 /*
  * data ftype, nullfunc stype.
  */
