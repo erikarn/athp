@@ -17,7 +17,12 @@
 #ifndef REGD_CTL_H
 #define REGD_CTL_H
 
-/* Regpair to CTL band mapping */
+/*
+ * These are a mapping of regulatory domain / EEPROM code
+ * to 2GHz/5GHz band edges.
+ *
+ * The CTL pairs are understood by firmware.
+ */
 static struct ath10k_reg_dmn_pair_mapping regDomainPairs[] = {
 	/* regpair, 5 GHz CTL, 2 GHz CTL */
 	{ATH10K_NO_ENUMRD, ATH10K_DEBUG_REG_DMN, ATH10K_DEBUG_REG_DMN},

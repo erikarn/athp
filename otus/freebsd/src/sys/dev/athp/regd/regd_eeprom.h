@@ -17,6 +17,13 @@
 #ifndef REGD_EEPROM_H
 #define REGD_EEPROM_H
 
+/*
+ * This is a list of regulatory domains supported in firmware.
+ *
+ * TODO: double check that these are BOTH the EEPROM regulatory
+ * domain codes /and/ the codes passed in via WMI to program the
+ * 2G/5G regulatory config.
+ */
 enum Ath10kEnumRd {
 	ATH10K_NO_ENUMRD = 0x00,
 	ATH10K_NULL1_WORLD = 0x03,
