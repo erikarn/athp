@@ -4368,13 +4368,10 @@ static void ath10k_wmi_event_service_ready_work(void *targ, int npending)
 	ar->fw_version_build = (__le32_to_cpu(arg.sw_ver1) & 0x0000ffff);
 	ar->phy_capability = __le32_to_cpu(arg.phy_capab);
 	ar->num_rf_chains = __le32_to_cpu(arg.num_rf_chains);
-#if 0
-	ar->ath_common.regulatory.current_rd = __le32_to_cpu(arg.eeprom_rd);
-#else
-	device_printf(ar->sc_dev, "%s: TODO: EEPROM code: 0x%08x\n",
+	ar->current_rd = __le32_to_cpu(arg.eeprom_rd);
+	device_printf(ar->sc_dev, "%s: EEPROM code: 0x%08x\n",
 	    __func__,
 	    __le32_to_cpu(arg.eeprom_rd));
-#endif
 
 	ath10k_dbg_dump(ar, ATH10K_DBG_WMI, NULL, "wmi svc: ",
 			arg.service_map, arg.service_map_len);
