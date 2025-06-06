@@ -3872,6 +3872,11 @@ ath10k_update_channel_list(struct ath10k *ar, int nchans,
 	return ret;
 }
 
+/*
+ * TODO: either net80211 needs to grow the DFS domains information
+ * inside its regulatory code (ie when to use FCC, ETSI, JP/MKK)
+ * or it needs to be hard-coded somewhere here.
+ */
 #if 0
 static enum wmi_dfs_region
 ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
@@ -3908,6 +3913,12 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
 
+	/*
+	 * TODO: query net80211 for the current regulatory domain /
+	 * country code, then pass that to regd/regd.c to convert it
+	 * to the ath10k EEPROM code / CTL configurations.
+	 */
+
 #if 0
 	regpair = ar->ath_common.regulatory.regpair;
 
@@ -3918,7 +3929,7 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 		wmi_dfs_reg = WMI_UNINIT_DFS_DOMAIN;
 	}
 #else
-	ath10k_warn(ar, "%s: TODO: finish setup/chanlist!\n", __func__);
+	ath10k_warn(ar, "%s: TODO: finish DFS setup!\n", __func__);
 	wmi_dfs_reg = WMI_UNINIT_DFS_DOMAIN;
 #endif
 
@@ -3933,6 +3944,7 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 					    regpair->reg_5ghz_ctl,
 					    wmi_dfs_reg);
 #else
+	ath10k_warn(ar, "%s: TODO: finish regdomain/ctl setup!\n", __func__);
 	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x0, 0x0, 0x0, /* CUS223E bringup code, regdomain 0 */
 	    0x1ff, 0x1ff, /* DEBUG_REG_DMN */
 	    wmi_dfs_reg);
