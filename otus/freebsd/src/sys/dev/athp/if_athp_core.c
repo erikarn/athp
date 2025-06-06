@@ -1460,6 +1460,9 @@ ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode)
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "firmware %s booted\n",
 		   ar->fw_version_str);
 
+	/* Program in the given EEPROM regdomain into the regulatory library */
+	ath10k_regd_set_eeprom(&ar->regd_info, ar->current_rd);
+
 	status = ath10k_wmi_cmd_init(ar);
 	if (status) {
 		ath10k_err(ar, "could not send WMI init command (%d)\n",
@@ -1730,9 +1733,12 @@ ath10k_core_register_work(void *arg, int npending)
 	}
 	status = ath10k_mac_register(ar);
 	if (status) {
-		ath10k_err(ar, "could not register to mac80211 (%d)\n", status);
+		ath10k_err(ar, "could not register to net80211 (%d)\n", status);
 		goto err_release_fw;
 	}
+
+	/* Default regulatory config */
+	ath10k_regd_init(&ar->regd_info);
 
 	/* See athp_pci. ath10k_fwlog_register(ar); */
 

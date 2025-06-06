@@ -52,6 +52,7 @@ struct ath10k_regd_info {
 
 #define ATH10K_NO_CTL                  0xff
 
+extern	void ath10k_regd_init(struct ath10k_regd_info *);
 extern	void ath10k_regd_set_eeprom(struct ath10k_regd_info *, uint16_t);
 extern	void ath10k_regd_get_regdomain(struct ath10k_regd_info *, uint16_t *,
 	    uint16_t *, uint16_t *);

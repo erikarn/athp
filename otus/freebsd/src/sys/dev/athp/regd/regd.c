@@ -51,6 +51,17 @@
  * now there's some missing in net80211) to keep things straight.
  */
 
+void
+ath10k_regd_init(struct ath10k_regd_info *ri)
+{
+	/* sensible (for adrian) defaults */
+	ri->rd_country_code = CTRY_UNITED_STATES;
+	ri->rd_eeprom = ATH10K_NO_ENUMRD;
+	ri->rd_regdomain = ATH10K_NO_ENUMRD;
+	ri->rd_ctl2ghz = ATH10K_DEBUG_REG_DMN;
+	ri->rd_ctl5ghz = ATH10K_DEBUG_REG_DMN;
+}
+
 /**
  * @brief Program in the initial EEPROM regulatory domain.
  *
@@ -61,11 +72,7 @@ void
 ath10k_regd_set_eeprom(struct ath10k_regd_info *ri, uint16_t eeprom_rd)
 {
 	/* TODO */
-	ri->rd_country_code = CTRY_UNITED_STATES;
 	ri->rd_eeprom = eeprom_rd;
-	ri->rd_regdomain = ATH10K_NO_ENUMRD;
-	ri->rd_ctl2ghz = ATH10K_DEBUG_REG_DMN;
-	ri->rd_ctl5ghz = ATH10K_DEBUG_REG_DMN;
 }
 
 void

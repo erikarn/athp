@@ -26,6 +26,8 @@
 
 #include <sys/kdb.h>
 
+#include "regd/regd.h"
+
 #include "if_athp_buf.h"
 #include "if_athp_thermal.h"
 #include "if_athp_htt.h"
@@ -390,7 +392,10 @@ struct ath10k {
 	u32 max_spatial_stream;
 	/* protected by conf_mutex */
 	bool ani_enabled;
+	/* raw EEPROM regdomain value */
 	u32 current_rd;
+
+	struct ath10k_regd_info regd_info;
 
 	DECLARE_BITMAP(fw_features, ATH10K_FW_FEATURE_COUNT);
 

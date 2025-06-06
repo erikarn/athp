@@ -3905,6 +3905,7 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 {
 	int ret;
 	enum wmi_dfs_region wmi_dfs_reg;
+	uint16_t rd, ctl2g, ctl5g;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
@@ -3912,12 +3913,6 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
-
-	/*
-	 * TODO: query net80211 for the current regulatory domain /
-	 * country code, then pass that to regd/regd.c to convert it
-	 * to the ath10k EEPROM code / CTL configurations.
-	 */
 
 #if 0
 	regpair = ar->ath_common.regulatory.regpair;
@@ -3935,20 +3930,13 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 
 	/* Target allows setting up per-band regdomain but ath_common provides
 	 * a combined one only */
-#if 0
+	ath10k_regd_get_regdomain(&ar->regd_info, &rd, &ctl2g, &ctl5g);
+
 	ret = ath10k_wmi_pdev_set_regdomain(ar,
-					    regpair->reg_domain,
-					    regpair->reg_domain, /* 2ghz */
-					    regpair->reg_domain, /* 5ghz */
-					    regpair->reg_2ghz_ctl,
-					    regpair->reg_5ghz_ctl,
-					    wmi_dfs_reg);
-#else
-	ath10k_warn(ar, "%s: TODO: finish regdomain/ctl setup!\n", __func__);
-	ret = ath10k_wmi_pdev_set_regdomain(ar, 0x0, 0x0, 0x0, /* CUS223E bringup code, regdomain 0 */
-	    0x1ff, 0x1ff, /* DEBUG_REG_DMN */
+	    rd, rd, rd, /* global, 2g, 5g regdomain */
+	    ctl2g, ctl5g, /* ctl2g, ctl5g */
 	    wmi_dfs_reg);
-#endif
+
 	if (ret)
 		ath10k_warn(ar, "failed to set pdev regdomain: %d\n", ret);
 }
