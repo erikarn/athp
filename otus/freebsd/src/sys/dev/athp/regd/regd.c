@@ -25,7 +25,6 @@
 #include "regd_ctl.h"
 #include "regd_country.h"
 
-
 /*
  * There's a few things here to "get right".
  *
@@ -51,3 +50,31 @@
  * between the net80211 ones and the ath10k ones (esp since right
  * now there's some missing in net80211) to keep things straight.
  */
+
+/**
+ * @brief Program in the initial EEPROM regulatory domain.
+ *
+ * This takes the current regulatory domain and figures out what
+ * the net80211 country code and net80211 regdomain should be.
+ */
+void
+ath10k_regd_set_eeprom(struct ath10k_regd_info *ri, uint16_t eeprom_rd)
+{
+	/* TODO */
+	ri->rd_country_code = CTRY_UNITED_STATES;
+	ri->rd_eeprom = eeprom_rd;
+	ri->rd_regdomain = ATH10K_NO_ENUMRD;
+	ri->rd_ctl2ghz = ATH10K_DEBUG_REG_DMN;
+	ri->rd_ctl5ghz = ATH10K_DEBUG_REG_DMN;
+}
+
+void
+ath10k_regd_get_regdomain(struct ath10k_regd_info *ri, uint16_t *regdomain,
+    uint16_t *ctl_2ghz, uint16_t *ctl_5ghz)
+{
+
+	/* TODO: for now, default to the debug regdomain/ctls */
+	*regdomain = ri->rd_regdomain;
+	*ctl_2ghz = ri->rd_ctl2ghz;
+	*ctl_5ghz = ri->rd_ctl5ghz;
+}
