@@ -47,10 +47,13 @@ struct ath10k_country_code_to_enum_rd {
 #define CTL_2GHT40              7
 #define CTL_5GHT40              8
 
+/* Debug and default EEPROM regdomains */
 #define CTRY_DEBUG 0x1ff
 #define CTRY_DEFAULT 0
 
+/* Set to 1 if the EEPROM code contains a country id, not an EEPROM regdomain */
 #define COUNTRY_ERD_FLAG        0x8000
+/* Clear this when reading the EEPROM regdomain code */
 #define WORLDWIDE_ROAMING_FLAG  0x4000
 
 #define MULTI_DOMAIN_MASK 0xFF00

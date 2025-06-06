@@ -25,3 +25,29 @@
 #include "regd_ctl.h"
 #include "regd_country.h"
 
+
+/*
+ * There's a few things here to "get right".
+ *
+ * The EEPROM code can be a few things:
+ *
+ * If COUNTRY_ERD_FLAG is set, then it's a country code, not a regulatory
+ * domain.  We need to instead search the ISO country code list and map
+ * that to a regdomain to continue.
+ *
+ * If it's a world-wide SKU (check is_wwr_sku() in linux regd.c) then
+ * the regdomain has a custom set of restrictive regdomains that get
+ * overlay on top of whatever the country is.  Set ath_world_regdomain()
+ * for more details.
+ *
+ * If there's no regdomain match found, the country code is CTRY_DEFAULT or
+ * it's a world-wide SKU, the SD_NO_CTL band CTL is used.
+ */
+
+/*
+ * Also, net80211 has a country code and regulatory domain.  ath(4) just
+ * trusts what net80211 gives it as being "the same as ath_hal", but
+ * I don't want to do that here.  I'll need to build an enum mapping
+ * between the net80211 ones and the ath10k ones (esp since right
+ * now there's some missing in net80211) to keep things straight.
+ */
