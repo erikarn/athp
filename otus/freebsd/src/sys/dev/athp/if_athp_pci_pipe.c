@@ -345,7 +345,7 @@ ath10k_pci_kill_tasklet(struct ath10k *ar)
 
 	del_timer_sync(&ar_pci->rx_post_retry);
 #else
-	device_printf(ar->sc_dev, "%s: called\n", __func__);
+	device_printf(ar->sc_dev, "%s: called; TODO!\n", __func__);
 #endif
 }
 

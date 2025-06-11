@@ -1519,7 +1519,7 @@ static int ath10k_monitor_recalc(struct ath10k *ar)
 
 	ATHP_CONF_LOCK_ASSERT(ar);
 
-	ath10k_warn(ar, "%s: called\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called\n", __func__);
 
 	needed = ath10k_mac_monitor_vdev_is_needed(ar);
 	allowed = ath10k_mac_monitor_vdev_is_allowed(ar);
@@ -5033,7 +5033,8 @@ int ath10k_start(struct ath10k *ar)
 	 */
 	ath10k_drain_tx(ar);
 
-	ath10k_warn(ar, "%s: called; state=%d\n", __func__, ar->state);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; state=%d\n",
+	    __func__, ar->state);
 
 	switch (ar->state) {
 	case ATH10K_STATE_RESTARTING:
@@ -5062,7 +5063,8 @@ int ath10k_start(struct ath10k *ar)
 		ret = -EBUSY;
 		goto err;
 	}
-	ath10k_warn(ar, "%s: state=%d\n", __func__, ar->state);
+	ath10k_dbg(ar, ATH10K_DBG_MISC,
+	    "%s: state=%d\n", __func__, ar->state);
 
 	ret = ath10k_hif_power_up(ar);
 	if (ret) {
@@ -5148,7 +5150,8 @@ int ath10k_start(struct ath10k *ar)
 	/* Kick-start deferred */
 	athp_taskq_start(ar);
 
-	ath10k_warn(ar, "%s: finished; state is now %d\n", __func__, ar->state);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: finished; state is now %d\n",
+	    __func__, ar->state);
 
 	return 0;
 
@@ -9219,7 +9222,8 @@ athp_sta_vif_wep_replumb(struct ieee80211vap *vap, const uint8_t *peer_addr)
 	if ((vap->iv_flags & IEEE80211_F_PRIVACY) == 0)
 		return;
 
-	ath10k_warn(ar, "%s: called; replumbing!\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; replumbing!\n",
+	    __func__);
 
 	/*
 	 * If net80211 has a default key index, use it.

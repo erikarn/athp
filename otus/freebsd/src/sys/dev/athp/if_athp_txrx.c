@@ -277,7 +277,8 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 	struct ath10k *ar = htt->ar;
 	struct ath10k_peer *peer;
 
-	ath10k_warn(ar, "%s: called; peer_id=%d\n", __func__, ev->peer_id);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; peer_id=%d\n",
+	    __func__, ev->peer_id);
 
 	ATHP_DATA_LOCK(ar);
 	peer = ath10k_peer_find(ar, ev->vdev_id, ev->addr);

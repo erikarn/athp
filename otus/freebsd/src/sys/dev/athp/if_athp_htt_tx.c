@@ -202,7 +202,8 @@ free_tx_pool:
 	dma_pool_destroy(htt->tx_pool);
 free_idr_pending_tx:
 #endif
-	ath10k_warn(ar, "%s: tearing down HTT locks\n", __func__);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: tearing down HTT locks\n",
+	    __func__);
 	mtx_destroy(&htt->tx_lock);
 	mtx_destroy(&htt->tx_comp_lock);
 	idr_destroy(&htt->pending_tx);

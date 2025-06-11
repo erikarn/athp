@@ -878,7 +878,8 @@ athp_parent(struct ieee80211com *ic)
 	struct ath10k *ar = ic->ic_softc;
 	int ret;
 
-	ath10k_warn(ar, "%s: called; nrunning=%d\n", __func__, ic->ic_nrunning);
+	ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: called; nrunning=%d\n",
+	    __func__, ic->ic_nrunning);
 
 	/*
 	 * XXX TODO: add conf lock - ath10k_start() grabs the lock;
@@ -896,7 +897,8 @@ athp_parent(struct ieee80211com *ic)
 		 * Don't start firmware if we're already running firmware.
 		 */
 		if (ar->state == ATH10K_STATE_OFF) {
-			ath10k_warn(ar, "%s: powering up\n", __func__);
+			ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: powering up\n",
+			    __func__);
 			ret = ath10k_start(ar);
 			if (ret != 0) {
 				ath10k_err(ar,
@@ -913,7 +915,8 @@ athp_parent(struct ieee80211com *ic)
 		}
 
 		if (ar->sc_isrunning == 0) {
-			ath10k_warn(ar, "%s: start vaps\n", __func__);
+			ath10k_dbg(ar, ATH10K_DBG_MISC,
+			    "%s: start vaps\n", __func__);
 			ieee80211_start_all(ic);
 			ar->sc_isrunning = 1;
 		}
@@ -931,7 +934,8 @@ athp_parent(struct ieee80211com *ic)
 		struct ath10k_vif *uvp;
 		struct ieee80211vap *vap;
 		ar->sc_isrunning = 0;
-		ath10k_warn(ar, "%s: stopped; flush everything and power down\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
+		    "%s: stopped; flush everything and power down\n", __func__);
 
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			uvp = ath10k_vif_to_arvif(vap);
@@ -953,7 +957,8 @@ athp_parent(struct ieee80211com *ic)
 		}
 
 		/* Everything is shutdown; power off the chip */
-		ath10k_warn(ar, "%s: powering down\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: powering down\n",
+		    __func__);
 		ath10k_stop(ar);
 	}
 }
@@ -1065,7 +1070,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	int error = 0;
 	struct ieee80211_node *bss_ni = NULL;
 
-	ath10k_warn(ar, "%s: %s -> %s (is_setup=%d) (is_dying=%d)\n",
+	ath10k_dbg(ar, ATH10K_DBG_MISC,
+	    "%s: %s -> %s (is_setup=%d) (is_dying=%d)\n",
 	    __func__,
 	    ieee80211_state_name[ostate],
 	    ieee80211_state_name[nstate],
@@ -1096,7 +1102,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 	 * the interface and power up the chip as required.
 	 */
 	if (vif->is_setup == 0) {
-		ath10k_warn(ar, "%s: adding interface\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MISC, "%s: adding interface\n",
+		    __func__);
 		/* XXX TODO - handle flags, like CLONE_BSSID, CLONE_MAC, etc */
 
 		/* call into driver; setup state */
@@ -1121,7 +1128,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 
 			goto skip3;
 		}
-		ath10k_warn(ar, "%s: interface add done: vdev id=%d\n", __func__, vif->vdev_id);
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
+		    "%s: interface add done: vdev id=%d\n",
+		    __func__, vif->vdev_id);
 
 		/* Get here - we're okay */
 		/* XXX locking! */
@@ -1145,6 +1154,9 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		 * turn this into a bit more of an async state change..
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA) {
+			device_printf(ar->sc_dev,
+			    "%s: TODO: defer STA BSS update w/ deferred TX?\n",
+			    __func__);
 			athp_node_set_is_in_peer_table(bss_ni, 1);
 			athp_bss_info_config(vap, bss_ni);
 			ath10k_bss_update(ar, vap, bss_ni, 1, 1);
@@ -1202,7 +1214,8 @@ athp_vap_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg
 		if (vap->iv_opmode != IEEE80211_M_STA)
 			break;
 
-		ath10k_warn(ar, "%s: pausing/flushing queues\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MISC,
+		    "%s: pausing/flushing queues\n", __func__);
 
 		ATHP_CONF_LOCK(ar);
 		athp_tx_disable(ar, vap);
@@ -2703,7 +2716,6 @@ athp_set_regdomain(struct ieee80211com *ic, struct ieee80211_regdomain *reg,
 	 * Loop over the provided channel list and establish the per-channel
 	 * limits such as flags and maximum TX power.
 	 */
-	ath10k_warn(ar, "%s: nchans=%d\n", __func__, nchans);
 
 	/*
 	 * Program in the given channel set into the hardware.
@@ -2747,7 +2759,6 @@ athp_getradiocaps(struct ieee80211com *ic, int maxchans, int *nchans,
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
 		setbit(bands, IEEE80211_MODE_11A);
 		if (ar->ht_cap_info & WMI_HT_CAP_ENABLED) {
-			ath10k_warn(ar, "%s: enabling HT/VHT rates\n", __func__);
 			setbit(bands, IEEE80211_MODE_11NA);
 			setbit(bands, IEEE80211_MODE_VHT_5GHZ);
 			cbw_flags |= NET80211_CBW_FLAG_VHT80;
