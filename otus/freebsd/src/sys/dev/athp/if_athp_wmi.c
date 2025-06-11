@@ -3118,7 +3118,8 @@ void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct athp_buf *pbuf)
 exit:
 	rcu_read_unlock();
 #else
-	device_printf(ar->sc_dev, "%s: TODO!\n", __func__);
+	ath10k_warn(ar, "%s: WMI STA kickout (%6D)\n", __func__,
+	    arg.mac_addr, ":");
 #endif
 }
 
@@ -3693,7 +3694,7 @@ radar_detected:
 	ieee80211_radar_detected(ar->hw);
 
 #else
-	device_printf(ar->sc_dev, "%s: TODO: csa check! get beacon!\n", __func__);
+	device_printf(ar->sc_dev, "%s: TODO: radar detection!\n", __func__);
 #endif
 }
 
