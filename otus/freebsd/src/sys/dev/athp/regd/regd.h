@@ -50,12 +50,25 @@ struct ath10k_regd_info {
 	uint16_t	rd_ctl5ghz;
 };
 
+/*
+ * TODO: this is here because net80211 doesn't currently
+ * encode this itself.
+ */
+enum ath10k_regd_dfs_domain {
+	ATH10K_REG_DFS_DOMAIN_UNINIT = 0,
+	ATH10K_REG_DFS_DOMAIN_FCC = 1,
+	ATH10K_REG_DFS_DOMAIN_ETSI = 2,
+	ATH10K_REG_DFS_DOMAIN_JP = 3,
+};
+
 #define ATH10K_NO_CTL                  0xff
 
 extern	void ath10k_regd_init(struct ath10k_regd_info *);
 extern	void ath10k_regd_set_eeprom(struct ath10k_regd_info *, uint16_t);
 extern	void ath10k_regd_get_regdomain(struct ath10k_regd_info *, uint16_t *,
 	    uint16_t *, uint16_t *);
+extern	void ath10k_regd_get_dfsdomain(struct ath10k_regd_info *,
+	    enum ath10k_regd_dfs_domain *dfsdomain);
 
 #if 0
 #define SD_NO_CTL               0xE0

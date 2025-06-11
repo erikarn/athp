@@ -1742,6 +1742,9 @@ ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 		arg.hidden_ssid = arvif->u.ap.hidden_ssid;
 
 		/* For now allow DFS for AP mode */
+		ath10k_warn(ar,
+		    "%s: TODO: enable chan_radar if a DFS domain is set!\n",
+		    __func__);
 		arg.channel.chan_radar =
 			!!(IEEE80211_IS_CHAN_RADAR(channel));
 	} else if (arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
@@ -3872,28 +3875,21 @@ ath10k_update_channel_list(struct ath10k *ar, int nchans,
 	return ret;
 }
 
-/*
- * TODO: either net80211 needs to grow the DFS domains information
- * inside its regulatory code (ie when to use FCC, ETSI, JP/MKK)
- * or it needs to be hard-coded somewhere here.
- */
-#if 0
 static enum wmi_dfs_region
-ath10k_mac_get_dfs_region(enum nl80211_dfs_regions dfs_region)
+ath10k_mac_get_dfs_region(enum ath10k_regd_dfs_domain dfs_region)
 {
 	switch (dfs_region) {
-	case NL80211_DFS_UNSET:
+	case ATH10K_REG_DFS_DOMAIN_UNINIT:
 		return WMI_UNINIT_DFS_DOMAIN;
-	case NL80211_DFS_FCC:
+	case ATH10K_REG_DFS_DOMAIN_FCC:
 		return WMI_FCC_DFS_DOMAIN;
-	case NL80211_DFS_ETSI:
+	case ATH10K_REG_DFS_DOMAIN_ETSI:
 		return WMI_ETSI_DFS_DOMAIN;
-	case NL80211_DFS_JP:
+	case ATH10K_REG_DFS_DOMAIN_JP:
 		return WMI_MKK4_DFS_DOMAIN;
 	}
 	return WMI_UNINIT_DFS_DOMAIN;
 }
-#endif
 
 /*
  * XXX TODO: strictly speaking, this is the full "regdomain
@@ -3905,6 +3901,7 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 {
 	int ret;
 	enum wmi_dfs_region wmi_dfs_reg;
+	enum ath10k_regd_dfs_domain dfsdomain;
 	uint16_t rd, ctl2g, ctl5g;
 
 	ATHP_CONF_LOCK_ASSERT(ar);
@@ -3914,23 +3911,12 @@ ath10k_regd_update(struct ath10k *ar, int nchans,
 	if (ret)
 		ath10k_warn(ar, "failed to update channel list: %d\n", ret);
 
-#if 0
-	regpair = ar->ath_common.regulatory.regpair;
-
-	if (config_enabled(CONFIG_ATH10K_DFS_CERTIFIED) && ar->dfs_detector) {
-		nl_dfs_reg = ar->dfs_detector->region;
-		wmi_dfs_reg = ath10k_mac_get_dfs_region(nl_dfs_reg);
-	} else {
-		wmi_dfs_reg = WMI_UNINIT_DFS_DOMAIN;
-	}
-#else
-	ath10k_warn(ar, "%s: TODO: finish DFS setup!\n", __func__);
-	wmi_dfs_reg = WMI_UNINIT_DFS_DOMAIN;
-#endif
 
 	/* Target allows setting up per-band regdomain but ath_common provides
 	 * a combined one only */
 	ath10k_regd_get_regdomain(&ar->regd_info, &rd, &ctl2g, &ctl5g);
+	ath10k_regd_get_dfsdomain(&ar->regd_info, &dfsdomain);
+	wmi_dfs_reg = ath10k_mac_get_dfs_region(dfsdomain);
 
 	ret = ath10k_wmi_pdev_set_regdomain(ar,
 	    rd, rd, rd, /* global, 2g, 5g regdomain */

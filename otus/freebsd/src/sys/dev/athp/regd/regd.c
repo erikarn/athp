@@ -75,6 +75,9 @@ ath10k_regd_set_eeprom(struct ath10k_regd_info *ri, uint16_t eeprom_rd)
 	ri->rd_eeprom = eeprom_rd;
 }
 
+/**
+ * @brief Fetch the current regdomain/SKU and ctl band edges for firmware.
+ */
 void
 ath10k_regd_get_regdomain(struct ath10k_regd_info *ri, uint16_t *regdomain,
     uint16_t *ctl_2ghz, uint16_t *ctl_5ghz)
@@ -84,4 +87,15 @@ ath10k_regd_get_regdomain(struct ath10k_regd_info *ri, uint16_t *regdomain,
 	*regdomain = ri->rd_regdomain;
 	*ctl_2ghz = ri->rd_ctl2ghz;
 	*ctl_5ghz = ri->rd_ctl5ghz;
+}
+
+/**
+ * @brief Fetch the current dfs domain for the given regdomain/SKU.
+ */
+void
+ath10k_regd_get_dfsdomain(struct ath10k_regd_info *ri,
+    enum ath10k_regd_dfs_domain *dfsdomain)
+{
+	/* TODO: everything! */
+	*dfsdomain = ATH10K_REG_DFS_DOMAIN_UNINIT;
 }
