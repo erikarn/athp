@@ -73,50 +73,13 @@
 
 #include "if_mtwreg.h"
 #include "if_mtwvar.h"
+#include "if_mtw_debug.h"
 
-#define MTW_DEBUG
-
-#ifdef MTW_DEBUG
 int mtw_debug;
 static SYSCTL_NODE(_hw_usb, OID_AUTO, mtw, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "USB mtw");
 SYSCTL_INT(_hw_usb_mtw, OID_AUTO, debug, CTLFLAG_RWTUN, &mtw_debug, 0,
     "mtw debug level");
-
-enum {
-	MTW_DEBUG_XMIT = 0x00000001,	  /* basic xmit operation */
-	MTW_DEBUG_XMIT_DESC = 0x00000002, /* xmit descriptors */
-	MTW_DEBUG_RECV = 0x00000004,	  /* basic recv operation */
-	MTW_DEBUG_RECV_DESC = 0x00000008, /* recv descriptors */
-	MTW_DEBUG_STATE = 0x00000010,	  /* 802.11 state transitions */
-	MTW_DEBUG_RATE = 0x00000020,	  /* rate adaptation */
-	MTW_DEBUG_USB = 0x00000040,	  /* usb requests */
-	MTW_DEBUG_FIRMWARE = 0x00000080,  /* firmware(9) loading debug */
-	MTW_DEBUG_BEACON = 0x00000100,	  /* beacon handling */
-	MTW_DEBUG_INTR = 0x00000200,	  /* ISR */
-	MTW_DEBUG_TEMP = 0x00000400,	  /* temperature calibration */
-	MTW_DEBUG_ROM = 0x00000800,	  /* various ROM info */
-	MTW_DEBUG_KEY = 0x00001000,	  /* crypto keys management */
-	MTW_DEBUG_TXPWR = 0x00002000,	  /* dump Tx power values */
-	MTW_DEBUG_RSSI = 0x00004000,	  /* dump RSSI lookups */
-	MTW_DEBUG_RESET = 0x00008000,	  /* initialization progress */
-	MTW_DEBUG_CALIB = 0x00010000,	  /* calibration progress */
-	MTW_DEBUG_CMD = 0x00020000,	  /* command queue */
-	MTW_DEBUG_ANY = 0xffffffff
-};
-
-#define MTW_DPRINTF(_sc, _m, ...)                                  \
-	do {                                                       \
-		if (mtw_debug & (_m))                              \
-			device_printf((_sc)->sc_dev, __VA_ARGS__); \
-	} while (0)
-
-#else
-#define MTW_DPRINTF(_sc, _m, ...) \
-	do {                      \
-		(void)_sc;        \
-	} while (0)
-#endif
 
 #define IEEE80211_HAS_ADDR4(wh) IEEE80211_IS_DSTODS(wh)
 
