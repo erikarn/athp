@@ -2139,11 +2139,13 @@ athp_node_flush_deferred_tx(struct ieee80211_node *ni)
 	struct ath10k *ar = ic->ic_softc;
 	struct mbuf *m;
 
-	ath10k_warn(ar, "%s: mac=%6D: flushing deferred tx\n",
-	    __func__, ni->ni_macaddr, ":");
+	ath10k_dbg(ar, ATH10K_DBG_DEFERRED_TX,
+	    "%s: mac=%6D: flushing deferred tx\n", __func__,
+	    ni->ni_macaddr, ":");
 
 	while ((m = mbufq_dequeue(&ATHP_NODE(ni)->deferred_txq)) != NULL) {
-		ath10k_warn(ar, "%s: mac=%6D: flushing frame\n",
+		ath10k_dbg(ar, ATH10K_DBG_DEFERRED_TX,
+		    "%s: mac=%6D: flushing frame\n",
 		    __func__, ni->ni_macaddr, ":");
 		ieee80211_tx_complete(ni, m, 1);
 	}
