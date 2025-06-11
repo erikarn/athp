@@ -13,20 +13,18 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__IF_MTWN_VAR_H__
-#define	__IF_MTWN_VAR_H__
+#ifndef	__IF_MTWN_USB_VAR_H__
+#define	__IF_MTWN_USB_VAR_H__
 
-struct mtwn_softc {
-	device_t		sc_dev;
-	uint32_t		sc_debug;
-	struct mtx		sc_mtx;
-	int			sc_detached;
+#define	MTWN_USB_SOFTC(sc)	((struct rtwn_usb_softc *)(sc))
+
+struct mtwn_usb_softc {
+	struct mtwn_softc	uc_sc;		/* must be the first */
+
+	/* USB state */
+	struct usb_device	*sc_udev;
+	struct usb_interface	*sc_iface;
 };
-#define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
-#define	MTWN_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
 #define	MTWN_LOCK_ASSERT(sc, t)	mtx_assert(&(sc)->sc_mtx, t)
 
-extern	int mtwn_attach(struct mtwn_softc *);
-extern	int mtwn_detach(struct mtwn_softc *);
-
-#endif	/* __IF_MTWN_VAR_H__ */
+#endif	/* __IF_MTWN_USB_VAR_H__ */
