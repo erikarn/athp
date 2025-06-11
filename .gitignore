@@ -1,2 +1,3 @@
-
 otus/freebsd/src/sys/.vscode/c_cpp_properties.json
+.depend
+.depend.*
