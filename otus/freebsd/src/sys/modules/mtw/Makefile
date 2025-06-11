@@ -9,4 +9,7 @@ SRCS    = if_mtw.c \
 	  bus_if.h device_if.h pci_if.h			\
 	  opt_wlan.h
 
+.PATH: ${.CURDIR}/../../dev/mtw/usb
+SRCS	+= if_mtw_usb.c
+
 .include <bsd.kmod.mk>

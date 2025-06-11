@@ -75,6 +75,8 @@
 #include "if_mtwvar.h"
 #include "if_mtw_debug.h"
 
+#include "usb/if_mtw_usb.h"
+
 int mtw_debug;
 static SYSCTL_NODE(_hw_usb, OID_AUTO, mtw, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "USB mtw");
@@ -131,14 +133,6 @@ static void mtw_unsetup_tx_list(struct mtw_softc *,
 				struct mtw_endpoint_queue *);
 static void mtw_load_microcode(void *arg);
 
-static usb_error_t mtw_do_request(struct mtw_softc *,
-				  struct usb_device_request *, void *);
-static int mtw_read(struct mtw_softc *, uint16_t, uint32_t *);
-static int mtw_read_region_1(struct mtw_softc *, uint16_t, uint8_t *, int);
-static int mtw_write_2(struct mtw_softc *, uint16_t, uint16_t);
-static int mtw_write(struct mtw_softc *, uint16_t, uint32_t);
-static int mtw_write_region_1(struct mtw_softc *, uint16_t, uint8_t *, int);
-static int mtw_set_region_4(struct mtw_softc *, uint16_t, uint32_t, int);
 static int mtw_efuse_read_2(struct mtw_softc *, uint16_t, uint16_t *);
 static int mtw_bbp_read(struct mtw_softc *, uint8_t, uint8_t *);
 static int mtw_bbp_write(struct mtw_softc *, uint8_t, uint8_t);
@@ -211,7 +205,6 @@ static void mtw_update_promisc(struct ieee80211com *);
 static int mtw_txrx_enable(struct mtw_softc *);
 static void mtw_init_locked(struct mtw_softc *);
 static void mtw_stop(void *);
-static void mtw_delay(struct mtw_softc *, u_int);
 static void mtw_update_chw(struct ieee80211com *ic);
 static int mtw_ampdu_enable(struct ieee80211_node *ni,
     struct ieee80211_tx_ampdu *tap);
@@ -430,29 +423,6 @@ mtw_wlan_enable(struct mtw_softc *sc, int enable)
 		tmp &= ~MTW_OSC_EN;
 		mtw_write(sc, MTW_OSC_CTRL, tmp);
 	}
-	return (error);
-}
-
-static int
-mtw_read_cfg(struct mtw_softc *sc, uint16_t reg, uint32_t *val)
-{
-	usb_device_request_t req;
-	uint32_t tmp;
-	uint16_t actlen;
-	int error;
-
-	req.bmRequestType = UT_READ_VENDOR_DEVICE;
-	req.bRequest = MTW_READ_CFG;
-	USETW(req.wValue, 0);
-	USETW(req.wIndex, reg);
-	USETW(req.wLength, 4);
-	error = usbd_do_request_flags(sc->sc_udev, &sc->sc_mtx, &req, &tmp, 0,
-	    &actlen, 1000);
-
-	if (error == 0)
-		*val = le32toh(tmp);
-	else
-		*val = 0xffffffff;
 	return (error);
 }
 
@@ -932,39 +902,6 @@ mtw_unsetup_tx_list(struct mtw_softc *sc, struct mtw_endpoint_queue *pq)
 }
 
 static int
-mtw_write_ivb(struct mtw_softc *sc, void *buf, uint16_t len)
-{
-	usb_device_request_t req;
-	uint16_t actlen;
-	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-	req.bRequest = MTW_RESET;
-	USETW(req.wValue, 0x12);
-	USETW(req.wIndex, 0);
-	USETW(req.wLength, len);
-
-	int error = usbd_do_request_flags(sc->sc_udev, &sc->sc_mtx, &req, buf,
-	    0, &actlen, 1000);
-
-	return (error);
-}
-
-static int
-mtw_write_cfg(struct mtw_softc *sc, uint16_t reg, uint32_t val)
-{
-	usb_device_request_t req;
-	int error;
-
-	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-	req.bRequest = MTW_WRITE_CFG;
-	USETW(req.wValue, 0);
-	USETW(req.wIndex, reg);
-	USETW(req.wLength, 4);
-	val = htole32(val);
-	error = usbd_do_request(sc->sc_udev, &sc->sc_mtx, &req, &val);
-	return (error);
-}
-
-static int
 mtw_usb_dma_write(struct mtw_softc *sc, uint32_t val)
 {
 	// if (sc->asic_ver == 0x7612)
@@ -1157,105 +1094,6 @@ mtw_load_microcode(void *arg)
 	return;
 fail:
 	return;
-}
-static usb_error_t
-mtw_do_request(struct mtw_softc *sc, struct usb_device_request *req, void *data)
-{
-	usb_error_t err;
-	int ntries = 5;
-
-	MTW_LOCK_ASSERT(sc, MA_OWNED);
-
-	while (ntries--) {
-		err = usbd_do_request_flags(sc->sc_udev, &sc->sc_mtx, req, data,
-		    0, NULL, 2000); // ms seconds
-		if (err == 0)
-			break;
-		MTW_DPRINTF(sc, MTW_DEBUG_USB,
-		    "Control request failed, %s (retrying)\n",
-		    usbd_errstr(err));
-		mtw_delay(sc, 10);
-	}
-	return (err);
-}
-
-static int
-mtw_read(struct mtw_softc *sc, uint16_t reg, uint32_t *val)
-{
-	uint32_t tmp;
-	int error;
-
-	error = mtw_read_region_1(sc, reg, (uint8_t *)&tmp, sizeof tmp);
-	if (error == 0)
-		*val = le32toh(tmp);
-	else
-		*val = 0xffffffff;
-	return (error);
-}
-
-static int
-mtw_read_region_1(struct mtw_softc *sc, uint16_t reg, uint8_t *buf, int len)
-{
-	usb_device_request_t req;
-
-	req.bmRequestType = UT_READ_VENDOR_DEVICE;
-	req.bRequest = MTW_READ_REGION_1;
-	USETW(req.wValue, 0);
-	USETW(req.wIndex, reg);
-	USETW(req.wLength, len);
-
-	return (mtw_do_request(sc, &req, buf));
-}
-
-static int
-mtw_write_2(struct mtw_softc *sc, uint16_t reg, uint16_t val)
-{
-
-	usb_device_request_t req;
-	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-	req.bRequest = MTW_WRITE_2;
-	USETW(req.wValue, val);
-	USETW(req.wIndex, reg);
-	USETW(req.wLength, 0);
-	return (usbd_do_request(sc->sc_udev, &sc->sc_mtx, &req, NULL));
-}
-
-static int
-mtw_write(struct mtw_softc *sc, uint16_t reg, uint32_t val)
-{
-
-	int error;
-
-	if ((error = mtw_write_2(sc, reg, val & 0xffff)) == 0) {
-
-		error = mtw_write_2(sc, reg + 2, val >> 16);
-	}
-
-	return (error);
-}
-
-static int
-mtw_write_region_1(struct mtw_softc *sc, uint16_t reg, uint8_t *buf, int len)
-{
-
-	usb_device_request_t req;
-	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-	req.bRequest = MTW_WRITE_REGION_1;
-	USETW(req.wValue, 0);
-	USETW(req.wIndex, reg);
-	USETW(req.wLength, len);
-	return (usbd_do_request(sc->sc_udev, &sc->sc_mtx, &req, buf));
-}
-
-static int
-mtw_set_region_4(struct mtw_softc *sc, uint16_t reg, uint32_t val, int count)
-{
-	int i, error = 0;
-
-	KASSERT((count & 3) == 0, ("mte_set_region_4: Invalid data length.\n"));
-	for (i = 0; i < count && error == 0; i += 4)
-		error = mtw_write(sc, reg + i, val);
-	return (error);
 }
 
 static int
@@ -4605,13 +4443,6 @@ mtw_stop(void *arg)
 			break;
 	}
 
-}
-
-static void
-mtw_delay(struct mtw_softc *sc, u_int ms)
-{
-	usb_pause_mtx(mtx_owned(&sc->sc_mtx) ? &sc->sc_mtx : NULL,
-	    USB_MS_TO_TICKS(ms));
 }
 
 static void

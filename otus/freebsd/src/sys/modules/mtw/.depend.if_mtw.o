@@ -183,4 +183,6 @@ if_mtw.o: \
   /home/adrian/work/freebsd/head/freebsd-src//sys/dev/usb/usb_debug.h \
   /home/adrian/work/freebsd/head/freebsd-src//sys/dev/usb/usb_msctest.h \
   /home/adrian/git/github/erikarn/athp/otus/freebsd/src/sys/modules/mtw/../../dev/mtw/if_mtwreg.h \
-  /home/adrian/git/github/erikarn/athp/otus/freebsd/src/sys/modules/mtw/../../dev/mtw/if_mtwvar.h
+  /home/adrian/git/github/erikarn/athp/otus/freebsd/src/sys/modules/mtw/../../dev/mtw/if_mtwvar.h \
+  /home/adrian/git/github/erikarn/athp/otus/freebsd/src/sys/modules/mtw/../../dev/mtw/if_mtw_debug.h \
+  /home/adrian/git/github/erikarn/athp/otus/freebsd/src/sys/modules/mtw/../../dev/mtw/usb/if_mtw_usb.h
