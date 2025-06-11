@@ -4024,6 +4024,21 @@ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason)
 }
 
 #if 0
+
+/**
+ * @brief Pause TX on the given vdev.
+ *
+ * This is part of the TLV interface (QCA6174 and related.)
+ * It attempts to stop the given transmit queue from queueing
+ * further frames to the vdev.
+ *
+ * There are a few reasons that this occurs, represented in
+ * "enum wmi_tlv_tx_pause_id".  All but one are sent from firmware;
+ * one is from the host.
+ *
+ * When there is no longer a pause reason, the queue may be
+ * unpaused.
+ */
 void ath10k_mac_vif_tx_lock(struct ath10k_vif *arvif, int reason)
 {
 	struct ath10k *ar = arvif->ar;
@@ -4035,6 +4050,9 @@ void ath10k_mac_vif_tx_lock(struct ath10k_vif *arvif, int reason)
 	ieee80211_stop_queue(ar->hw, arvif->vdev_id);
 }
 
+/*
+ * @brief Unpause TX on the given vdev.
+ */
 void ath10k_mac_vif_tx_unlock(struct ath10k_vif *arvif, int reason)
 {
 	struct ath10k *ar = arvif->ar;
@@ -4094,6 +4112,14 @@ static void ath10k_mac_handle_tx_pause_iter(void *data, u8 *mac,
 }
 #endif
 
+/**
+ * @brief Handle a pause event from either firmware or host.
+ *
+ * Pause events come from the QCA6174 and related TLV firmware.
+ * In order to prevent traffic loss and/or hung traffic queues,
+ * it's best to stop queuing frames to the given vdev or vdevs
+ * until all of the relevant conditions have been cleared.
+ */
 void ath10k_mac_handle_tx_pause_vdev(struct ath10k *ar, u32 vdev_id,
 				     enum wmi_tlv_tx_pause_id pause_id,
 				     enum wmi_tlv_tx_pause_action action)
