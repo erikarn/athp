@@ -82,6 +82,8 @@ static eventhandler_tag mtwn_usb_etag;
 static device_probe_t mtwn_usb_match;
 static device_attach_t mtwn_usb_attach;
 static device_detach_t mtwn_usb_detach;
+static device_suspend_t mtwn_usb_suspend;
+static device_resume_t mtwn_usb_resume;
 
 static int
 mtwn_usb_match(device_t self)
@@ -105,19 +107,38 @@ mtwn_usb_attach(device_t self)
 	struct mtwn_usb_softc *uc = device_get_softc(self);
 	struct mtwn_softc *sc = &uc->uc_sc;
 	struct usb_attach_arg *uaa = device_get_ivars(self);
+	int error;
 
 	device_set_usb_desc(self);
 	uc->sc_udev = uaa->device;
 	sc->sc_dev = self;
-
-	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->sc_dev),
-	    MTX_NETWORK_LOCK, MTX_DEF);
+	// ic->ic_name = device_get_nameunit(self);
 
 	device_printf(sc->sc_dev, "%s: hi!\n", __func__);
 
-	mtwn_attach(sc);
+	/* Early attach */
+	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->sc_dev),
+	    MTX_NETWORK_LOCK, MTX_DEF);
+
+	/* driver/usb sysctl */
+	mtwn_sysctl_attach(sc);
+
+	/* bus access methods */
+	/* chipset access methods */
+
+	/* Setup endpoints */
+
+	/* Allocate Tx/Rx buffers */
+
+	/* Generic attach */
+	error = mtwn_attach(sc);
+	if (error != 0)
+		goto detach;
 
 	return (0);
+detach:
+	mtwn_usb_detach(self);
+	return (ENXIO);
 }
 
 static int
@@ -126,11 +147,19 @@ mtwn_usb_detach(device_t self)
 	struct mtwn_usb_softc *uc = device_get_softc(self);
 	struct mtwn_softc *sc = &uc->uc_sc;
 
+	device_printf(sc->sc_dev, "%s: bye!\n", __func__);
+
 	sc->sc_detached = 1;
 
 	mtwn_detach(sc);
 
-	device_printf(sc->sc_dev, "%s: bye!\n", __func__);
+	/* Free Tx/Rx buffers */
+
+	/* Detach USB transfers */
+
+	/* private detach */
+
+	mtx_destroy(&sc->sc_mtx);
 
 	return (0);
 }
@@ -175,11 +204,33 @@ mtwn_usb_driver_loaded(struct module *mod, int what, void *arg)
 	return (0);
 }
 
+static int
+mtwn_usb_suspend(device_t self)
+{
+	struct mtwn_usb_softc *uc = device_get_softc(self);
+
+	mtwn_suspend(&uc->uc_sc);
+	return (0);
+}
+
+static int
+mtwn_usb_resume(device_t self)
+{
+	struct mtwn_usb_softc *uc = device_get_softc(self);
+
+	mtwn_resume(&uc->uc_sc);
+	return (0);
+}
+
 static device_method_t mtwn_usb_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe, mtwn_usb_match),
 	DEVMETHOD(device_attach, mtwn_usb_attach),
-	DEVMETHOD(device_detach, mtwn_usb_detach), DEVMETHOD_END
+	DEVMETHOD(device_detach, mtwn_usb_detach),
+	DEVMETHOD(device_suspend, mtwn_usb_suspend),
+	DEVMETHOD(device_resume, mtwn_usb_resume),
+
+	DEVMETHOD_END
 };
 
 static driver_t mtwn_usb_driver = { .name = "mtwn_usb",

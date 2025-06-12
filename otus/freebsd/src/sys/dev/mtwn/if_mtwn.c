@@ -77,6 +77,34 @@ mtwn_detach(struct mtwn_softc *sc)
 	return (0);
 }
 
+int
+mtwn_suspend(struct mtwn_softc *sc)
+{
+
+	device_printf(sc->sc_dev, "%s: called!\n", __func__);
+	return (0);
+}
+
+int
+mtwn_resume(struct mtwn_softc *sc)
+{
+
+	device_printf(sc->sc_dev, "%s: called!\n", __func__);
+	return (0);
+}
+
+void
+mtwn_sysctl_attach(struct mtwn_softc *sc)
+{
+	struct sysctl_ctx_list *ctx = device_get_sysctl_ctx(sc->sc_dev);
+	struct sysctl_oid *tree = device_get_sysctl_tree(sc->sc_dev);
+
+	SYSCTL_ADD_U32(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
+	    "debug", CTLFLAG_RWTUN, &sc->sc_debug, sc->sc_debug,
+	    "Control debugging printfs");
+
+}
+
 MODULE_VERSION(mtwn, 1);
 
 MODULE_DEPEND(mtwn, firmware, 1, 1, 1);

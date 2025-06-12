@@ -28,5 +28,8 @@ struct mtwn_softc {
 
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);
+extern	int mtwn_suspend(struct mtwn_softc *);
+extern	int mtwn_resume(struct mtwn_softc *);
+extern	void mtwn_sysctl_attach(struct mtwn_softc *);
 
 #endif	/* __IF_MTWN_VAR_H__ */
