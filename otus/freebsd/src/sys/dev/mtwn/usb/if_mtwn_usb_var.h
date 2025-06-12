@@ -16,7 +16,25 @@
 #ifndef	__IF_MTWN_USB_VAR_H__
 #define	__IF_MTWN_USB_VAR_H__
 
-#define	MTWN_USB_SOFTC(sc)	((struct rtwn_usb_softc *)(sc))
+#define	MTWN_USB_SOFTC(sc)	((struct mtwn_usb_softc *)(sc))
+
+#define	MTWN_USB_RX_LIST_COUNT		16
+#define	MTWN_USB_TX_LIST_COUNT		16
+
+#define	MTWN_USB_RXBUFSZ_DEF		2048
+
+/* TODO: verify against mt76 */
+#define	MTWN_USB_BULK_EP_COUNT		8
+
+struct mtwn_data {
+	uint8_t			*buf;
+	uint16_t		buflen;
+	int			qid;
+	struct mbuf		*m;
+	struct ieee80211_node	*ni;
+	STAILQ_ENTRY(mtwn_data)	next;
+};
+typedef STAILQ_HEAD(, mtwn_data) mtwn_datahead;
 
 struct mtwn_usb_softc {
 	struct mtwn_softc	uc_sc;		/* must be the first */
@@ -24,7 +42,16 @@ struct mtwn_usb_softc {
 	/* USB state */
 	struct usb_device	*sc_udev;
 	struct usb_interface	*sc_iface;
+
+	struct mtwn_data	uc_rx[MTWN_USB_RX_LIST_COUNT];
+	mtwn_datahead		uc_rx_active;
+	mtwn_datahead		uc_rx_inactive;
+	int			uc_rx_buf_size;
+
+	struct mtwn_data	uc_tx[MTWN_USB_TX_LIST_COUNT];
+	mtwn_datahead		uc_tx_active[MTWN_USB_BULK_EP_COUNT];
+	mtwn_datahead		uc_tx_inactive;
+	mtwn_datahead		uc_tx_pending[MTWN_USB_BULK_EP_COUNT];
 };
-#define	MTWN_LOCK_ASSERT(sc, t)	mtx_assert(&(sc)->sc_mtx, t)
 
 #endif	/* __IF_MTWN_USB_VAR_H__ */

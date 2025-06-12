@@ -67,6 +67,7 @@
 #include "../if_mtwn_debug.h"
 
 #include "if_mtwn_usb_var.h"
+#include "if_mtwn_usb_data_list.h"
 
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
 #define MTWN_DEV(v, p)                                        \
@@ -122,6 +123,7 @@ mtwn_usb_attach(device_t self)
 
 	/* driver/usb sysctl */
 	mtwn_sysctl_attach(sc);
+	uc->uc_rx_buf_size = MTWN_USB_RXBUFSZ_DEF;
 
 	/* bus access methods */
 	/* chipset access methods */
