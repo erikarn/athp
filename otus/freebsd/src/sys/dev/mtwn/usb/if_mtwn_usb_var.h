@@ -21,10 +21,25 @@
 #define	MTWN_USB_RX_LIST_COUNT		16
 #define	MTWN_USB_TX_LIST_COUNT		16
 
-#define	MTWN_USB_RXBUFSZ_DEF		2048
+/* TODO: check with mt76 */
+#define	MTWN_USB_RXBUFSZ_DEF		16384
+#define	MTWN_USB_TXBUFSZ		16384
 
-/* TODO: verify against mt76 */
 #define	MTWN_USB_BULK_EP_COUNT		8
+
+enum {
+	MTWN_BULK_RX_PKT,
+	MTWN_BULK_RX_CMD_RESP,
+
+	MTWN_BULK_TX_INBAND_CMD,
+	MTWN_BULK_TX_AC_BE,
+	MTWN_BULK_TX_AC_BK,
+	MTWN_BULK_TX_AC_VI,
+	MTWN_BULK_TX_AC_VO,
+	MTWN_BULK_TX_HCCA,
+};
+
+#define	MTWN_USB_BULK_TX_FIRST MTWN_BULK_TX_INBAND_CMD
 
 struct mtwn_data {
 	uint8_t			*buf;
@@ -44,7 +59,7 @@ struct mtwn_usb_softc {
 	struct usb_interface	*sc_iface;
 
 	struct mtwn_data	uc_rx[MTWN_USB_RX_LIST_COUNT];
-	mtwn_datahead		uc_rx_active;
+	mtwn_datahead		uc_rx_active[MTWN_USB_BULK_EP_COUNT];
 	mtwn_datahead		uc_rx_inactive;
 	int			uc_rx_buf_size;
 

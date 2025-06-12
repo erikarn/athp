@@ -68,6 +68,8 @@
 
 #include "if_mtwn_usb_var.h"
 #include "if_mtwn_usb_data_list.h"
+#include "if_mtwn_usb_data_rx.h"
+#include "if_mtwn_usb_data_tx.h"
 
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
 #define MTWN_DEV(v, p)                                        \
@@ -131,6 +133,12 @@ mtwn_usb_attach(device_t self)
 	/* Setup endpoints */
 
 	/* Allocate Tx/Rx buffers */
+	error = mtwn_usb_alloc_rx_list(uc);
+	if (error != 0)
+		goto detach;
+	error = mtwn_usb_alloc_tx_list(uc);
+	if (error != 0)
+		goto detach;
 
 	/* Generic attach */
 	error = mtwn_attach(sc);
@@ -156,6 +164,8 @@ mtwn_usb_detach(device_t self)
 	mtwn_detach(sc);
 
 	/* Free Tx/Rx buffers */
+	mtwn_usb_free_tx_list(uc);
+	mtwn_usb_free_rx_list(uc);
 
 	/* Detach USB transfers */
 
