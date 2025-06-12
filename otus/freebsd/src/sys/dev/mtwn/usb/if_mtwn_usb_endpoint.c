@@ -69,13 +69,17 @@
 #include "if_mtwn_usb_var.h"
 #include "if_mtwn_usb_endpoint.h"
 
+/* For TX/RX endpoint callbacks */
+#include "if_mtwn_usb_rx.h"
+#include "if_mtwn_usb_tx.h"
+
 /*
  * This is a static configuration for now, for my MT7610U NIC.
  * Other NICs will eventually need different configurations,
  * and hopefully when that happens the bulk of the configuration
  * change will happen here.
  */
-static const struct usb_config mtwn_config[MTWN_BULK_EP_COUNT] = {
+static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 	[MTWN_BULK_RX_PKT] = {
 		.type = UE_BULK,
 		.endpoint = 0x84,
@@ -84,7 +88,8 @@ static const struct usb_config mtwn_config[MTWN_BULK_EP_COUNT] = {
 			.pipe_bof = -1,
 			.short_xfer_ok = 1,
 		},
-		.callback = mtwn_bulk_rx_pkt,
+		.callback = mtwn_bulk_rx_pkt_callback,
+		.bufsize = MTWN_USB_RXBUFSZ_DEF,
 	},
 	[MTWN_BULK_RX_CMD_RESP] = {
 		.type = UE_BULK,
@@ -94,6 +99,94 @@ static const struct usb_config mtwn_config[MTWN_BULK_EP_COUNT] = {
 			.pipe_bof = -1,
 			.short_xfer_ok = 1,
 		},
-		.callback = mtwn_bulk_rx_cmd_resp,
+		.callback = mtwn_bulk_rx_cmd_resp_callback,
+		.bufsize = MTWN_USB_RXBUFSZ_DEF,
 	},
+
+	/* TX endpoints */
+	[MTWN_BULK_TX_INBAND_CMD] = {
+		.type = UE_BULK,
+		.endpoint = 0x04,
+		.direction = UE_DIR_OUT,
+		.bufsize = 128,
+		.flags = {.pipe_bof = 1,
+		.force_short_xfer = 0,},
+		.callback = mtwn_bulk_tx_inband_cmd_callback,
+		.timeout = 5000,        /* ms */
+	},
+	[MTWN_BULK_TX_AC_BE] = {
+		.type = UE_BULK,
+		.endpoint = 0x05,
+		.direction = UE_DIR_OUT,
+		.bufsize = 128,
+		.flags = {.pipe_bof = 1,
+		.force_short_xfer = 0,},
+		.callback = mtwn_bulk_tx_ac_be_callback,
+		.timeout = 5000,        /* ms */
+	},
+	[MTWN_BULK_TX_AC_BK] = {
+		.type = UE_BULK,
+		.endpoint = 0x06,
+		.direction = UE_DIR_OUT,
+		.bufsize = 128,
+		.flags = {.pipe_bof = 1,
+		.force_short_xfer = 0,},
+		.callback = mtwn_bulk_tx_ac_bk_callback,
+		.timeout = 5000,        /* ms */
+	},
+	[MTWN_BULK_TX_AC_VI] = {
+		.type = UE_BULK,
+		.endpoint = 0x07,
+		.direction = UE_DIR_OUT,
+		.bufsize = 128,
+		.flags = {.pipe_bof = 1,
+		.force_short_xfer = 0,},
+		.callback = mtwn_bulk_tx_ac_vi_callback,
+		.timeout = 5000,        /* ms */
+	},
+	[MTWN_BULK_TX_AC_VO] = {
+		.type = UE_BULK,
+		.endpoint = 0x09,
+		.direction = UE_DIR_OUT,
+		.bufsize = 128,
+		.flags = {.pipe_bof = 1,
+		.force_short_xfer = 0,},
+		.callback = mtwn_bulk_tx_ac_vo_callback,
+		.timeout = 5000,        /* ms */
+	},
+	[MTWN_BULK_TX_HCCA] = {
+		.type = UE_BULK,
+		.endpoint = 0x04,
+		.direction = UE_DIR_OUT,
+		.bufsize = 128,
+		.flags = {.pipe_bof = 1,
+		.force_short_xfer = 0,},
+		.callback = mtwn_bulk_tx_hcca_callback,
+		.timeout = 5000,        /* ms */
+	},
+
+
+	/* TODO: the rest */
+
 };
+
+int
+mtwn_usb_setup_endpoints(struct mtwn_usb_softc *uc)
+{
+	const uint8_t iface_index = 0;	/* XXX */
+	struct mtwn_softc *sc = &uc->uc_sc;
+	int error;
+
+	error = usbd_transfer_setup(uc->uc_udev, &iface_index,
+	    uc->uc_xfer, mtwn_config, MTWN_USB_BULK_EP_COUNT, uc,
+	    &sc->sc_mtx);
+
+	if (error != 0) {
+		device_printf(sc->sc_dev,
+		     "%s: couldn't allocate USB transfers, error=%s\n",
+		     __func__, usbd_errstr(error));
+		return (error);
+	}
+
+	return (0);
+}

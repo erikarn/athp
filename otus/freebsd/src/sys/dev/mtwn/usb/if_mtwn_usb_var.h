@@ -55,8 +55,11 @@ struct mtwn_usb_softc {
 	struct mtwn_softc	uc_sc;		/* must be the first */
 
 	/* USB state */
-	struct usb_device	*sc_udev;
-	struct usb_interface	*sc_iface;
+	struct usb_device	*uc_udev;
+	struct usb_interface	*uc_iface;
+
+	/* USB transfers */
+	struct usb_xfer		*uc_xfer[MTWN_USB_BULK_EP_COUNT];
 
 	struct mtwn_data	uc_rx[MTWN_USB_RX_LIST_COUNT];
 	mtwn_datahead		uc_rx_active[MTWN_USB_BULK_EP_COUNT];

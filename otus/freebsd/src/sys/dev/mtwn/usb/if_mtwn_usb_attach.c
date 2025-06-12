@@ -71,6 +71,9 @@
 #include "if_mtwn_usb_data_rx.h"
 #include "if_mtwn_usb_data_tx.h"
 
+/* XXX for RX transfer start and all transfer stop */
+#include "if_mtwn_usb_rx.h"
+
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
 #define MTWN_DEV(v, p)                                        \
 	{                                                     \
@@ -113,7 +116,7 @@ mtwn_usb_attach(device_t self)
 	int error;
 
 	device_set_usb_desc(self);
-	uc->sc_udev = uaa->device;
+	uc->uc_udev = uaa->device;
 	sc->sc_dev = self;
 	// ic->ic_name = device_get_nameunit(self);
 
@@ -145,6 +148,9 @@ mtwn_usb_attach(device_t self)
 	if (error != 0)
 		goto detach;
 
+	/* XXX TODO for now, for bring-up */
+	mtwn_usb_rx_start_xfers(uc);
+
 	return (0);
 detach:
 	mtwn_usb_detach(self);
@@ -159,7 +165,11 @@ mtwn_usb_detach(device_t self)
 
 	device_printf(sc->sc_dev, "%s: bye!\n", __func__);
 
+	MTWN_LOCK(sc);
 	sc->sc_detached = 1;
+	/* XXX do it here now */
+	mtwn_usb_abort_xfers(uc);
+	MTWN_UNLOCK(sc);
 
 	mtwn_detach(sc);
 
@@ -168,6 +178,7 @@ mtwn_usb_detach(device_t self)
 	mtwn_usb_free_rx_list(uc);
 
 	/* Detach USB transfers */
+	usbd_transfer_unsetup(uc->uc_xfer, MTWN_USB_BULK_EP_COUNT);
 
 	/* private detach */
 
