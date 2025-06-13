@@ -39,6 +39,12 @@ enum {
 	MTWN_BULK_TX_HCCA,
 };
 
+/* USB device IDs */
+enum {
+	MTWN_CHIP_MT7610U = 0,
+	MTWN_CHIP_MAX_USB
+};
+
 #define	MTWN_USB_BULK_TX_FIRST MTWN_BULK_TX_INBAND_CMD
 
 struct mtwn_data {

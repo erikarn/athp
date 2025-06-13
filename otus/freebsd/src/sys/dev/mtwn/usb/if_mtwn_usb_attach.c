@@ -71,16 +71,19 @@
 #include "if_mtwn_usb_data_rx.h"
 #include "if_mtwn_usb_data_tx.h"
 #include "if_mtwn_usb_vendor_io.h"
+#include "if_mtwn_usb_endpoint.h"
 
 /* XXX for RX transfer start and all transfer stop */
 #include "if_mtwn_usb_rx.h"
 
+#include "../mt76x0/usb/mtwn_chip_mt7610u_usb.h"
+
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
-#define MTWN_DEV(v, p)                                        \
-	{                                                     \
-		USB_VP(USB_VENDOR_##v, USB_PRODUCT_##v##_##p) \
+#define MTWN_DEV(v, p, chipid)						\
+	{								\
+		USB_VPI(USB_VENDOR_##v, USB_PRODUCT_##v##_##p, chipid)	\
 	}
-	{ USB_VP(0x148f, 0x761a) },
+	{ USB_VPI(0x148f, 0x761a, MTWN_CHIP_MT7610U) },
 };
 #undef MTWN_DEV
 
@@ -136,14 +139,31 @@ mtwn_usb_attach(device_t self)
 	sc->sc_busops.sc_write_4 = mtwn_usb_write_4;
 
 	/* chipset access methods */
+	switch (USB_GET_DRIVER_INFO(uaa)) {
+	case MTWN_CHIP_MT7610U:
+		mtwn_chip_mt7610u_attach(sc);
+	default:
+		device_printf(sc->sc_dev, "%s: unknown chip\n",
+		    __func__);
+		error = ENXIO; /* XXX */
+		goto detach;
+	}
 
 	/* Setup endpoints */
+	error = mtwn_usb_setup_endpoints(uc);
+	if (error != 0)
+		goto detach;
 
 	/* Allocate Tx/Rx buffers */
 	error = mtwn_usb_alloc_rx_list(uc);
 	if (error != 0)
 		goto detach;
 	error = mtwn_usb_alloc_tx_list(uc);
+	if (error != 0)
+		goto detach;
+
+	/* Init hardware, before generic attach */
+	error = MTWN_CHIP_INIT_HARDWARE(sc);
 	if (error != 0)
 		goto detach;
 
@@ -185,6 +205,7 @@ mtwn_usb_detach(device_t self)
 	usbd_transfer_unsetup(uc->uc_xfer, MTWN_USB_BULK_EP_COUNT);
 
 	/* private detach */
+	MTWN_CHIP_DETACH(sc);
 
 	mtx_destroy(&sc->sc_mtx);
 

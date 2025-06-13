@@ -23,6 +23,17 @@ struct mtwn_bus_ops {
 	uint32_t	(*sc_read_4)(struct mtwn_softc *, uint32_t);
 };
 
+/**
+ * + detach() - detach private state (eg memory) before driver detach finishes
+ * + reset() - chip reset, lock TBD
+ * + init_hardware() - initial attach hardware setup, called w/out lock held
+ */
+struct mtwn_chip_ops {
+	void		(*sc_chip_detach)(struct mtwn_softc *);
+	int		(*sc_chip_reset)(struct mtwn_softc *);
+	int		(*sc_chip_init_hardware)(struct mtwn_softc *);
+};
+
 struct mtwn_softc {
 	device_t		sc_dev;
 	uint32_t		sc_debug;
@@ -31,16 +42,28 @@ struct mtwn_softc {
 
 	/* Bus operations */
 	struct mtwn_bus_ops	sc_busops;
+
+	/* Chip operations */
+	struct mtwn_chip_ops	sc_chipops;
 };
 
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	MTWN_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
 #define	MTWN_LOCK_ASSERT(sc, t)	mtx_assert(&(sc)->sc_mtx, t)
 
+/* Bus operations */
 #define	MTWN_REG_READ_4(_sc, _reg)				\
 	    ((_sc)->sc_busops.sc_read_4((_sc), (_reg)))
 #define	MTWN_REG_WRITE_4(_sc, _reg, _val)			\
 	    ((_sc)->sc_busops.sc_write_4((_sc), (_reg), (_val)))
+
+/* Chip operations */
+#define	MTWN_CHIP_RESET(_sc)					\
+	    ((_sc)->sc_chipops.sc_chip_reset((_sc)))
+#define	MTWN_CHIP_DETACH(_sc)					\
+	    ((_sc)->sc_chipops.sc_chip_detach((_sc)))
+#define	MTWN_CHIP_INIT_HARDWARE(_sc)					\
+	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc)))
 
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);
