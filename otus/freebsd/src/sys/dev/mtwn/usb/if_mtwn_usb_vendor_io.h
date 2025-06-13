@@ -1,5 +1,5 @@
-/*-
- * Copyright (c) 2025 Adrian Chadd <adrian@FreeBSD.org>.
+/*
+ * Copyright (c) 2025, Adrian Chadd <adrian@FreeBSD.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,21 +13,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef	__IF_MTWN_USB_VENDOR_IO_H__
+#define	__IF_MTWN_USB_VENDOR_IO_H__
 
-#ifndef	__IF_MTWN_DEBUG_H__
-#define	__IF_MTWN_DEBUG_H__
+extern	uint32_t mtwn_usb_read_4(struct mtwn_softc *, uint32_t);
+extern	void mtwn_usb_write_4(struct mtwn_softc *, uint32_t, uint32_t);
 
-enum {
+/* XXX TODO: doesn't belong here */
+extern	void mtwn_delay(struct mtwn_softc *, int);
 
-	MTWN_DEBUG_USB = 0x00000040,
-
-	MTWN_DEBUG_ANY = 0xffffffff
-};
-
-#define MTWN_DPRINTF(_sc, _m, ...)					\
-	do {								\
-		if ((_sc)->sc_debug & (_m))				\
-			device_printf((_sc)->sc_dev, __VA_ARGS__);	\
-	} while (0)
-
-#endif/* __IF_MTWN_DEBUG_H__ */
+#endif	/* __IF_MTWN_USB_VENDOR_IO_H__ */

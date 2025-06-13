@@ -27,8 +27,8 @@
  * The rest of the vendor access types are also defined here.
  */
 
-#define	MTWN_USB_VEND_TYPE_EEPROM	(1 << 31)
-#define	MTWN_USB_VENDOR_TYPE_CFG		(1 << 30)
+#define	MTWN_USB_VENDOR_TYPE_EEPROM	(1 << 31)
+#define	MTWN_USB_VENDOR_TYPE_CFG	(1 << 30)
 #define	MTWN_USB_VENDOR_TYPE_MASK		\
 	    (MTWN_USB_VENDOR_TYPE_EEPROM | MTWN_USB_VENDOR_TYPE_CFG)
 
