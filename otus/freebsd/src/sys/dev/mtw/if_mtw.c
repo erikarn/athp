@@ -186,7 +186,6 @@ static void mtw_update_beacon_cb(void *);
 static void mtw_updateprot(struct ieee80211com *);
 static void mtw_updateprot_cb(void *);
 static void mtw_usb_timeout_cb(void *);
-static int mtw_reset(struct mtw_softc *sc);
 static void mtw_enable_tsf_sync(struct mtw_softc *);
 
 
@@ -3720,23 +3719,6 @@ mtw_usb_timeout_cb(void *arg)
 		    "timeout by unknown cause\n");
 	}
 }
-static int mtw_reset(struct mtw_softc *sc)
-{
-
-	usb_device_request_t req;
-	uint16_t tmp;
-	uint16_t actlen;
-
-	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-	req.bRequest = MTW_RESET;
-	USETW(req.wValue, 1);
-	USETW(req.wIndex, 0);
-	USETW(req.wLength, 0);
-	return (usbd_do_request_flags(sc->sc_udev, &sc->sc_mtx,
-				 &req, &tmp, 0, &actlen, 1000));
-
-}
-
 
 static void
 mtw_update_promisc_locked(struct mtw_softc *sc)

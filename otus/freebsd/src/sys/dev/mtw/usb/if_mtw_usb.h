@@ -30,9 +30,6 @@ extern	int mtw_write(struct mtw_softc *sc, uint16_t reg, uint32_t val);
 extern	int mtw_write_region_1(struct mtw_softc *sc, uint16_t reg, uint8_t *buf, int len);
 extern	int mtw_set_region_4(struct mtw_softc *sc, uint16_t reg, uint32_t val, int count);
 extern	void mtw_delay(struct mtw_softc *, u_int);
-
-
-
-
+extern	int mtw_reset(struct mtw_softc *);
 
 #endif	/* __IF_MTW_USB_H__ */

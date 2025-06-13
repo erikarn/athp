@@ -242,3 +242,19 @@ mtw_delay(struct mtw_softc *sc, u_int ms)
 	    USB_MS_TO_TICKS(ms));
 }
 
+
+int
+mtw_reset(struct mtw_softc *sc)
+{
+	usb_device_request_t req;
+	uint16_t tmp;
+	uint16_t actlen;
+
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = MTW_RESET;
+	USETW(req.wValue, 1);
+	USETW(req.wIndex, 0);
+	USETW(req.wLength, 0);
+	return (usbd_do_request_flags(sc->sc_udev, &sc->sc_mtx,
+	    &req, &tmp, 0, &actlen, 1000));
+}
