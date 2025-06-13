@@ -70,6 +70,7 @@
 #include "if_mtwn_usb_data_list.h"
 #include "if_mtwn_usb_data_rx.h"
 #include "if_mtwn_usb_data_tx.h"
+#include "if_mtwn_usb_vendor_io.h"
 
 /* XXX for RX transfer start and all transfer stop */
 #include "if_mtwn_usb_rx.h"
@@ -131,6 +132,9 @@ mtwn_usb_attach(device_t self)
 	uc->uc_rx_buf_size = MTWN_USB_RXBUFSZ_DEF;
 
 	/* bus access methods */
+	sc->sc_busops.sc_read_4 = mtwn_usb_read_4;
+	sc->sc_busops.sc_write_4 = mtwn_usb_write_4;
+
 	/* chipset access methods */
 
 	/* Setup endpoints */

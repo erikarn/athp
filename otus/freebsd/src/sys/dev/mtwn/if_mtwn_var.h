@@ -16,15 +16,31 @@
 #ifndef	__IF_MTWN_VAR_H__
 #define	__IF_MTWN_VAR_H__
 
+struct mtwn_softc;
+
+struct mtwn_bus_ops {
+	void		(*sc_write_4)(struct mtwn_softc *, uint32_t, uint32_t);
+	uint32_t	(*sc_read_4)(struct mtwn_softc *, uint32_t);
+};
+
 struct mtwn_softc {
 	device_t		sc_dev;
 	uint32_t		sc_debug;
 	struct mtx		sc_mtx;
 	int			sc_detached;
+
+	/* Bus operations */
+	struct mtwn_bus_ops	sc_busops;
 };
+
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	MTWN_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
 #define	MTWN_LOCK_ASSERT(sc, t)	mtx_assert(&(sc)->sc_mtx, t)
+
+#define	MTWN_REG_READ_4(_sc, _reg)				\
+	    ((_sc)->sc_busops.sc_read_4((_sc), (_reg)))
+#define	MTWN_REG_WRITE_4(_sc, _reg, _val)			\
+	    ((_sc)->sc_busops.sc_write_4((_sc), (_reg), (_val)))
 
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);
