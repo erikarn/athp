@@ -59,7 +59,9 @@
 #include "../../if_mtwn_debug.h"
 
 #include "../mtwn_mt76x0_init.h"
+#include "../mtwn_mt76x0_mac.h"
 #include "../mtwn_mt76x0_var.h"
+#include "../mtwn_mt76x0_reg.h"
 
 #include "mtwn_mcu_mt7610u_reg.h" /* XXX for the mcu buf size */
 #include "mtwn_chip_mt7610u_usb.h"
@@ -98,10 +100,21 @@ mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
  * mt76x0_register_device() - so much more work, heh
  */
 
+/**
+ * @brief Setup the hardware during probe/attach.
+ *
+ * This sets up the hardware and firmware enough during probe/attach
+ * to be able to read out the config (eg EEPROM contents) and other
+ * bits/pieces needed for net80211 attach.
+ *
+ * This must be called with the lock held.
+ */
 static int
 mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 {
 	int ret;
+	uint32_t asic_ver, mac_ver;
+	uint32_t efuse;
 
 	/* XXX TODO: Our version of mt76x0u_probe() */
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
@@ -112,12 +125,24 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 		return ret;
 
 	/* wait for mac */
-	/* populate asic/mac rev */
+	ret = mtwn_mt76x0_mac_wait_ready(sc);
+	if (ret != 0)
+		return (ret);
+
+	/* populate asic/mac rev, efuse */
+	asic_ver = MTWN_REG_READ_4(sc, MT76_REG_ASIC_VERSION);
+	mac_ver = MTWN_REG_READ_4(sc, MT76_REG_MAC_CSR0);
+	efuse = MTWN_REG_READ_4(sc, MT76_REG_EFUSE_CTRL);
+	device_printf(sc->sc_dev, "%s: asic_ver=0x%08x, mac_ver=0x%08x, efuse=0x%08x\n",
+	    __func__, asic_ver, mac_ver, efuse);
+
 	/* efuse check */
+	if ((efuse & MT76_REG_EFUSE_CTRL_SEL) == 0)
+		device_printf(sc->sc_dev, "%s: warning, EFUSE not present\n", __func__);
 
 	/* mt76x0u_register_device() */
 /*
- * allocate mcu_data
+ * allocate mcu_data - already done, so ignore
  * alloc queues - we've already done this, so ignore
  * mt76x0u_init_hardware(sc, true); - this is MTWN_CHIP_INIT_HARDWARE(sc, true);
  * check fragments for AMSDU support
@@ -138,6 +163,10 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 		return (ret);
 
 	/* wait for mac */
+	ret = mtwn_mt76x0_mac_wait_ready(sc);
+	if (ret != 0)
+		return (ret);
+
 	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
 	/* mt76x0_init_usb_dma */
 	/* mt76x0_init_hardware - mac, bb/phy, rf, etc setup */
