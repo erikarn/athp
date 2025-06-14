@@ -269,9 +269,19 @@ static int
 mtwn_usb_resume(device_t self)
 {
 	struct mtwn_usb_softc *uc = device_get_softc(self);
+	struct mtwn_softc *sc = &uc->uc_sc;
+	int ret;
 
-	/* mt76u_resume_rx */
-	/* mt76x0u_init_hardware(dev, false) */
+	/* TODO: mt76u_resume_rx */
+
+	ret = MTWN_CHIP_INIT_HARDWARE(sc, false);
+	if (ret != 0) {
+		device_printf(sc->sc_dev,
+		    "%s: failed to init post resume (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
 
 	mtwn_resume(&uc->uc_sc);
 	return (0);

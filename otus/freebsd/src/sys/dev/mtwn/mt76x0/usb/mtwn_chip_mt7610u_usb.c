@@ -80,9 +80,9 @@ mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
 /*
  * allocate mcu_data
  * alloc queues - we've already done this, so ignore
- * mt76x0u_init_hardware(sc, true);
+ * mt76x0u_init_hardware(sc, true); - this is MTWN_CHIP_INIT_HARDWARE(sc, true);
  * check fragments for AMSDU support
- * mt76x0_register_device()
+ * mt76x0_register_device() - so much more work, heh
  */
 
 static int
@@ -109,11 +109,18 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 static int
 mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 {
+	int ret;
+
+	device_printf(sc->sc_dev, "%s: called; reset=%d\n", __func__, reset);
 	/* mt76x0_chip_onoff(true, reset) */
+	ret = mtwn_mt76x0_chip_onoff(sc, true, reset);
+	if (ret != 0)
+		return (ret);
+
 	/* wait for mac */
-	/* mt76x0u_mcu_init() */
+	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
 	/* mt76x0_init_usb_dma */
-	/* mt76x0_init_hardware */
+	/* mt76x0_init_hardware - mac, bb/phy, rf, etc setup */
 	/* mt76x02u_init_beacon_config */
 
 #if 0
