@@ -105,9 +105,8 @@ mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
 /**
  * @brief Setup the hardware during probe/attach.
  *
- * This sets up the hardware and firmware enough during probe/attach
- * to be able to read out the config (eg EEPROM contents) and other
- * bits/pieces needed for net80211 attach.
+ * This resets and powers up the hardware far enough to do some basic
+ * sanity checks.
  *
  * This must be called with the lock held.
  */
@@ -145,24 +144,17 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 	if ((efuse & MT76_REG_EFUSE_CTRL_SEL) == 0)
 		device_printf(sc->sc_dev, "%s: warning, EFUSE not present\n", __func__);
 
-	/* mt76x0u_register_device() */
-
-	/* Initialise the hardware */
-	ret = MTWN_CHIP_INIT_HARDWARE(sc, true);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: INIT_HARDWARE failed (err %d)\n",
-		    __func__, ret);
-		return (ret);
-	}
-
-	/* XXX TODO: A-MSDU support */
-
-	/* TODO: mt76x0_register_device() */
+	/* XXX TODO: A-MSDU support check / config */
 
 	return (0);
 }
 
-static void
+/**
+ * @brief Initialise the DMA engine configuration.
+ *
+ * This configures the DMA engine paramters for the chip.
+ */
+static bool
 mtwn_mt7610u_init_usb_dma(struct mtwn_softc *sc)
 {
 	uint32_t reg;
@@ -193,46 +185,16 @@ mtwn_mt7610u_init_usb_dma(struct mtwn_softc *sc)
 	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, reg);
 	reg &= ~MT76_REG_USB_DMA_CFG_RX_DROP_OR_PAD;
 	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, reg);
+
+	return (0);
 }
 
 static int
-mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
+mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc)
 {
-	int ret;
-
-	device_printf(sc->sc_dev, "%s: called; reset=%d\n", __func__, reset);
-	/* mt76x0_chip_onoff(true, reset) */
-	ret = mtwn_mt76x0_chip_onoff(sc, true, reset);
-	if (ret != 0)
-		return (ret);
-
-	/* wait for mac */
-	if (!mtwn_mt76x0_mac_wait_ready(sc)) {
-		MTWN_ERR_PRINTF(sc, "%s: mac not ready\n", __func__);
-		return (ENXIO);
-	}
-
-	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
-	ret = mtwn_mt7610u_mcu_init(sc);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: mcu_init failed (err %d)\n", __func__,
-		    ret);
-		return (ret);
-	}
-
-	/* mt76x0_init_usb_dma - configures TX/RX DMA engine parameters */
-	mtwn_mt7610u_init_usb_dma(sc);
-
-	/* mt76x0_init_hardware - mac, bb/phy, rf, etc setup */
-	/* mt76x02u_init_beacon_config */
-
-#if 0
-	mt76_rmw(sc, MT_US_CYC_CFG, MT_US_CYC_CNT, 0x1e);
-	mt76_wr(sc, MT_TXOP_CTRL_CFG,
-	    FIELD_PREP(MT_TXOP_TRUN_EN, 0x3f) |
-	    FIELD_PREP(MT_TXOP_EXT_CCA_DLY, 0x58));
-#endif
-
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+	MTWN_TODO_PRINTF(sc, "%s: TODO: this should be a chip call!\n",
+	    __func__);
 	return (0);
 }
 
@@ -251,7 +213,52 @@ mtwn_chip_mt7610u_power_off(struct mtwn_softc *sc)
 	}
 
 	sc->flags.mcu_running = false;
+	sc->flags.power_on = false;
 
+	return (0);
+}
+
+static int
+mtwn_chip_mt7610u_power_on(struct mtwn_softc *sc, bool reset)
+{
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	ret = mtwn_mt76x0_chip_onoff(sc, true, reset);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to power chip on (err=%d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+	sc->flags.power_on = true;
+	return (0);
+}
+
+static bool
+mtwn_mt7610u_beacon_config(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_TODO_PRINTF(sc,
+	    "%s: TODO: implement in chip layer and call from here\n",
+	    __func__);
+	return (0);
+}
+
+static bool
+mtwn_mt7610u_post_init_setup(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+#if 0
+	mt76_rmw(sc, MT_US_CYC_CFG, MT_US_CYC_CNT, 0x1e);
+	mt76_wr(sc, MT_TXOP_CTRL_CFG,
+	    FIELD_PREP(MT_TXOP_TRUN_EN, 0x3f) |
+	    FIELD_PREP(MT_TXOP_EXT_CCA_DLY, 0x58));
+#endif
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO: implement!", __func__);
 	return (0);
 }
 
@@ -286,9 +293,14 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_reset = mtwn_chip_mt7610u_reset;
 	sc->sc_chipops.sc_chip_setup_hardware =
 	    mtwn_chip_mt7610u_setup_hardware;
-	sc->sc_chipops.sc_chip_init_hardware =
-	    mtwn_chip_mt7610u_init_hardware;
+	sc->sc_chipops.sc_chip_init_hardware = mtwn_chip_mt7610u_init_hardware;
 	sc->sc_chipops.sc_chip_power_off = mtwn_chip_mt7610u_power_off;
+	sc->sc_chipops.sc_chip_power_on = mtwn_chip_mt7610u_power_on;
+	sc->sc_chipops.sc_chip_mac_wait_ready = mtwn_mt76x0_mac_wait_ready;
+	sc->sc_chipops.sc_chip_dma_param_setup = mtwn_mt7610u_init_usb_dma;
+	sc->sc_chipops.sc_chip_beacon_config = mtwn_mt7610u_beacon_config;
+	sc->sc_chipops.sc_chip_post_init_setup = mtwn_mt7610u_post_init_setup;
+	sc->sc_chipops.sc_chip_mcu_init = mtwn_mt7610u_mcu_init;
 
 	return (0);
 }

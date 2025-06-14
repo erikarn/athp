@@ -35,15 +35,22 @@ struct mtwn_bus_ops {
  * + detach() - detach private state (eg memory) before driver detach finishes
  * + reset() - chip reset, lock TBD
  * + setup_hardware() - initial attach hardware setup, called w/out lock held
- * + init_hardware() - do hardware init / re-init, called w/ lock held
+ * + init_hardware() - do hardware init after power-on / firmware load
+ * + power_on() - power off the chip, w/ or w/out reset, called w/ lock held
  * + power_off() - power off the chip, called w/ lock held
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
 	int		(*sc_chip_reset)(struct mtwn_softc *);
-	int		(*sc_chip_init_hardware)(struct mtwn_softc *, bool);
+	int		(*sc_chip_init_hardware)(struct mtwn_softc *);
 	int		(*sc_chip_setup_hardware)(struct mtwn_softc *);
+	int		(*sc_chip_power_on)(struct mtwn_softc *sc, bool);
 	int		(*sc_chip_power_off)(struct mtwn_softc *sc);
+	bool		(*sc_chip_mac_wait_ready)(struct mtwn_softc *sc);
+	bool		(*sc_chip_dma_param_setup)(struct mtwn_softc *sc);
+	bool		(*sc_chip_beacon_config)(struct mtwn_softc *sc);
+	bool		(*sc_chip_post_init_setup)(struct mtwn_softc *sc);
+	int		(*sc_chip_mcu_init)(struct mtwn_softc *sc);
 };
 
 struct mtwn_mcu_ops {
@@ -74,6 +81,7 @@ struct mtwn_softc {
 
 	struct {
 		bool mcu_running;
+		bool power_on;
 	} flags;
 
 	/* Bus operations */
@@ -107,12 +115,24 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_reset((_sc)))
 #define	MTWN_CHIP_DETACH(_sc)					\
 	    ((_sc)->sc_chipops.sc_chip_detach((_sc)))
-#define	MTWN_CHIP_INIT_HARDWARE(_sc, _reset)			\
-	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc), (_reset)))
+#define	MTWN_CHIP_INIT_HARDWARE(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc)))
 #define	MTWN_CHIP_SETUP_HARDWARE(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_setup_hardware((_sc)))
+#define	MTWN_CHIP_POWER_ON(_sc, _reset)				\
+	    ((_sc)->sc_chipops.sc_chip_power_on((_sc), (_reset)))
 #define	MTWN_CHIP_POWER_OFF(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_power_off((_sc)))
+#define	MTWN_CHIP_MAC_WAIT_READY(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_mac_wait_ready((_sc)))
+#define	MTWN_CHIP_DMA_PARAM_SETUP(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_dma_param_setup((_sc)))
+#define	MTWN_CHIP_BEACON_CONFIG(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_beacon_config((_sc)))
+#define	MTWN_CHIP_POST_INIT_SETUP(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_post_init_setup((_sc)))
+#define	MTWN_CHIP_MCU_INIT(_sc)					\
+	    ((_sc)->sc_chipops.sc_chip_mcu_init((_sc)))
 
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);

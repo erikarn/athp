@@ -58,10 +58,78 @@
 #include "if_mtwn_var.h"
 #include "if_mtwn_debug.h"
 
+static int
+mtwn_init(struct mtwn_softc *sc)
+{
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* Power on hardware; do a reset */
+	ret = MTWN_CHIP_POWER_ON(sc, true);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: POWER_ON failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* Wait for MAC ready */
+	if (!MTWN_CHIP_MAC_WAIT_READY(sc)) {
+		MTWN_ERR_PRINTF(sc, "%s: MAC_WAIT_READY failed\n", __func__);
+		return (ret);
+	}
+
+	/* MCU init / firmware load */
+	ret = MTWN_CHIP_MCU_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: MCU_INIT failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* DMA parameter setup */
+	ret = MTWN_CHIP_DMA_PARAM_SETUP(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: DMA_PARAM_SETUP failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* Chipset hardware init (mt76x0_init_hardware) */
+	ret = MTWN_CHIP_INIT_HARDWARE(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: INIT_HARDWARE failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* Beacon config */
+	ret = MTWN_CHIP_BEACON_CONFIG(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: BEACON_CONFIG failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* Post init setup */
+	ret = MTWN_CHIP_POST_INIT_SETUP(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: POST_INIT_SETUP failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	return (0);
+}
+
 int
 mtwn_attach(struct mtwn_softc *sc)
 {
 	MTWN_INFO_PRINTF(sc, "%s: hi!\n", __func__);
+
+	MTWN_LOCK(sc);
+	mtwn_init(sc);
+	MTWN_UNLOCK(sc);
 
 	return (0);
 }

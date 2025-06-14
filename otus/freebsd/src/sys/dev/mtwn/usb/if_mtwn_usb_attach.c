@@ -184,11 +184,13 @@ mtwn_usb_attach(device_t self)
 	if (error != 0)
 		goto detach;
 
+#if 0
 	/* XXX TODO for now, for bring-up */
 	/* XXX TODO: do we need xfers up for initial firmware setup above? */
 	MTWN_LOCK(sc);
 	mtwn_usb_rx_start_xfers(uc);
 	MTWN_UNLOCK(sc);
+#endif
 
 	return (0);
 detach:
@@ -288,21 +290,9 @@ mtwn_usb_resume(device_t self)
 {
 	struct mtwn_usb_softc *uc = device_get_softc(self);
 	struct mtwn_softc *sc = &uc->uc_sc;
-	int ret;
 
 	/* TODO: mt76u_resume_rx */
 	MTWN_TODO_PRINTF(sc, "%s: TODO: mt76u_resume_rx\n", __func__);
-
-	/* XXX TODO: push this into a chip specific resume method? */
-	/* XXX TODO: maybe this should be done via mtwn_resume -> ieee80211_resume_all() ? */
-	MTWN_LOCK(sc);
-	ret = MTWN_CHIP_INIT_HARDWARE(sc, false);
-	MTWN_UNLOCK(sc);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: failed to init post resume (err %d)\n",
-		    __func__, ret);
-		return (ret);
-	}
 
 	mtwn_resume(&uc->uc_sc);
 	return (0);
