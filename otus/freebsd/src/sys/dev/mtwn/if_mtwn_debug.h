@@ -30,4 +30,21 @@ enum {
 			device_printf((_sc)->sc_dev, __VA_ARGS__);	\
 	} while (0)
 
+#define	MTWN_ERR_PRINTF(_sc, ...)					\
+	    device_printf((_sc)->sc_dev, __VA_ARGS__);
+#define	MTWN_WARN_PRINTF(_sc, ...)					\
+	    device_printf((_sc)->sc_dev, __VA_ARGS__);
+#define	MTWN_INFO_PRINTF(_sc, ...)					\
+	    device_printf((_sc)->sc_dev, __VA_ARGS__);
+
+#if 1
+#define	MTWN_FUNC_ENTER(_sc)						\
+	    device_printf((_sc)->sc_dev, "%s: enter", __func__);
+#define	MTWN_FUNC_EXIT(_sc)						\
+	    device_printf((_sc)->sc_dev, "%s: exit", __func__);
+#else
+#define	MTWN_FUNC_ENTER(_sc) (void) 0
+#define	MTWN_FUNC_EXIT(_sc) (void) 0
+#endif
+
 #endif/* __IF_MTWN_DEBUG_H__ */
