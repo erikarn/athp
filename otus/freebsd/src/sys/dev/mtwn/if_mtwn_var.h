@@ -26,6 +26,8 @@ struct mtwn_reg_pair {
 struct mtwn_bus_ops {
 	void		(*sc_write_4)(struct mtwn_softc *, uint32_t, uint32_t);
 	uint32_t	(*sc_read_4)(struct mtwn_softc *, uint32_t);
+	uint32_t	(*sc_rmw_4)(struct mtwn_softc *, uint32_t, uint32_t,
+			    uint32_t);
 	void		(*sc_delay)(struct mtwn_softc *, uint32_t);
 };
 

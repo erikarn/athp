@@ -170,7 +170,27 @@ mtwn_usb_write_4(struct mtwn_softc *sc, uint32_t reg, uint32_t val)
 	}
 }
 
-/* XXX doesn't belong here */
+/**
+ * @brief Read-modify-write a 4 byte register region.
+ *
+ * This reads the value at reg, masks out any bits set in mask,
+ * sets any bits in val, and writes the result back.
+ * The result is returned.
+ */
+uint32_t
+mtwn_usb_rmw_4(struct mtwn_softc *sc, uint32_t reg, uint32_t mask,
+    uint32_t val)
+{
+	uint32_t r;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+	r = mtwn_usb_read_4(sc, reg) & ~mask;
+	r |= (val & ~mask);
+	mtwn_usb_write_4(sc, reg, r);
+	return (r);
+}
+
+
 void
 mtwn_usb_delay(struct mtwn_softc *sc, uint32_t usec)
 {
