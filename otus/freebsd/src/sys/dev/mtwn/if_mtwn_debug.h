@@ -39,9 +39,9 @@ enum {
 
 #if 1
 #define	MTWN_FUNC_ENTER(_sc)						\
-	    device_printf((_sc)->sc_dev, "%s: enter", __func__);
+	    device_printf((_sc)->sc_dev, "%s: enter\n", __func__);
 #define	MTWN_FUNC_EXIT(_sc)						\
-	    device_printf((_sc)->sc_dev, "%s: exit", __func__);
+	    device_printf((_sc)->sc_dev, "%s: exit\n", __func__);
 #else
 #define	MTWN_FUNC_ENTER(_sc) (void) 0
 #define	MTWN_FUNC_EXIT(_sc) (void) 0
