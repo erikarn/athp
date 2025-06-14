@@ -58,10 +58,11 @@
 #include "../../if_mtwn_var.h"
 #include "../../if_mtwn_debug.h"
 
+#include "../mtwn_mt7610_var.h"
 #include "../mtwn_mt7610_init.h"
 #include "../mtwn_mt7610_mac.h"
-#include "../mtwn_mt7610_var.h"
 #include "../mtwn_mt7610_reg.h"
+#include "../mtwn_mt7610_mcu.h"
 
 #include "mtwn_mcu_mt7610u_reg.h" /* XXX for the mcu buf size */
 #include "mtwn_mcu_mt7610u_usb.h"
@@ -161,6 +162,39 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 	return (0);
 }
 
+static void
+mtwn_mt7610u_init_usb_dma(struct mtwn_softc *sc)
+{
+	uint32_t reg;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_FUNC_ENTER(sc);
+
+	reg = MTWN_REG_READ_4(sc, MT76_REG_USB_DMA_CFG);
+	reg |= (MT76_REG_USB_DMA_CFG_RX_BULK_EN |
+	    MT76_REG_USB_DMA_CFG_TX_BULK_EN);
+	/*
+	 * Disable AGGR_BULK_RX, this configures the DMA engine
+	 * to send one MPDU per RX frame.
+	 *
+	 * TODO: once the driver is up and working, maybe look
+	 * at making this optional?
+	 */
+	reg &= ~MT76_REG_USB_DMA_CFG_RX_BULK_AGG_EN;
+	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, reg);
+
+	if (!mtwn_mt7610_mcu_firmware_running(sc))
+		MTWN_WARN_PRINTF(sc, "%s: MCU not ready!\n", __func__);
+
+	/* Toggle RX_DROP_OR_PAD */
+	reg = MTWN_REG_READ_4(sc, MT76_REG_USB_DMA_CFG);
+	reg |= MT76_REG_USB_DMA_CFG_RX_DROP_OR_PAD;
+	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, reg);
+	reg &= ~MT76_REG_USB_DMA_CFG_RX_DROP_OR_PAD;
+	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, reg);
+}
+
 static int
 mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 {
@@ -180,6 +214,7 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 		return (ret);
 	}
 
+	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
 	ret = mtwn_mt7610u_mcu_init(sc);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: mcu_init failed (err %d)\n", __func__,
@@ -187,8 +222,9 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 		return (ret);
 	}
 
-	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
-	/* mt76x0_init_usb_dma */
+	/* mt76x0_init_usb_dma - configures TX/RX DMA engine parameters */
+	mtwn_mt7610u_init_usb_dma(sc);
+
 	/* mt76x0_init_hardware - mac, bb/phy, rf, etc setup */
 	/* mt76x02u_init_beacon_config */
 

@@ -13,6 +13,7 @@ SRCS    = if_mtwn.c \
 .PATH: ${.CURDIR}/../../dev/mtwn/mt7610
 SRCS	+= mtwn_mt7610_init.c
 SRCS	+= mtwn_mt7610_mac.c
+SRCS	+= mtwn_mt7610_mcu.c
 
 .PATH: ${.CURDIR}/../../dev/mtwn/mt7610/usb
 
