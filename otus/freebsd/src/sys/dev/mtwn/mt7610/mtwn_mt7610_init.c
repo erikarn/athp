@@ -59,8 +59,8 @@
 #include "../if_mtwn_debug.h"
 #include "../if_mtwn_util.h"
 
-#include "mtwn_mt76x0_init.h"
-#include "mtwn_mt76x0_reg.h"
+#include "mtwn_mt7610_init.h"
+#include "mtwn_mt7610_reg.h"
 
 /**
  * @brief enable/disable the WLAN clock; verify it's stable

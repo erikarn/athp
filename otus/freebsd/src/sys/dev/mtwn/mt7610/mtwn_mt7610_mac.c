@@ -59,8 +59,8 @@
 #include "../if_mtwn_debug.h"
 #include "../if_mtwn_util.h"
 
-#include "mtwn_mt76x0_reg.h"
-#include "mtwn_mt76x0_mac.h"
+#include "mtwn_mt7610_reg.h"
+#include "mtwn_mt7610_mac.h"
 
 #define	MTWN_WAIT_FOR_MAC_NTRIES		100
 

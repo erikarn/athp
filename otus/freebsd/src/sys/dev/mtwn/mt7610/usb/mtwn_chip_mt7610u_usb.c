@@ -58,10 +58,10 @@
 #include "../../if_mtwn_var.h"
 #include "../../if_mtwn_debug.h"
 
-#include "../mtwn_mt76x0_init.h"
-#include "../mtwn_mt76x0_mac.h"
-#include "../mtwn_mt76x0_var.h"
-#include "../mtwn_mt76x0_reg.h"
+#include "../mtwn_mt7610_init.h"
+#include "../mtwn_mt7610_mac.h"
+#include "../mtwn_mt7610_var.h"
+#include "../mtwn_mt7610_reg.h"
 
 #include "mtwn_mcu_mt7610u_reg.h" /* XXX for the mcu buf size */
 #include "mtwn_mcu_mt7610u_usb.h"

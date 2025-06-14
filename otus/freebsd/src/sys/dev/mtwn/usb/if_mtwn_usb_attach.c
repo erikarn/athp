@@ -76,8 +76,8 @@
 /* XXX for RX transfer start and all transfer stop */
 #include "if_mtwn_usb_rx.h"
 
-#include "../mt76x0/usb/mtwn_chip_mt7610u_usb.h"
-#include "../mt76x0/usb/mtwn_mcu_mt7610u_usb.h"
+#include "../mt7610/usb/mtwn_chip_mt7610u_usb.h"
+#include "../mt7610/usb/mtwn_mcu_mt7610u_usb.h"
 
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
 #define MTWN_DEV(v, p, chipid)						\

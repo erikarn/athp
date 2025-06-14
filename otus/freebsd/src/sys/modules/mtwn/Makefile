@@ -10,11 +10,11 @@ SRCS    = if_mtwn.c \
 	  bus_if.h device_if.h usb_if.h usbdevs.h \
 	  opt_wlan.h
 
-.PATH: ${.CURDIR}/../../dev/mtwn/mt76x0
-SRCS	+= mtwn_mt76x0_init.c
-SRCS	+= mtwn_mt76x0_mac.c
+.PATH: ${.CURDIR}/../../dev/mtwn/mt7610
+SRCS	+= mtwn_mt7610_init.c
+SRCS	+= mtwn_mt7610_mac.c
 
-.PATH: ${.CURDIR}/../../dev/mtwn/mt76x0/usb
+.PATH: ${.CURDIR}/../../dev/mtwn/mt7610/usb
 
 SRCS	+= mtwn_chip_mt7610u_usb.c
 SRCS	+= mtwn_mcu_mt7610u_usb.c
