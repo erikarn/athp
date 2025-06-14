@@ -207,11 +207,9 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 		return (ret);
 
 	/* wait for mac */
-	ret = mtwn_mt76x0_mac_wait_ready(sc);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: mac not ready (err %d)\n", __func__,
-		    ret);
-		return (ret);
+	if (!mtwn_mt76x0_mac_wait_ready(sc)) {
+		MTWN_ERR_PRINTF(sc, "%s: mac not ready\n", __func__);
+		return (ENXIO);
 	}
 
 	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
