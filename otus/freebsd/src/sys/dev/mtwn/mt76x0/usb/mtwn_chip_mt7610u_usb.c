@@ -121,13 +121,16 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 
 	/* Disable hardware, so MCU doesn't fail on hot reboot */
 	ret = mtwn_mt76x0_chip_onoff(sc, false, false);
-	if (ret != 0)
-		return ret;
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: onoff failed (%d)\n", __func__, ret);
+		return (ret);
+	}
 
 	/* wait for mac */
-	ret = mtwn_mt76x0_mac_wait_ready(sc);
-	if (ret != 0)
-		return (ret);
+	if (!mtwn_mt76x0_mac_wait_ready(sc)) {
+		MTWN_ERR_PRINTF(sc, "%s: mac wait ready failed\n", __func__);
+		return (ETIMEDOUT);
+	}
 
 	/* populate asic/mac rev, efuse */
 	asic_ver = MTWN_REG_READ_4(sc, MT76_REG_ASIC_VERSION);
