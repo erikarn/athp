@@ -61,6 +61,7 @@
 #include "../mtwn_mt76x0_init.h"
 #include "../mtwn_mt76x0_var.h"
 
+#include "mtwn_mcu_mt7610u_reg.h" /* XXX for the mcu buf size */
 #include "mtwn_chip_mt7610u_usb.h"
 
 static void
@@ -156,15 +157,27 @@ int
 mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 {
 	struct mtwn_mt7610_chip_priv *psc;
+	char *mcu_buf;
 
 	/* Allocate mt76x0 chip private state */
 	psc = malloc(sizeof(struct mtwn_mt7610_chip_priv), M_TEMP,
 	    M_NOWAIT | M_ZERO);
+
 	if (psc == NULL) {
 		device_printf(sc->sc_dev, "%s: malloc failure\n", __func__);
 		return (ENOMEM);
 	}
+
+	/* Allocate MCU URB buffer */
+	mcu_buf = malloc(MWTN_MCU_RESP_URB_SIZE, M_TEMP, M_NOWAIT | M_ZERO);
+	if (mcu_buf == NULL) {
+		device_printf(sc->sc_dev, "%s: malloc failure\n", __func__);
+		free(mcu_buf, M_TEMP);
+		return (ENOMEM);
+	}
+
 	sc->sc_chipops_priv = psc;
+	psc->mcu_data = mcu_buf;
 
 	/* Chip attach methods */
 	sc->sc_chipops.sc_chip_detach = mtwn_chip_mt7610u_detach;
