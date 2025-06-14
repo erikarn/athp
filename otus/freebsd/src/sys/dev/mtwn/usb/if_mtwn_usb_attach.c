@@ -138,6 +138,7 @@ mtwn_usb_attach(device_t self)
 	/* bus access methods */
 	sc->sc_busops.sc_read_4 = mtwn_usb_read_4;
 	sc->sc_busops.sc_write_4 = mtwn_usb_write_4;
+	sc->sc_busops.sc_delay = mtwn_usb_delay;
 
 	/* chipset / MCU access methods */
 	switch (USB_GET_DRIVER_INFO(uaa)) {

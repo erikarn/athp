@@ -26,6 +26,7 @@ struct mtwn_reg_pair {
 struct mtwn_bus_ops {
 	void		(*sc_write_4)(struct mtwn_softc *, uint32_t, uint32_t);
 	uint32_t	(*sc_read_4)(struct mtwn_softc *, uint32_t);
+	void		(*sc_delay)(struct mtwn_softc *, uint32_t);
 };
 
 /**
@@ -86,6 +87,10 @@ struct mtwn_softc {
 	    ((_sc)->sc_busops.sc_read_4((_sc), (_reg)))
 #define	MTWN_REG_WRITE_4(_sc, _reg, _val)			\
 	    ((_sc)->sc_busops.sc_write_4((_sc), (_reg), (_val)))
+#define	MTWN_UDELAY(_sc, _usec)					\
+	    ((_sc)->sc_busops.sc_delay((_sc), (_usec)))
+#define	MTWN_MDELAY(_sc, _msec)					\
+		MTWN_UDELAY((_sc), (_msec) * 1000)
 
 /* Chip operations */
 #define	MTWN_CHIP_RESET(_sc)					\

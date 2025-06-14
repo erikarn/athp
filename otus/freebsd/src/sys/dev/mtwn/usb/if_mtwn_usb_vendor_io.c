@@ -88,7 +88,7 @@ mtwn_do_request(struct mtwn_usb_softc *uc, usb_device_request_t *req,
 		MTWN_DPRINTF(sc, MTWN_DEBUG_USB,
 		    "Control request failed, %s (retrying)\n",
 		    usbd_errstr(err));
-		mtwn_delay(sc, 10);
+		MTWN_MDELAY(sc, 10);
 	}
 	return (err);
 }
@@ -172,8 +172,13 @@ mtwn_usb_write_4(struct mtwn_softc *sc, uint32_t reg, uint32_t val)
 
 /* XXX doesn't belong here */
 void
-mtwn_delay(struct mtwn_softc *sc, int msec)
+mtwn_usb_delay(struct mtwn_softc *sc, uint32_t usec)
 {
+	if (usec < 1000) {
+		DELAY(usec);
+		return;
+	}
+
 	usb_pause_mtx(mtx_owned(&sc->sc_mtx) ? &sc->sc_mtx : NULL,
-	    USB_MS_TO_TICKS(msec));
+	    USB_MS_TO_TICKS(usec / 1000));
 }

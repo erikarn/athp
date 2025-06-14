@@ -58,6 +58,8 @@
 #include "../../if_mtwn_var.h"
 #include "../../if_mtwn_debug.h"
 
+#include "../mtwn_mt76x0_init.h"
+
 #include "mtwn_chip_mt7610u_usb.h"
 
 static void
@@ -86,11 +88,16 @@ mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
 static int
 mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 {
+	int ret;
+
 	/* XXX TODO: Our version of mt76x0u_probe() */
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
 
-	/* mt76u_init() - we've already done this */
-	/* chip onoff */
+	/* Disable hardware, so MCU doesn't fail on hot reboot */
+	ret = mtwn_mt76x0_chip_onoff(sc, false, false);
+	if (ret != 0)
+		return ret;
+
 	/* wait for mac */
 	/* populate asic/mac rev */
 	/* efuse check */

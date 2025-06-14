@@ -13,13 +13,10 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__IF_MTWN_USB_VENDOR_IO_H__
-#define	__IF_MTWN_USB_VENDOR_IO_H__
+#ifndef	__MTWN_MT76X0_INIT_H__
+#define	__MTWN_MT76X0_INIT_H__
 
-extern	uint32_t mtwn_usb_read_4(struct mtwn_softc *, uint32_t);
-extern	void mtwn_usb_write_4(struct mtwn_softc *, uint32_t, uint32_t);
+extern	int mtwn_mt76x0_set_wlan_state(struct mtwn_softc *, uint32_t, bool);
+extern	int mtwn_mt76x0_chip_onoff(struct mtwn_softc *, bool, bool);
 
-/* XXX TODO: doesn't belong here */
-extern	void mtwn_usb_delay(struct mtwn_softc *, uint32_t);
-
-#endif	/* __IF_MTWN_USB_VENDOR_IO_H__ */
+#endif	/* __MTWN_MT76X0_INIT_H__ */
