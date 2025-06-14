@@ -18,6 +18,11 @@
 
 struct mtwn_softc;
 
+struct mtwn_reg_pair {
+	uint32_t reg;
+	uint32_t val;
+};
+
 struct mtwn_bus_ops {
 	void		(*sc_write_4)(struct mtwn_softc *, uint32_t, uint32_t);
 	uint32_t	(*sc_read_4)(struct mtwn_softc *, uint32_t);
@@ -31,7 +36,28 @@ struct mtwn_bus_ops {
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
 	int		(*sc_chip_reset)(struct mtwn_softc *);
-	int		(*sc_chip_init_hardware)(struct mtwn_softc *);
+	int		(*sc_chip_init_hardware)(struct mtwn_softc *, bool);
+	int		(*sc_chip_setup_hardware)(struct mtwn_softc *);
+};
+
+struct mtwn_mcu_ops {
+	int		(*sc_mcu_send_msg)(struct mtwn_softc *,
+			    int, const void *, int, bool);
+	int		(*sc_mcu_parse_response)(struct mtwn_softc *,
+			    int, struct mbuf *, int);
+	uint32_t	(*sc_mcu_reg_read)(struct mtwn_softc *, uint32_t);
+	int		(*sc_mcu_reg_write)(struct mtwn_softc *, uint32_t,
+			    uint32_t);
+	int		(*sc_mcu_reg_pair_read)(struct mtwn_softc *,
+			    int, struct mtwn_reg_pair *rp, int);
+	int		(*sc_mcu_reg_pair_write)(struct mtwn_softc *,
+			    int, const struct mtwn_reg_pair *rp, int);
+};
+
+struct mtwn_mcu_cfg {
+	uint32_t headroom;
+	uint32_t tailroom;
+	int max_retry;
 };
 
 struct mtwn_softc {
@@ -45,6 +71,10 @@ struct mtwn_softc {
 
 	/* Chip operations */
 	struct mtwn_chip_ops	sc_chipops;
+
+	/* MCU operations */
+	struct mtwn_mcu_ops	sc_mcuops;
+	struct mtwn_mcu_cfg	sc_mcucfg;
 };
 
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
@@ -62,8 +92,10 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_reset((_sc)))
 #define	MTWN_CHIP_DETACH(_sc)					\
 	    ((_sc)->sc_chipops.sc_chip_detach((_sc)))
-#define	MTWN_CHIP_INIT_HARDWARE(_sc)					\
-	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc)))
+#define	MTWN_CHIP_INIT_HARDWARE(_sc, _reset)			\
+	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc), (_reset)))
+#define	MTWN_CHIP_SETUP_HARDWARE(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_setup_hardware((_sc)))
 
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);

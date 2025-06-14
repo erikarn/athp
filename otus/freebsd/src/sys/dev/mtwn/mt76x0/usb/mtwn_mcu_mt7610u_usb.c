@@ -58,77 +58,74 @@
 #include "../../if_mtwn_var.h"
 #include "../../if_mtwn_debug.h"
 
-#include "mtwn_chip_mt7610u_usb.h"
+#include "mtwn_mcu_mt7610u_usb.h"
 
-static void
-mtwn_chip_mt7610u_detach(struct mtwn_softc *sc)
+static int
+mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
+    const void *data, int len, bool wait_resp)
 {
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	return (ENXIO);
 }
 
 static int
-mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
+mtwn_mcu_mt7610u_mcu_parse_response(struct mtwn_softc *sc, int cmd,
+    struct mbuf *m, int seq)
 {
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
-	return (0);
+	return (ENXIO);
 }
 
-/* mt7610u_register_device() - needs to do these */
-/* TODO: maybe fold this into mtwn_chip_mt7610u_setup_hardware() */
-/*
- * allocate mcu_data
- * alloc queues - we've already done this, so ignore
- * mt76x0u_init_hardware(sc, true);
- * check fragments for AMSDU support
- * mt76x0_register_device()
- */
-
-static int
-mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
+static uint32_t
+mtwn_mcu_mt7610u_mcu_reg_read(struct mtwn_softc *sc, uint32_t reg)
 {
-	/* XXX TODO: Our version of mt76x0u_probe() */
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
-
-	/* mt76u_init() - we've already done this */
-	/* chip onoff */
-	/* wait for mac */
-	/* populate asic/mac rev */
-	/* efuse check */
-
-	/* mt76x0u_register_device() */
-	return (0);
+	return (0xffffffff);
 }
 
 static int
-mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
+mtwn_mcu_mt7610u_mcu_reg_write(struct mtwn_softc *sc, uint32_t reg,
+    uint32_t data)
 {
-	/* mt76x0_chip_onoff(true, reset) */
-	/* wait for mac */
-	/* mt76x0u_mcu_init() */
-	/* mt76x0_init_usb_dma */
-	/* mt76x0_init_hardware */
-	/* mt76x02u_init_beacon_config */
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	return (ENXIO);
+}
 
-#if 0
-	mt76_rmw(sc, MT_US_CYC_CFG, MT_US_CYC_CNT, 0x1e);
-	mt76_wr(sc, MT_TXOP_CTRL_CFG,
-	    FIELD_PREP(MT_TXOP_TRUN_EN, 0x3f) |
-	    FIELD_PREP(MT_TXOP_EXT_CCA_DLY, 0x58));
-#endif
+static int
+mtwn_mcu_mt7610u_mcu_reg_pair_read(struct mtwn_softc *sc, int base,
+    struct mtwn_reg_pair *rp, int n)
+{
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	return (ENXIO);
+}
 
-	return (0);
+static int
+mtwn_mcu_mt7610u_mcu_reg_pair_write(struct mtwn_softc *sc, int base,
+    const struct mtwn_reg_pair *rp, int n)
+{
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	return (ENXIO);
 }
 
 int
-mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
+mtwn_mcu_mt7610u_attach(struct mtwn_softc *sc)
 {
-	/* Chip attach methods */
-	sc->sc_chipops.sc_chip_detach = mtwn_chip_mt7610u_detach;
-	sc->sc_chipops.sc_chip_reset = mtwn_chip_mt7610u_reset;
-	sc->sc_chipops.sc_chip_setup_hardware =
-	    mtwn_chip_mt7610u_setup_hardware;
-	sc->sc_chipops.sc_chip_init_hardware =
-	    mtwn_chip_mt7610u_init_hardware;
+	/* MCU attach methods / config */
+
+	sc->sc_mcucfg.tailroom = 8;
+	sc->sc_mcucfg.headroom = 4; /* XXX MT_CMD_HDR_LEN */
+	/* XXX TODO: max_retry? */
+
+	sc->sc_mcuops.sc_mcu_send_msg = mtwn_mcu_mt7610u_mcu_send_msg;
+	sc->sc_mcuops.sc_mcu_parse_response =
+	    mtwn_mcu_mt7610u_mcu_parse_response;
+	sc->sc_mcuops.sc_mcu_reg_read = mtwn_mcu_mt7610u_mcu_reg_read;
+	sc->sc_mcuops.sc_mcu_reg_write = mtwn_mcu_mt7610u_mcu_reg_write;
+	sc->sc_mcuops.sc_mcu_reg_pair_read =
+	    mtwn_mcu_mt7610u_mcu_reg_pair_read;
+	sc->sc_mcuops.sc_mcu_reg_pair_write =
+	    mtwn_mcu_mt7610u_mcu_reg_pair_write;
 
 	return (0);
 }
+

@@ -77,6 +77,7 @@
 #include "if_mtwn_usb_rx.h"
 
 #include "../mt76x0/usb/mtwn_chip_mt7610u_usb.h"
+#include "../mt76x0/usb/mtwn_mcu_mt7610u_usb.h"
 
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
 #define MTWN_DEV(v, p, chipid)						\
@@ -138,10 +139,11 @@ mtwn_usb_attach(device_t self)
 	sc->sc_busops.sc_read_4 = mtwn_usb_read_4;
 	sc->sc_busops.sc_write_4 = mtwn_usb_write_4;
 
-	/* chipset access methods */
+	/* chipset / MCU access methods */
 	switch (USB_GET_DRIVER_INFO(uaa)) {
 	case MTWN_CHIP_MT7610U:
 		mtwn_chip_mt7610u_attach(sc);
+		mtwn_mcu_mt7610u_attach(sc);
 	default:
 		device_printf(sc->sc_dev, "%s: unknown chip\n",
 		    __func__);
@@ -163,7 +165,7 @@ mtwn_usb_attach(device_t self)
 		goto detach;
 
 	/* Init hardware, before generic attach */
-	error = MTWN_CHIP_INIT_HARDWARE(sc);
+	error = MTWN_CHIP_SETUP_HARDWARE(sc);
 	if (error != 0)
 		goto detach;
 
@@ -173,6 +175,7 @@ mtwn_usb_attach(device_t self)
 		goto detach;
 
 	/* XXX TODO for now, for bring-up */
+	/* XXX TODO: do we need xfers up for initial firmware setup above? */
 	mtwn_usb_rx_start_xfers(uc);
 
 	return (0);
@@ -265,6 +268,9 @@ static int
 mtwn_usb_resume(device_t self)
 {
 	struct mtwn_usb_softc *uc = device_get_softc(self);
+
+	/* mt76u_resume_rx */
+	/* mt76x0u_init_hardware(dev, false) */
 
 	mtwn_resume(&uc->uc_sc);
 	return (0);
