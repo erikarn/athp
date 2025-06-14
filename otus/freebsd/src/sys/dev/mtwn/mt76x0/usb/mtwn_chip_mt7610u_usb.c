@@ -202,6 +202,25 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 	return (0);
 }
 
+static int
+mtwn_chip_mt7610u_power_off(struct mtwn_softc *sc)
+{
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	ret = mtwn_mt76x0_chip_onoff(sc, false, false);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to power chip off (err=%d)\n",
+		    __func__, ret);
+		/* XXX let suspend happen for now */
+	}
+
+	sc->flags.mcu_running = false;
+
+	return (0);
+}
+
 int
 mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 {
@@ -235,6 +254,7 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	    mtwn_chip_mt7610u_setup_hardware;
 	sc->sc_chipops.sc_chip_init_hardware =
 	    mtwn_chip_mt7610u_init_hardware;
+	sc->sc_chipops.sc_chip_power_off = mtwn_chip_mt7610u_power_off;
 
 	return (0);
 }

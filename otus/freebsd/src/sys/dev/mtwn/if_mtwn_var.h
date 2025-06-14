@@ -34,13 +34,16 @@ struct mtwn_bus_ops {
 /**
  * + detach() - detach private state (eg memory) before driver detach finishes
  * + reset() - chip reset, lock TBD
- * + init_hardware() - initial attach hardware setup, called w/out lock held
+ * + setup_hardware() - initial attach hardware setup, called w/out lock held
+ * + init_hardware() - do hardware init / re-init, called w/ lock held
+ * + power_off() - power off the chip, called w/ lock held
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
 	int		(*sc_chip_reset)(struct mtwn_softc *);
 	int		(*sc_chip_init_hardware)(struct mtwn_softc *, bool);
 	int		(*sc_chip_setup_hardware)(struct mtwn_softc *);
+	int		(*sc_chip_power_off)(struct mtwn_softc *sc);
 };
 
 struct mtwn_mcu_ops {
@@ -108,6 +111,8 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc), (_reset)))
 #define	MTWN_CHIP_SETUP_HARDWARE(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_setup_hardware((_sc)))
+#define	MTWN_CHIP_POWER_OFF(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_power_off((_sc)))
 
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);

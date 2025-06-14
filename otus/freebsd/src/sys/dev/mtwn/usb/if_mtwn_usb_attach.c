@@ -274,6 +274,10 @@ static int
 mtwn_usb_suspend(device_t self)
 {
 	struct mtwn_usb_softc *uc = device_get_softc(self);
+	struct mtwn_softc *sc = &uc->uc_sc;
+
+	/* TODO: mt76u_stop_rx - stops further RX USB processing */
+	MTWN_TODO_PRINTF(sc, "%s: TODO: mt76u_stop_rx\n", __func__);
 
 	mtwn_suspend(&uc->uc_sc);
 	return (0);
@@ -287,9 +291,13 @@ mtwn_usb_resume(device_t self)
 	int ret;
 
 	/* TODO: mt76u_resume_rx */
+	MTWN_TODO_PRINTF(sc, "%s: TODO: mt76u_resume_rx\n", __func__);
 
-	/* XXX TODO: this shouldn't be don here unless it's USB related */
+	/* XXX TODO: push this into a chip specific resume method? */
+	/* XXX TODO: maybe this should be done via mtwn_resume -> ieee80211_resume_all() ? */
+	MTWN_LOCK(sc);
 	ret = MTWN_CHIP_INIT_HARDWARE(sc, false);
+	MTWN_UNLOCK(sc);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to init post resume (err %d)\n",
 		    __func__, ret);

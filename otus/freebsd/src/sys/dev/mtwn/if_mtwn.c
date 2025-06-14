@@ -78,16 +78,30 @@ mtwn_detach(struct mtwn_softc *sc)
 int
 mtwn_suspend(struct mtwn_softc *sc)
 {
+	int ret;
 
-	device_printf(sc->sc_dev, "%s: called!\n", __func__);
+	MTWN_FUNC_ENTER(sc);
+	MTWN_TODO_PRINTF(sc, "%s: ieee80211_suspend_all\n", __func__);
+
+	MTWN_LOCK(sc);
+	ret = MTWN_CHIP_POWER_OFF(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: POWER_OFF failed (err %d)\n",
+		    __func__, ret);
+	}
+	MTWN_UNLOCK(sc);
+
 	return (0);
 }
 
 int
 mtwn_resume(struct mtwn_softc *sc)
 {
+	MTWN_FUNC_ENTER(sc);
+	MTWN_TODO_PRINTF(sc, "%s: ieee80211_resume_all\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: explicit chip power-on / hardware-init?\n",
+	    __func__);
 
-	device_printf(sc->sc_dev, "%s: called!\n", __func__);
 	return (0);
 }
 
