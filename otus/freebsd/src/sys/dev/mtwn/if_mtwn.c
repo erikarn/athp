@@ -61,14 +61,7 @@
 int
 mtwn_attach(struct mtwn_softc *sc)
 {
-	uint32_t reg;
-
-	device_printf(sc->sc_dev, "%s: hi!\n", __func__);
-	MTWN_LOCK(sc);
-#define	MT76XX_REG_ASIC_VERSION		0x00000000
-	reg = MTWN_REG_READ_4(sc, MT76XX_REG_ASIC_VERSION);
-	MTWN_UNLOCK(sc);
-	device_printf(sc->sc_dev, "%s: ASIC version: 0x%08x\n", __func__, reg);
+	MTWN_INFO_PRINTF(sc, "%s: hi!\n", __func__);
 
 	return (0);
 }
@@ -76,8 +69,7 @@ mtwn_attach(struct mtwn_softc *sc)
 int
 mtwn_detach(struct mtwn_softc *sc)
 {
-
-	device_printf(sc->sc_dev, "%s: bye!\n", __func__);
+	MTWN_INFO_PRINTF(sc, "%s: bye!\n", __func__);
 	sc->sc_detached = 1;
 
 	return (0);
