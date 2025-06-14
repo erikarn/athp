@@ -28,7 +28,6 @@
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/rman.h>
-#include <sys/firmware.h>
 #include <sys/module.h>
 #include <sys/taskqueue.h>
 
