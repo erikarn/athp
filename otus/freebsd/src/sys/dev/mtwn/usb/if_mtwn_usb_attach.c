@@ -152,9 +152,9 @@ mtwn_usb_attach(device_t self)
 		error = mtwn_mcu_mt7610u_attach(sc);
 		if (error != 0)
 			goto detach;
+		break;
 	default:
-		device_printf(sc->sc_dev, "%s: unknown chip\n",
-		    __func__);
+		device_printf(sc->sc_dev, "%s: unknown chip\n", __func__);
 		error = ENXIO; /* XXX */
 		goto detach;
 	}
@@ -173,7 +173,9 @@ mtwn_usb_attach(device_t self)
 		goto detach;
 
 	/* Init hardware, before generic attach */
+	MTWN_LOCK(sc);
 	error = MTWN_CHIP_SETUP_HARDWARE(sc);
+	MTWN_UNLOCK(sc);
 	if (error != 0)
 		goto detach;
 
@@ -184,7 +186,9 @@ mtwn_usb_attach(device_t self)
 
 	/* XXX TODO for now, for bring-up */
 	/* XXX TODO: do we need xfers up for initial firmware setup above? */
+	MTWN_LOCK(sc);
 	mtwn_usb_rx_start_xfers(uc);
+	MTWN_UNLOCK(sc);
 
 	return (0);
 detach:
@@ -209,9 +213,11 @@ mtwn_usb_detach(device_t self)
 
 	mtwn_detach(sc);
 
+	MTWN_LOCK(sc);
 	/* Free Tx/Rx buffers */
 	mtwn_usb_free_tx_list(uc);
 	mtwn_usb_free_rx_list(uc);
+	MTWN_UNLOCK(sc);
 
 	/* Detach USB transfers */
 	usbd_transfer_unsetup(uc->uc_xfer, MTWN_USB_BULK_EP_COUNT);
