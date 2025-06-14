@@ -125,7 +125,7 @@ mtwn_usb_attach(device_t self)
 	sc->sc_dev = self;
 	// ic->ic_name = device_get_nameunit(self);
 
-	device_printf(sc->sc_dev, "%s: hi!\n", __func__);
+	MTWN_INFO_PRINTF(sc, "%s: hi!\n", __func__);
 
 	/* Early attach */
 	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->sc_dev),
@@ -154,7 +154,7 @@ mtwn_usb_attach(device_t self)
 			goto detach;
 		break;
 	default:
-		device_printf(sc->sc_dev, "%s: unknown chip\n", __func__);
+		MTWN_ERR_PRINTF(sc, "%s: unknown chip\n", __func__);
 		error = ENXIO; /* XXX */
 		goto detach;
 	}
@@ -203,7 +203,7 @@ mtwn_usb_detach(device_t self)
 	struct mtwn_usb_softc *uc = device_get_softc(self);
 	struct mtwn_softc *sc = &uc->uc_sc;
 
-	device_printf(sc->sc_dev, "%s: bye!\n", __func__);
+	MTWN_INFO_PRINTF(sc, "%s: bye!\n", __func__);
 
 	MTWN_LOCK(sc);
 	sc->sc_detached = 1;
@@ -290,8 +290,7 @@ mtwn_usb_resume(device_t self)
 
 	ret = MTWN_CHIP_INIT_HARDWARE(sc, false);
 	if (ret != 0) {
-		device_printf(sc->sc_dev,
-		    "%s: failed to init post resume (err %d)\n",
+		MTWN_ERR_PRINTF(sc, "%s: failed to init post resume (err %d)\n",
 		    __func__, ret);
 		return (ret);
 	}

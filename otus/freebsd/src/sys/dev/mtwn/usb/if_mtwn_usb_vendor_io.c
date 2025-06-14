@@ -138,8 +138,7 @@ mtwn_usb_read_4(struct mtwn_softc *sc, uint32_t reg)
 
 	error = mtwn_do_request(MTWN_USB_SOFTC(sc), &req, (void *) &data);
 	if (error != 0) {
-		device_printf(sc->sc_dev,
-		    "%s: USB transfer failed\n", __func__);
+		MTWN_ERR_PRINTF(sc, "%s: USB transfer failed\n", __func__);
 		return (0xffffffff);
 	}
 	return (le32toh(data));
@@ -164,8 +163,7 @@ mtwn_usb_write_4(struct mtwn_softc *sc, uint32_t reg, uint32_t val)
 
 	error = mtwn_do_request(MTWN_USB_SOFTC(sc), &req, (void *) &data);
 	if (error != 0) {
-		device_printf(sc->sc_dev,
-		    "%s: USB transfer failed\n", __func__);
+		MTWN_ERR_PRINTF(sc, "%s: USB transfer failed\n", __func__);
 		return;
 	}
 }

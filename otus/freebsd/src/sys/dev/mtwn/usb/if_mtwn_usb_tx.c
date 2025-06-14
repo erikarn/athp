@@ -79,7 +79,8 @@ mtwn_bulk_tx_callback_qid(struct usb_xfer *xfer, usb_error_t error, int qid)
 	struct mtwn_softc *sc = &uc->uc_sc;
 	struct mtwn_data *data;
 
-	device_printf(sc->sc_dev, "%s: called, qid %d\n", __func__, qid);
+	/* XXX strictly should be FUNC_ENTER, but I haven't got one that prints args yet */
+	MTWN_INFO_PRINTF(sc, "%s: called, qid %d\n", __func__, qid);
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
@@ -91,7 +92,7 @@ mtwn_bulk_tx_callback_qid(struct usb_xfer *xfer, usb_error_t error, int qid)
 		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
 
 		/* TODO: TX completed */
-		device_printf(sc->sc_dev, "%s: completed, data=%p\n",
+		MTWN_INFO_PRINTF(sc, "%s: completed, data=%p\n",
 		    __func__, data);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
@@ -114,11 +115,11 @@ tr_setup:
 		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
 
 		/* TODO: TX completed */
-		device_printf(sc->sc_dev, "%s: completed, data=%p\n",
+		MTWN_INFO_PRINTF(sc, "%s: completed, data=%p\n",
 		    __func__, data);
 
 		if (error != 0)
-			device_printf(sc->sc_dev,
+			MTWN_ERR_PRINTF(sc,
 			    "%s: called; txeof qid=%d, error=%s\n",
 			    __func__,
 			    qid,

@@ -78,7 +78,7 @@ mtwn_bulk_rx_pkt_callback(struct usb_xfer *xfer, usb_error_t error)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_FUNC_ENTER(sc);
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
@@ -88,8 +88,7 @@ mtwn_bulk_rx_pkt_callback(struct usb_xfer *xfer, usb_error_t error)
 		STAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_PKT], next);
 
 		/* TODO: here's where we'd process it! */
-		device_printf(sc->sc_dev, "%s: processed %p\n",
-		    __func__, data);
+		MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, data);
 
 		STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		/* FALLTHROUGH */
@@ -136,7 +135,7 @@ mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_FUNC_ENTER(sc);
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
@@ -147,8 +146,7 @@ mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
 		     next);
 
 		/* TODO: here's where we'd process it! */
-		device_printf(sc->sc_dev, "%s: processed %p\n",
-		    __func__, data);
+		MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, data);
 
 		STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		/* FALLTHROUGH */

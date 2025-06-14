@@ -182,7 +182,7 @@ mtwn_usb_setup_endpoints(struct mtwn_usb_softc *uc)
 	    &sc->sc_mtx);
 
 	if (error != 0) {
-		device_printf(sc->sc_dev,
+		MTWN_ERR_PRINTF(sc,
 		     "%s: couldn't allocate USB transfers, error=%s\n",
 		     __func__, usbd_errstr(error));
 		return (error);

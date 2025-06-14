@@ -80,8 +80,7 @@ mtwn_usb_alloc_list(struct mtwn_softc *sc, struct mtwn_data data[],
 		dp->m = NULL;
 		dp->buf = malloc(maxsz, M_USBDEV, M_NOWAIT);
 		if (dp->buf == NULL) {
-			device_printf(sc->sc_dev,
-			    "could not allocate buffer\n");
+			MTWN_ERR_PRINTF(sc, "could not allocate buffer\n");
 			error = ENOMEM;
 			goto fail;
 		}
