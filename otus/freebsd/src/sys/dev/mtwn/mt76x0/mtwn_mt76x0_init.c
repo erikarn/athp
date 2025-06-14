@@ -57,14 +57,50 @@
 
 #include "../if_mtwn_var.h"
 #include "../if_mtwn_debug.h"
+#include "../if_mtwn_util.h"
 
 #include "mtwn_mt76x0_init.h"
 #include "mtwn_mt76x0_reg.h"
 
+
+/**
+ * @brief enable/disable the WLAN clock; verify it's stable
+ */
 int
 mtwn_mt76x0_set_wlan_state(struct mtwn_softc *sc, uint32_t val, bool enable)
 {
-	device_printf(sc->sc_dev, "%s: TODO\n", __func__);
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/*
+	 * The linux mt76 driver doesn't gate WLAN_CLK because
+	 * of some problems during the probe/attach path.
+	 * So it's never taken out of the mask below during
+	 * disable.
+	 */
+	if (enable) {
+		val |= (MT76_REG_WLAN_FUN_CTRL_WLAN_EN |
+		    MT76_REG_WLAN_FUN_CTRL_WLAN_CLK_EN);
+	} else {
+		val &= ~(MT76_REG_WLAN_FUN_CTRL_WLAN_EN);
+	}
+
+	MTWN_REG_WRITE_4(sc, MT76_REG_WLAN_FUN_CTRL, val);
+	MTWN_UDELAY(sc, 20);
+
+	if (enable) {
+		ret = mtwn_reg_poll(sc, MT76_REG_CMB_CTRL,
+		    MT76_REG_CMB_CTRL_XTAL_RDY | MT76_REG_CMB_CTRL_PLL_LD,
+		    MT76_REG_CMB_CTRL_XTAL_RDY | MT76_REG_CMB_CTRL_PLL_LD,
+		    2000);
+		if (ret != 0) {
+			device_printf(sc->sc_dev,
+			    "%s: failed to wait for PLL/XTAL\n", __func__);
+			return (ret);
+		}
+	}
+
 	return (0);
 }
 
