@@ -69,6 +69,10 @@ struct mtwn_softc {
 	struct mtx		sc_mtx;
 	int			sc_detached;
 
+	struct {
+		bool mcu_running;
+	} flags;
+
 	/* Bus operations */
 	struct mtwn_bus_ops	sc_busops;
 

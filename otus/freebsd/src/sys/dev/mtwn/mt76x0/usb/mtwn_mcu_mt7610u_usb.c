@@ -129,3 +129,17 @@ mtwn_mcu_mt7610u_attach(struct mtwn_softc *sc)
 	return (0);
 }
 
+int
+mtwn_mt7610u_mcu_init(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_FUNC_ENTER(sc);
+
+	MTWN_WARN_PRINTF(sc, "%s: TODO\n", __func__);
+	/* XXX TODO */
+
+	sc->flags.mcu_running = true;
+
+	return (0);
+}

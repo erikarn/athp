@@ -64,6 +64,7 @@
 #include "../mtwn_mt76x0_reg.h"
 
 #include "mtwn_mcu_mt7610u_reg.h" /* XXX for the mcu buf size */
+#include "mtwn_mcu_mt7610u_usb.h"
 #include "mtwn_chip_mt7610u_usb.h"
 
 static void
@@ -144,13 +145,19 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 		device_printf(sc->sc_dev, "%s: warning, EFUSE not present\n", __func__);
 
 	/* mt76x0u_register_device() */
-/*
- * allocate mcu_data - already done, so ignore
- * alloc queues - we've already done this, so ignore
- * mt76x0u_init_hardware(sc, true); - this is MTWN_CHIP_INIT_HARDWARE(sc, true);
- * check fragments for AMSDU support
- * mt76x0_register_device() - so much more work, heh
- */
+
+	/* Initialise the hardware */
+	ret = MTWN_CHIP_INIT_HARDWARE(sc, true);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: INIT_HARDWARE failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* XXX TODO: A-MSDU support */
+
+	/* TODO: mt76x0_register_device() */
+
 	return (0);
 }
 
@@ -167,8 +174,18 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 
 	/* wait for mac */
 	ret = mtwn_mt76x0_mac_wait_ready(sc);
-	if (ret != 0)
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: mac not ready (err %d)\n", __func__,
+		    ret);
 		return (ret);
+	}
+
+	ret = mtwn_mt7610u_mcu_init(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: mcu_init failed (err %d)\n", __func__,
+		    ret);
+		return (ret);
+	}
 
 	/* mt76x0u_mcu_init() - loads firmware, sets up mcu */
 	/* mt76x0_init_usb_dma */

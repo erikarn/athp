@@ -288,13 +288,13 @@ mtwn_usb_resume(device_t self)
 
 	/* TODO: mt76u_resume_rx */
 
+	/* XXX TODO: this shouldn't be don here unless it's USB related */
 	ret = MTWN_CHIP_INIT_HARDWARE(sc, false);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to init post resume (err %d)\n",
 		    __func__, ret);
 		return (ret);
 	}
-
 
 	mtwn_resume(&uc->uc_sc);
 	return (0);
