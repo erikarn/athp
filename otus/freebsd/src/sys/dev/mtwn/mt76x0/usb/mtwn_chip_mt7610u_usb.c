@@ -59,13 +59,25 @@
 #include "../../if_mtwn_debug.h"
 
 #include "../mtwn_mt76x0_init.h"
+#include "../mtwn_mt76x0_var.h"
 
 #include "mtwn_chip_mt7610u_usb.h"
 
 static void
 mtwn_chip_mt7610u_detach(struct mtwn_softc *sc)
 {
+	struct mtwn_mt7610_chip_priv *psc;
+
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
+
+	psc = sc->sc_chipops_priv;
+	/* XXX TODO: create allocator, don't use M_TEMP */
+	if (psc != NULL) {
+		if (psc->mcu_data != NULL)
+			free(psc->mcu_data, M_TEMP);
+		free(psc, M_TEMP);
+	}
+	psc = sc->sc_chipops_priv = NULL;
 }
 
 static int
@@ -103,6 +115,13 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 	/* efuse check */
 
 	/* mt76x0u_register_device() */
+/*
+ * allocate mcu_data
+ * alloc queues - we've already done this, so ignore
+ * mt76x0u_init_hardware(sc, true); - this is MTWN_CHIP_INIT_HARDWARE(sc, true);
+ * check fragments for AMSDU support
+ * mt76x0_register_device() - so much more work, heh
+ */
 	return (0);
 }
 
@@ -136,6 +155,17 @@ mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc, bool reset)
 int
 mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 {
+	struct mtwn_mt7610_chip_priv *psc;
+
+	/* Allocate mt76x0 chip private state */
+	psc = malloc(sizeof(struct mtwn_mt7610_chip_priv), M_TEMP,
+	    M_NOWAIT | M_ZERO);
+	if (psc == NULL) {
+		device_printf(sc->sc_dev, "%s: malloc failure\n", __func__);
+		return (ENOMEM);
+	}
+	sc->sc_chipops_priv = psc;
+
 	/* Chip attach methods */
 	sc->sc_chipops.sc_chip_detach = mtwn_chip_mt7610u_detach;
 	sc->sc_chipops.sc_chip_reset = mtwn_chip_mt7610u_reset;

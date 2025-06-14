@@ -144,8 +144,14 @@ mtwn_usb_attach(device_t self)
 	/* chipset / MCU access methods */
 	switch (USB_GET_DRIVER_INFO(uaa)) {
 	case MTWN_CHIP_MT7610U:
-		mtwn_chip_mt7610u_attach(sc);
-		mtwn_mcu_mt7610u_attach(sc);
+		error = mtwn_chip_mt7610u_attach(sc);
+		/* XXX print error */
+		if (error != 0)
+			goto detach;
+		/* XXX print error */
+		error = mtwn_mcu_mt7610u_attach(sc);
+		if (error != 0)
+			goto detach;
 	default:
 		device_printf(sc->sc_dev, "%s: unknown chip\n",
 		    __func__);
@@ -182,6 +188,7 @@ mtwn_usb_attach(device_t self)
 
 	return (0);
 detach:
+	/* XXX print error */
 	mtwn_usb_detach(self);
 	return (ENXIO);
 }

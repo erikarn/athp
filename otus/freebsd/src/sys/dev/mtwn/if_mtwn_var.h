@@ -74,6 +74,7 @@ struct mtwn_softc {
 
 	/* Chip operations */
 	struct mtwn_chip_ops	sc_chipops;
+	void			*sc_chipops_priv;
 
 	/* MCU operations */
 	struct mtwn_mcu_ops	sc_mcuops;
