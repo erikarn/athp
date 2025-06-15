@@ -95,7 +95,7 @@ mtwn_init(struct mtwn_softc *sc)
 	}
 
 	/* MCU init / firmware load */
-	ret = MTWN_CHIP_MCU_INIT(sc, fw->data, fw->datasize);
+	ret = MTWN_MCU_INIT(sc, fw->data, fw->datasize);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: MCU_INIT failed (err %d)\n",
 		    __func__, ret);

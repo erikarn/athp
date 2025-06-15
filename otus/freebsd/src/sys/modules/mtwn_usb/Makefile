@@ -15,4 +15,8 @@ SRCS    = if_mtwn_usb_attach.c \
 	  bus_if.h device_if.h usb_if.h usbdevs.h \
 	  opt_wlan.h
 
+.PATH: ${.CURDIR}/../../dev/mtwn/usb/mt7610u
+
+SRCS	+= mtwn_mt7610u_mcu.c
+
 .include <bsd.kmod.mk>

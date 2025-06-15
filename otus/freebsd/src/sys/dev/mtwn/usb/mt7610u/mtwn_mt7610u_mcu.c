@@ -68,12 +68,12 @@
 
 #include "../../usb/if_mtwn_usb_var.h"
 
-#include "../mtwn_mt7610_mcu_reg.h"
-#include "../mtwn_mt7610_reg.h"
-#include "../mtwn_mt7610_mcu.h"
+#include "../../mt7610/mtwn_mt7610_mcu_reg.h"
+#include "../../mt7610/mtwn_mt7610_reg.h"
+#include "../../mt7610/mtwn_mt7610_mcu.h"
 
-#include "mtwn_mcu_mt7610u_usb.h"
-#include "mtwn_mcu_mt7610u_reg.h"
+#include "mtwn_mt7610u_mcu.h"
+#include "mtwn_mt7610u_mcu_reg.h"
 
 static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
@@ -140,6 +140,7 @@ mtwn_mcu_mt7610u_attach(struct mtwn_softc *sc)
 	    mtwn_mcu_mt7610u_mcu_reg_pair_read;
 	sc->sc_mcuops.sc_mcu_reg_pair_write =
 	    mtwn_mcu_mt7610u_mcu_reg_pair_write;
+	sc->sc_mcuops.sc_mcu_init = mtwn_mt7610u_mcu_init;
 
 	return (0);
 }

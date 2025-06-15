@@ -13,10 +13,10 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__MTWN_MCU_MT7610U_USB_H__
-#define	__MTWN_MCU_MT7610U_USB_H__
+#ifndef	__MTWN_MT7610U_MCU_H__
+#define	__MTWN_MT7610U_MCU_H__
 
 extern	int mtwn_mcu_mt7610u_attach(struct mtwn_softc *);
 extern	int mtwn_mt7610u_mcu_init(struct mtwn_softc *, const void *, size_t);
 
-#endif	/* __MTWN_MCU_MT7610U_USB_H__ */
+#endif	/* __MTWN_MT7610U_MCU_H__ */

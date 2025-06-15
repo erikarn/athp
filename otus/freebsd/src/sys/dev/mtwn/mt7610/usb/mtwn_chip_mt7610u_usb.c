@@ -64,8 +64,6 @@
 #include "../mtwn_mt7610_reg.h"
 #include "../mtwn_mt7610_mcu.h"
 
-#include "mtwn_mcu_mt7610u_reg.h" /* XXX for the mcu buf size */
-#include "mtwn_mcu_mt7610u_usb.h"
 #include "mtwn_chip_mt7610u_usb.h"
 
 static void
@@ -278,7 +276,10 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	}
 
 	/* Allocate MCU URB buffer */
+	/* XXX TODO: belongs in the mtwn usb bus mcu stuff? */
+#define MWTN_MCU_RESP_URB_SIZE 1024
 	mcu_buf = malloc(MWTN_MCU_RESP_URB_SIZE, M_TEMP, M_NOWAIT | M_ZERO);
+#undef MWTN_MCU_RESP_URB_SIZE
 	if (mcu_buf == NULL) {
 		device_printf(sc->sc_dev, "%s: malloc failure\n", __func__);
 		free(mcu_buf, M_TEMP);
@@ -300,7 +301,6 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_dma_param_setup = mtwn_mt7610u_init_usb_dma;
 	sc->sc_chipops.sc_chip_beacon_config = mtwn_mt7610u_beacon_config;
 	sc->sc_chipops.sc_chip_post_init_setup = mtwn_mt7610u_post_init_setup;
-	sc->sc_chipops.sc_chip_mcu_init = mtwn_mt7610u_mcu_init;
 
 	return (0);
 }
