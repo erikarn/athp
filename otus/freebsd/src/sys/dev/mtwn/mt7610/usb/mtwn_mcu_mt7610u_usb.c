@@ -160,7 +160,7 @@ mtwn_mt7610u_mcu_fw_reset(struct mtwn_softc *sc)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	req.bmRequestType = UT_READ_VENDOR_DEVICE;
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
 	req.bRequest = 1; /* MTWN_USB_VENDOR_DEV_MODE */
 	USETW(req.wValue, 1);
 	USETW(req.wIndex, 0);
@@ -191,7 +191,7 @@ mtwn_mt7610u_mcu_ivb_upload(struct mtwn_softc *sc,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	req.bmRequestType = UT_READ_VENDOR_DEVICE;
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
 	req.bRequest = 1; /* MTWN_USB_VENDOR_DEV_MODE */
 	USETW(req.wValue, 0x12);
 	USETW(req.wIndex, 0);
@@ -220,12 +220,63 @@ mtwn_mt7610u_mcu_ivb_upload(struct mtwn_softc *sc,
  * not a vendor transfer! Ouch!
  */
 static int
+mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
+    char *buf, const char *fw_buf, int len, uint32_t addr)
+{
+	MTWN_TODO_PRINTF(sc, "%s: TODO! (%d bytes at offset %u)\n",
+	    __func__, len, addr);
+
+	/*
+	 * TODO: this would be what __mt76x02u_mcu_fw_send_data()
+	 * is doing; pay attention to how the buffer is formed,
+	 * the single_wr calls to the same address, the desc index
+	 * incrementing, etc.
+	 */
+	return (0);
+}
+
+/*
+ * TODO: I still don't think all of this machinery belongs here!
+ */
+static int
 mtwn_mt7610u_mcu_fw_send_data(struct mtwn_softc *sc, const char *data,
     int data_len, uint32_t max_payload, uint32_t offset)
 {
+	char *buf;
+	int ret = 0, cur_len, len, pos = 0, max_len;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-	return (0);
+
+	buf = malloc(max_payload, M_TEMP, M_NOWAIT | M_ZERO);
+	if (buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate %d byte buffer\n",
+		    __func__, max_payload);
+		return (ENOMEM);
+	}
+
+	/* Loop over the payload, sending up to max_payload bytes at a time */
+
+	max_len = max_payload - 8;	/* XXX TODO: figure out why? */
+	cur_len = data_len;
+
+	while (cur_len > 0) {
+		len = MIN(cur_len, max_len);
+		ret = mtwn_mt7610u_mcu_fw_send_data_chunk(sc, buf,
+		    data + pos, len, offset + pos);
+		if (ret != 0) {
+			MTWN_ERR_PRINTF(sc,
+			    "%s: failed to send chunk (error %d)\n",
+			    __func__, ret);
+			break;
+		}
+
+		cur_len -= len;
+		pos += len;
+		MTWN_MDELAY(sc, 5);
+	}
+
+	free(buf, M_TEMP);
+	return (ret);
 }
 
 

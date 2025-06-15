@@ -69,6 +69,23 @@
 #include "if_mtwn_usb_var.h"
 #include "if_mtwn_usb_tx.h"
 
+
+/*
+ * Handle completion of the given TX buffer.
+ *
+ * Note the caller still needs to shuffle it to the inactive list.
+ */
+static void
+mtwn_usb_txeof(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *data)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+
+	MTWN_INFO_PRINTF(sc, "%s: completed, qid=%d, data=%p\n",
+	    __func__, qid, data);
+
+	wakeup(data);
+}
+
 /*
  * Handles data, command and HCCA queues.
  */
@@ -91,9 +108,8 @@ mtwn_bulk_tx_callback_qid(struct usb_xfer *xfer, usb_error_t error, int qid)
 			goto tr_setup;
 		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
 
-		/* TODO: TX completed */
-		MTWN_INFO_PRINTF(sc, "%s: completed, data=%p\n",
-		    __func__, data);
+		/* TX completed */
+		mtwn_usb_txeof(uc, qid, data);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
@@ -114,9 +130,8 @@ tr_setup:
 			goto tr_setup;
 		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
 
-		/* TODO: TX completed */
-		MTWN_INFO_PRINTF(sc, "%s: completed, data=%p\n",
-		    __func__, data);
+		/* TX completed */
+		mtwn_usb_txeof(uc, qid, data);
 
 		if (error != 0)
 			MTWN_ERR_PRINTF(sc,
