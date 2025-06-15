@@ -188,6 +188,50 @@ mtwn_usb_rmw_4(struct mtwn_softc *sc, uint32_t reg, uint32_t mask,
 	return (r);
 }
 
+/**
+ * @brief Write a 32 bit value as two 16 bit vendor transfers.
+ *
+ * This is used in some places like the MCU firmware load path.
+ * It's not designed to be consumed by the mtwn driver code.
+ */
+int
+mtwn_usb_single_write_4(struct mtwn_softc *sc, uint8_t reqid, uint16_t reg,
+    uint32_t val)
+{
+	usb_device_request_t req;
+	int error;
+
+	/* Low 16 bits of data */
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = reqid;
+	USETW(req.wValue, val & 0xffff);
+	USETW(req.wIndex, reg);
+	USETW(req.wLength, 0);
+
+	error = mtwn_do_request(MTWN_USB_SOFTC(sc), &req, NULL);
+	if (error != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: USB transfer failed\n", __func__);
+		return (error);
+	}
+
+	/* High 16 bits of data */
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = reqid;
+	USETW(req.wValue, val >> 16);
+	USETW(req.wIndex, reg + 2);
+	USETW(req.wLength, 0);
+
+	error = mtwn_do_request(MTWN_USB_SOFTC(sc), &req, NULL);
+	if (error != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: USB transfer failed\n", __func__);
+		return (error);
+	}
+
+	return (0);
+}
+
+
+
 
 void
 mtwn_usb_delay(struct mtwn_softc *sc, uint32_t usec)

@@ -66,9 +66,12 @@
 #include "../../if_mtwn_debug.h"
 #include "../../if_mtwn_util.h"
 
-#include "../../usb/if_mtwn_usb_var.h"
+#include "../if_mtwn_usb_var.h"
+#include "../if_mtwn_usb_vendor_req.h"
+#include "../if_mtwn_usb_vendor_io.h"
 
 #include "../../mt7610/mtwn_mt7610_mcu_reg.h"
+#include "../../mt7610/mtwn_mt7610_dma_reg.h"
 #include "../../mt7610/mtwn_mt7610_reg.h"
 #include "../../mt7610/mtwn_mt7610_mcu.h"
 
@@ -224,8 +227,53 @@ static int
 mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
     char *buf, const char *fw_buf, int len, uint32_t addr)
 {
+	uint32_t info, val;
+	int err, data_len;
+
 	MTWN_TODO_PRINTF(sc, "%s: TODO! (%d bytes at offset %u)\n",
 	    __func__, len, addr);
+
+	/* TODO: grab a TX command buffer; fail early if we can't */
+
+	/* Setup header for payload chunk */
+	info = htole32(
+	    _IEEE80211_SHIFTMASK(MT7610_MCU_MSG_PORT_CPU_TX_PORT, MT7610_MCU_MSG_PORT)
+	    | _IEEE80211_SHIFTMASK(len, MT7610_MCU_MSG_LEN)
+	    | _IEEE80211_SHIFTMASK(MT7610_MCU_MSG_TYPE_CMD_ID, MT7610_MCU_MSG_TYPE));
+
+	/* Copy header + fw buffer into our pre-allocated data buffer */
+	memset(buf, 0, len);
+	memcpy(buf, &info, sizeof(info));
+	memcpy(buf + sizeof(info), fw_buf, len);
+	memset(buf + sizeof(info) + len, 0, 4);
+
+	/* Write the address and length */
+	err = mtwn_usb_single_write_4(sc, MTWN_USB_VENDOR_WRITE_FCE,
+	    MT7610_FCE_DMA_ADDR, addr);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to write DMA_ADDR (err %d)\n",
+		    __func__, err);
+		return (err);
+	}
+	len = roundup(len, 4);
+	err = mtwn_usb_single_write_4(sc, MTWN_USB_VENDOR_WRITE_FCE,
+	    MT7610_FCE_DMA_LEN, len << 16);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to write DMA_LEN (err %d)\n",
+		    __func__, err);
+		return (err);
+	}
+
+	data_len = MTWN_MCU_CMD_HDR_LEN + len + sizeof(info);
+
+
+	/* TODO: send data + data_len to EP_OUT_INBAND_CMD */
+	MTWN_TODO_PRINTF(sc, "%s: TODO: actual bulk EP, %d bytes\n", __func__, data_len);
+
+	/* Bump DESC_IDX */
+	val = MTWN_REG_READ_4(sc, MT76_REG_TX_CPU_FROM_FCE_CPU_DESC_IDX);
+	val++;
+	MTWN_REG_WRITE_4(sc, MT76_REG_TX_CPU_FROM_FCE_CPU_DESC_IDX, val);
 
 	/*
 	 * TODO: this would be what __mt76x02u_mcu_fw_send_data()
