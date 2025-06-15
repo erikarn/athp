@@ -58,33 +58,48 @@
 #include "if_mtwn_var.h"
 #include "if_mtwn_debug.h"
 
+/*
+ * Call with the lock NOT held, as the firmware load
+ * needs no lock held.
+ */
 static int
 mtwn_init(struct mtwn_softc *sc)
 {
+	const struct firmware *fw = NULL;
 	int ret;
 
-	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+	MTWN_LOCK_ASSERT(sc, MA_NOTOWNED);
+
+	/* Fetch the firmware file */
+	fw = firmware_get("mediatek/mt7610u.bin");
+	if (fw == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't load firmware!\n", __func__);
+		return (ENXIO);
+	}
+
+	MTWN_LOCK(sc);
 
 	/* Power on hardware; do a reset */
 	ret = MTWN_CHIP_POWER_ON(sc, true);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: POWER_ON failed (err %d)\n",
 		    __func__, ret);
-		return (ret);
+		goto error;
 	}
 
 	/* Wait for MAC ready */
 	if (!MTWN_CHIP_MAC_WAIT_READY(sc)) {
 		MTWN_ERR_PRINTF(sc, "%s: MAC_WAIT_READY failed\n", __func__);
-		return (ret);
+		ret = ENXIO;
+		goto error;
 	}
 
 	/* MCU init / firmware load */
-	ret = MTWN_CHIP_MCU_INIT(sc);
+	ret = MTWN_CHIP_MCU_INIT(sc, fw->data, fw->datasize);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: MCU_INIT failed (err %d)\n",
 		    __func__, ret);
-		return (ret);
+		goto error;
 	}
 
 	/* DMA parameter setup */
@@ -92,7 +107,7 @@ mtwn_init(struct mtwn_softc *sc)
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: DMA_PARAM_SETUP failed (err %d)\n",
 		    __func__, ret);
-		return (ret);
+		goto error;
 	}
 
 	/* Chipset hardware init (mt76x0_init_hardware) */
@@ -100,7 +115,7 @@ mtwn_init(struct mtwn_softc *sc)
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: INIT_HARDWARE failed (err %d)\n",
 		    __func__, ret);
-		return (ret);
+		goto error;
 	}
 
 	/* Beacon config */
@@ -108,7 +123,7 @@ mtwn_init(struct mtwn_softc *sc)
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: BEACON_CONFIG failed (err %d)\n",
 		    __func__, ret);
-		return (ret);
+		goto error;
 	}
 
 	/* Post init setup */
@@ -116,10 +131,25 @@ mtwn_init(struct mtwn_softc *sc)
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: POST_INIT_SETUP failed (err %d)\n",
 		    __func__, ret);
-		return (ret);
+		goto error;
+	}
+
+	MTWN_UNLOCK(sc);
+
+	if (fw != NULL) {
+		firmware_put(fw, FIRMWARE_UNLOAD);
+		fw = NULL;
 	}
 
 	return (0);
+
+error:
+	MTWN_UNLOCK(sc);
+	if (fw != NULL) {
+		firmware_put(fw, FIRMWARE_UNLOAD);
+		fw = NULL;
+	}
+	return (ret);
 }
 
 int
@@ -127,9 +157,7 @@ mtwn_attach(struct mtwn_softc *sc)
 {
 	MTWN_INFO_PRINTF(sc, "%s: hi!\n", __func__);
 
-	MTWN_LOCK(sc);
 	mtwn_init(sc);
-	MTWN_UNLOCK(sc);
 
 	return (0);
 }

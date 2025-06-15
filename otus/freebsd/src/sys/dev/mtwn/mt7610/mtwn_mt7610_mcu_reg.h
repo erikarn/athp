@@ -13,10 +13,22 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__MTWN_MCU_MT7610U_USB_H__
-#define	__MTWN_MCU_MT7610U_USB_H__
+#ifndef	__MTWN_MT7610_MCU_REG_H__
+#define	__MTWN_MT7610_MCU_REG_H__
 
-extern	int mtwn_mcu_mt7610u_attach(struct mtwn_softc *);
-extern	int mtwn_mt7610u_mcu_init(struct mtwn_softc *, const void *, size_t);
+#define	MT7610_MCU_IVB_SIZE		0x40
+#define	MT7610_MCU_DLM_OFFSET		0x80000
 
-#endif	/* __MTWN_MCU_MT7610U_USB_H__ */
+/*
+ * Firmware header - all little-endian.
+ */
+struct mtwn_mt7610_fw_header {
+	uint32_t ilm_len;
+	uint32_t dlm_len;
+	uint32_t build_ver;
+	uint32_t fw_ver;
+	uint8_t pad[4];
+	char build_time[16];
+};
+
+#endif	/* __MTWN_MT7610_MCU_REG_H__ */

@@ -50,7 +50,8 @@ struct mtwn_chip_ops {
 	bool		(*sc_chip_dma_param_setup)(struct mtwn_softc *sc);
 	bool		(*sc_chip_beacon_config)(struct mtwn_softc *sc);
 	bool		(*sc_chip_post_init_setup)(struct mtwn_softc *sc);
-	int		(*sc_chip_mcu_init)(struct mtwn_softc *sc);
+	int		(*sc_chip_mcu_init)(struct mtwn_softc *sc,
+			    const void *, size_t);
 };
 
 struct mtwn_mcu_ops {
@@ -131,13 +132,17 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_beacon_config((_sc)))
 #define	MTWN_CHIP_POST_INIT_SETUP(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_post_init_setup((_sc)))
-#define	MTWN_CHIP_MCU_INIT(_sc)					\
-	    ((_sc)->sc_chipops.sc_chip_mcu_init((_sc)))
+#define	MTWN_CHIP_MCU_INIT(_sc, _data, _len)			\
+	    ((_sc)->sc_chipops.sc_chip_mcu_init((_sc), (_data), (_len)))
 
+/* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);
 extern	int mtwn_detach(struct mtwn_softc *);
 extern	int mtwn_suspend(struct mtwn_softc *);
 extern	int mtwn_resume(struct mtwn_softc *);
 extern	void mtwn_sysctl_attach(struct mtwn_softc *);
+
+/* if_mtwn_firmware.c */
+extern	int mtwn_firmware_load(struct mtwn_softc *);
 
 #endif	/* __IF_MTWN_VAR_H__ */

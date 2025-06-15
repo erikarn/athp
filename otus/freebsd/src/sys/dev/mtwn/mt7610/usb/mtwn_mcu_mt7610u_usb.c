@@ -58,6 +58,9 @@
 #include "../../if_mtwn_var.h"
 #include "../../if_mtwn_debug.h"
 
+#include "../mtwn_mt7610_mcu_reg.h"
+#include "../mtwn_mt7610_mcu.h"
+
 #include "mtwn_mcu_mt7610u_usb.h"
 
 static int
@@ -130,11 +133,51 @@ mtwn_mcu_mt7610u_attach(struct mtwn_softc *sc)
 }
 
 int
-mtwn_mt7610u_mcu_init(struct mtwn_softc *sc)
+mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 {
+	const struct mtwn_mt7610_fw_header *fw_hdr;
+	uint32_t val;
+	int len;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	MTWN_FUNC_ENTER(sc);
+
+	if (mtwn_mt7610_mcu_firmware_running(sc)) {
+		MTWN_INFO_PRINTF(sc, "%s: firmware already running\n",
+		    __func__);
+		return (0);
+	}
+
+	if (buf_size < sizeof(*fw_hdr)) {
+		MTWN_ERR_PRINTF(sc, "%s: firmware is too small\n", __func__);
+		return (ENXIO);
+	}
+
+	fw_hdr = (const struct mtwn_mt7610_fw_header *) buf;
+	if (le32toh(fw_hdr->ilm_len) <= MT7610_MCU_IVB_SIZE) {
+		MTWN_ERR_PRINTF(sc, "%s: ilm_len invalid\n", __func__);
+		return (ENXIO);
+	}
+
+	len = sizeof(*fw_hdr);
+	len += le32toh(fw_hdr->ilm_len) + le32toh(fw_hdr->dlm_len);
+
+	if (len != buf_size) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: mismatching firmware size (file %d, hdr size %d)\n",
+		    __func__,
+		    (int) buf_size,
+		    len);
+		return (ENXIO);
+	}
+
+	val = le16toh(fw_hdr->fw_ver);
+
+	MTWN_INFO_PRINTF(sc, "Firmware Version: %d.%d.%02d Build: %x "
+	    "Build time: %.16s\n",
+	    (val >> 12) & 0xf, (val >> 8) & 0xf, val & 0xf,
+	    le16toh(fw_hdr->build_ver), fw_hdr->build_time);
 
 	MTWN_WARN_PRINTF(sc, "%s: TODO\n", __func__);
 	/* XXX TODO */
