@@ -38,6 +38,8 @@ enum {
 	    device_printf((_sc)->sc_dev, __VA_ARGS__);
 #define	MTWN_TODO_PRINTF(_sc, ...)					\
 	    device_printf((_sc)->sc_dev, __VA_ARGS__);
+#define	MTWN_DEBUG_PRINTF(_sc, ...)					\
+	    device_printf((_sc)->sc_dev, __VA_ARGS__);
 
 #if 1
 #define	MTWN_FUNC_ENTER(_sc)						\

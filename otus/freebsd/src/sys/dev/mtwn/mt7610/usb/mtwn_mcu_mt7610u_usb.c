@@ -55,13 +55,25 @@
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
 
+/*
+ * TODO: for now, until I figure out how to push the USB
+ * specific bits where they .. better belong?
+ */
+#include <dev/usb/usb.h>
+#include <dev/usb/usbdi.h>
+
 #include "../../if_mtwn_var.h"
 #include "../../if_mtwn_debug.h"
+#include "../../if_mtwn_util.h"
+
+#include "../../usb/if_mtwn_usb_var.h"
 
 #include "../mtwn_mt7610_mcu_reg.h"
+#include "../mtwn_mt7610_reg.h"
 #include "../mtwn_mt7610_mcu.h"
 
 #include "mtwn_mcu_mt7610u_usb.h"
+#include "mtwn_mcu_mt7610u_reg.h"
 
 static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
@@ -132,12 +144,151 @@ mtwn_mcu_mt7610u_attach(struct mtwn_softc *sc)
 	return (0);
 }
 
+/*
+ * TODO: this requires sending a USB vendor transfer;
+ * I'm not sure we should be doing those here.
+ * Instead, I need to think about how to push the USB
+ * specific bits into mtwn/usb/ rather than in the chip
+ * code.
+ */
+static int
+mtwn_mt7610u_mcu_fw_reset(struct mtwn_softc *sc)
+{
+	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
+	usb_device_request_t req = { 0 };
+	int err;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	req.bmRequestType = UT_READ_VENDOR_DEVICE;
+	req.bRequest = 1; /* MTWN_USB_VENDOR_DEV_MODE */
+	USETW(req.wValue, 1);
+	USETW(req.wIndex, 0);
+	USETW(req.wLength, 0);
+
+	err = usbd_do_request_flags(uc->uc_udev, &sc->sc_mtx,
+	    &req, NULL, 0, NULL, 2000);
+
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: USB transfer failure (%s)\n",
+		    __func__, usbd_errstr(err));
+	}
+
+	return (err);
+}
+
+/*
+ * XXX TODO: another USB vendor request, that should be in the
+ * USB layer, sigh.
+ */
+static int
+mtwn_mt7610u_mcu_ivb_upload(struct mtwn_softc *sc,
+    const char *buf, int len)
+{
+	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
+	usb_device_request_t req = { 0 };
+	int err;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	req.bmRequestType = UT_READ_VENDOR_DEVICE;
+	req.bRequest = 1; /* MTWN_USB_VENDOR_DEV_MODE */
+	USETW(req.wValue, 0x12);
+	USETW(req.wIndex, 0);
+	USETW(req.wLength, len);
+
+	/*
+	 * TODO: sigh, const elimination? Do I need a private copy
+	 * just in case?
+	 */
+	err = usbd_do_request_flags(uc->uc_udev, &sc->sc_mtx,
+	    &req, (char *) (uintptr_t) buf, 0, NULL, 2000);
+
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: USB transfer failure (%s)\n",
+		    __func__, usbd_errstr(err));
+	}
+
+	return (err);
+}
+
+/*
+ * TODO: sigh, another thing that requires some direct USB transfers.
+ * Those shouldn't be done in here!
+ *
+ * AND this is doing a bulk send out the OUT_INBAND_CMD endpoint,
+ * not a vendor transfer! Ouch!
+ */
+static int
+mtwn_mt7610u_mcu_fw_send_data(struct mtwn_softc *sc, const char *data,
+    int data_len, uint32_t max_payload, uint32_t offset)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	return (0);
+}
+
+
+
+static int
+mtwn_mt7610u_mcu_upload_firmware(struct mtwn_softc *sc,
+    const struct mtwn_mt7610_fw_header *fw_hdr)
+{
+	uint32_t ilm_len, dlm_len;
+	const char *fw_buf = (const char *) (fw_hdr + 1);
+	int err;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+
+	ilm_len = le32toh(fw_hdr->ilm_len) - MT7610_MCU_IVB_SIZE;
+	MTWN_DEBUG_PRINTF(sc, "%s: FW: ILM = %u bytes, IVB = %u bytes\n",
+	    __func__, ilm_len, MT7610_MCU_IVB_SIZE);
+
+	err = mtwn_mt7610u_mcu_fw_send_data(sc, fw_buf + MT7610_MCU_IVB_SIZE,
+	    ilm_len, MTWN_MCU_FW_URB_MAX_PAYLOAD, MT7610_MCU_IVB_SIZE);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: IVB send failed (err %d)\n",
+		    __func__, err);
+		return (err);
+	}
+
+	dlm_len = le32toh(fw_hdr->dlm_len);
+	MTWN_DEBUG_PRINTF(sc, "%s: FW: DLM = %u bytes\n", __func__, dlm_len);
+	err = mtwn_mt7610u_mcu_fw_send_data(sc,
+	    fw_buf + le32toh(fw_hdr->ilm_len),
+	    dlm_len, MTWN_MCU_FW_URB_MAX_PAYLOAD, MT7610_MCU_DLM_OFFSET);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: DLM send failed (err %d)\n",
+		    __func__, err);
+		return (err);
+	}
+
+	err = mtwn_mt7610u_mcu_ivb_upload(sc, fw_buf, MT7610_MCU_IVB_SIZE);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: IVB send failed (err %d)\n",
+		    __func__, err);
+		return (err);
+	}
+
+	err = mtwn_reg_poll(sc, MT76_REG_MCU_COM_REG0, 1, 1, 1000);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: Firmware didn't start (err %d)\n",
+		    __func__, err);
+		return (err);
+	}
+
+	MTWN_DEBUG_PRINTF(sc, "%s: FW: running\n", __func__);
+
+	return (0);
+}
+
 int
 mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 {
 	const struct mtwn_mt7610_fw_header *fw_hdr;
 	uint32_t val;
-	int len;
+	int len, ret;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
@@ -160,8 +311,14 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 		return (ENXIO);
 	}
 
+	MTWN_INFO_PRINTF(sc, "%s: ilm_len=%d, dlm_len=%d, hdr len=%d\n",
+	    __func__,
+	    le32toh(fw_hdr->ilm_len),
+	    le32toh(fw_hdr->dlm_len),
+	    (int) sizeof(*fw_hdr));
+
 	len = sizeof(*fw_hdr);
-	len += le32toh(fw_hdr->ilm_len) + le32toh(fw_hdr->dlm_len);
+	len += (le32toh(fw_hdr->ilm_len) + le32toh(fw_hdr->dlm_len));
 
 	if (len != buf_size) {
 		MTWN_ERR_PRINTF(sc,
@@ -179,8 +336,54 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 	    (val >> 12) & 0xf, (val >> 8) & 0xf, val & 0xf,
 	    le16toh(fw_hdr->build_ver), fw_hdr->build_time);
 
-	MTWN_WARN_PRINTF(sc, "%s: TODO\n", __func__);
-	/* XXX TODO */
+	/* Firmware has been validated; time to setup to upload it */
+
+	MTWN_REG_WRITE_4(sc, 0x1004, 0x2c);
+
+	val = MTWN_REG_READ_4(sc, MT76_REG_USB_DMA_CFG);
+	val |= MT76_REG_USB_DMA_CFG_RX_BULK_EN;
+	val |= MT76_REG_USB_DMA_CFG_TX_BULK_EN;
+	/* TODO: yeah, we need SM/MS macros here */
+	val &= ~MT76_REG_USB_DMA_CFG_RX_BULK_AGG_TOUT;
+	val |= 0x20; /* AGG_TOUT is at offset 0 */
+	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, val);
+
+	ret = mtwn_mt7610u_mcu_fw_reset(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: mcu_fw_reset failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	MTWN_MDELAY(sc, 5);
+
+	MTWN_REG_WRITE_4(sc, MT76_REG_FCE_PSE_CTRL, 1);
+
+	/* tx_fs_base_ptr */
+	MTWN_REG_WRITE_4(sc, MT76_REG_TX_CPU_FROM_FCE_BASE_PTR, 0x400230);
+	/* tx_fs_max_cnt */
+	MTWN_REG_WRITE_4(sc, MT76_REG_TX_CPU_FROM_FCE_MAX_COUNT, 1);
+	/* pdma enable */
+	MTWN_REG_WRITE_4(sc, MT76_REG_FCE_PDMA_GLOBAL_CONF, 0x44);
+	/* skip_fs_en */
+	MTWN_REG_WRITE_4(sc, MT76_REG_FCE_SKIP_FS, 3);
+
+	/* Toggle TX_WL_DROP */
+	val = MTWN_REG_READ_4(sc, MT76_REG_USB_DMA_CFG);
+	val |= MT76_REG_USB_DMA_CFG_UDMA_TX_WL_DROP;
+	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, val);
+	val &= ~MT76_REG_USB_DMA_CFG_UDMA_TX_WL_DROP;
+	MTWN_REG_WRITE_4(sc, MT76_REG_USB_DMA_CFG, val);
+
+	/* Upload firmware */
+	ret = mtwn_mt7610u_mcu_upload_firmware(sc, fw_hdr);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: upload_firmware failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	MTWN_REG_WRITE_4(sc, MT76_REG_FCE_PSE_CTRL, 1);
 
 	sc->flags.mcu_running = true;
 

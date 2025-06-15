@@ -25,10 +25,16 @@
 struct mtwn_mt7610_fw_header {
 	uint32_t ilm_len;
 	uint32_t dlm_len;
-	uint32_t build_ver;
-	uint32_t fw_ver;
+	uint16_t build_ver;
+	uint16_t fw_ver;
 	uint8_t pad[4];
 	char build_time[16];
 };
+
+#define	MT76_REG_MCU_COM_REG0			0x0730
+#define	MT76_REG_MCU_COM_REG1			0x0734
+#define	MT76_REG_MCU_COM_REG2			0x0738
+#define	MT76_REG_MCU_COM_REG3			0x073c
+
 
 #endif	/* __MTWN_MT7610_MCU_REG_H__ */

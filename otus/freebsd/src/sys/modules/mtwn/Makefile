@@ -7,6 +7,7 @@ KMOD    = if_mtwn
 # Top-level FreeBSD glue (device, netif, busdma, etc)
 SRCS    = if_mtwn.c \
 	  if_mtwn_util.c \
+	  if_mtwn_firmware.c \
 	  bus_if.h device_if.h usb_if.h usbdevs.h \
 	  opt_wlan.h
 
