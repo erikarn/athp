@@ -18,10 +18,11 @@
 #define	__IF_MTWN_DEBUG_H__
 
 enum {
+	MTWN_DEBUG_XMIT =	0x00000001,
+	MTWN_DEBUG_FIRMWARE =	0x00000080, /* firmware loading */
+	MTWN_DEBUG_USB =	0x00000040,
 
-	MTWN_DEBUG_USB = 0x00000040,
-
-	MTWN_DEBUG_ANY = 0xffffffff
+	MTWN_DEBUG_ANY =	0xffffffff
 };
 
 #define MTWN_DPRINTF(_sc, _m, ...)					\

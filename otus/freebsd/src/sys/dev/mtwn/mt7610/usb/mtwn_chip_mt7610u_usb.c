@@ -148,8 +148,6 @@ mtwn_mt7610u_init_usb_dma(struct mtwn_softc *sc)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_FUNC_ENTER(sc);
-
 	reg = MTWN_REG_READ_4(sc, MT76_REG_USB_DMA_CFG);
 	reg |= (MT76_REG_USB_DMA_CFG_RX_BULK_EN |
 	    MT76_REG_USB_DMA_CFG_TX_BULK_EN);

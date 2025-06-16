@@ -233,7 +233,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	uint32_t info, val;
 	int err, data_len;
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO! (%d bytes at offset %u)\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE, "%s: (%d bytes at offset %u)\n",
 	    __func__, len, addr);
 
 	/* Grab a TX command buffer; fail early if we can't */
@@ -285,7 +285,8 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	bf->buflen = data_len;
 
 	err = mtwn_usb_tx_queue_wait(uc, MTWN_BULK_TX_INBAND_CMD, bf, 1000);
-	MTWN_DEBUG_PRINTF(sc, "%s: actual bulk EP, %d bytes, returned %d\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE,
+	    "%s: actual bulk EP, %d bytes, returned %d\n",
 	    __func__, data_len, err);
 	if (err != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to send TX payload (err %d)\n",
@@ -301,7 +302,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	val++;
 	MTWN_REG_WRITE_4(sc, MT76_REG_TX_CPU_FROM_FCE_CPU_DESC_IDX, val);
 
-	MTWN_DEBUG_PRINTF(sc, "%s: done!\n", __func__);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE, "%s: done!\n", __func__);
 
 	return (0);
 error:
@@ -367,7 +368,8 @@ mtwn_mt7610u_mcu_upload_firmware(struct mtwn_softc *sc,
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	ilm_len = le32toh(fw_hdr->ilm_len) - MT7610_MCU_IVB_SIZE;
-	MTWN_DEBUG_PRINTF(sc, "%s: FW: ILM = %u bytes, IVB = %u bytes\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE,
+	    "%s: FW: ILM = %u bytes, IVB = %u bytes\n",
 	    __func__, ilm_len, MT7610_MCU_IVB_SIZE);
 
 	err = mtwn_mt7610u_mcu_fw_send_data(sc, fw_buf + MT7610_MCU_IVB_SIZE,
@@ -379,7 +381,8 @@ mtwn_mt7610u_mcu_upload_firmware(struct mtwn_softc *sc,
 	}
 
 	dlm_len = le32toh(fw_hdr->dlm_len);
-	MTWN_DEBUG_PRINTF(sc, "%s: FW: DLM = %u bytes\n", __func__, dlm_len);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE, "%s: FW: DLM = %u bytes\n",
+	    __func__, dlm_len);
 	err = mtwn_mt7610u_mcu_fw_send_data(sc,
 	    fw_buf + le32toh(fw_hdr->ilm_len),
 	    dlm_len, MTWN_MCU_FW_URB_MAX_PAYLOAD, MT7610_MCU_DLM_OFFSET);
@@ -402,7 +405,7 @@ mtwn_mt7610u_mcu_upload_firmware(struct mtwn_softc *sc,
 		return (ETIMEDOUT);
 	}
 
-	MTWN_DEBUG_PRINTF(sc, "%s: FW: running\n", __func__);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE, "%s: FW: running\n", __func__);
 
 	return (0);
 }
@@ -415,8 +418,6 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 	int len, ret;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
-
-	MTWN_FUNC_ENTER(sc);
 
 	if (mtwn_mt7610_mcu_firmware_running(sc)) {
 		MTWN_INFO_PRINTF(sc, "%s: firmware already running\n",
@@ -435,7 +436,8 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 		return (ENXIO);
 	}
 
-	MTWN_INFO_PRINTF(sc, "%s: ilm_len=%d, dlm_len=%d, hdr len=%d\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE,
+	    "%s: ilm_len=%d, dlm_len=%d, hdr len=%d\n",
 	    __func__,
 	    le32toh(fw_hdr->ilm_len),
 	    le32toh(fw_hdr->dlm_len),

@@ -82,11 +82,12 @@ mtwn_usb_txeof(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *data)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_INFO_PRINTF(sc, "%s: completed, qid=%d, data=%p\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_XMIT, "%s: completed, qid=%d, data=%p\n",
 	    __func__, qid, data);
 
 	if ((data->ni != NULL) || (data->m != NULL))
-		MTWN_TODO_PRINTF(sc, "%s: need to handle ni/m free!\n", __func__);
+		MTWN_TODO_PRINTF(sc,
+		    "%s: need to handle ni/m free!\n", __func__);
 
 	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, data, next);
 
@@ -186,8 +187,8 @@ mtwn_bulk_tx_callback_qid(struct usb_xfer *xfer, usb_error_t error, int qid)
 	struct mtwn_softc *sc = &uc->uc_sc;
 	struct mtwn_data *data;
 
-	/* XXX strictly should be FUNC_ENTER, but I haven't got one that prints args yet */
-	MTWN_INFO_PRINTF(sc, "%s: called, qid %d\n", __func__, qid);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_XMIT, "%s: called, qid %d\n",
+	    __func__, qid);
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
