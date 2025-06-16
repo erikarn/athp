@@ -69,6 +69,7 @@
 #include "../if_mtwn_usb_var.h"
 #include "../if_mtwn_usb_vendor_req.h"
 #include "../if_mtwn_usb_vendor_io.h"
+#include "../if_mtwn_usb_tx.h"
 
 #include "../../mt7610/mtwn_mt7610_mcu_reg.h"
 #include "../../mt7610/mtwn_mt7610_dma_reg.h"
@@ -227,13 +228,24 @@ static int
 mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
     char *buf, const char *fw_buf, int len, uint32_t addr)
 {
+	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
+	struct mtwn_data *bf = NULL;
 	uint32_t info, val;
 	int err, data_len;
 
 	MTWN_TODO_PRINTF(sc, "%s: TODO! (%d bytes at offset %u)\n",
 	    __func__, len, addr);
 
-	/* TODO: grab a TX command buffer; fail early if we can't */
+	/* Grab a TX command buffer; fail early if we can't */
+	/*
+	 * TODO: maybe pass in an optional length later, and have it error if
+	 * the transfer won't fit? As a sanity check?
+	 */
+	bf = mtwn_usb_tx_getbuf(uc);
+	if (bf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to get tx buffer\n", __func__);
+		return (ENOBUFS);
+	}
 
 	/* Setup header for payload chunk */
 	info = htole32(
@@ -253,7 +265,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	if (err != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to write DMA_ADDR (err %d)\n",
 		    __func__, err);
-		return (err);
+		goto error;
 	}
 	len = roundup(len, 4);
 	err = mtwn_usb_single_write_4(sc, MTWN_USB_VENDOR_WRITE_FCE,
@@ -261,27 +273,41 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	if (err != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to write DMA_LEN (err %d)\n",
 		    __func__, err);
-		return (err);
+		goto error;
 	}
 
 	data_len = MTWN_MCU_CMD_HDR_LEN + len + sizeof(info);
 
+	/* send data + data_len to EP_OUT_INBAND_CMD */
+	/* TODO: just use the buffer directly, don't use a staging buffer */
+	/* TODO: verify the length fits inside the tx buffer! AIEE! */
+	memcpy(bf->buf, buf, data_len);
+	bf->buflen = data_len;
 
-	/* TODO: send data + data_len to EP_OUT_INBAND_CMD */
-	MTWN_TODO_PRINTF(sc, "%s: TODO: actual bulk EP, %d bytes\n", __func__, data_len);
+	err = mtwn_usb_tx_queue_wait(uc, MTWN_BULK_TX_INBAND_CMD, bf, 1000);
+	MTWN_DEBUG_PRINTF(sc, "%s: actual bulk EP, %d bytes, returned %d\n",
+	    __func__, data_len, err);
+	if (err != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to send TX payload (err %d)\n",
+		    __func__, err);
+		goto error;
+	}
+
+	/* Note: the bf is no longer ours once this is called */
+	bf = NULL;
 
 	/* Bump DESC_IDX */
 	val = MTWN_REG_READ_4(sc, MT76_REG_TX_CPU_FROM_FCE_CPU_DESC_IDX);
 	val++;
 	MTWN_REG_WRITE_4(sc, MT76_REG_TX_CPU_FROM_FCE_CPU_DESC_IDX, val);
 
-	/*
-	 * TODO: this would be what __mt76x02u_mcu_fw_send_data()
-	 * is doing; pay attention to how the buffer is formed,
-	 * the single_wr calls to the same address, the desc index
-	 * incrementing, etc.
-	 */
+	MTWN_DEBUG_PRINTF(sc, "%s: done!\n", __func__);
+
 	return (0);
+error:
+	if (bf != NULL)
+		mtwn_usb_tx_returnbuf(uc, bf);
+	return (err);
 }
 
 /*
