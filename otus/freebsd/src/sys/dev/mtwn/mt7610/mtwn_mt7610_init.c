@@ -150,6 +150,30 @@ error:
 	return (ret);
 }
 
+/**
+ * @brief toggle the CSR and BBP reset.
+ */
+static int
+mtwn_mt7610_reset_csr_bbp(struct mtwn_softc *sc)
+{
+	uint32_t val;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	val = MT7610_REG_MAC_SYS_CTRL_RESET_CSR |
+	    MT7610_REG_MAC_SYS_CTRL_RESET_BBP;
+
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_SYS_CTRL, val);
+	MTWN_MDELAY(sc, 200);
+
+	val = MTWN_REG_READ_4(sc, MT7610_REG_MAC_SYS_CTRL);
+	val =~ (MT7610_REG_MAC_SYS_CTRL_RESET_CSR |
+	    MT7610_REG_MAC_SYS_CTRL_RESET_BBP);
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_SYS_CTRL, val);
+
+	return (0);
+}
+
 /*
  * Analog of mt76x0_init_hardware(); but I'll end
  * up needing to break some of this stuff out into
@@ -158,9 +182,9 @@ error:
 int
 mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 {
-	//int ret;
+	int ret;
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO! In progress!\n", __func__);
 
 	/* wait for DMA to be off */
 	if (!mtwn_mt7610_wait_for_wpdma(sc, 1000)) {
@@ -175,6 +199,11 @@ mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 	}
 
 	/* reset_csr_bbp */
+	ret = mtwn_mt7610_reset_csr_bbp(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: CSR/BBP reset failed!\n", __func__);
+		return (ret);
+	}
 
 	/* mcu function select - this sends an MCU command / waits for resp */
 
