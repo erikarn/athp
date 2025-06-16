@@ -365,7 +365,6 @@ mtwn_mt7610u_mcu_upload_firmware(struct mtwn_softc *sc,
 	int err;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 
 	ilm_len = le32toh(fw_hdr->ilm_len) - MT7610_MCU_IVB_SIZE;
 	MTWN_DEBUG_PRINTF(sc, "%s: FW: ILM = %u bytes, IVB = %u bytes\n",
@@ -397,11 +396,10 @@ mtwn_mt7610u_mcu_upload_firmware(struct mtwn_softc *sc,
 		return (err);
 	}
 
-	err = mtwn_reg_poll(sc, MT76_REG_MCU_COM_REG0, 1, 1, 1000);
-	if (err != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: Firmware didn't start (err %d)\n",
-		    __func__, err);
-		return (err);
+	if (!mtwn_reg_poll(sc, MT76_REG_MCU_COM_REG0, 1, 1, 1000)) {
+		MTWN_ERR_PRINTF(sc, "%s: Firmware didn't start (timeout)\n",
+		    __func__);
+		return (ETIMEDOUT);
 	}
 
 	MTWN_DEBUG_PRINTF(sc, "%s: FW: running\n", __func__);
