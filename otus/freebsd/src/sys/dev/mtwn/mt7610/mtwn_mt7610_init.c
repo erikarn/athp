@@ -68,8 +68,6 @@
 int
 mtwn_mt76x0_set_wlan_state(struct mtwn_softc *sc, uint32_t val, bool enable)
 {
-	int ret;
-
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	/*
@@ -89,14 +87,17 @@ mtwn_mt76x0_set_wlan_state(struct mtwn_softc *sc, uint32_t val, bool enable)
 	MTWN_UDELAY(sc, 20);
 
 	if (enable) {
-		ret = mtwn_reg_poll(sc, MT76_REG_CMB_CTRL,
+		if (!mtwn_reg_poll(sc, MT76_REG_CMB_CTRL,
 		    MT76_REG_CMB_CTRL_XTAL_RDY | MT76_REG_CMB_CTRL_PLL_LD,
 		    MT76_REG_CMB_CTRL_XTAL_RDY | MT76_REG_CMB_CTRL_PLL_LD,
-		    2000);
-		if (ret != 0) {
-			device_printf(sc->sc_dev,
-			    "%s: failed to wait for PLL/XTAL\n", __func__);
-			return (ret);
+		    2000)) {
+			MTWN_ERR_PRINTF(sc,
+			    "%s: PLL/XTAL check failed; CMB_CTRL=0x%08x\n",
+			    __func__, MTWN_REG_READ_4(sc, MT76_REG_CMB_CTRL));
+			/*
+			 * Note: mt76 logs an error here; but it doesn't
+			 * fail the function.
+			 */
 		}
 	}
 
