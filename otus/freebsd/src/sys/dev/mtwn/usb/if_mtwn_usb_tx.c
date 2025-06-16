@@ -80,10 +80,100 @@ mtwn_usb_txeof(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *data)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
 	MTWN_INFO_PRINTF(sc, "%s: completed, qid=%d, data=%p\n",
 	    __func__, qid, data);
 
+	if ((data->ni != NULL) || (data->m != NULL))
+		MTWN_TODO_PRINTF(sc, "%s: need to handle ni/m free!\n", __func__);
+
+	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, data, next);
+
+	/* TODO: only wake-up if a flag is set in the data struct? */
 	wakeup(data);
+}
+
+/**
+ * @brief Allocate a TX buffer to queue.
+ */
+struct mtwn_data *
+mtwn_usb_tx_getbuf(struct mtwn_usb_softc *uc)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	struct mtwn_data *bf;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	bf = STAILQ_FIRST(&uc->uc_tx_inactive);
+	if (bf == NULL) {
+		/*
+		 * XXX TODO: make it not an error once we start doing
+		 * actual traffic!
+		 *
+		 * TODO: have a getbuf for mgmt/cmd versus data, so
+		 * large amounts of data doesn't end up stopping command/mgmt
+		 * stuff.
+		 */
+		MTWN_ERR_PRINTF(sc, "%s: out of xmit buffers\n", __func__);
+		return (NULL);
+	}
+	STAILQ_REMOVE_HEAD(&uc->uc_tx_inactive, next);
+	return (bf);
+}
+
+/**
+ * Free a buffer before it's been queued to the USB system for writing.
+ *
+ * This places the buffer back on the inactive queue.
+ */
+void
+mtwn_usb_tx_returnbuf(struct mtwn_usb_softc *uc, struct mtwn_data *bf)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, bf, next);
+}
+
+/**
+ * @brief queue the given buffer to the given endpoint.
+ *
+ * This queues the buffer and will return immediately.
+ */
+int
+mtwn_usb_tx_queue(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *bf)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	STAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
+	usbd_transfer_start(uc->uc_xfer[qid]);
+	return (0);
+}
+
+/**
+ * @brief Wait for the given buffer to be transmitted, or timeout
+ *
+ * Note to the caller that once this is called, the buffer is no
+ * longer owned by the caller.
+ */
+int
+mtwn_usb_tx_queue_wait(struct mtwn_usb_softc *uc, int qid,
+    struct mtwn_data *bf, int timeout)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	STAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
+	usbd_transfer_start(uc->uc_xfer[qid]);
+
+	ret = msleep(bf, &sc->sc_mtx, 0, "mtxn_tx_wait", timeout);
+
+	return (ret);
 }
 
 /*

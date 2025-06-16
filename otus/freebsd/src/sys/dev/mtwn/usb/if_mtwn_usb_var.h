@@ -23,6 +23,11 @@
 
 /* TODO: check with mt76 */
 #define	MTWN_USB_RXBUFSZ_DEF		16384
+
+/*
+ * Note: this needs to be big enough to send a firmware load chunk,
+ * which can be up to 12KiB.
+ */
 #define	MTWN_USB_TXBUFSZ		16384
 
 #define	MTWN_USB_BULK_EP_COUNT		8

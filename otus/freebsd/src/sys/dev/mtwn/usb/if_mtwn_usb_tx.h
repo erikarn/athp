@@ -16,6 +16,14 @@
 #ifndef	__IF_MTWN_USB_TX_H__
 #define	__IF_MTWN_USB_TX_H__
 
+extern	struct mtwn_data * mtwn_usb_tx_getbuf(struct mtwn_usb_softc *);
+extern	void mtwn_usb_tx_returnbuf(struct mtwn_usb_softc *, struct mtwn_data *);
+
+extern	int mtwn_usb_tx_queue(struct mtwn_usb_softc *, int,
+	    struct mtwn_data *);
+extern	int mtwn_usb_tx_queue_wait(struct mtwn_usb_softc *, int,
+	    struct mtwn_data *, int);
+
 extern	void mtwn_bulk_tx_ac_be_callback(struct usb_xfer *, usb_error_t);
 extern	void mtwn_bulk_tx_ac_bk_callback(struct usb_xfer *, usb_error_t);
 extern	void mtwn_bulk_tx_ac_vi_callback(struct usb_xfer *, usb_error_t);
