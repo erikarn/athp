@@ -108,9 +108,12 @@ static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 		.type = UE_BULK,
 		.endpoint = 0x04,
 		.direction = UE_DIR_OUT,
-		.bufsize = 128,
-		.flags = {.pipe_bof = 1,
-		.force_short_xfer = 0,},
+		.bufsize = MTWN_USB_TXBUFSZ, /* 0x2c44? */
+		.flags = {
+		    .pipe_bof = 1,
+		    .force_short_xfer = 1,
+		    .no_pipe_ok = 1,
+		},
 		.callback = mtwn_bulk_tx_inband_cmd_callback,
 		.timeout = 5000,        /* ms */
 	},
@@ -118,9 +121,12 @@ static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 		.type = UE_BULK,
 		.endpoint = 0x05,
 		.direction = UE_DIR_OUT,
-		.bufsize = 128,
-		.flags = {.pipe_bof = 1,
-		.force_short_xfer = 0,},
+		.bufsize = MTWN_USB_TXBUFSZ,
+		.flags = {
+		    .pipe_bof = 1,
+		    .force_short_xfer = 1,
+		    .no_pipe_ok = 1
+		},
 		.callback = mtwn_bulk_tx_ac_be_callback,
 		.timeout = 5000,        /* ms */
 	},
@@ -128,9 +134,12 @@ static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 		.type = UE_BULK,
 		.endpoint = 0x06,
 		.direction = UE_DIR_OUT,
-		.bufsize = 128,
-		.flags = {.pipe_bof = 1,
-		.force_short_xfer = 0,},
+		.bufsize = MTWN_USB_TXBUFSZ,
+		.flags = {
+		    .pipe_bof = 1,
+		    .force_short_xfer = 1,
+		    .no_pipe_ok = 1
+		},
 		.callback = mtwn_bulk_tx_ac_bk_callback,
 		.timeout = 5000,        /* ms */
 	},
@@ -138,9 +147,7 @@ static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 		.type = UE_BULK,
 		.endpoint = 0x07,
 		.direction = UE_DIR_OUT,
-		.bufsize = 128,
-		.flags = {.pipe_bof = 1,
-		.force_short_xfer = 0,},
+		.bufsize = MTWN_USB_TXBUFSZ,
 		.callback = mtwn_bulk_tx_ac_vi_callback,
 		.timeout = 5000,        /* ms */
 	},
@@ -148,9 +155,12 @@ static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 		.type = UE_BULK,
 		.endpoint = 0x09,
 		.direction = UE_DIR_OUT,
-		.bufsize = 128,
-		.flags = {.pipe_bof = 1,
-		.force_short_xfer = 0,},
+		.bufsize = MTWN_USB_TXBUFSZ,
+		.flags = {
+		    .pipe_bof = 1,
+		    .force_short_xfer = 1,
+		    .no_pipe_ok = 1
+		},
 		.callback = mtwn_bulk_tx_ac_vo_callback,
 		.timeout = 5000,        /* ms */
 	},
@@ -158,16 +168,15 @@ static const struct usb_config mtwn_config[MTWN_USB_BULK_EP_COUNT] = {
 		.type = UE_BULK,
 		.endpoint = 0x04,
 		.direction = UE_DIR_OUT,
-		.bufsize = 128,
-		.flags = {.pipe_bof = 1,
-		.force_short_xfer = 0,},
+		.bufsize = MTWN_USB_TXBUFSZ,
+		.flags = {
+		    .pipe_bof = 1,
+		    .force_short_xfer = 1,
+		    .no_pipe_ok = 1
+		},
 		.callback = mtwn_bulk_tx_hcca_callback,
 		.timeout = 5000,        /* ms */
 	},
-
-
-	/* TODO: the rest */
-
 };
 
 int
