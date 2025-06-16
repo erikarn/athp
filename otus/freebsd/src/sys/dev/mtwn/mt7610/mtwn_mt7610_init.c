@@ -60,6 +60,8 @@
 #include "../if_mtwn_util.h"
 
 #include "mtwn_mt7610_init.h"
+#include "mtwn_mt7610_mac.h"
+#include "mtwn_mt7610_dma.h"
 #include "mtwn_mt7610_reg.h"
 
 /**
@@ -156,31 +158,45 @@ error:
 int
 mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 {
+	//int ret;
+
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 
-	/* wait_for_wpdma */
+	/* wait for DMA to be off */
+	if (!mtwn_mt7610_wait_for_wpdma(sc, 1000)) {
+		MTWN_ERR_PRINTF(sc, "%s: DMA didn't quieten\n", __func__);
+		return (ETIMEDOUT);
+	}
 
-	/* wait for ASIC ready after FW load */
+	/* wait for ASIC ready after firmware load */
+	if (!mtwn_mt76x0_mac_wait_ready(sc)) {
+		MTWN_ERR_PRINTF(sc, "%s: MAC isn't ready!\n", __func__);
+		return (ETIMEDOUT);
+	}
 
 	/* reset_csr_bbp */
 
-	/* mcu function select */
+	/* mcu function select - this sends an MCU command / waits for resp */
 
-	/* init mac registers */
+	/* init mac registers - first table write */
 
 	/* wait for txrx idle */
 
-	/* init bbp */
+	/* init bbp - another table write */
 
-	/* initial RX filter */
+	/* (initial RX filter - done in mtwn driver) */
+	/*
+	 * TODO: see if mt76.rxfilter is used in any subsequent
+	 * init functions (mac_wcid, mac_shared_key, eeprom, phy init)
+	 */
 
 	/* shared key setup */
 
 	/* wcid setup */
 
-	/* eeprom init */
+	/* (eeprom init - already done in mtwn driver) */
 
-	/* phy init */
+	/* phy init - likely needs eeprom init done first! */
 
 	return (0);
 }
