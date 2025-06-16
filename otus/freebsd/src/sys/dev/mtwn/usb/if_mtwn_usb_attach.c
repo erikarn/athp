@@ -185,14 +185,6 @@ mtwn_usb_attach(device_t self)
 	if (error != 0)
 		goto detach;
 
-#if 0
-	/* XXX TODO for now, for bring-up */
-	/* XXX TODO: do we need xfers up for initial firmware setup above? */
-	MTWN_LOCK(sc);
-	mtwn_usb_rx_start_xfers(uc);
-	MTWN_UNLOCK(sc);
-#endif
-
 	return (0);
 detach:
 	/* XXX print error */
@@ -227,6 +219,7 @@ mtwn_usb_detach(device_t self)
 
 	/* private detach */
 	MTWN_CHIP_DETACH(sc);
+	MTWN_EEPROM_DETACH(sc);
 
 	mtx_destroy(&sc->sc_mtx);
 

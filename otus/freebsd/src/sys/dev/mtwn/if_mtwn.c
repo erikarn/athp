@@ -140,11 +140,25 @@ mtwn_init(struct mtwn_softc *sc)
 
 	/* setup wcid entries */
 
-	/* EEPROM init */
+	/* EFUSE validate */
+	ret = MTWN_EFUSE_VALIDATE(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: EFUSE_VALIDATE failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
+
+	/* EEPROM load */
+	ret = MTWN_EFUSE_POPULATE(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: EFUSE_POPULATE failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* PHY init */
 
-
+#if 0
 	/* Chipset hardware init */
 	/* TODO: this likely will get further decomposed into more methods */
 	ret = MTWN_CHIP_INIT_HARDWARE(sc);
@@ -153,6 +167,7 @@ mtwn_init(struct mtwn_softc *sc)
 		    __func__, ret);
 		goto error;
 	}
+#endif
 
 	/* Beacon config */
 	ret = MTWN_CHIP_BEACON_CONFIG(sc);
@@ -208,9 +223,29 @@ error:
 int
 mtwn_attach(struct mtwn_softc *sc)
 {
+	int ret;
+	uint8_t macaddr[IEEE80211_ADDR_LEN] = { 0 };
+
 	MTWN_INFO_PRINTF(sc, "%s: hi!\n", __func__);
 
+	/* Attach EEPROM private state early */
+	ret = MTWN_EEPROM_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: eeprom state attach failed (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
 	mtwn_init(sc);
+
+	ret = MTWN_EEPROM_MACADDR_READ(sc, macaddr);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to read MAC address (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	MTWN_INFO_PRINTF(sc, "%s: MAC address: %6D\n", __func__, macaddr, ":");
 
 	return (0);
 }

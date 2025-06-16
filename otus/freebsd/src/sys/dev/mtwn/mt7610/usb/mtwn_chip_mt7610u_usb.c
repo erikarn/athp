@@ -63,6 +63,8 @@
 #include "../mtwn_mt7610_mac.h"
 #include "../mtwn_mt7610_reg.h"
 #include "../mtwn_mt7610_mcu.h"
+#include "../mtwn_mt7610_eeprom.h"
+#include "../mtwn_mt7610_eeprom_reg.h" /* XXX for eeprom size */
 
 #include "mtwn_chip_mt7610u_usb.h"
 
@@ -238,6 +240,90 @@ mtwn_mt7610u_post_init_setup(struct mtwn_softc *sc)
 	return (0);
 }
 
+/**
+ * @brief Initialise the EEPROM state.
+ *
+ * This will do housekeeping like allocate the MT7610 EEPROM
+ * sized eeprom buffer.  Don't do any register IO here;
+ * that's for later on during validation/setup.
+ */
+static int
+mtwn_mt7610u_eeprom_init(struct mtwn_softc *sc)
+{
+	char *eeprom_buf;
+
+	/* Allocate EEPROM buffer */
+	eeprom_buf = malloc(MT7610_EEPROM_SIZE, M_TEMP, M_NOWAIT | M_ZERO);
+	if (eeprom_buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: malloc failure\n", __func__);
+		return (ENOMEM);
+	}
+	sc->sc_eepromops_priv = eeprom_buf;
+	return (0);
+}
+
+static int
+mtwn_mt7610u_eeprom_detach(struct mtwn_softc *sc)
+{
+
+	if (sc->sc_eepromops_priv != NULL) {
+		free(sc->sc_eepromops_priv, M_TEMP);
+		sc->sc_eepromops_priv = NULL;
+	}
+
+	return (0);
+}
+
+/**
+ * @brief Validate the EFUSE data.
+ *
+ * This validates the EFUSE data in the chip.
+ */
+static int
+mtwn_mt7610u_efuse_validate(struct mtwn_softc *sc)
+{
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* Validate physical size check */
+	ret = mtwn_mt7610_efuse_physical_size_check(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: physical size check failed (err %d)\n",
+		    __func__, ret);
+	}
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO: other validation!\n", __func__);
+
+	return (0);
+}
+
+/**
+ * @brief populate efuse -> eeprom data.
+ */
+static int
+mtwn_mt7610u_efuse_populate(struct mtwn_softc *sc)
+{
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (sc->sc_eepromops_priv == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: called on NULL eeprompriv!\n",
+		    __func__);
+		return (EINVAL);
+	}
+
+	ret = mtwn_mt7610_efuse_populate(sc, sc->sc_eepromops_priv,
+	    MT7610_EEPROM_SIZE);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: populate failed (err %d)\n",
+		    __func__, ret);
+	}
+
+	return (0);
+}
+
 int
 mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 {
@@ -260,7 +346,7 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 #undef MWTN_MCU_RESP_URB_SIZE
 	if (mcu_buf == NULL) {
 		device_printf(sc->sc_dev, "%s: malloc failure\n", __func__);
-		free(mcu_buf, M_TEMP);
+		free(psc, M_TEMP);
 		return (ENOMEM);
 	}
 
@@ -280,6 +366,14 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_beacon_config = mtwn_mt7610u_beacon_config;
 	sc->sc_chipops.sc_chip_post_init_setup = mtwn_mt7610u_post_init_setup;
 	sc->sc_chipops.sc_chip_rxfilter_read = mtwn_mt7610_rxfilter_read;
+
+	/* eeprom attach methods */
+	sc->sc_eepromops.sc_eeprom_init = mtwn_mt7610u_eeprom_init;
+	sc->sc_eepromops.sc_eeprom_detach = mtwn_mt7610u_eeprom_detach;
+	sc->sc_eepromops.sc_efuse_validate = mtwn_mt7610u_efuse_validate;
+	sc->sc_eepromops.sc_efuse_populate = mtwn_mt7610u_efuse_populate;
+	sc->sc_eepromops.sc_eeprom_macaddr_read =
+	    mtwn_mt7610_eeprom_macaddr_read;
 
 	return (0);
 }

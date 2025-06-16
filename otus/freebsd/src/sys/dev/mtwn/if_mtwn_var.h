@@ -70,6 +70,16 @@ struct mtwn_mcu_ops {
 			    const void *, size_t);
 };
 
+struct mtwn_eeprom_ops {
+	int		(*sc_eeprom_init)(struct mtwn_softc *sc);
+	int		(*sc_eeprom_detach)(struct mtwn_softc *sc);
+	int		(*sc_efuse_validate)(struct mtwn_softc *sc);
+	int		(*sc_efuse_populate)(struct mtwn_softc *sc);
+
+	int		(*sc_eeprom_macaddr_read)(struct mtwn_softc *sc,
+			    uint8_t *);
+};
+
 struct mtwn_mcu_cfg {
 	uint32_t headroom;
 	uint32_t tailroom;
@@ -94,10 +104,15 @@ struct mtwn_softc {
 	struct mtwn_chip_ops	sc_chipops;
 	void			*sc_chipops_priv;
 
+	/* EEPROM operations */
+	struct mtwn_eeprom_ops	sc_eepromops;
+	void			*sc_eepromops_priv;
+
 	/* MCU operations */
 	struct mtwn_mcu_ops	sc_mcuops;
 	struct mtwn_mcu_cfg	sc_mcucfg;
 
+	/* MAC state */
 	struct {
 		uint32_t	sc_rx_filter;
 	} mac_state;
@@ -147,6 +162,18 @@ struct mtwn_softc {
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\
 	    ((_sc)->sc_mcuops.sc_mcu_init((_sc), (_data), (_len)))
+
+/* EEPROM/EFUSE operations */
+#define	MTWN_EEPROM_INIT(_sc)					\
+	    ((_sc)->sc_eepromops.sc_eeprom_init((_sc)))
+#define	MTWN_EEPROM_DETACH(_sc)					\
+	    ((_sc)->sc_eepromops.sc_eeprom_detach((_sc)))
+#define	MTWN_EFUSE_VALIDATE(_sc)				\
+	    ((_sc)->sc_eepromops.sc_efuse_validate((_sc)))
+#define	MTWN_EFUSE_POPULATE(_sc)				\
+	    ((_sc)->sc_eepromops.sc_efuse_populate((_sc)))
+#define	MTWN_EEPROM_MACADDR_READ(_sc, _mac)			\
+	    ((_sc)->sc_eepromops.sc_eeprom_macaddr_read((_sc), (_mac)))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);
