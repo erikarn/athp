@@ -107,6 +107,9 @@ struct mtwn_softc {
 	    ((_sc)->sc_busops.sc_read_4((_sc), (_reg)))
 #define	MTWN_REG_WRITE_4(_sc, _reg, _val)			\
 	    ((_sc)->sc_busops.sc_write_4((_sc), (_reg), (_val)))
+#define	MTWN_REG_RMW_4(_sc, _reg, _mask, _val)			\
+	    ((_sc)->sc_busops.sc_rmw_4((_sc), (_reg), (_mask),	\
+	    (_val)))
 #define	MTWN_UDELAY(_sc, _usec)					\
 	    ((_sc)->sc_busops.sc_delay((_sc), (_usec)))
 #define	MTWN_MDELAY(_sc, _msec)					\
