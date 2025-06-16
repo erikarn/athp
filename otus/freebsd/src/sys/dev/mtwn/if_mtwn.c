@@ -110,7 +110,8 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
-	/* Chipset hardware init (mt76x0_init_hardware) */
+	/* Chipset hardware init */
+	/* TODO: this likely will get further decomposed into more methods */
 	ret = MTWN_CHIP_INIT_HARDWARE(sc);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: INIT_HARDWARE failed (err %d)\n",

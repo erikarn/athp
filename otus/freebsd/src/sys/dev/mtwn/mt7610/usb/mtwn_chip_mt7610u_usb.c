@@ -90,16 +90,6 @@ mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
 	return (0);
 }
 
-/* mt7610u_register_device() - needs to do these */
-/* TODO: maybe fold this into mtwn_chip_mt7610u_setup_hardware() */
-/*
- * allocate mcu_data
- * alloc queues - we've already done this, so ignore
- * mt76x0u_init_hardware(sc, true); - this is MTWN_CHIP_INIT_HARDWARE(sc, true);
- * check fragments for AMSDU support
- * mt76x0_register_device() - so much more work, heh
- */
-
 /**
  * @brief Setup the hardware during probe/attach.
  *
@@ -115,7 +105,6 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 	uint32_t asic_ver, mac_ver;
 	uint32_t efuse;
 
-	/* XXX TODO: Our version of mt76x0u_probe() */
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
 
 	/* Disable hardware, so MCU doesn't fail on hot reboot */
@@ -190,6 +179,7 @@ mtwn_mt7610u_init_usb_dma(struct mtwn_softc *sc)
 static int
 mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc)
 {
+	/* This is what mt76x0_init_hardware() should be doing */
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 	MTWN_TODO_PRINTF(sc, "%s: TODO: this should be a chip call!\n",
 	    __func__);
@@ -249,14 +239,13 @@ mtwn_mt7610u_post_init_setup(struct mtwn_softc *sc)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-#if 0
-	mt76_rmw(sc, MT_US_CYC_CFG, MT_US_CYC_CNT, 0x1e);
-	mt76_wr(sc, MT_TXOP_CTRL_CFG,
-	    FIELD_PREP(MT_TXOP_TRUN_EN, 0x3f) |
-	    FIELD_PREP(MT_TXOP_EXT_CCA_DLY, 0x58));
-#endif
+	MTWN_REG_RMW_4(sc, MT7610_REG_US_CYC_CFG,
+	    MT7610_REG_US_CYC_CFG_CNT, 0x1e);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO: implement!", __func__);
+	MTWN_REG_WRITE_4(sc, MT7610_REG_TXOP_CTRL_CFG,
+	    _IEEE80211_SHIFTMASK(0x3f, MT7610_REG_TXOP_CTRL_CFG_TRUN_EN) |
+	    _IEEE80211_SHIFTMASK(0x58, MT7610_REG_TXOP_CTRL_CFG_EXT_CCA_DLY));
+
 	return (0);
 }
 
