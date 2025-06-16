@@ -153,6 +153,23 @@ error:
 	return (ret);
 }
 
+/*
+ * TODO: figure out why upon driver load I'm not forcing a firmware
+ * load; likely the mt76 driver never handled that case and
+ * also detects that there's already firmware loaded?
+ *
+ * TODO: implement the rest of hardware_init, enough to get
+ * to running state and read the EEPROM MAC and whatever else
+ * is needed for net80211 registration!
+ *
+ * TODO: mtwn_stop() ; look at what mt76x0u_stop() does,
+ * start implementing the chipset/bus methods for that.
+ *
+ * Find where MT76_STATE_RUNNING is set and cleared; those
+ * are our next targets once mt76x0_hardware_init() is
+ * completed.
+ */
+
 int
 mtwn_attach(struct mtwn_softc *sc)
 {
