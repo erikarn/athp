@@ -59,6 +59,15 @@
 #include "if_mtwn_debug.h"
 
 /*
+ * @brief Do probe/attach time hardware setup.
+ *
+ * For now, only call this once (during mtwn_attach())
+ * until I figure out what bits and pieces from the mt76
+ * driver should be done at probe/attach (eg EEPROM
+ * size allocation, initial firmware load, read EEPROM
+ * contents, etc) and what we need to do for each
+ * transition from inactive -> active.
+ *
  * Call with the lock NOT held, as the firmware load
  * needs no lock held.
  */
@@ -109,6 +118,32 @@ mtwn_init(struct mtwn_softc *sc)
 		    __func__, ret);
 		goto error;
 	}
+
+	/* from mt76x0_init_hardware */
+
+	/* wait for wpdma */
+
+	/* wait for mac */
+
+	/* reset csr_bbp */
+
+	/* mac function select */
+
+	/* mac init */
+
+	/* init bbp */
+
+	/* read RX filter */
+	sc->mac_state.sc_rx_filter = MTWN_CHIP_RXFILTER_READ(sc);
+
+	/* setup shared keys */
+
+	/* setup wcid entries */
+
+	/* EEPROM init */
+
+	/* PHY init */
+
 
 	/* Chipset hardware init */
 	/* TODO: this likely will get further decomposed into more methods */

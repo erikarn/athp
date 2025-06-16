@@ -177,16 +177,6 @@ mtwn_mt7610u_init_usb_dma(struct mtwn_softc *sc)
 }
 
 static int
-mtwn_chip_mt7610u_init_hardware(struct mtwn_softc *sc)
-{
-	/* This is what mt76x0_init_hardware() should be doing */
-	MTWN_LOCK_ASSERT(sc, MA_OWNED);
-	MTWN_TODO_PRINTF(sc, "%s: TODO: this should be a chip call!\n",
-	    __func__);
-	return (0);
-}
-
-static int
 mtwn_chip_mt7610u_power_off(struct mtwn_softc *sc)
 {
 	int ret;
@@ -283,13 +273,14 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_reset = mtwn_chip_mt7610u_reset;
 	sc->sc_chipops.sc_chip_setup_hardware =
 	    mtwn_chip_mt7610u_setup_hardware;
-	sc->sc_chipops.sc_chip_init_hardware = mtwn_chip_mt7610u_init_hardware;
+	sc->sc_chipops.sc_chip_init_hardware = mtwn_mt7610_init_hardware;
 	sc->sc_chipops.sc_chip_power_off = mtwn_chip_mt7610u_power_off;
 	sc->sc_chipops.sc_chip_power_on = mtwn_chip_mt7610u_power_on;
 	sc->sc_chipops.sc_chip_mac_wait_ready = mtwn_mt76x0_mac_wait_ready;
 	sc->sc_chipops.sc_chip_dma_param_setup = mtwn_mt7610u_init_usb_dma;
 	sc->sc_chipops.sc_chip_beacon_config = mtwn_mt7610u_beacon_config;
 	sc->sc_chipops.sc_chip_post_init_setup = mtwn_mt7610u_post_init_setup;
+	sc->sc_chipops.sc_chip_rxfilter_read = mtwn_mt7610_rxfilter_read;
 
 	return (0);
 }

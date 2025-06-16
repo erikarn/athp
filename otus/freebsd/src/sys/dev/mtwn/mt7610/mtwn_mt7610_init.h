@@ -18,5 +18,6 @@
 
 extern	int mtwn_mt76x0_set_wlan_state(struct mtwn_softc *, uint32_t, bool);
 extern	int mtwn_mt76x0_chip_onoff(struct mtwn_softc *, bool, bool);
+extern	int mtwn_mt7610_init_hardware(struct mtwn_softc *);
 
 #endif	/* __MTWN_MT76X0_INIT_H__ */

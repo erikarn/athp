@@ -17,5 +17,6 @@
 #define	__MTWN_MT76X0_MAC_H__
 
 extern	bool mtwn_mt76x0_mac_wait_ready(struct mtwn_softc *);
+extern	uint32_t mtwn_mt7610_rxfilter_read(struct mtwn_softc *);
 
 #endif	/* __MTWN_MT76X0_MAC_H__ */

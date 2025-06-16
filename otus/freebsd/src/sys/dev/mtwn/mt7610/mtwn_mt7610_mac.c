@@ -92,5 +92,19 @@ mtwn_mt76x0_mac_wait_ready(struct mtwn_softc *sc)
 	}
 	device_printf(sc->sc_dev, "%s: timeout\n", __func__);
 	return (false);
+}
 
+/**
+ * @brief Read the RX filter.
+ *
+ * For now this returns the rxfilter register value.
+ * If the RX filter changes format based on MAC versions then this'll
+ * end up needing to turn into some intermediary struct or something.
+ */
+uint32_t
+mtwn_mt7610_rxfilter_read(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	return (MTWN_REG_READ_4(sc, MT7610_REG_RX_FILTER_CFG));
 }

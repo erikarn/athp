@@ -50,6 +50,7 @@ struct mtwn_chip_ops {
 	bool		(*sc_chip_dma_param_setup)(struct mtwn_softc *sc);
 	bool		(*sc_chip_beacon_config)(struct mtwn_softc *sc);
 	bool		(*sc_chip_post_init_setup)(struct mtwn_softc *sc);
+	uint32_t	(*sc_chip_rxfilter_read)(struct mtwn_softc *sc);
 };
 
 struct mtwn_mcu_ops {
@@ -96,6 +97,10 @@ struct mtwn_softc {
 	/* MCU operations */
 	struct mtwn_mcu_ops	sc_mcuops;
 	struct mtwn_mcu_cfg	sc_mcucfg;
+
+	struct {
+		uint32_t	sc_rx_filter;
+	} mac_state;
 };
 
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
@@ -136,7 +141,10 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_beacon_config((_sc)))
 #define	MTWN_CHIP_POST_INIT_SETUP(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_post_init_setup((_sc)))
+#define	MTWN_CHIP_RXFILTER_READ(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_rxfilter_read((_sc)))
 
+/* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\
 	    ((_sc)->sc_mcuops.sc_mcu_init((_sc), (_data), (_len)))
 

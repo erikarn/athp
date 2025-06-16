@@ -146,3 +146,40 @@ error:
 	    __func__, ret);
 	return (ret);
 }
+
+/*
+ * Analog of mt76x0_init_hardware(); but I'll end
+ * up needing to break some of this stuff out into
+ * if_mtwn.c and have it do some more work.
+ */
+int
+mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
+{
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+
+	/* wait_for_wpdma */
+
+	/* wait for ASIC ready after FW load */
+
+	/* reset_csr_bbp */
+
+	/* mcu function select */
+
+	/* init mac registers */
+
+	/* wait for txrx idle */
+
+	/* init bbp */
+
+	/* initial RX filter */
+
+	/* shared key setup */
+
+	/* wcid setup */
+
+	/* eeprom init */
+
+	/* phy init */
+
+	return (0);
+}
