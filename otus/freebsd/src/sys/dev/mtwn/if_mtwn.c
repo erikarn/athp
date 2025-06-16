@@ -234,7 +234,9 @@ mtwn_attach(struct mtwn_softc *sc)
 		return (ret);
 	}
 
-	mtwn_init(sc);
+	ret = mtwn_init(sc);
+	if (ret != 0)
+		return (ret);
 
 	ret = MTWN_EEPROM_MACADDR_READ(sc, macaddr);
 	if (ret != 0) {
