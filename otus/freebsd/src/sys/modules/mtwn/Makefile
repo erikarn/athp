@@ -8,6 +8,7 @@ KMOD    = if_mtwn
 SRCS    = if_mtwn.c \
 	  if_mtwn_util.c \
 	  if_mtwn_firmware.c \
+	  if_mtwn_mcu.c \
 	  bus_if.h device_if.h usb_if.h usbdevs.h \
 	  opt_wlan.h
 

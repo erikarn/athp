@@ -185,4 +185,8 @@ extern	void mtwn_sysctl_attach(struct mtwn_softc *);
 /* if_mtwn_firmware.c */
 extern	int mtwn_firmware_load(struct mtwn_softc *);
 
+/* if_mtwn_mcu.c */
+extern	struct mbuf * mtwn_mcu_msg_alloc(struct mtwn_softc *,
+	    const char *, int, int);
+
 #endif	/* __IF_MTWN_VAR_H__ */
