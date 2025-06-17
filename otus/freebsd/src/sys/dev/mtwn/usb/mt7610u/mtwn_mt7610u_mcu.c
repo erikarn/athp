@@ -87,19 +87,34 @@ static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
     const void *data, int len, bool wait_resp)
 {
+	struct mbuf *m;
+	uint8_t seq = 0;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* Base off of __m76x02u_mcu_send_msg */
 	MTWN_TODO_PRINTF(sc, "%s: called\n", __func__);
 
 	/* allocate mbuf, with the relevant head/tailroom */
 	/* (see __mt76_mcu_msg_alloc for setting up an mbuf) */
 	/* (i still need to better understand how the len/data_len stuff works)  */
+	m = mtwn_mcu_msg_alloc(sc, data, len, len);
+	if (m == NULL) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: couldn't get a message mbuf\n", __func__);
+		return (ENOMEM);
+	}
 
-	/* Base off of __m76x02u_mcu_send_msg */
-
-	/* assign seqno */
+	/* assign seqno, make sure '0' isn't used as a value */
+	if (!wait_resp) {
+		seq = ++sc->sc_mcustate.msg_seq & 0xf;
+		if (seq == 0)
+			seq = ++sc->sc_mcustate.msg_seq & 0xf;
+	}
 
 	/* prepare info field */
 
-	/* mt76x02u_skb_dma_info - setup dma info header */
+	/* mt76x02u_skb_dma_info - setup dma info header, adjust mbuf size/padding, etc */
 
 	/* bulk msg to INBAND_CMD */
 

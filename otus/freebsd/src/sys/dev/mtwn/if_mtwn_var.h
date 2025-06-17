@@ -86,6 +86,10 @@ struct mtwn_mcu_cfg {
 	int max_retry;
 };
 
+struct mtwn_mcu_state {
+	uint32_t msg_seq;
+};
+
 struct mtwn_softc {
 	device_t		sc_dev;
 	uint32_t		sc_debug;
@@ -111,6 +115,7 @@ struct mtwn_softc {
 	/* MCU operations */
 	struct mtwn_mcu_ops	sc_mcuops;
 	struct mtwn_mcu_cfg	sc_mcucfg;
+	struct mtwn_mcu_state	sc_mcustate;
 
 	/* MAC state */
 	struct {
