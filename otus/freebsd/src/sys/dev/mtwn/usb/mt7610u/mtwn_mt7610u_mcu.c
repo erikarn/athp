@@ -79,11 +79,31 @@
 #include "mtwn_mt7610u_mcu.h"
 #include "mtwn_mt7610u_mcu_reg.h"
 
+/*
+ * TODO: maybe just make this take an mbuf? to make buffer
+ * management easier?
+ */
 static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
     const void *data, int len, bool wait_resp)
 {
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: called\n", __func__);
+
+	/* allocate mbuf, with the relevant head/tailroom */
+	/* (see __mt76_mcu_msg_alloc for setting up an mbuf) */
+	/* (i still need to better understand how the len/data_len stuff works)  */
+
+	/* Base off of __m76x02u_mcu_send_msg */
+
+	/* assign seqno */
+
+	/* prepare info field */
+
+	/* mt76x02u_skb_dma_info - setup dma info header */
+
+	/* bulk msg to INBAND_CMD */
+
+	/* if wait_resp, do mt76x02u_mcu_wait_resp */
 	return (ENXIO);
 }
 
