@@ -200,9 +200,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	/* Bulk TX */
 	m_print(m, -1);
 
-	/* Optionally wait until it's transmitted */
-
-	/* XXX TODO: wait or no wait? */
+	/* XXX TODO: TX transfer wait or no wait? */
 	if (wait_resp)
 		ret = mtwn_usb_tx_queue_wait(uc, MTWN_BULK_TX_INBAND_CMD, bf,
 		    1000);
@@ -217,14 +215,20 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 		return (ret);
 	}
 
+	/*
+	 * if wait_resp, do mt76x02u_mcu_wait_resp to wait for the
+	 * actual response notification
+	 */
+	if (wait_resp)
+		MTWN_TODO_PRINTF(sc,
+		    "%s: TODO: wait for matching RX response!\n",
+		    __func__);
+
 	/* Done! */
 	m_freem(m);
 
 	return (0);
 
-	/* bulk msg to INBAND_CMD */
-
-	/* if wait_resp, do mt76x02u_mcu_wait_resp */
 
 	/* TODO: freeing the buffer; we're done */
 	m_freem(m);
