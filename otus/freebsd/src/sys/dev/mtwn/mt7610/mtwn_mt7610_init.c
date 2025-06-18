@@ -218,10 +218,20 @@ mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 		return (ret);
 	}
 
-
 	/* init mac registers - first table write */
+	ret = mtwn_mt7610_mac_init_registers(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: MAC register init failed!\n",
+		    __func__);
+		return (ret);
+	}
 
 	/* wait for txrx idle */
+	if (!mtwn_mt7610_mac_wait_for_txrx_idle(sc)) {
+		MTWN_ERR_PRINTF(sc, "%s: timeout waiting for TX/RX idle!\n",
+		    __func__);
+		return (ETIMEDOUT);
+	}
 
 	/* init bbp - another table write */
 

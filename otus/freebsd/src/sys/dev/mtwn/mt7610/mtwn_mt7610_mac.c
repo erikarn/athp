@@ -108,3 +108,37 @@ mtwn_mt7610_rxfilter_read(struct mtwn_softc *sc)
 
 	return (MTWN_REG_READ_4(sc, MT7610_REG_RX_FILTER_CFG));
 }
+
+bool
+mtwn_mt7610_mac_wait_for_txrx_idle(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	return (mtwn_reg_poll(sc,
+	    MT7610_REG_MAC_STATUS,
+	    (MT7610_REG_MAC_STATUS_TX | MT7610_REG_MAC_STATUS_RX),
+	    0, 100));
+}
+
+int
+mtwn_mt7610_mac_init_registers(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* common_mac_reg_table */
+
+	/* mt76x0_mac_reg_table */
+
+	/* release bbp/mac */
+
+	/* CCA */
+
+	/* clear FCE_L2_STUFF_WR_MPDU_LEN_EN */
+
+	/* setup TX ring mappings - see Linux mt76 for more info */
+	MTWN_REG_RMW_4(sc, MT7610_REG_WMM_CTRL, 0x3ff, 0x201);
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO! Time to implement!\n", __func__);
+	return (0);
+}
+

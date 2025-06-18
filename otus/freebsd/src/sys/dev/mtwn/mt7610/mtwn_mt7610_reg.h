@@ -77,6 +77,14 @@
 #define		MT7610_REG_WPDMA_GLO_CFG_CLK_GATE_DIS	0x40000000
 #define		MT7610_REG_WPDMA_GLO_CFG_RX_2B_OFFSET	0x80000000
 
+#define	MT7610_REG_WMM_CTRL			0x0230
+
+/*
+ * Note: FCE_DMA_ADDR / LEN / CFG are accessed only in the
+ * mt76x0/mt76x2 USB MCU paths and via a different vendor type
+ * transfer.  These should be relocated to a more relevant place
+ * for that.
+ */
 #define	MT7610_FCE_DMA_ADDR			0x0230
 #define	MT7610_FCE_DMA_LEN			0x0234
 #define	MT7610_USB_DMA_CFG			0x0238
@@ -121,6 +129,10 @@
 #define		MT7610_REG_MAC_SYS_CTRL_RESET_BBP	0x00000002
 #define		MT7610_REG_MAC_SYS_CTRL_ENABLE_TX	0x00000004
 #define		MT7610_REG_MAC_SYS_CTRL_ENABLE_RX	0x00000008
+
+#define	MT7610_REG_MAC_STATUS			0x1200
+#define		MT7610_REG_MAC_STATUS_TX		0x00000001
+#define		MT7610_REG_MAC_STATUS_RX		0x00000002
 
 #define	MT7610_REG_TXOP_CTRL_CFG		0x1340
 #define		MT7610_REG_TXOP_CTRL_CFG_TRUN_EN	0x0000003f
