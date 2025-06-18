@@ -114,6 +114,38 @@ mtwn_usb_match(device_t self)
 }
 
 static int
+mtwn_usb_reg_pair_read(struct mtwn_softc *sc, int base,
+    struct mtwn_reg_pair *rp, int n)
+{
+	int i;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (sc->flags.mcu_running)
+		return (MTWN_MCU_REG_PAIR_READ_4(sc, base, rp, n));
+
+	for (i = 0; i < n; i++)
+		rp->val = MTWN_REG_READ_4(sc, base + rp->reg);
+	return (0);
+}
+
+static int
+mtwn_usb_reg_pair_write(struct mtwn_softc *sc, int base,
+    const struct mtwn_reg_pair *rp, int n)
+{
+	int i;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (sc->flags.mcu_running)
+		return (MTWN_MCU_REG_PAIR_WRITE_4(sc, base, rp, n));
+
+	for (i = 0; i < n; i++)
+		MTWN_REG_WRITE_4(sc, base + rp->reg, rp->val);
+	return (0);
+}
+
+static int
 mtwn_usb_attach(device_t self)
 {
 	struct mtwn_usb_softc *uc = device_get_softc(self);
@@ -143,6 +175,8 @@ mtwn_usb_attach(device_t self)
 	sc->sc_busops.sc_write_4 = mtwn_usb_write_4;
 	sc->sc_busops.sc_rmw_4 = mtwn_usb_rmw_4;
 	sc->sc_busops.sc_delay = mtwn_usb_delay;
+	sc->sc_busops.sc_reg_pair_read = mtwn_usb_reg_pair_read;
+	sc->sc_busops.sc_reg_pair_write = mtwn_usb_reg_pair_write;
 
 	/* chipset / MCU access methods */
 	switch (USB_GET_DRIVER_INFO(uaa)) {

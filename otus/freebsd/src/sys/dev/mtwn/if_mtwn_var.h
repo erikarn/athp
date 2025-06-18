@@ -29,6 +29,12 @@ struct mtwn_bus_ops {
 	uint32_t	(*sc_rmw_4)(struct mtwn_softc *, uint32_t, uint32_t,
 			    uint32_t);
 	void		(*sc_delay)(struct mtwn_softc *, uint32_t);
+
+	/* Note: these may end up going via the MCU path if the MCU is up */
+	int		(*sc_reg_pair_read)(struct mtwn_softc *,
+			    int, struct mtwn_reg_pair *rp, int);
+	int		(*sc_reg_pair_write)(struct mtwn_softc *,
+			    int, const struct mtwn_reg_pair *rp, int);
 };
 
 /**
@@ -139,6 +145,12 @@ struct mtwn_softc {
 	    ((_sc)->sc_busops.sc_delay((_sc), (_usec)))
 #define	MTWN_MDELAY(_sc, _msec)					\
 		MTWN_UDELAY((_sc), (_msec) * 1000)
+#define	MTWN_REG_PAIR_READ_4(_sc, _base, _rp, _n)		\
+	    ((_sc)->sc_busops.sc_reg_pair_read((_sc), (_base),	\
+	    (_rp), (_n)))
+#define	MTWN_REG_PAIR_WRITE_4(_sc, _base, _rp, _n)		\
+	    ((_sc)->sc_busops.sc_reg_pair_write((_sc), (_base),	\
+	    (_rp), (_n)))
 
 /* Chip operations */
 #define	MTWN_CHIP_RESET(_sc)					\
@@ -173,6 +185,13 @@ struct mtwn_softc {
 #define	MTWN_MCU_HANDLE_RESPONSE(_sc, _msg, _len)		\
 	    ((_sc)->sc_mcuops.sc_mcu_handle_response((_sc),	\
 	     (_msg), (_len)))
+#define	MTWN_MCU_REG_PAIR_READ_4(_sc, _base, _rp, _n)		\
+	    ((_sc)->sc_mcuops.sc_mcu_reg_pair_read((_sc), (_base),	\
+	    (_rp), (_n)))
+#define	MTWN_MCU_REG_PAIR_WRITE_4(_sc, _base, _rp, _n)	\
+	    ((_sc)->sc_mcuops.sc_mcu_reg_pair_write((_sc), (_base),	\
+	    (_rp), (_n)))
+
 
 /* EEPROM/EFUSE operations */
 #define	MTWN_EEPROM_INIT(_sc)					\
