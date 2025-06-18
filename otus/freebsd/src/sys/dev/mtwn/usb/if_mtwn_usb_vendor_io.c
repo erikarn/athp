@@ -230,9 +230,6 @@ mtwn_usb_single_write_4(struct mtwn_softc *sc, uint8_t reqid, uint16_t reg,
 	return (0);
 }
 
-
-
-
 void
 mtwn_usb_delay(struct mtwn_softc *sc, uint32_t usec)
 {
