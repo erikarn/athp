@@ -60,6 +60,7 @@
 #include "../if_mtwn_util.h"
 
 #include "mtwn_mt7610_reg.h"
+#include "mtwn_mt7610_mcu_reg.h"
 #include "mtwn_mt7610_mcu.h"
 
 bool
@@ -68,4 +69,29 @@ mtwn_mt7610_mcu_firmware_running(struct mtwn_softc *sc)
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	return (MTWN_REG_READ_4(sc, MT76_REG_COM_REG0) == 1);
+}
+
+/**
+ * @brief Perform a MCU function select firmware command.
+ *
+ * TODO: this actually does a potentially blocking MCU operation!
+ */
+int
+mtwn_mt7610_mcu_function_select(struct mtwn_softc *sc, uint32_t func,
+    uint32_t val)
+{
+	struct mtwn_mt7610_mcu_func_select_msg msg = { 0 };
+	bool wait = false;
+	int ret;
+
+	msg.func = htole32(func);
+	msg.value = htole32(val);
+
+	/* Wait for each of them except Q_SELECT */
+	if (func != MT7610_MCU_FUNC_Q_SELECT)
+		wait = true;
+
+	ret = MTWN_MCU_SEND_MSG(sc, MT7610_MCU_CMD_FUN_SET_OP, &msg,
+	    sizeof(msg), wait);
+	return (ret);
 }

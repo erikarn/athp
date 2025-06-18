@@ -31,6 +31,53 @@ struct mtwn_mt7610_fw_header {
 	char build_time[16];
 };
 
+/*
+ * Firmware MCU commands
+ */
+#define	MT7610_MCU_CMD_FUN_SET_OP		1
+#define	MT7610_MCU_CMD_LOAD_CR			2
+#define	MT7610_MCU_CMD_INIT_GAIN_OP		3
+#define	MT7610_MCU_CMD_DYNC_VGA_OP		6
+#define	MT7610_MCU_CMD_TDLS_CH_SW		7
+#define	MT7610_MCU_CMD_BURST_WRITE		8
+#define	MT7610_MCU_CMD_READ_MODIFY_WRITE	9
+#define	MT7610_MCU_CMD_RANDOM_READ		10
+#define	MT7610_MCU_CMD_BURST_READ		11
+#define	MT7610_MCU_CMD_RANDOM_WRITE		12
+#define	MT7610_MCU_CMD_LED_MODE_OP		16
+#define	MT7610_MCU_CMD_POWER_SAVING_OP		20
+#define	MT7610_MCU_CMD_WOW_CONFIG		21
+#define	MT7610_MCU_CMD_WOW_QUERY		22
+#define	MT7610_MCU_CMD_WOW_FEATURE		24
+#define	MT7610_MCU_CMD_CARRIER_DETECT_OP	28
+#define	MT7610_MCU_CMD_RADOR_DETECT_OP		29
+#define	MT7610_MCU_CMD_SWITCH_CHANNEL_OP	30
+#define	MT7610_MCU_CMD_CALIBRATION_OP		31
+#define	MT7610_MCU_CMD_BEACON_OP		32
+#define	MT7610_MCU_CMD_ANTENNA_OP		33
+
+/* MT7610_MCU_CMD_FUN_SET_OP */
+/* TODO: which are TX, which are RX/notification events? */
+/* TODO: make this an enum? It /does/ go into the FW header */
+#define	MT7610_MCU_FUNC_Q_SELECT		1
+#define	MT7610_MCU_FUNC_BW_SETTING		2
+#define	MT7610_MCU_FUNC_USB2_SW_DISCONNECT	2
+#define	MT7610_MCU_FUNC_USB3_SW_DISCONNECT	3
+#define	MT7610_MCU_FUNC_LOG_FW_DEBUG_MSG	4
+#define	MT7610_MCU_FUNC_GET_FW_VERSION		5
+
+/**
+ * function select
+ * id - little endian
+ * value - little endian
+ */
+struct mtwn_mt7610_mcu_func_select_msg {
+	uint32_t func;		/* function id above */
+	uint32_t value;
+};
+
+/* XXX Registers - are these inside the MCU? */
+
 #define	MT76_REG_MCU_COM_REG0			0x0730
 #define	MT76_REG_MCU_COM_REG1			0x0734
 #define	MT76_REG_MCU_COM_REG2			0x0738

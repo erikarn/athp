@@ -80,20 +80,81 @@
 #include "mtwn_mt7610u_mcu_reg.h"
 
 /*
- * TODO: maybe just make this take an mbuf? to make buffer
- * management easier?
+ * TODO: this doesn't belong here; as it's also used when crafting
+ * 802.11 frames to send to WLAN_PORT.  But for bring-up, this will
+ * be OK.
  */
+static int
+mtwn_mt7610u_dma_mbuf_setup(struct mtwn_softc *sc, struct mbuf *m,
+    uint32_t port, uint32_t flags)
+{
+	/* XXX eww */
+	char zero_buf[sizeof(uint32_t) * 2] = { 0, };
+	uint32_t pad, tx_info;
+
+	MTWN_TODO_PRINTF(sc, "%s: port=%d, flags=0x%08x\n", __func__,
+	    port, flags);
+
+	tx_info = _IEEE80211_SHIFTMASK(roundup(m->m_len, 4),
+	    MT7610_DMA_TXD_INFO_LEN);
+	tx_info |= _IEEE80211_SHIFTMASK(port, MT7610_DMA_TXD_INFO_DPORT);
+	tx_info |= flags;
+
+	/*
+	 * Prepend the info descriptor, the mbuf should already
+	 * have the headroom.
+	 *
+	 * TODO: see about adding a prepend method that ONLY supports
+	 * the M_LEADINGSPACE() path, and will never do the allocate
+	 * path.
+	 */
+	if (M_LEADINGSPACE(m) < sizeof(tx_info)) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: not enough mbuf headroom (found %ld bytes)\n",
+		    __func__, M_LEADINGSPACE(m));
+		return (ENOSPC);
+	}
+
+	M_PREPEND(m, sizeof(tx_info), M_NOWAIT);
+	tx_info = htole32(tx_info);
+	m_copyback(m, 0, sizeof(tx_info), (void *) &tx_info);
+
+	/* Round the payload length up to a DWORD multiple + padding */
+	pad = roundup(m->m_len, sizeof(uint32_t)) +
+	    sizeof(uint32_t) - m->m_len;
+
+	/* Zero out the padding - XXX done in the zero_buf above */
+	/* Append the padding - XXX ew, I wish we had an mbuf call for this */
+	m_append(m, pad, zero_buf);
+
+	MTWN_TODO_PRINTF(sc, "%s: (tx_info=0x%08x, pad=%u)\n",
+	    __func__, le32toh(tx_info), pad);
+	return (0);
+}
+
 static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
     const void *data, int len, bool wait_resp)
 {
-	struct mbuf *m;
+	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
+	struct mtwn_data *bf = NULL;
+	struct mbuf *m = NULL;
+	uint32_t info;
+	int ret;
 	uint8_t seq = 0;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	/* Base off of __m76x02u_mcu_send_msg */
-	MTWN_TODO_PRINTF(sc, "%s: called\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: called; cmd=%d, data=%p, len=%d, wait=%d\n",
+	    __func__, cmd, data, len, wait_resp);
+
+	/* Allocate a buffer for transmit */
+	bf = mtwn_usb_tx_getbuf(uc);
+	if (bf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buf!\n", __func__);
+		return (ENOBUFS);
+	}
 
 	/* allocate mbuf, with the relevant head/tailroom */
 	/* (see __mt76_mcu_msg_alloc for setting up an mbuf) */
@@ -102,24 +163,72 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	if (m == NULL) {
 		MTWN_ERR_PRINTF(sc,
 		    "%s: couldn't get a message mbuf\n", __func__);
+		mtwn_usb_tx_returnbuf(uc, bf);
 		return (ENOMEM);
 	}
 
 	/* assign seqno, make sure '0' isn't used as a value */
-	if (!wait_resp) {
+	if (wait_resp) {
 		seq = ++sc->sc_mcustate.msg_seq & 0xf;
 		if (seq == 0)
 			seq = ++sc->sc_mcustate.msg_seq & 0xf;
 	}
 
 	/* prepare info field */
+	info = _IEEE80211_SHIFTMASK(seq, MT7610_MCU_MSG_CMD_SEQ);
+	info |= _IEEE80211_SHIFTMASK(cmd, MT7610_MCU_MSG_CMD_TYPE);
+	info |= _IEEE80211_SHIFTMASK(MT7610_MCU_MSG_TYPE_CMD_ID,
+	    MT7610_MCU_MSG_TYPE);
 
 	/* mt76x02u_skb_dma_info - setup dma info header, adjust mbuf size/padding, etc */
+	ret = mtwn_mt7610u_dma_mbuf_setup(sc, m,
+	    MT7610_MCU_MSG_PORT_CPU_TX_PORT, info);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't do mbuf setup (err %d)\n",
+		    __func__, ret);
+		mtwn_usb_tx_returnbuf(uc, bf);
+		m_freem(m);
+		return (ret);
+	}
+
+	/* Copy data into the mtwn_buf; mbuf reference */
+	/* XXX TODO: i wish I could just dma mbufs here... */
+	/* XXX TODO: assert the message fits in the buf size */
+	memcpy(bf->buf, m->m_data, m->m_len);
+	bf->buflen = m->m_len;
+
+	/* Bulk TX */
+	m_print(m, -1);
+
+	/* Optionally wait until it's transmitted */
+
+	/* XXX TODO: wait or no wait? */
+	if (wait_resp)
+		ret = mtwn_usb_tx_queue_wait(uc, MTWN_BULK_TX_INBAND_CMD, bf,
+		    1000);
+	else
+		ret = mtwn_usb_tx_queue(uc, MTWN_BULK_TX_INBAND_CMD, bf);
+
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't queue buffer (err %d)\n",
+		    __func__, ret);
+		mtwn_usb_tx_returnbuf(uc, bf);
+		m_freem(m);
+		return (ret);
+	}
+
+	/* Done! */
+	m_freem(m);
+
+	return (0);
 
 	/* bulk msg to INBAND_CMD */
 
 	/* if wait_resp, do mt76x02u_mcu_wait_resp */
-	return (ENXIO);
+
+	/* TODO: freeing the buffer; we're done */
+	m_freem(m);
+	return (0);
 }
 
 static int

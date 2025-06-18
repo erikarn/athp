@@ -90,9 +90,19 @@ mtwn_mcu_msg_alloc(struct mtwn_softc *sc, const char *data, int len,
 
 	/* Zero the buffer contents */
 	memset(mtod(m, char *), 0, mbuf_len);
+	/* Set the mbuf length to the max length, for m_adj calculations */
+	/* XXX TODO gotta be a better way to send the mbuf length! */
+	m->m_len = mbuf_len;
 
 	/* Reserve headroom */
 	m_adj(m, sc->sc_mcucfg.headroom);
+
+	MTWN_DEBUG_PRINTF(sc,
+	    "%s: len=%d, mbuf_len=%zu, M_START=%p, m_data=%p, HEADROOM=%ld\n",
+	    __func__, len, mbuf_len, M_START(m), m->m_data, M_LEADINGSPACE(m));
+
+	/* Now set it to 0, for appending */
+	m->m_len = 0;
 
 	/* Copy data if it exists */
 	if ((data != NULL) && (data_len > 0))

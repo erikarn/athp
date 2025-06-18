@@ -167,6 +167,9 @@ struct mtwn_softc {
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\
 	    ((_sc)->sc_mcuops.sc_mcu_init((_sc), (_data), (_len)))
+#define	MTWN_MCU_SEND_MSG(_sc, _func, _msg, _len, _wait) \
+	    ((_sc)->sc_mcuops.sc_mcu_send_msg((_sc), (_func),	\
+	     (_msg), (_len), (_wait)))
 
 /* EEPROM/EFUSE operations */
 #define	MTWN_EEPROM_INIT(_sc)					\

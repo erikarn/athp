@@ -63,6 +63,8 @@
 #include "mtwn_mt7610_mac.h"
 #include "mtwn_mt7610_dma.h"
 #include "mtwn_mt7610_reg.h"
+#include "mtwn_mt7610_mcu.h"
+#include "mtwn_mt7610_mcu_reg.h" /* XXX for Q_SELECT */
 
 /**
  * @brief enable/disable the WLAN clock; verify it's stable
@@ -206,6 +208,16 @@ mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 	}
 
 	/* mcu function select - this sends an MCU command / waits for resp */
+	/*
+	 * XXX TODO: this is where I wonder how to better split this up...
+	 */
+	ret = mtwn_mt7610_mcu_function_select(sc, MT7610_MCU_FUNC_Q_SELECT,
+	    1);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: MCU Q_SELECT(1) failed!\n", __func__);
+		return (ret);
+	}
+
 
 	/* init mac registers - first table write */
 
