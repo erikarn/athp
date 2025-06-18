@@ -56,8 +56,8 @@ struct mtwn_chip_ops {
 struct mtwn_mcu_ops {
 	int		(*sc_mcu_send_msg)(struct mtwn_softc *,
 			    int, const void *, int, bool);
-	int		(*sc_mcu_parse_response)(struct mtwn_softc *,
-			    int, struct mbuf *, int);
+	int		(*sc_mcu_handle_response)(struct mtwn_softc *,
+			    char *, int);
 	uint32_t	(*sc_mcu_reg_read)(struct mtwn_softc *, uint32_t);
 	int		(*sc_mcu_reg_write)(struct mtwn_softc *, uint32_t,
 			    uint32_t);
@@ -170,6 +170,9 @@ struct mtwn_softc {
 #define	MTWN_MCU_SEND_MSG(_sc, _func, _msg, _len, _wait) \
 	    ((_sc)->sc_mcuops.sc_mcu_send_msg((_sc), (_func),	\
 	     (_msg), (_len), (_wait)))
+#define	MTWN_MCU_HANDLE_RESPONSE(_sc, _msg, _len)		\
+	    ((_sc)->sc_mcuops.sc_mcu_handle_response((_sc),	\
+	     (_msg), (_len)))
 
 /* EEPROM/EFUSE operations */
 #define	MTWN_EEPROM_INIT(_sc)					\

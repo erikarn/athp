@@ -126,6 +126,28 @@ finish:
 	(void) 0;
 }
 
+
+/**
+ * @brief process the receive message and recycle buffer.
+ *
+ * This processes the RX payload, completes the command with any
+ * pending command state, and recycles the buffer.
+ */
+static void
+mtwn_bulk_rx_cmd_rxeof(struct mtwn_usb_softc *uc, struct usb_xfer *xfer,
+    struct mtwn_data *bf)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	int len;
+
+	MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, bf);
+
+	usbd_xfer_status(xfer, &len, NULL, NULL, NULL);
+
+	MTWN_MCU_HANDLE_RESPONSE(sc, bf->buf, len);
+
+	STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, bf, next);
+}
 void
 mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
 {
@@ -145,10 +167,8 @@ mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
 		STAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
 		     next);
 
-		/* TODO: here's where we'd process it! */
-		MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, data);
-
-		STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
+		/* Process it; recycle buffer */
+		mtwn_bulk_rx_cmd_rxeof(uc, xfer, data);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:

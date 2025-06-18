@@ -87,9 +87,14 @@ mtwn_mt7610_mcu_function_select(struct mtwn_softc *sc, uint32_t func,
 	msg.func = htole32(func);
 	msg.value = htole32(val);
 
+	/* comment it out for now; force wait completion */
+#if 0
 	/* Wait for each of them except Q_SELECT */
 	if (func != MT7610_MCU_FUNC_Q_SELECT)
 		wait = true;
+#else
+		wait = true;
+#endif
 
 	ret = MTWN_MCU_SEND_MSG(sc, MT7610_MCU_CMD_FUN_SET_OP, &msg,
 	    sizeof(msg), wait);

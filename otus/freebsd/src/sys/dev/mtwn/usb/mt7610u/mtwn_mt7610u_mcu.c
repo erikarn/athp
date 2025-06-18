@@ -232,11 +232,29 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 }
 
 static int
-mtwn_mcu_mt7610u_mcu_parse_response(struct mtwn_softc *sc, int cmd,
-    struct mbuf *m, int seq)
+mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
+    int len)
 {
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
-	return (ENXIO);
+	uint32_t rxfce;
+
+	MTWN_TODO_PRINTF(sc, "%s: called (%d bytes)\n", __func__, len);
+
+	if (len < sizeof(uint32_t))
+		return (0);
+
+	memcpy(&rxfce, &buf[0], sizeof(uint32_t));
+	MTWN_DEBUG_PRINTF(sc, "%s: rxfce = 0x%08x, len=%d, seq=%d, evt_type=%d, qsel=%d, dport=%d, type=%d\n",
+	    __func__,
+	    rxfce,
+	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_LEN),
+	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_CMD_SEQ),
+	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_EVT_TYPE),
+	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_QSEL),
+	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_D_PORT),
+	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_TYPE));
+
+
+	return (0);
 }
 
 static uint32_t
@@ -280,8 +298,8 @@ mtwn_mcu_mt7610u_attach(struct mtwn_softc *sc)
 	/* XXX TODO: max_retry? */
 
 	sc->sc_mcuops.sc_mcu_send_msg = mtwn_mcu_mt7610u_mcu_send_msg;
-	sc->sc_mcuops.sc_mcu_parse_response =
-	    mtwn_mcu_mt7610u_mcu_parse_response;
+	sc->sc_mcuops.sc_mcu_handle_response =
+	    mtwn_mcu_mt7610u_mcu_handle_response;
 	sc->sc_mcuops.sc_mcu_reg_read = mtwn_mcu_mt7610u_mcu_reg_read;
 	sc->sc_mcuops.sc_mcu_reg_write = mtwn_mcu_mt7610u_mcu_reg_write;
 	sc->sc_mcuops.sc_mcu_reg_pair_read =
