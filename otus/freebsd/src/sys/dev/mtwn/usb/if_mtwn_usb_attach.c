@@ -174,7 +174,9 @@ mtwn_usb_attach(device_t self)
 		goto detach;
 
 	/* TODO: enable RX payloads, so I can debug attach commands */
+	MTWN_LOCK(sc);
 	mtwn_usb_rx_start_xfers(uc);
+	MTWN_UNLOCK(sc);
 
 	/* Init hardware, before generic attach */
 	MTWN_LOCK(sc);
