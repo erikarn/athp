@@ -22,6 +22,16 @@
 /* TODO: is this just part of the global memory map? */
 #define	MT7610_MCU_MEMMAP_WLAN		0x410000
 
+#define	MT7610_MCU_INBAND_PACKET_MAX_LEN	192
+
+/*
+ * Maximum number of regpair read/writes
+ *
+ * pairs of uint32_t's fit inside PACKET_MAX_LEN
+ */
+#define	MT7610_MCU_MAX_REGPAIR_IO_PER_PKT	\
+	    (MT7610_MCU_INBAND_PACKET_MAX_LEN / 8)
+
 /*
  * Firmware header - all little-endian.
  */

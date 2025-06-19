@@ -276,19 +276,84 @@ mtwn_mcu_mt7610u_mcu_reg_write(struct mtwn_softc *sc, uint32_t reg,
 }
 
 static int
+mtwn_mcu_mt7610u_mcu_reg_pair_read_chunk(struct mtwn_softc *sc,
+    int base, struct mtwn_reg_pair *rp, int n, bool final)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO!: base=0x%08x, n=%d, final=%d\n",
+	    __func__, base, n, final);
+
+	/*
+	 * This is more exciting because not only do we need to
+	 * wait for the completion of the actual command, we also
+	 * need to grab the contents from the notification and
+	 * populate our regpair with it!
+	 */
+
+	return (0);
+}
+
+static int
 mtwn_mcu_mt7610u_mcu_reg_pair_read(struct mtwn_softc *sc, int base,
     struct mtwn_reg_pair *rp, int n)
 {
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-	return (ENXIO);
+	int count, ret = 0;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_DEBUG_PRINTF(sc, "%s: base=0x%08x, n=%d\n", __func__, base, n);
+
+	for (count = 0; count < n; count += MT7610_MCU_MAX_REGPAIR_IO_PER_PKT) {
+		int num = MIN(MT7610_MCU_MAX_REGPAIR_IO_PER_PKT, n - count);
+		ret = mtwn_mcu_mt7610u_mcu_reg_pair_read_chunk(sc,
+		    base, rp + count, num,
+		    (n - count) <= MT7610_MCU_MAX_REGPAIR_IO_PER_PKT);
+		if (ret != 0)
+			goto error;
+	}
+
+	return (0);
+error:
+	MTWN_ERR_PRINTF(sc, "%s: failed to read (err %d)\n", __func__, ret);
+	return (ret);
+}
+
+static int
+mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
+    int base, const struct mtwn_reg_pair *rp, int n, bool final)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO!: base=0x%08x, n=%d, final=%d\n",
+	    __func__, base, n, final);
+
+	return (0);
 }
 
 static int
 mtwn_mcu_mt7610u_mcu_reg_pair_write(struct mtwn_softc *sc, int base,
     const struct mtwn_reg_pair *rp, int n)
 {
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-	return (ENXIO);
+	int count, ret = 0;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_DEBUG_PRINTF(sc, "%s: base=0x%08x, n=%d\n", __func__, base, n);
+
+	for (count = 0; count < n; count += MT7610_MCU_MAX_REGPAIR_IO_PER_PKT) {
+		int num = MIN(MT7610_MCU_MAX_REGPAIR_IO_PER_PKT, n - count);
+		ret = mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(sc,
+		    base, rp + count, num,
+		    (n - count) <= MT7610_MCU_MAX_REGPAIR_IO_PER_PKT);
+		if (ret != 0)
+			goto error;
+	}
+
+	return (0);
+error:
+	MTWN_ERR_PRINTF(sc, "%s: failed to write (err %d)\n", __func__, ret);
+	return (ret);
 }
 
 int
