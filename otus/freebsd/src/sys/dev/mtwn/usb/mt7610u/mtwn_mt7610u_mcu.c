@@ -649,7 +649,7 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 
 	MTWN_MDELAY(sc, 5);
 
-	MTWN_REG_WRITE_4(sc, MT76_REG_FCE_PSE_CTRL, 1);
+	MTWN_REG_WRITE_4(sc, MT7610_REG_FCE_PSE_CTRL, 1);
 
 	/* tx_fs_base_ptr */
 	MTWN_REG_WRITE_4(sc, MT76_REG_TX_CPU_FROM_FCE_BASE_PTR, 0x400230);
@@ -675,7 +675,7 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 		return (ret);
 	}
 
-	MTWN_REG_WRITE_4(sc, MT76_REG_FCE_PSE_CTRL, 1);
+	MTWN_REG_WRITE_4(sc, MT7610_REG_FCE_PSE_CTRL, 1);
 
 	sc->flags.mcu_running = true;
 

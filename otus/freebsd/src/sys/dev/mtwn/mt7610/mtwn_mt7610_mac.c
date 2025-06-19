@@ -62,6 +62,8 @@
 #include "mtwn_mt7610_reg.h"
 #include "mtwn_mt7610_mac.h"
 
+#include "mtwn_mt7610_mac_initvals.h"
+
 #define	MTWN_WAIT_FOR_MAC_NTRIES		100
 
 /**
