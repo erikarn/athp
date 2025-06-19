@@ -141,6 +141,10 @@ struct mtwn_softc {
 #define	MTWN_REG_RMW_4(_sc, _reg, _mask, _val)			\
 	    ((_sc)->sc_busops.sc_rmw_4((_sc), (_reg), (_mask),	\
 	    (_val)))
+#define	MTWN_REG_SET_4(_sc, _reg, _val)				\
+	    ((_sc)->sc_busops.sc_rmw_4((_sc), (_reg), 0, (_val)))
+#define	MTWN_REG_CLEAR_4(_sc, _reg, _val)			\
+	    ((_sc)->sc_busops.sc_rmw_4((_sc), (_reg), (_val), 0))
 #define	MTWN_UDELAY(_sc, _usec)					\
 	    ((_sc)->sc_busops.sc_delay((_sc), (_usec)))
 #define	MTWN_MDELAY(_sc, _msec)					\
