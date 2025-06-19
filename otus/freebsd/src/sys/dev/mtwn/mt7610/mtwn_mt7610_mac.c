@@ -61,6 +61,7 @@
 
 #include "mtwn_mt7610_reg.h"
 #include "mtwn_mt7610_mac.h"
+#include "mtwn_mt7610_mcu_reg.h" /* for MT7610_MCU_MEMMAP_WLAN */
 
 #include "mtwn_mt7610_mac_initvals.h"
 
@@ -127,20 +128,31 @@ mtwn_mt7610_mac_init_registers(struct mtwn_softc *sc)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
+	MTWN_FUNC_ENTER(sc);
+
 	/* common_mac_reg_table */
+	MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_WLAN,
+	    mtwn_mt7610_common_mac_reg_table,
+	    nitems(mtwn_mt7610_common_mac_reg_table));
 
 	/* mt76x0_mac_reg_table */
+	MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_WLAN,
+	    mtwn_mt7610_mac_reg_table,
+	    nitems(mtwn_mt7610_mac_reg_table));
 
 	/* release bbp/mac */
+	MTWN_REG_CLEAR_4(sc, MT7610_REG_MAC_SYS_CTRL, 0x03);
 
 	/* CCA */
+	MTWN_REG_SET_4(sc, MT7610_REG_EXT_CCA_CFG, 0xf000);
 
 	/* clear FCE_L2_STUFF_WR_MPDU_LEN_EN */
+	MTWN_REG_CLEAR_4(sc, MT7610_REG_FCE_L2_STUFF,
+	    MT7610_REG_FCE_L2_STUFF_WR_MPDU_LEN_EN);
 
 	/* setup TX ring mappings - see Linux mt76 for more info */
 	MTWN_REG_RMW_4(sc, MT7610_REG_WMM_CTRL, 0x3ff, 0x201);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO! Time to implement!\n", __func__);
 	return (0);
 }
 

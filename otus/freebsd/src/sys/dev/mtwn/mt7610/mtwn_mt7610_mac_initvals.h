@@ -50,7 +50,7 @@ static const struct mtwn_reg_pair mtwn_mt7610_common_mac_reg_table[] = {
 	{ MT7610_REG_PWR_PIN_CFG,		0x00000000 },
 };
 
-static const struct mtwn_reg_pair mt7610_mac_reg_table[] = {
+static const struct mtwn_reg_pair mtwn_mt7610_mac_reg_table[] = {
 	{ MT7610_REG_IOCFG_6,			0xa0040080 },
 	{ MT7610_REG_PBF_SYS_CTRL,		0x00080c00 },
 	{ MT7610_REG_PBF_CFG,			0x77723c1f },
