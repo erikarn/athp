@@ -257,14 +257,13 @@ mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_D_PORT),
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_TYPE));
 
-
 	return (0);
 }
 
 static uint32_t
 mtwn_mcu_mt7610u_mcu_reg_read(struct mtwn_softc *sc, uint32_t reg)
 {
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (0xffffffff);
 }
 
@@ -272,7 +271,7 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_write(struct mtwn_softc *sc, uint32_t reg,
     uint32_t data)
 {
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (ENXIO);
 }
 
@@ -280,7 +279,7 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_pair_read(struct mtwn_softc *sc, int base,
     struct mtwn_reg_pair *rp, int n)
 {
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (ENXIO);
 }
 
@@ -288,7 +287,7 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_pair_write(struct mtwn_softc *sc, int base,
     const struct mtwn_reg_pair *rp, int n)
 {
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (ENXIO);
 }
 
@@ -586,6 +585,7 @@ mtwn_mt7610u_mcu_init(struct mtwn_softc *sc, const void *buf, size_t buf_size)
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	if (mtwn_mt7610_mcu_firmware_running(sc)) {
+		sc->flags.mcu_running = true;
 		MTWN_INFO_PRINTF(sc, "%s: firmware already running\n",
 		    __func__);
 		return (0);

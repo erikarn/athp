@@ -121,6 +121,10 @@ mtwn_usb_reg_pair_read(struct mtwn_softc *sc, int base,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
+	MTWN_DEBUG_PRINTF(sc,
+	    "%s: called, base=0x%08x, count=%d, mcu_running=%d\n",
+	    __func__, base, n, sc->flags.mcu_running);
+
 	if (sc->flags.mcu_running)
 		return (MTWN_MCU_REG_PAIR_READ_4(sc, base, rp, n));
 
@@ -134,6 +138,10 @@ mtwn_usb_reg_pair_write(struct mtwn_softc *sc, int base,
     const struct mtwn_reg_pair *rp, int n)
 {
 	int i;
+
+	MTWN_DEBUG_PRINTF(sc,
+	    "%s: called, base=0x%08x, count=%d, mcu_running=%d\n",
+	    __func__, base, n, sc->flags.mcu_running);
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
