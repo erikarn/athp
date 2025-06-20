@@ -69,7 +69,7 @@
 #include "../if_mtwn_usb_var.h"
 #include "../if_mtwn_usb_vendor_req.h"
 #include "../if_mtwn_usb_vendor_io.h"
-#include "../if_mtwn_usb_tx.h"
+#include "../if_mtwn_usb_cmd.h"
 
 #include "../../mt7610/mtwn_mt7610_mcu_reg.h"
 #include "../../mt7610/mtwn_mt7610_dma_reg.h"
@@ -137,7 +137,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
     const void *data, int len, bool wait_resp)
 {
 	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
-	struct mtwn_data *bf = NULL;
+	struct mtwn_cmd *bf = NULL;
 	struct mbuf *m = NULL;
 	uint32_t info;
 	int ret;
@@ -150,7 +150,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	    __func__, cmd, data, len, wait_resp);
 
 	/* Allocate a buffer for transmit */
-	bf = mtwn_usb_tx_getbuf(uc);
+	bf = mtwn_usb_cmd_get(uc);
 	if (bf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buf!\n", __func__);
 		return (ENOBUFS);
@@ -163,7 +163,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	if (m == NULL) {
 		MTWN_ERR_PRINTF(sc,
 		    "%s: couldn't get a message mbuf\n", __func__);
-		mtwn_usb_tx_returnbuf(uc, bf);
+		mtwn_usb_cmd_return(uc, bf);
 		return (ENOMEM);
 	}
 
@@ -186,7 +186,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't do mbuf setup (err %d)\n",
 		    __func__, ret);
-		mtwn_usb_tx_returnbuf(uc, bf);
+		mtwn_usb_cmd_return(uc, bf);
 		m_freem(m);
 		return (ret);
 	}
@@ -202,15 +202,14 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 
 	/* XXX TODO: TX transfer wait or no wait? */
 	if (wait_resp)
-		ret = mtwn_usb_tx_queue_wait(uc, MTWN_BULK_TX_INBAND_CMD, bf,
-		    1000);
+		ret = mtwn_usb_cmd_queue_wait(uc, bf, 1000);
 	else
-		ret = mtwn_usb_tx_queue(uc, MTWN_BULK_TX_INBAND_CMD, bf);
+		ret = mtwn_usb_cmd_queue(uc, bf);
 
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't queue buffer (err %d)\n",
 		    __func__, ret);
-		mtwn_usb_tx_returnbuf(uc, bf);
+		mtwn_usb_cmd_return(uc, bf);
 		m_freem(m);
 		return (ret);
 	}
@@ -225,12 +224,6 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 		    __func__);
 
 	/* Done! */
-	m_freem(m);
-
-	return (0);
-
-
-	/* TODO: freeing the buffer; we're done */
 	m_freem(m);
 	return (0);
 }
@@ -459,7 +452,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
     char *buf, const char *fw_buf, int len, uint32_t addr)
 {
 	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
-	struct mtwn_data *bf = NULL;
+	struct mtwn_cmd *bf = NULL;
 	uint32_t info, val;
 	int err, data_len;
 
@@ -471,7 +464,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	 * TODO: maybe pass in an optional length later, and have it error if
 	 * the transfer won't fit? As a sanity check?
 	 */
-	bf = mtwn_usb_tx_getbuf(uc);
+	bf = mtwn_usb_cmd_get(uc);
 	if (bf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to get tx buffer\n", __func__);
 		return (ENOBUFS);
@@ -514,7 +507,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	memcpy(bf->buf, buf, data_len);
 	bf->buflen = data_len;
 
-	err = mtwn_usb_tx_queue_wait(uc, MTWN_BULK_TX_INBAND_CMD, bf, 1000);
+	err = mtwn_usb_cmd_queue_wait(uc, bf, 1000);
 	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE,
 	    "%s: actual bulk EP, %d bytes, returned %d\n",
 	    __func__, data_len, err);
@@ -537,7 +530,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	return (0);
 error:
 	if (bf != NULL)
-		mtwn_usb_tx_returnbuf(uc, bf);
+		mtwn_usb_cmd_return(uc, bf);
 	return (err);
 }
 

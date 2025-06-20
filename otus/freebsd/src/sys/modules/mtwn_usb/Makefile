@@ -11,6 +11,7 @@ SRCS    = if_mtwn_usb_attach.c \
 	  if_mtwn_usb_endpoint.c \
 	  if_mtwn_usb_rx.c \
 	  if_mtwn_usb_tx.c \
+	  if_mtwn_usb_cmd.c \
 	  if_mtwn_usb_vendor_io.c \
 	  bus_if.h device_if.h usb_if.h usbdevs.h \
 	  opt_wlan.h

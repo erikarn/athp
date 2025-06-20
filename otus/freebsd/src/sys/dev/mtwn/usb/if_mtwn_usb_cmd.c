@@ -67,60 +67,109 @@
 #include "../if_mtwn_debug.h"
 
 #include "if_mtwn_usb_var.h"
-#include "if_mtwn_usb_tx.h"
+#include "if_mtwn_usb_cmd.h"
+
+static void
+mtwn_usb_cmd_free_list_array(struct mtwn_usb_softc *uc, struct mtwn_cmd cmd[],
+    int ndata)
+{
+	int i;
+	for (i = 0; i < ndata; i++) {
+		struct mtwn_cmd *c = &cmd[i];
+		if (c->buf != NULL) {
+			free(c->buf, M_USBDEV);
+			c->buf = NULL;
+		}
+		wakeup(c);
+	}
+}
+
+static int
+mtwn_usb_cmd_alloc_list_array(struct mtwn_usb_softc *uc, struct mtwn_cmd cmd[],
+    int ndata, int maxsz)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	int error, i;
+
+	for (i = 0; i < ndata; i++) {
+		struct mtwn_cmd *c = &cmd[i];
+		c->buf = malloc(maxsz, M_USBDEV, M_NOWAIT);
+		if (c->buf == NULL) {
+			MTWN_ERR_PRINTF(sc, "couldn't allocate buffer\n");
+			error = ENOMEM;
+			goto fail;
+		}
+	}
+	return (0);
+fail:
+	mtwn_usb_cmd_free_list_array(uc, cmd, ndata);
+	return (error);
+}
+
+int
+mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *uc)
+{
+	STAILQ_INIT(&uc->uc_cmd_active);
+	STAILQ_INIT(&uc->uc_cmd_pending);
+	STAILQ_INIT(&uc->uc_cmd_waiting);
+	STAILQ_INIT(&uc->uc_cmd_inactive);
+
+	return (mtwn_usb_cmd_alloc_list_array(uc, uc->uc_cmd,
+	    MTWN_USB_CMD_LIST_COUNT, MTWN_USB_CMDBUFSZ));
+}
+
+void
+mtwn_usb_free_cmd_list(struct mtwn_usb_softc *uc)
+{
+	mtwn_usb_cmd_free_list_array(uc, uc->uc_cmd,
+	    MTWN_USB_CMD_LIST_COUNT);
+
+	STAILQ_INIT(&uc->uc_cmd_active);
+	STAILQ_INIT(&uc->uc_cmd_pending);
+	STAILQ_INIT(&uc->uc_cmd_waiting);
+	STAILQ_INIT(&uc->uc_cmd_inactive);
+}
 
 
 /*
- * Handle completion of the given TX buffer.
+ * Handle completion of the given command buffer.
  *
  * Note the caller still needs to shuffle it to the inactive list.
  */
 static void
-mtwn_usb_txeof(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *data)
+mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_XMIT, "%s: completed, qid=%d, data=%p\n",
-	    __func__, qid, data);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p\n",
+	    __func__, cmd);
 
-	if ((data->ni != NULL) || (data->m != NULL))
-		MTWN_TODO_PRINTF(sc,
-		    "%s: need to handle ni/m free!\n", __func__);
-
-	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, data, next);
+	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 
 	/* TODO: only wake-up if a flag is set in the data struct? */
-	wakeup(data);
+	wakeup(cmd);
 }
 
 /**
- * @brief Allocate a TX buffer to queue.
+ * @brief Allocate a TX command to queue.
  */
-struct mtwn_data *
-mtwn_usb_tx_getbuf(struct mtwn_usb_softc *uc)
+struct mtwn_cmd *
+mtwn_usb_cmd_get(struct mtwn_usb_softc *uc)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
-	struct mtwn_data *bf;
+	struct mtwn_cmd *cmd;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	bf = STAILQ_FIRST(&uc->uc_tx_inactive);
-	if (bf == NULL) {
-		/*
-		 * XXX TODO: make it not an error once we start doing
-		 * actual traffic!
-		 *
-		 * TODO: have a getbuf for mgmt/cmd versus data, so
-		 * large amounts of data doesn't end up stopping command/mgmt
-		 * stuff.
-		 */
-		MTWN_ERR_PRINTF(sc, "%s: out of xmit buffers\n", __func__);
+	cmd = STAILQ_FIRST(&uc->uc_cmd_inactive);
+	if (cmd == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: out of command buffers\n", __func__);
 		return (NULL);
 	}
-	STAILQ_REMOVE_HEAD(&uc->uc_tx_inactive, next);
-	return (bf);
+	STAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
+	return (cmd);
 }
 
 /**
@@ -129,13 +178,13 @@ mtwn_usb_tx_getbuf(struct mtwn_usb_softc *uc)
  * This places the buffer back on the inactive queue.
  */
 void
-mtwn_usb_tx_returnbuf(struct mtwn_usb_softc *uc, struct mtwn_data *bf)
+mtwn_usb_cmd_return(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, bf, next);
+	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 }
 
 /**
@@ -144,13 +193,13 @@ mtwn_usb_tx_returnbuf(struct mtwn_usb_softc *uc, struct mtwn_data *bf)
  * This queues the buffer and will return immediately.
  */
 int
-mtwn_usb_tx_queue(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *bf)
+mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
-	usbd_transfer_start(uc->uc_xfer[qid]);
+	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
+	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 	return (0);
 }
 
@@ -161,74 +210,75 @@ mtwn_usb_tx_queue(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *bf)
  * longer owned by the caller.
  */
 int
-mtwn_usb_tx_queue_wait(struct mtwn_usb_softc *uc, int qid,
-    struct mtwn_data *bf, int timeout)
+mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
+    int timeout)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	int ret;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
-	usbd_transfer_start(uc->uc_xfer[qid]);
+	cmd->flags.do_wait = true;
 
-	ret = msleep(bf, &sc->sc_mtx, 0, "mtxn_tx_wait", timeout);
+
+	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
+	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
+
+	ret = msleep(cmd, &sc->sc_mtx, 0, "mtxn_tx_wait", timeout);
 
 	return (ret);
 }
 
 /*
- * Handles data, command and HCCA queues.
+ * Handle the MTWN_BULK_TX_INBAND_CMD queue.
  */
-static void
-mtwn_bulk_tx_callback_qid(struct usb_xfer *xfer, usb_error_t error, int qid)
+void
+mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct mtwn_usb_softc *uc = usbd_xfer_softc(xfer);
 	struct mtwn_softc *sc = &uc->uc_sc;
-	struct mtwn_data *data;
+	struct mtwn_cmd *cmd;
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_XMIT, "%s: called, qid %d\n",
-	    __func__, qid);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: called\n", __func__);
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
-		data = STAILQ_FIRST(&uc->uc_tx_active[qid]);
-		if (data == NULL)
+		cmd = STAILQ_FIRST(&uc->uc_cmd_active);
+		if (cmd == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
+		STAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
 
 		/* TX completed */
-		mtwn_usb_txeof(uc, qid, data);
+		mtwn_usb_cmd_eof(uc, cmd);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
-		data = STAILQ_FIRST(&uc->uc_tx_pending[qid]);
-		if (data == NULL) {
+		cmd = STAILQ_FIRST(&uc->uc_cmd_pending);
+		if (cmd == NULL) {
 			/* Empty! */
 			goto finish;
 		}
-		STAILQ_REMOVE_HEAD(&uc->uc_tx_pending[qid], next);
-		STAILQ_INSERT_TAIL(&uc->uc_tx_active[qid], data, next);
+		STAILQ_REMOVE_HEAD(&uc->uc_cmd_pending, next);
+		STAILQ_INSERT_TAIL(&uc->uc_cmd_active, cmd, next);
 
-		usbd_xfer_set_frame_data(xfer, 0, data->buf, data->buflen);
+		usbd_xfer_set_frame_data(xfer, 0, cmd->buf, cmd->buflen);
 		usbd_transfer_submit(xfer);
 		break;
 	default:
-		data = STAILQ_FIRST(&uc->uc_tx_active[qid]);
-		if (data == NULL)
+		cmd = STAILQ_FIRST(&uc->uc_cmd_active);
+		if (cmd == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
+		STAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
 
 		/* TX completed */
-		mtwn_usb_txeof(uc, qid, data);
+		mtwn_usb_cmd_eof(uc, cmd);
 
 		if (error != 0)
 			MTWN_ERR_PRINTF(sc,
-			    "%s: called; txeof qid=%d, error=%s\n",
+			    "%s: called; txeof error=%s\n",
 			    __func__,
-			    qid,
 			    usbd_errstr(error));
 		if (error != USB_ERR_CANCELLED) {
 			usbd_xfer_set_stall(xfer);
@@ -237,37 +287,5 @@ tr_setup:
 		break;
 	}
 finish:
-	/* TODO: Kick-start more transmit */
-	(void) 0;
+	return;
 }
-
-void
-mtwn_bulk_tx_ac_be_callback(struct usb_xfer *xfer, usb_error_t error)
-{
-	mtwn_bulk_tx_callback_qid(xfer, error, MTWN_BULK_TX_AC_BE);
-}
-
-void
-mtwn_bulk_tx_ac_bk_callback(struct usb_xfer *xfer, usb_error_t error)
-{
-	mtwn_bulk_tx_callback_qid(xfer, error, MTWN_BULK_TX_AC_BK);
-}
-
-void
-mtwn_bulk_tx_ac_vi_callback(struct usb_xfer *xfer, usb_error_t error)
-{
-	mtwn_bulk_tx_callback_qid(xfer, error, MTWN_BULK_TX_AC_VI);
-}
-
-void
-mtwn_bulk_tx_ac_vo_callback(struct usb_xfer *xfer, usb_error_t error)
-{
-	mtwn_bulk_tx_callback_qid(xfer, error, MTWN_BULK_TX_AC_VO);
-}
-
-void
-mtwn_bulk_tx_hcca_callback(struct usb_xfer *xfer, usb_error_t error)
-{
-	mtwn_bulk_tx_callback_qid(xfer, error, MTWN_BULK_TX_HCCA);
-}
-

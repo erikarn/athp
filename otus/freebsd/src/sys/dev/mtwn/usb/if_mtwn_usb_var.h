@@ -20,6 +20,7 @@
 
 #define	MTWN_USB_RX_LIST_COUNT		16
 #define	MTWN_USB_TX_LIST_COUNT		16
+#define	MTWN_USB_CMD_LIST_COUNT		16
 
 /* TODO: check with mt76 */
 #define	MTWN_USB_RXBUFSZ_DEF		16384
@@ -29,6 +30,8 @@
  * which can be up to 12KiB.
  */
 #define	MTWN_USB_TXBUFSZ		16384
+
+#define	MTWN_USB_CMDBUFSZ		16384
 
 #define	MTWN_USB_BULK_EP_COUNT		8
 
@@ -71,6 +74,23 @@ struct mtwn_data {
 };
 typedef STAILQ_HEAD(, mtwn_data) mtwn_datahead;
 
+struct mtwn_cmd {
+	uint8_t			*buf;
+	uint16_t		buflen;
+	int			seq;
+	struct {
+		bool do_wait;
+	} flags;
+	struct {
+		char *buf;
+		int bufsize;
+		int len;	/* response length */
+	} resp;
+	STAILQ_ENTRY(mtwn_cmd)	next;
+};
+typedef STAILQ_HEAD(, mtwn_cmd) mtwn_cmd_head;
+
+
 struct mtwn_usb_softc {
 	struct mtwn_softc	uc_sc;		/* must be the first */
 
@@ -90,6 +110,12 @@ struct mtwn_usb_softc {
 	mtwn_datahead		uc_tx_active[MTWN_USB_BULK_EP_COUNT];
 	mtwn_datahead		uc_tx_inactive;
 	mtwn_datahead		uc_tx_pending[MTWN_USB_BULK_EP_COUNT];
+
+	struct mtwn_cmd		uc_cmd[MTWN_USB_CMD_LIST_COUNT];
+	mtwn_cmd_head		uc_cmd_active;
+	mtwn_cmd_head		uc_cmd_inactive;
+	mtwn_cmd_head		uc_cmd_pending;
+	mtwn_cmd_head		uc_cmd_waiting;
 };
 
 #endif	/* __IF_MTWN_USB_VAR_H__ */

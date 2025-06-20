@@ -72,6 +72,7 @@
 /* For TX/RX endpoint callbacks */
 #include "if_mtwn_usb_rx.h"
 #include "if_mtwn_usb_tx.h"
+#include "if_mtwn_usb_cmd.h"
 
 /*
  * This is a static configuration for now, for my MT7610U NIC.

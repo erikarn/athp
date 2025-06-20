@@ -70,6 +70,7 @@
 #include "if_mtwn_usb_data_list.h"
 #include "if_mtwn_usb_data_rx.h"
 #include "if_mtwn_usb_data_tx.h"
+#include "if_mtwn_usb_cmd.h"
 #include "if_mtwn_usb_vendor_io.h"
 #include "if_mtwn_usb_endpoint.h"
 
@@ -176,7 +177,7 @@ mtwn_usb_attach(device_t self)
 	mtwn_sysctl_attach(sc);
 	uc->uc_rx_buf_size = MTWN_USB_RXBUFSZ_DEF;
 
-	sc->sc_debug = MTWN_DEBUG_XMIT | MTWN_DEBUG_USB;
+	sc->sc_debug = MTWN_DEBUG_XMIT | MTWN_DEBUG_USB | MTWN_DEBUG_CMD;
 
 	/* bus access methods */
 	sc->sc_busops.sc_read_4 = mtwn_usb_read_4;
@@ -214,6 +215,9 @@ mtwn_usb_attach(device_t self)
 	if (error != 0)
 		goto detach;
 	error = mtwn_usb_alloc_tx_list(uc);
+	if (error != 0)
+		goto detach;
+	error = mtwn_usb_alloc_cmd_list(uc);
 	if (error != 0)
 		goto detach;
 
@@ -261,6 +265,7 @@ mtwn_usb_detach(device_t self)
 	/* Free Tx/Rx buffers */
 	mtwn_usb_free_tx_list(uc);
 	mtwn_usb_free_rx_list(uc);
+	mtwn_usb_free_cmd_list(uc);
 	MTWN_UNLOCK(sc);
 
 	/* Detach USB transfers */

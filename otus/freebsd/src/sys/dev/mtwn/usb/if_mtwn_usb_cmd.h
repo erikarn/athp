@@ -13,21 +13,19 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__IF_MTWN_USB_TX_H__
-#define	__IF_MTWN_USB_TX_H__
+#ifndef	__IF_MTWN_USB_CMD_H__
+#define	__IF_MTWN_USB_CMD_H__
 
-extern	struct mtwn_data * mtwn_usb_tx_getbuf(struct mtwn_usb_softc *);
-extern	void mtwn_usb_tx_returnbuf(struct mtwn_usb_softc *, struct mtwn_data *);
+extern	int mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *);
+extern	void mtwn_usb_free_cmd_list(struct mtwn_usb_softc *);
 
-extern	int mtwn_usb_tx_queue(struct mtwn_usb_softc *, int,
-	    struct mtwn_data *);
-extern	int mtwn_usb_tx_queue_wait(struct mtwn_usb_softc *, int,
-	    struct mtwn_data *, int);
+extern	struct mtwn_cmd * mtwn_usb_cmd_get(struct mtwn_usb_softc *);
+extern	void mtwn_usb_cmd_return(struct mtwn_usb_softc *, struct mtwn_cmd *);
 
-extern	void mtwn_bulk_tx_ac_be_callback(struct usb_xfer *, usb_error_t);
-extern	void mtwn_bulk_tx_ac_bk_callback(struct usb_xfer *, usb_error_t);
-extern	void mtwn_bulk_tx_ac_vi_callback(struct usb_xfer *, usb_error_t);
-extern	void mtwn_bulk_tx_ac_vo_callback(struct usb_xfer *, usb_error_t);
-extern	void mtwn_bulk_tx_hcca_callback(struct usb_xfer *, usb_error_t);
+extern	int mtwn_usb_cmd_queue(struct mtwn_usb_softc *, struct mtwn_cmd *);
+extern	int mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *, struct mtwn_cmd *,
+	    int);
 
-#endif	/* __IF_MTWN_USB_TX_H__ */
+extern	void mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *, usb_error_t);
+
+#endif	/* __IF_MTWN_USB_CMD_H__ */
