@@ -200,12 +200,16 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	struct mtwn_cmd *cmd;
+	int total_size;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	if (size > MTWN_USB_CMDBUFSZ) {
-		MTWN_ERR_PRINTF(sc, "%s: requested size (%d) > %d bytes\n",
-		    __func__, size, MTWN_USB_CMDBUFSZ);
+	/* XXX TODO: not the best way to do this, but .. */
+	total_size = size + sc->sc_mcucfg.headroom + sc->sc_mcucfg.tailroom;
+
+	if (total_size > MTWN_USB_CMDBUFSZ) {
+		MTWN_ERR_PRINTF(sc, "%s: size (%d) > %d bytes\n",
+		    __func__, total_size, MTWN_USB_CMDBUFSZ);
 		return (NULL);
 	}
 
