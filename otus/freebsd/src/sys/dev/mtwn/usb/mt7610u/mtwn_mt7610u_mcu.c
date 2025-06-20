@@ -151,7 +151,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	    __func__, cmd, data, len, wait_tx, wait_resp);
 
 	/* Allocate a buffer for transmit */
-	bf = mtwn_usb_cmd_get(uc);
+	bf = mtwn_usb_cmd_get(uc, len);
 	if (bf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buf!\n", __func__);
 		return (ENOBUFS);
@@ -494,11 +494,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	    __func__, len, addr);
 
 	/* Grab a TX command buffer; fail early if we can't */
-	/*
-	 * TODO: maybe pass in an optional length later, and have it error if
-	 * the transfer won't fit? As a sanity check?
-	 */
-	bf = mtwn_usb_cmd_get(uc);
+	bf = mtwn_usb_cmd_get(uc, len);
 	if (bf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to get tx buffer\n", __func__);
 		return (ENOBUFS);

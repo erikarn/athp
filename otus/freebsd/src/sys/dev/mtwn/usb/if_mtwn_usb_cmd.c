@@ -196,12 +196,18 @@ mtwn_usb_cmd_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd, int timeout)
  * @brief Allocate a TX command to queue.
  */
 struct mtwn_cmd *
-mtwn_usb_cmd_get(struct mtwn_usb_softc *uc)
+mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	struct mtwn_cmd *cmd;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (size > MTWN_USB_CMDBUFSZ) {
+		MTWN_ERR_PRINTF(sc, "%s: requested size (%d) > %d bytes\n",
+		    __func__, size, MTWN_USB_CMDBUFSZ);
+		return (NULL);
+	}
 
 	cmd = STAILQ_FIRST(&uc->uc_cmd_inactive);
 	if (cmd == NULL) {
