@@ -350,11 +350,60 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
     int base, const struct mtwn_reg_pair *rp, int n, bool final)
 {
+	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
+	struct mtwn_cmd *cmd;
+	char *buf;
+	int alloc_size;
+	int i, offset, ret;
+
+	alloc_size = (n * sizeof(uint32_t) * 2);
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	MTWN_TODO_PRINTF(sc, "%s: TODO!: base=0x%08x, n=%d, final=%d\n",
 	    __func__, base, n, final);
 
+	/* Allocate temporary buffer */
+	buf = malloc(alloc_size, M_TEMP, M_NOWAIT | M_ZERO);
+	if (buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buffer\n",
+		    __func__);
+		return (ENOBUFS);
+	}
+
+	/* Allocate cmd buffer */
+	cmd = mtwn_usb_cmd_get(uc, alloc_size);
+	if (cmd == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate command buffer\n",
+		    __func__);
+		free(buf, M_TEMP);
+		return (ENOBUFS);
+	}
+
+	/* Append our register/value pairs */
+	for (offset = 0, i = 0; i < n; i++, offset += (sizeof(uint32_t) * 2)) {
+		uint32_t val;
+
+		val = htole32(rp[i].reg + base);
+		memcpy(buf + offset, &val, sizeof(uint32_t));
+		val = htole32(rp[i].val);
+		memcpy(buf + offset + sizeof(uint32_t), &val, sizeof(uint32_t));
+	}
+
+	/*
+	 * Send the message, always wait for TX completion first;
+	 * wait for RX completion if required.
+	 */
+	ret = MTWN_MCU_SEND_MSG(sc, MT7610_MCU_CMD_RANDOM_WRITE, buf,
+	    alloc_size, true, final);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to send (err %d)\n", __func__,
+		    ret);
+		free(buf, M_TEMP);
+		return (ret);
+	}
+
+	free(buf, M_TEMP);
 	return (0);
 }
 
