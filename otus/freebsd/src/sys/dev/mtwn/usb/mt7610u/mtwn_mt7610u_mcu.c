@@ -134,7 +134,7 @@ mtwn_mt7610u_dma_mbuf_setup(struct mtwn_softc *sc, struct mbuf *m,
 
 static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
-    const void *data, int len, bool wait_resp)
+    const void *data, int len, bool wait_tx, bool wait_resp)
 {
 	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
 	struct mtwn_cmd *bf = NULL;
@@ -146,8 +146,9 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	/* Base off of __m76x02u_mcu_send_msg */
-	MTWN_TODO_PRINTF(sc, "%s: called; cmd=%d, data=%p, len=%d, wait=%d\n",
-	    __func__, cmd, data, len, wait_resp);
+	MTWN_TODO_PRINTF(sc,
+	    "%s: called; cmd=%d, data=%p, len=%d, wait_tx=%d, wait_resp=%d\n",
+	    __func__, cmd, data, len, wait_tx, wait_resp);
 
 	/* Allocate a buffer for transmit */
 	bf = mtwn_usb_cmd_get(uc);
@@ -172,6 +173,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 		seq = ++sc->sc_mcustate.msg_seq & 0xf;
 		if (seq == 0)
 			seq = ++sc->sc_mcustate.msg_seq & 0xf;
+		bf->seq = seq;
 	}
 
 	/* prepare info field */
@@ -201,8 +203,8 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	m_print(m, -1);
 
 	/* XXX TODO: TX transfer wait or no wait? */
-	if (wait_resp)
-		ret = mtwn_usb_cmd_queue_wait(uc, bf, 1000);
+	if (wait_tx)
+		ret = mtwn_usb_cmd_queue_wait(uc, bf, 1000, wait_resp);
 	else
 		ret = mtwn_usb_cmd_queue(uc, bf);
 
@@ -218,10 +220,9 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	 * if wait_resp, do mt76x02u_mcu_wait_resp to wait for the
 	 * actual response notification
 	 */
-	if (wait_resp)
-		MTWN_TODO_PRINTF(sc,
-		    "%s: TODO: wait for matching RX response!\n",
-		    __func__);
+	if (wait_resp) {
+		MTWN_TODO_PRINTF(sc, "%s: TODO: RX response!\n", __func__);
+	}
 
 	/* Done! */
 	m_freem(m);
@@ -232,15 +233,16 @@ static int
 mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
     int len)
 {
+	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
 	uint32_t rxfce;
-
-	MTWN_TODO_PRINTF(sc, "%s: called (%d bytes)\n", __func__, len);
+	uint8_t seq;
 
 	if (len < sizeof(uint32_t))
 		return (0);
 
 	memcpy(&rxfce, &buf[0], sizeof(uint32_t));
-	MTWN_DEBUG_PRINTF(sc, "%s: rxfce = 0x%08x, len=%d, seq=%d, evt_type=%d, qsel=%d, dport=%d, type=%d\n",
+	MTWN_DEBUG_PRINTF(sc, "%s: rxfce = 0x%08x, len=%d, seq=%d, "
+	    "evt_type=%d, qsel=%d, dport=%d, type=%d\n",
 	    __func__,
 	    rxfce,
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_LEN),
@@ -249,6 +251,38 @@ mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_QSEL),
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_D_PORT),
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_TYPE));
+
+	/*
+	 * If we have a sequence number then we need to complete the
+	 * existing waiting buffers until we find ours, then copy the
+	 * response body in, then wake -it- up.
+	 */
+	seq = _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_CMD_SEQ);
+	if (seq != 0) {
+		struct mtwn_cmd *cmd;
+
+		MTWN_TODO_PRINTF(sc, "%s: handle finding/waking up seq %d\n",
+		    __func__, seq);
+
+		while ((cmd = mtwn_usb_cmd_get_waiting(uc)) != NULL) {
+			if (cmd->seq == seq) {
+				MTWN_TODO_PRINTF(sc,
+				    "%s: TODO: copy completion info in!\n",
+				    __func__);
+				mtwn_usb_cmd_complete(uc, cmd);
+				break;
+			} else
+				mtwn_usb_cmd_complete(uc, cmd);
+		}
+		return (0);
+	}
+	MTWN_TODO_PRINTF(sc, "%s: handle unknown type/evttype!\n", __func__);
+
+	/*
+	 * Otherwise, it could just be a notification; we'll need to pass
+	 * those up to the chipset specific method to handle appropriately!
+	 */
+	/* TODO */
 
 	return (0);
 }
@@ -507,7 +541,8 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	memcpy(bf->buf, buf, data_len);
 	bf->buflen = data_len;
 
-	err = mtwn_usb_cmd_queue_wait(uc, bf, 1000);
+	/* Wait for TX completion, but don't wait for RX notification */
+	err = mtwn_usb_cmd_queue_wait(uc, bf, 1000, false);
 	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE,
 	    "%s: actual bulk EP, %d bytes, returned %d\n",
 	    __func__, data_len, err);

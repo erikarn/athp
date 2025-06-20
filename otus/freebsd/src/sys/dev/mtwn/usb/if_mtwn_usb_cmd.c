@@ -138,6 +138,20 @@ mtwn_usb_free_cmd_list(struct mtwn_usb_softc *uc)
 	STAILQ_INIT(&uc->uc_cmd_inactive);
 }
 
+/**
+ * @brief Complete the given command, re-insert it on the inactive list.
+ */
+void
+mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p; completing\n",
+	    __func__, cmd);
+	wakeup(cmd);
+	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
+}
 
 /*
  * Handle completion of the given command buffer.
@@ -154,10 +168,28 @@ mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p\n",
 	    __func__, cmd);
 
-	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
+	if (cmd->flags.do_wait == true)
+		STAILQ_INSERT_HEAD(&uc->uc_cmd_waiting, cmd, next);
+	else
+		mtwn_usb_cmd_complete(uc, cmd);
+}
 
-	/* TODO: only wake-up if a flag is set in the data struct? */
-	wakeup(cmd);
+/**
+ * @brief wait for the command buffer in question to complete.
+ */
+int
+mtwn_usb_cmd_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd, int timeout)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p, seq=%d, waiting\n",
+	    __func__, cmd, cmd->seq);
+
+	ret = msleep(cmd, &sc->sc_mtx, 0, "mtxn_tx_cmd_wait", timeout);
+	return (ret);
 }
 
 /**
@@ -216,24 +248,27 @@ mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
  *
  * Note to the caller that once this is called, the buffer is no
  * longer owned by the caller.
+ *
+ * Also note this isn't going to wait for the RESPONSE, only the
+ * transfer completed.
  */
 int
 mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
-    int timeout)
+    int timeout, bool wait_resp)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	int ret;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	cmd->flags.do_wait = true;
-
+	/* Wait for completion, not just transmit */
+	if (wait_resp)
+		cmd->flags.do_wait = true;
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 
-	ret = msleep(cmd, &sc->sc_mtx, 0, "mtxn_tx_wait", timeout);
-
+	ret = mtwn_usb_cmd_wait(uc, cmd, timeout);
 	return (ret);
 }
 
@@ -296,4 +331,22 @@ tr_setup:
 	}
 finish:
 	return;
+}
+
+/**
+ * @brief Remove/return the first waiting buffer in the list.
+ */
+struct mtwn_cmd *
+mtwn_usb_cmd_get_waiting(struct mtwn_usb_softc *uc)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	struct mtwn_cmd *cmd;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	cmd = STAILQ_FIRST(&uc->uc_cmd_waiting);
+	if (cmd == NULL)
+		return (NULL);
+	STAILQ_REMOVE_HEAD(&uc->uc_cmd_waiting, next);
+	return (cmd);
 }

@@ -19,12 +19,17 @@
 extern	int mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *);
 extern	void mtwn_usb_free_cmd_list(struct mtwn_usb_softc *);
 
+extern	struct mtwn_cmd * mtwn_usb_cmd_get_waiting(struct mtwn_usb_softc *);
+extern	void mtwn_usb_cmd_complete(struct mtwn_usb_softc *, struct mtwn_cmd *);
+extern	int mtwn_usb_cmd_wait(struct mtwn_usb_softc *, struct mtwn_cmd *,
+	    int);
+
 extern	struct mtwn_cmd * mtwn_usb_cmd_get(struct mtwn_usb_softc *);
 extern	void mtwn_usb_cmd_return(struct mtwn_usb_softc *, struct mtwn_cmd *);
 
 extern	int mtwn_usb_cmd_queue(struct mtwn_usb_softc *, struct mtwn_cmd *);
 extern	int mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *, struct mtwn_cmd *,
-	    int);
+	    int, bool);
 
 extern	void mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *, usb_error_t);
 
