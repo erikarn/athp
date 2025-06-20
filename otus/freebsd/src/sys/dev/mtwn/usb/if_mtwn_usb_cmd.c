@@ -109,13 +109,21 @@ fail:
 int
 mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *uc)
 {
+	int i, ret;
+
 	STAILQ_INIT(&uc->uc_cmd_active);
 	STAILQ_INIT(&uc->uc_cmd_pending);
 	STAILQ_INIT(&uc->uc_cmd_waiting);
 	STAILQ_INIT(&uc->uc_cmd_inactive);
 
-	return (mtwn_usb_cmd_alloc_list_array(uc, uc->uc_cmd,
-	    MTWN_USB_CMD_LIST_COUNT, MTWN_USB_CMDBUFSZ));
+	ret = mtwn_usb_cmd_alloc_list_array(uc, uc->uc_cmd,
+	    MTWN_USB_CMD_LIST_COUNT, MTWN_USB_CMDBUFSZ);
+	if (ret != 0)
+		return (ret);
+
+	for (i = 0; i < MTWN_USB_CMD_LIST_COUNT; i++)
+		STAILQ_INSERT_HEAD(&uc->uc_cmd_inactive, &uc->uc_cmd[i], next);
+	return (0);
 }
 
 void
