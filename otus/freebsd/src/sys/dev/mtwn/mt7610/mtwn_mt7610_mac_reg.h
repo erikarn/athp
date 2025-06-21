@@ -13,14 +13,9 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__MTWN_MT76X0_MAC_H__
-#define	__MTWN_MT76X0_MAC_H__
+#ifndef	__MTWN_MT7610_MAC_REG_H__
+#define	__MTWN_MT7610_MAC_REG_H__
 
-extern	bool mtwn_mt76x0_mac_wait_ready(struct mtwn_softc *);
-extern	uint32_t mtwn_mt7610_rxfilter_read(struct mtwn_softc *);
-extern bool mtwn_mt7610_mac_wait_for_txrx_idle(struct mtwn_softc *);
-extern int mtwn_mt7610_mac_init_registers(struct mtwn_softc *);
-extern	int mtwn_mt7610_mac_shared_key_setup(struct mtwn_softc *, uint8_t,
-	    uint8_t, struct ieee80211_key *);
+#define	MTWN_MT7610_MAC_SHARED_KEY_SIZE		32
 
-#endif	/* __MTWN_MT76X0_MAC_H__ */
+#endif	/* __MTWN_MT7610_MAC_REG_H__ */

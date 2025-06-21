@@ -382,7 +382,7 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	    mtwn_mt7610_eeprom_macaddr_read;
 
 	/* chipset config */
-	sc->sc_chip_cfg.num_shared_keys = 16;
+	sc->sc_chip_cfg.num_vifs = 16;
 	sc->sc_chip_cfg.num_wcid = 256;
 
 	return (0);

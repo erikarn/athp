@@ -117,7 +117,7 @@ struct mtwn_mcu_cfg {
 };
 
 struct mtwn_mac_cfg {
-	int num_shared_keys;
+	int num_vifs;
 	int num_wcid;
 };
 

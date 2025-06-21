@@ -244,9 +244,14 @@ mtwn_mt7610_shared_keys_init(struct mtwn_softc *sc)
 int
 mtwn_mt7610_wcid_init(struct mtwn_softc *sc)
 {
+	int i, j;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	for (i = 0; i < sc->sc_chip_cfg.num_vifs; i++)
+		for (j = 0; j < 4; j++)
+			mtwn_mt7610_mac_shared_key_setup(sc, i, j, NULL);
+
 	return (0);
 }
 

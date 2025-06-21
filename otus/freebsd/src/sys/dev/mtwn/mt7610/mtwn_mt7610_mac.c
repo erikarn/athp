@@ -59,8 +59,10 @@
 #include "../if_mtwn_debug.h"
 #include "../if_mtwn_util.h"
 
+#include "mtwn_mt7610_var.h"
 #include "mtwn_mt7610_reg.h"
 #include "mtwn_mt7610_mac.h"
+#include "mtwn_mt7610_mac_reg.h"
 #include "mtwn_mt7610_mcu_reg.h" /* for MT7610_MCU_MEMMAP_WLAN */
 
 #include "mtwn_mt7610_mac_initvals.h"
@@ -156,3 +158,97 @@ mtwn_mt7610_mac_init_registers(struct mtwn_softc *sc)
 	return (0);
 }
 
+/**
+ * @brief Populate the key data for a given shared key.
+ */
+static enum mtwn_mt7610_mac_cipher_type
+mtwn_mt7610_mac_get_key_info(struct mtwn_softc *sc, struct ieee80211_key *wk,
+    uint8_t *key_data)
+{
+	memset(key_data, 0, MTWN_MT7610_MAC_SHARED_KEY_SIZE);
+
+	/* a blank key should just be programmed with blank info */
+	if (wk == NULL)
+		return (MT7610_MAC_CIPHER_NONE);
+
+	if (wk->wk_keylen > MTWN_MT7610_MAC_SHARED_KEY_SIZE)
+		return (MT7610_MAC_CIPHER_NONE);
+	if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
+		return (MT7610_MAC_CIPHER_NONE);
+
+	/*
+	 * Copy the key, minus the MIC.
+	 *
+	 * TODO: net80211 needs accessors for this stuff!
+	 */
+	memcpy(key_data, wk->wk_key, wk->wk_keylen);
+
+	switch (wk->wk_cipher->ic_cipher) {
+	case IEEE80211_CIPHER_WEP:
+		if (wk->wk_keylen == 5)
+			return (MT7610_MAC_CIPHER_WEP40);
+		else if (wk->wk_keylen == 13)
+			return (MT7610_MAC_CIPHER_WEP104);
+		else {
+			MTWN_ERR_PRINTF(sc, "%s: unknown WEP keysize (%d)\n",
+			    __func__, wk->wk_keylen);
+			memset(key_data, 0, MTWN_MT7610_MAC_SHARED_KEY_SIZE);
+			return (MT7610_MAC_CIPHER_NONE);
+		}
+		break;
+	case IEEE80211_CIPHER_AES_CCM:
+		return (MT7610_MAC_CIPHER_AES_CCMP);
+	case IEEE80211_CIPHER_TKIP:
+		memcpy(key_data + 16, wk->wk_txmic, 8);
+		memcpy(key_data + 24, wk->wk_txmic, 8);
+		MTWN_TODO_PRINTF(sc, "%s: TODO: verify TKIP key/mic copying!\n",
+		    __func__);
+		return (MT7610_MAC_CIPHER_TKIP);
+	default:
+		return (MT7610_MAC_CIPHER_NONE);
+	}
+}
+
+/**
+ * @brief Program in the given shared key for the given vap/vif.
+ *
+ * This programs in the given key, or clears it entirely if key
+ * is NULL.
+ */
+int
+mtwn_mt7610_mac_shared_key_setup(struct mtwn_softc *sc, uint8_t vif,
+   uint8_t key_id, struct ieee80211_key *key)
+{
+	enum mtwn_mt7610_mac_cipher_type cipher;
+	uint8_t key_data[MTWN_MT7610_MAC_SHARED_KEY_SIZE];
+	uint32_t val;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	cipher = mtwn_mt7610_mac_get_key_info(sc, key, key_data);
+
+	/*
+	 * Return not supported if a key is supplied that isn't
+	 * supported in hardware.
+	 */
+	if (key != NULL && cipher == MT7610_MAC_CIPHER_NONE)
+		return (ENOTSUP);
+
+	/* Write the key mode into the right register offset for the vif */
+	val = MTWN_REG_READ_4(sc, MT7610_REG_MAC_SKEY_MODE(vif));
+	val &= ~(MT7610_REG_MAC_SKEY_MODE_MASK <<
+	    MT7610_REG_MAC_SKEY_MODE_SHIFT(vif, key_id));
+	val |= cipher << MT7610_REG_MAC_SKEY_MODE_SHIFT(vif, key_id);
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_SKEY_MODE(vif), val);
+
+	/* TODO: write the key, need MTWN_WRITE_COPY() */
+	MTWN_TODO_PRINTF(sc, "%s: TODO: key write!\n", __func__);
+
+#if 0
+	MTWN_WRITE_COPY(sc, MT_SKEY(vif, key_id), key_data,
+	    MTWN_MT7610_MAC_SHARED_KEY_SIZE);
+#endif
+
+	return (0);
+
+}

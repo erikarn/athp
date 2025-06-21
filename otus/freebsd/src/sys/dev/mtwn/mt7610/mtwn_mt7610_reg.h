@@ -406,4 +406,31 @@
 #define	MT76_REG_USB3_DMA_CFG			0x9018
 /* Note: shares register definitions with MT76_REG_USB_DMA_CFG */
 
+/*
+ * These control the shared key array/mode, indexed by vif id.
+ * It looks like it's split across two separate regions.
+ */
+#define	MT7610_REG_MAC_SKEY_BASE_0		0xac00
+#define	MT7610_REG_MAC_SKEY_BASE_1		0xb400
+#define	MT7610_REG_MAC_SKEY_0(_bss, _idx)			\
+	    (MT7610_REG_MAC_SKEY_BASE_0 + (4 * (_bss) + (_idx)) * 32)
+#define	MT7610_REG_MAC_SKEY_1(_bss, _idx)			\
+	    (MT7610_REG_MAC_SKEY_BASE_1 + (4 * ((_bss) & 7) + (_idx)) * 32)
+#define	MT7610_REG_MAC_SKEY(_bss, _idx)				\
+	    (((_bss) & 8) ? MT7610_REG_MAC_SKEY_1(_bss, _idx) :	\
+	    MT7610_REG_MAC_SKEY_0(_bss, _idx))
+
+#define	MT7610_REG_MAC_SKEY_MODE_BASE_0		0xb000
+#define	MT7610_REG_MAC_SKEY_MODE_BASE_1		0xb3f0
+#define	MT7610_REG_MAC_SKEY_MODE_0(_bss)			\
+	    (MT7610_REG_MAC_SKEY_MODE_BASE_0 + (((_bss) / 2) << 2))
+#define	MT7610_REG_MAC_SKEY_MODE_1(_bss)			\
+	    (MT7610_REG_MAC_SKEY_MODE_BASE_1 + ((((_bss) & 7) / 2) << 2))
+#define	MT7610_REG_MAC_SKEY_MODE(_bss)				\
+	    (((_bss) & 8) ? MT7610_REG_MAC_SKEY_MODE_1(_bss) :	\
+	    MT7610_REG_MAC_SKEY_MODE_0(_bss))
+#define	MT7610_REG_MAC_SKEY_MODE_MASK		0x0f
+#define	MT7610_REG_MAC_SKEY_MODE_SHIFT(_bss, _idx)		\
+	    (4 * ((_idx) + 4 * ((_bss) & 1)))
+
 #endif	/* __MTWN_MT76X0_REG_H__ */

@@ -29,10 +29,35 @@ struct mtwn_mt7610_chip_priv {
 	char *mcu_data;
 
 	struct mtwn_mt7610_rx_freq_cal rx_freq_cal;
-
 };
 
 #define	MTWN_MT7610_CHIP_SOFTC(sc)			\
 	    ((struct mtwn_mt7610_chip_priv *)((sc)->sc_chipops_priv))
+
+/*
+ * ba_mask - little endian
+ */
+struct mt7610_mac_wcid_addr {
+	uint8_t macaddr[6];
+	uint16_t ba_mask;
+} __packed __aligned(4);
+
+struct mt7610_mac_wcid_key {
+	uint8_t key[16];
+	uint8_t tx_mic[8];
+	uint8_t rx_mic[8];
+} __packed __aligned(4);
+
+enum mtwn_mt7610_mac_cipher_type {
+	MT7610_MAC_CIPHER_NONE = 0,
+	MT7610_MAC_CIPHER_WEP40 = 1,
+	MT7610_MAC_CIPHER_WEP104 = 2,
+	MT7610_MAC_CIPHER_TKIP = 3,
+	MT7610_MAC_CIPHER_AES_CCMP = 4,
+	MT7610_MAC_CIPHER_CKIP40 = 5,
+	MT7610_MAC_CIPHER_CKIP104 = 6,
+	MT7610_MAC_CIPHER_CKIP128 = 7,
+	MT7610_MAC_CIPHER_WAPI = 8,
+};
 
 #endif	/* __MTWN_MT7610_VAR_H__ */
