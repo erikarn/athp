@@ -241,13 +241,8 @@ mtwn_mt7610_mac_shared_key_setup(struct mtwn_softc *sc, uint8_t vif,
 	val |= cipher << MT7610_REG_MAC_SKEY_MODE_SHIFT(vif, key_id);
 	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_SKEY_MODE(vif), val);
 
-	/* TODO: write the key, need MTWN_WRITE_COPY() */
-	MTWN_TODO_PRINTF(sc, "%s: TODO: key write!\n", __func__);
-
-#if 0
-	MTWN_WRITE_COPY(sc, MT_SKEY(vif, key_id), key_data,
+	MTWN_REG_WRITE_COPY_4(sc, MT7610_REG_MAC_SKEY(vif, key_id), key_data,
 	    MTWN_MT7610_MAC_SHARED_KEY_SIZE);
-#endif
 
 	return (0);
 
