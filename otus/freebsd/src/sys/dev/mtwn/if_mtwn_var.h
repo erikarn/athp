@@ -46,6 +46,11 @@ struct mtwn_bus_ops {
  * + init_hardware() - do hardware init after power-on / firmware load
  * + power_on() - power off the chip, w/ or w/out reset, called w/ lock held
  * + power_off() - power off the chip, called w/ lock held
+ * + mac_wait_ready() - wait for the MAC to be ready
+ * + dma_param_setup() - setup chipset DMA parameter/configuration (eg AMSDU)
+ * + beacon_config() - configure initial beacon parameters
+ * + post_init_setup() - do setup after initial chip setup
+ * + rxfilter_read() - read the RX filter value
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
@@ -94,6 +99,11 @@ struct mtwn_mcu_cfg {
 	int max_retry;
 };
 
+struct mtwn_mac_cfg {
+	int num_shared_keys;
+	int num_wcid;
+};
+
 struct mtwn_mcu_state {
 	uint32_t msg_seq;
 };
@@ -115,6 +125,7 @@ struct mtwn_softc {
 	/* Chip operations */
 	struct mtwn_chip_ops	sc_chipops;
 	void			*sc_chipops_priv;
+	struct mtwn_mac_cfg	sc_chip_cfg;
 
 	/* EEPROM operations */
 	struct mtwn_eeprom_ops	sc_eepromops;
