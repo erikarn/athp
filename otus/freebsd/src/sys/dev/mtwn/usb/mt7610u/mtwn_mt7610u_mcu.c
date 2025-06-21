@@ -92,8 +92,8 @@ mtwn_mt7610u_dma_mbuf_setup(struct mtwn_softc *sc, struct mbuf *m,
 	char zero_buf[sizeof(uint32_t) * 2] = { 0, };
 	uint32_t pad, tx_info;
 
-	MTWN_TODO_PRINTF(sc, "%s: port=%d, flags=0x%08x\n", __func__,
-	    port, flags);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_XMIT | MTWN_DEBUG_CMD,
+	    "%s: port=%d, flags=0x%08x\n", __func__, port, flags);
 
 	tx_info = _IEEE80211_SHIFTMASK(roundup(m->m_len, 4),
 	    MT7610_DMA_TXD_INFO_LEN);
@@ -127,7 +127,8 @@ mtwn_mt7610u_dma_mbuf_setup(struct mtwn_softc *sc, struct mbuf *m,
 	/* Append the padding - XXX ew, I wish we had an mbuf call for this */
 	m_append(m, pad, zero_buf);
 
-	MTWN_TODO_PRINTF(sc, "%s: (tx_info=0x%08x, pad=%u)\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD | MTWN_DEBUG_XMIT,
+	    "%s: (tx_info=0x%08x, pad=%u)\n",
 	    __func__, le32toh(tx_info), pad);
 	return (0);
 }
@@ -146,7 +147,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	/* Base off of __m76x02u_mcu_send_msg */
-	MTWN_TODO_PRINTF(sc,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
 	    "%s: called; cmd=%d, data=%p, len=%d, wait_tx=%d, wait_resp=%d\n",
 	    __func__, cmd, data, len, wait_tx, wait_resp);
 
@@ -200,9 +201,13 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	bf->buflen = m->m_len;
 
 	/* Bulk TX */
-	m_print(m, -1);
+	if (sc->sc_debug & MTWN_DEBUG_CMD)
+		m_print(m, -1);
 
-	/* XXX TODO: TX transfer wait or no wait? */
+	/*
+	 * wait_tx signals whether to wait for TX to complete, not RX
+	 * completion.
+	 */
 	if (wait_tx)
 		ret = mtwn_usb_cmd_queue_wait(uc, bf, 1000, wait_resp);
 	else
@@ -360,7 +365,7 @@ mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!: base=0x%08x, n=%d, final=%d\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: base=0x%08x, n=%d, final=%d\n",
 	    __func__, base, n, final);
 
 	/* Allocate temporary buffer */
@@ -415,7 +420,8 @@ mtwn_mcu_mt7610u_mcu_reg_pair_write(struct mtwn_softc *sc, int base,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DEBUG_PRINTF(sc, "%s: base=0x%08x, n=%d\n", __func__, base, n);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	    "%s: base=0x%08x, n=%d\n", __func__, base, n);
 
 	for (count = 0; count < n; count += MT7610_MCU_MAX_REGPAIR_IO_PER_PKT) {
 		int num = MIN(MT7610_MCU_MAX_REGPAIR_IO_PER_PKT, n - count);

@@ -122,7 +122,7 @@ mtwn_usb_reg_pair_read(struct mtwn_softc *sc, int base,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DEBUG_PRINTF(sc,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
 	    "%s: called, base=0x%08x, count=%d, mcu_running=%d\n",
 	    __func__, base, n, sc->flags.mcu_running);
 
@@ -140,7 +140,7 @@ mtwn_usb_reg_pair_write(struct mtwn_softc *sc, int base,
 {
 	int i;
 
-	MTWN_DEBUG_PRINTF(sc,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
 	    "%s: called, base=0x%08x, count=%d, mcu_running=%d\n",
 	    __func__, base, n, sc->flags.mcu_running);
 
@@ -177,7 +177,7 @@ mtwn_usb_attach(device_t self)
 	mtwn_sysctl_attach(sc);
 	uc->uc_rx_buf_size = MTWN_USB_RXBUFSZ_DEF;
 
-	sc->sc_debug = MTWN_DEBUG_XMIT | MTWN_DEBUG_USB | MTWN_DEBUG_CMD;
+	//sc->sc_debug = MTWN_DEBUG_XMIT | MTWN_DEBUG_USB | MTWN_DEBUG_CMD;
 
 	/* bus access methods */
 	sc->sc_busops.sc_read_4 = mtwn_usb_read_4;

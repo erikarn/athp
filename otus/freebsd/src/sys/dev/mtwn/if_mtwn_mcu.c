@@ -97,7 +97,7 @@ mtwn_mcu_msg_alloc(struct mtwn_softc *sc, const char *data, int len,
 	/* Reserve headroom */
 	m_adj(m, sc->sc_mcucfg.headroom);
 
-	MTWN_DEBUG_PRINTF(sc,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
 	    "%s: len=%d, mbuf_len=%zu, M_START=%p, m_data=%p, HEADROOM=%ld\n",
 	    __func__, len, mbuf_len, M_START(m), m->m_data, M_LEADINGSPACE(m));
 
