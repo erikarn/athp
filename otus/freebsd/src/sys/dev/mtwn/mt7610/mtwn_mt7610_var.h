@@ -28,11 +28,11 @@ struct mtwn_mt7610_rx_freq_cal {
 struct mtwn_mt7610_chip_priv {
 	char *mcu_data;
 
-	struct mtwn_mt7610_rx_freq_cal freq_cal;
+	struct mtwn_mt7610_rx_freq_cal rx_freq_cal;
 
 };
 
 #define	MTWN_MT7610_CHIP_SOFTC(sc)			\
-	    ((struct mtwn_mt7610_chip_priv *)(sc->chipops_priv))
+	    ((struct mtwn_mt7610_chip_priv *)((sc)->sc_chipops_priv))
 
 #endif	/* __MTWN_MT7610_VAR_H__ */

@@ -63,6 +63,7 @@
 #include "mtwn_mt7610_mac.h"
 #include "mtwn_mt7610_mcu_reg.h" /* for MT7610_MCU_MEMMAP_WLAN */
 
+#include "mtwn_mt7610_var.h"
 #include "mtwn_mt7610_phy_reg.h"
 #include "mtwn_mt7610_bbp.h"
 #include "mtwn_mt7610_bbp_initvals.h"
@@ -98,25 +99,52 @@ mtwn_mt7610_bbp_get_version(struct mtwn_softc *sc)
 
 /**
  * @brief Program in the current rf switch table.
+ *
+ * The RF band is a bitmap of band and channel width which is
+ * used to select the switch table entries to program.
  */
 int
 mtwn_mt7610_bbp_set_switch_table(struct mtwn_softc *sc, uint16_t rf_band,
     bool do_agc)
 {
-#if 0
 	struct mtwn_mt7610_chip_priv *psc = MTWN_MT7610_CHIP_SOFTC(sc);
-
 	int i;
-#endif
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+
+	for (i = 0; i < nitems(mtwn_mt7610_bbp_switch_tab); i++) {
+		const struct mtwn_mt7610_bbp_switch_item *item =
+		    &mtwn_mt7610_bbp_switch_tab[i];
+
+		/* Check rf mode / band match what we're looking for */
+		if ((rf_band & item->bw_band) != rf_band)
+			continue;
+
+		/* Conditionally do LNA gain correction */
+		if ((do_agc == true) &&
+		    (item->reg_pair.reg == MT7610_REG_BBP(AGC, 8))) {
+			uint32_t val = item->reg_pair.val;
+			uint8_t gain;
+
+			gain = _IEEE80211_MASKSHIFT(val,
+			    MT7610_REG_BBP_AGC_GAIN);
+			gain -= psc->rx_freq_cal.lna_gain * 2;
+			/* TODO: clamp gain? */
+			/* TODO: implement IEEE80211_MASKSHIFT_RMW or something? */
+			val &= ~MT7610_REG_BBP_AGC_GAIN;
+			val |= _IEEE80211_SHIFTMASK(gain,
+			    MT7610_REG_BBP_AGC_GAIN);
+			MTWN_REG_WRITE_4(sc, item->reg_pair.reg, val);
+		} else {
+			MTWN_REG_WRITE_4(sc, item->reg_pair.reg,
+			    item->reg_pair.val);
+		}
+	}
+
 	return (0);
 }
 
 int
 mtwn_mt7610_bbp_init(struct mtwn_softc *sc)
 {
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-
 	if (!mtwn_mt7610_bbp_wait_ready(sc)) {
 		MTWN_ERR_PRINTF(sc, "%s: BBP is not ready\n", __func__);
 		return (EIO);

@@ -30,6 +30,12 @@
 #define	MTWN_MT7610_PHY_RF_A_BAND_HB		0x1000
 #define	MTWN_MT7610_PHY_RF_A_BAND_11J		0x2000
 
+/* AGC, R8/R9 */
+#define	MT7610_REG_BBP_AGC_LNA_GAIN_MODE	0x000000c0
+#define	MT7610_REG_BBP_AGC_LNA_GAIN_MODE_S	6
+#define	MT7610_REG_BBP_AGC_GAIN			0x00007f00
+#define	MT7610_REG_BBP_AGC_GAIN_S		8
+
 struct mtwn_mt7610_bbp_switch_item {
 	uint16_t bw_band;
 	struct mtwn_reg_pair reg_pair;
