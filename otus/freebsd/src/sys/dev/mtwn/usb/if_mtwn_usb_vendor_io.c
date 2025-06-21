@@ -269,8 +269,10 @@ mtwn_usb_read_copy_4(struct mtwn_softc *sc, uint32_t offset, char *data,
 	 * usbd_get_max_frame_length(); see ng_ubt.c for the only
 	 * example I can find.
 	 */
+#if 0
 	MTWN_TODO_PRINTF(sc, "%s: TODO: use usbd_get_max_frame_length()!\n",
 	    __func__);
+#endif
 	transfer_size = 16;
 	transfer_len = roundup(len, 4);
 
@@ -362,8 +364,10 @@ mtwn_usb_write_copy_4(struct mtwn_softc *sc, uint32_t offset,
 	 * usbd_get_max_frame_length(); see ng_ubt.c for the only
 	 * example I can find.
 	 */
+#if 0
 	MTWN_TODO_PRINTF(sc, "%s: TODO: use usbd_get_max_frame_length()!\n",
 	    __func__);
+#endif
 	transfer_size = 16;
 	transfer_len = roundup(len, 4);
 
