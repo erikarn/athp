@@ -23,5 +23,8 @@ extern	uint32_t mtwn_usb_rmw_4(struct mtwn_softc *, uint32_t, uint32_t,
 extern int mtwn_usb_single_write_4(struct mtwn_softc *sc, uint8_t,
 	    uint16_t, uint32_t);
 extern	void mtwn_usb_delay(struct mtwn_softc *, uint32_t);
+extern int mtwn_usb_read_copy_4(struct mtwn_softc *sc, uint32_t, char *, int);
+extern int mtwn_usb_write_copy_4(struct mtwn_softc *sc, uint32_t, const char *,
+	    int);
 
 #endif	/* __IF_MTWN_USB_VENDOR_IO_H__ */

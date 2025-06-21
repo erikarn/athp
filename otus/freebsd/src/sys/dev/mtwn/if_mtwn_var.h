@@ -37,6 +37,11 @@ struct mtwn_bus_ops {
 			    int, struct mtwn_reg_pair *rp, int);
 	int		(*sc_reg_pair_write)(struct mtwn_softc *,
 			    int, const struct mtwn_reg_pair *rp, int);
+
+	int		(*sc_read_copy_4)(struct mtwn_softc *, uint32_t,
+			    char *, int);
+	int		(*sc_write_copy_4)(struct mtwn_softc *, uint32_t,
+			    const char *, int);
 };
 
 /**
@@ -185,6 +190,13 @@ struct mtwn_softc {
 #define	MTWN_REG_PAIR_WRITE_4(_sc, _base, _rp, _n)		\
 	    ((_sc)->sc_busops.sc_reg_pair_write((_sc), (_base),	\
 	    (_rp), (_n)))
+
+#define	MTWN_REG_READ_COPY_4(_sc, _base, _data, _n)		\
+	    ((_sc)->sc_busops.sc_read_copy_4((_sc),		\
+	    (_base), (_data), (_n)))
+#define	MTWN_REG_WRITE_COPY_4(_sc, _base, _data, _n)		\
+	    ((_sc)->sc_busops.sc_write_copy_4((_sc),		\
+	    (_base), (_data), (_n)))
 
 /* Chip operations */
 #define	MTWN_CHIP_RESET(_sc)					\

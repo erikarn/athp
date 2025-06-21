@@ -241,3 +241,23 @@ mtwn_usb_delay(struct mtwn_softc *sc, uint32_t usec)
 	usb_pause_mtx(mtx_owned(&sc->sc_mtx) ? &sc->sc_mtx : NULL,
 	    USB_MS_TO_TICKS(usec / 1000));
 }
+
+int
+mtwn_usb_read_copy_4(struct mtwn_softc *sc, uint32_t offset, char *data,
+    int len)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	return (0);
+}
+
+int
+mtwn_usb_write_copy_4(struct mtwn_softc *sc, uint32_t offset,
+    const char *data, int len)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	return (0);
+}
