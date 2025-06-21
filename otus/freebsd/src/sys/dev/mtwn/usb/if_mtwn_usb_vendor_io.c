@@ -284,7 +284,7 @@ mtwn_usb_read_copy_4(struct mtwn_softc *sc, uint32_t offset, char *data,
 		    "%s: Verify why we're given a non-DWORD aligned buffer!\n",
 		    __func__);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
 	    "%s: called; offset=0x%08x, len=%d, transfer_len=%d\n", __func__,
 	    offset, len, transfer_len);
 
@@ -299,7 +299,7 @@ mtwn_usb_read_copy_4(struct mtwn_softc *sc, uint32_t offset, char *data,
 		/* Calculate how big a transfer to attempt */
 		s = MIN(transfer_size, transfer_len - i);
 
-		MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+		MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
 		    "%s: transfer %d bytes at offset 0x%08x, copy %d bytes\n",
 		    __func__, s, offset + i, MIN(s, len - i));
 
@@ -377,7 +377,7 @@ mtwn_usb_write_copy_4(struct mtwn_softc *sc, uint32_t offset,
 		    "%s: Verify why we're given a non-DWORD aligned buffer!\n",
 		    __func__);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
 	    "%s: called; offset=0x%08x, len=%d, transfer_len=%d\n", __func__,
 	    offset, len, transfer_len);
 
@@ -392,7 +392,7 @@ mtwn_usb_write_copy_4(struct mtwn_softc *sc, uint32_t offset,
 		/* Calculate how big a transfer to attempt */
 		s = MIN(transfer_size, transfer_len - i);
 
-		MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+		MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
 		    "%s: transfer %d bytes at offset 0x%08x\n",
 		    __func__, s, offset + i);
 

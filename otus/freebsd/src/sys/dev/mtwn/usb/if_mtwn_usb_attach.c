@@ -122,7 +122,7 @@ mtwn_usb_reg_pair_read(struct mtwn_softc *sc, int base,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
 	    "%s: called, base=0x%08x, count=%d, mcu_running=%d\n",
 	    __func__, base, n, sc->flags.mcu_running);
 
@@ -140,7 +140,7 @@ mtwn_usb_reg_pair_write(struct mtwn_softc *sc, int base,
 {
 	int i;
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
 	    "%s: called, base=0x%08x, count=%d, mcu_running=%d\n",
 	    __func__, base, n, sc->flags.mcu_running);
 
