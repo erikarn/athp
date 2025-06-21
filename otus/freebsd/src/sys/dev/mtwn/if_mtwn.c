@@ -119,6 +119,7 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
+#if 0
 	/* Chipset hardware init */
 	/* TODO: this likely will get further decomposed into more methods */
 	ret = MTWN_CHIP_INIT_HARDWARE(sc);
@@ -127,27 +128,42 @@ mtwn_init(struct mtwn_softc *sc)
 		    __func__, ret);
 		goto error;
 	}
-
-	/* from mt76x0_init_hardware */
-
-	/* wait for wpdma */
-
-	/* wait for mac */
-
-	/* reset csr_bbp */
-
-	/* mac function select */
+#endif
 
 	/* mac init */
+	ret = MTWN_CHIP_MAC_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: CHIP_MAC_INIT failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* init bbp */
+	ret = MTWN_CHIP_BBP_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: CHIP_MAC_INIT failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* read RX filter */
 	sc->mac_state.sc_rx_filter = MTWN_CHIP_RXFILTER_READ(sc);
 
 	/* setup shared keys */
+	ret = MTWN_CHIP_SHARED_KEYS_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: CHIP_SHARED_KEYS failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* setup wcid entries */
+	ret = MTWN_CHIP_WCID_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: CHIP_WCID_INIT failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* EFUSE validate */
 	ret = MTWN_EFUSE_VALIDATE(sc);
@@ -157,7 +173,7 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
-	/* EEPROM load */
+	/* EEPROM load; needed for PHY init */
 	ret = MTWN_EFUSE_POPULATE(sc);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: EFUSE_POPULATE failed (err %d)\n",
@@ -166,6 +182,12 @@ mtwn_init(struct mtwn_softc *sc)
 	}
 
 	/* PHY init */
+	ret = MTWN_CHIP_PHY_INIT(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: PHY_INIT failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* Beacon config */
 	ret = MTWN_CHIP_BEACON_CONFIG(sc);

@@ -61,6 +61,7 @@
 #include "../mtwn_mt7610_var.h"
 #include "../mtwn_mt7610_init.h"
 #include "../mtwn_mt7610_mac.h"
+#include "../mtwn_mt7610_bbp.h"
 #include "../mtwn_mt7610_reg.h"
 #include "../mtwn_mt7610_mcu.h"
 #include "../mtwn_mt7610_eeprom.h"
@@ -358,7 +359,6 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_reset = mtwn_chip_mt7610u_reset;
 	sc->sc_chipops.sc_chip_setup_hardware =
 	    mtwn_chip_mt7610u_setup_hardware;
-	sc->sc_chipops.sc_chip_init_hardware = mtwn_mt7610_init_hardware;
 	sc->sc_chipops.sc_chip_power_off = mtwn_chip_mt7610u_power_off;
 	sc->sc_chipops.sc_chip_power_on = mtwn_chip_mt7610u_power_on;
 	sc->sc_chipops.sc_chip_mac_wait_ready = mtwn_mt76x0_mac_wait_ready;
@@ -367,6 +367,12 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_post_init_setup = mtwn_mt7610u_post_init_setup;
 	sc->sc_chipops.sc_chip_rxfilter_read = mtwn_mt7610_rxfilter_read;
 
+	sc->sc_chipops.sc_chip_mac_init = mtwn_mt7610_mac_init;
+	sc->sc_chipops.sc_chip_bbp_init = mtwn_mt7610_bbp_init;
+	sc->sc_chipops.sc_chip_shared_keys_init = mtwn_mt7610_shared_keys_init;
+	sc->sc_chipops.sc_chip_wcid_init = mtwn_mt7610_wcid_init;
+	sc->sc_chipops.sc_chip_phy_init = mtwn_mt7610_phy_init;
+
 	/* eeprom attach methods */
 	sc->sc_eepromops.sc_eeprom_init = mtwn_mt7610u_eeprom_init;
 	sc->sc_eepromops.sc_eeprom_detach = mtwn_mt7610u_eeprom_detach;
@@ -374,6 +380,10 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_eepromops.sc_efuse_populate = mtwn_mt7610u_efuse_populate;
 	sc->sc_eepromops.sc_eeprom_macaddr_read =
 	    mtwn_mt7610_eeprom_macaddr_read;
+
+	/* chipset config */
+	sc->sc_chip_cfg.num_shared_keys = 16;
+	sc->sc_chip_cfg.num_wcid = 256;
 
 	return (0);
 }

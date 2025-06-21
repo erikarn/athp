@@ -51,11 +51,22 @@ struct mtwn_bus_ops {
  * + beacon_config() - configure initial beacon parameters
  * + post_init_setup() - do setup after initial chip setup
  * + rxfilter_read() - read the RX filter value
+ *
+ * The break-out methods from init_hardware(), called during probe/attach
+ * and initial resume:
+ *
+ * + bbp_init() - BBP init
+ * + mac_init() - MAC init
+ * + key_init() - key init
+ * + wcid_init() - wcid init
+ * + phy_init() - PHY/RF init
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
 	int		(*sc_chip_reset)(struct mtwn_softc *);
+#if 0
 	int		(*sc_chip_init_hardware)(struct mtwn_softc *);
+#endif
 	int		(*sc_chip_setup_hardware)(struct mtwn_softc *);
 	int		(*sc_chip_power_on)(struct mtwn_softc *sc, bool);
 	int		(*sc_chip_power_off)(struct mtwn_softc *sc);
@@ -64,6 +75,12 @@ struct mtwn_chip_ops {
 	bool		(*sc_chip_beacon_config)(struct mtwn_softc *sc);
 	bool		(*sc_chip_post_init_setup)(struct mtwn_softc *sc);
 	uint32_t	(*sc_chip_rxfilter_read)(struct mtwn_softc *sc);
+
+	int		(*sc_chip_bbp_init)(struct mtwn_softc *);
+	int		(*sc_chip_mac_init)(struct mtwn_softc *);
+	int		(*sc_chip_shared_keys_init)(struct mtwn_softc *);
+	int		(*sc_chip_wcid_init)(struct mtwn_softc *);
+	int		(*sc_chip_phy_init)(struct mtwn_softc *);
 };
 
 struct mtwn_mcu_ops {
@@ -174,8 +191,10 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_reset((_sc)))
 #define	MTWN_CHIP_DETACH(_sc)					\
 	    ((_sc)->sc_chipops.sc_chip_detach((_sc)))
+#if 0
 #define	MTWN_CHIP_INIT_HARDWARE(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc)))
+#endif
 #define	MTWN_CHIP_SETUP_HARDWARE(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_setup_hardware((_sc)))
 #define	MTWN_CHIP_POWER_ON(_sc, _reset)				\
@@ -192,6 +211,17 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_post_init_setup((_sc)))
 #define	MTWN_CHIP_RXFILTER_READ(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_rxfilter_read((_sc)))
+
+#define	MTWN_CHIP_MAC_INIT(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_mac_init((_sc)))
+#define	MTWN_CHIP_BBP_INIT(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_bbp_init((_sc)))
+#define	MTWN_CHIP_SHARED_KEYS_INIT(_sc)			\
+	    ((_sc)->sc_chipops.sc_chip_shared_keys_init((_sc)))
+#define	MTWN_CHIP_WCID_INIT(_sc)			\
+	    ((_sc)->sc_chipops.sc_chip_wcid_init((_sc)))
+#define	MTWN_CHIP_PHY_INIT(_sc)			\
+	    ((_sc)->sc_chipops.sc_chip_phy_init((_sc)))
 
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\

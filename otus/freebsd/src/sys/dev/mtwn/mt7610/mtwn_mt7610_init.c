@@ -177,17 +177,10 @@ mtwn_mt7610_reset_csr_bbp(struct mtwn_softc *sc)
 	return (0);
 }
 
-/*
- * Analog of mt76x0_init_hardware(); but I'll end
- * up needing to break some of this stuff out into
- * if_mtwn.c and have it do some more work.
- */
 int
-mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
+mtwn_mt7610_mac_init(struct mtwn_softc *sc)
 {
 	int ret;
-
-	MTWN_TODO_PRINTF(sc, "%s: TODO! In progress!\n", __func__);
 
 	/* wait for DMA to be off */
 	if (!mtwn_mt7610_wait_for_wpdma(sc, 1000)) {
@@ -234,27 +227,35 @@ mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 		return (ETIMEDOUT);
 	}
 
-	/* init bbp - another table write */
-	ret = mtwn_mt7610_bbp_init(sc);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: BBP register init failed!\n",
-		    __func__);
-		return (ret);
-	}
+	return (0);
+}
 
-	/* (initial RX filter - done in mtwn driver) */
-	/*
-	 * TODO: see if mt76.rxfilter is used in any subsequent
-	 * init functions (mac_wcid, mac_shared_key, eeprom, phy init)
-	 */
+/* TODO: placeholder */
+int
+mtwn_mt7610_shared_keys_init(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	/* shared key setup */
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	return (0);
+}
 
-	/* wcid setup */
+/* TODO: placeholder */
+int
+mtwn_mt7610_wcid_init(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	/* (eeprom init - already done in mtwn driver) */
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	return (0);
+}
 
-	/* phy init - likely needs eeprom init done first! */
+/* TODO: placeholder */
+int
+mtwn_mt7610_phy_init(struct mtwn_softc *sc)
+{
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (0);
 }
