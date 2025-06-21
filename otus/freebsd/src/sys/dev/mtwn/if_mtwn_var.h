@@ -16,6 +16,8 @@
 #ifndef	__IF_MTWN_VAR_H__
 #define	__IF_MTWN_VAR_H__
 
+#define	MTWN_MAX_CHAINS			2
+
 struct mtwn_softc;
 
 struct mtwn_reg_pair {

@@ -13,26 +13,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__MTWN_MT7610_VAR_H__
-#define	__MTWN_MT7610_VAR_H__
+#ifndef	__MTWN_MT7610_BBP_H__
+#define	__MTWN_MT7610_BBP_H__
 
-struct mtwn_mt7610_rx_freq_cal {
-	int8_t high_gain[MTWN_MAX_CHAINS];
-	int8_t rssi_offset[MTWN_MAX_CHAINS];
-	int8_t lna_gain;
-	uint8_t mcu_gain;
-	int16_t temp_offset;
-	uint8_t freq_offset;
-};
+extern	bool mtwn_mt7610_bbp_wait_ready(struct mtwn_softc *);
+extern	uint32_t mtwn_mt7610_bbp_get_version(struct mtwn_softc *);
+extern	int mtwn_mt7610_bbp_set_switch_table(struct mtwn_softc *, uint16_t,
+	    bool);
 
-struct mtwn_mt7610_chip_priv {
-	char *mcu_data;
+extern	int mtwn_mt7610_bbp_init(struct mtwn_softc *);
 
-	struct mtwn_mt7610_rx_freq_cal freq_cal;
-
-};
-
-#define	MTWN_MT7610_CHIP_SOFTC(sc)			\
-	    ((struct mtwn_mt7610_chip_priv *)(sc->chipops_priv))
-
-#endif	/* __MTWN_MT7610_VAR_H__ */
+#endif	/* __MTWN_MT7610_BBP_H__ */

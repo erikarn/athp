@@ -61,6 +61,7 @@
 
 #include "mtwn_mt7610_init.h"
 #include "mtwn_mt7610_mac.h"
+#include "mtwn_mt7610_bbp.h"
 #include "mtwn_mt7610_dma.h"
 #include "mtwn_mt7610_reg.h"
 #include "mtwn_mt7610_mcu.h"
@@ -234,6 +235,12 @@ mtwn_mt7610_init_hardware(struct mtwn_softc *sc)
 	}
 
 	/* init bbp - another table write */
+	ret = mtwn_mt7610_bbp_init(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: BBP register init failed!\n",
+		    __func__);
+		return (ret);
+	}
 
 	/* (initial RX filter - done in mtwn driver) */
 	/*

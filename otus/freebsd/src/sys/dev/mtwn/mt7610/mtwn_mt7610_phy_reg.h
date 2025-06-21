@@ -13,26 +13,26 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__MTWN_MT7610_VAR_H__
-#define	__MTWN_MT7610_VAR_H__
+#ifndef	__MTWN_MT7610_PHY_REGS_H__
+#define	__MTWN_MT7610_PHY_REGS_H__
 
-struct mtwn_mt7610_rx_freq_cal {
-	int8_t high_gain[MTWN_MAX_CHAINS];
-	int8_t rssi_offset[MTWN_MAX_CHAINS];
-	int8_t lna_gain;
-	uint8_t mcu_gain;
-	int16_t temp_offset;
-	uint8_t freq_offset;
+/* Flags passed into set_chan_params; the switch table initvals */
+
+#define	MTWN_MT7610_PHY_RF_BW_20		1
+#define	MTWN_MT7610_PHY_RF_BW_40		2
+#define	MTWN_MT7610_PHY_RF_BW_10		4
+#define	MTWN_MT7610_PHY_RF_BW_80		8
+
+#define	MTWN_MT7610_PHY_RF_G_BAND		0x0100
+#define	MTWN_MT7610_PHY_RF_A_BAND		0x0200
+#define	MTWN_MT7610_PHY_RF_A_BAND_LB		0x0400
+#define	MTWN_MT7610_PHY_RF_A_BAND_MB		0x0800
+#define	MTWN_MT7610_PHY_RF_A_BAND_HB		0x1000
+#define	MTWN_MT7610_PHY_RF_A_BAND_11J		0x2000
+
+struct mtwn_mt7610_bbp_switch_item {
+	uint16_t bw_band;
+	struct mtwn_reg_pair reg_pair;
 };
 
-struct mtwn_mt7610_chip_priv {
-	char *mcu_data;
-
-	struct mtwn_mt7610_rx_freq_cal freq_cal;
-
-};
-
-#define	MTWN_MT7610_CHIP_SOFTC(sc)			\
-	    ((struct mtwn_mt7610_chip_priv *)(sc->chipops_priv))
-
-#endif	/* __MTWN_MT7610_VAR_H__ */
+#endif	/* __MTWN_MT7610_PHY_REGS_H__ */
