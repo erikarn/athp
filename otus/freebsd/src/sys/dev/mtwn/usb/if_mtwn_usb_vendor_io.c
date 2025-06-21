@@ -242,22 +242,178 @@ mtwn_usb_delay(struct mtwn_softc *sc, uint32_t usec)
 	    USB_MS_TO_TICKS(usec / 1000));
 }
 
+/**
+ * @brief do a multi-read starting at the given offset.
+ *
+ * This doesn't do any endian swizzling; it's purely for
+ * copying a range of memory in/out of the chip register
+ * space.
+ *
+ * Note that this gets bumped to only copy a multiple of
+ * 4 bytes, to avoid data corruption.
+ * From mt76: See: "mt76: round up length on mt76_wr_copy"
+ */
 int
 mtwn_usb_read_copy_4(struct mtwn_softc *sc, uint32_t offset, char *data,
     int len)
 {
+	usb_device_request_t req;
+	int error, transfer_size;
+	char *buf;
+	int i, s, transfer_len;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	/*
+	 * TODO: find the maximum control transfer size by using
+	 * usbd_get_max_frame_length(); see ng_ubt.c for the only
+	 * example I can find.
+	 */
+	MTWN_TODO_PRINTF(sc, "%s: TODO: use usbd_get_max_frame_length()!\n",
+	    __func__);
+	transfer_size = 16;
+	transfer_len = roundup(len, 4);
+
+	/*
+	 * Note: this is OK, as we're using a temp buffer that should
+	 * avoid writing data out that's past the end of the given buffer.
+	 * However I'd like to know and understand why!
+	 */
+	if (transfer_len != len)
+		MTWN_WARN_PRINTF(sc,
+		    "%s: Verify why we're given a non-DWORD aligned buffer!\n",
+		    __func__);
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	    "%s: called; offset=0x%08x, len=%d, transfer_len=%d\n", __func__,
+	    offset, len, transfer_len);
+
+	buf = malloc(transfer_size, M_TEMP, M_ZERO | M_NOWAIT);
+	if (buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to allocate %d bytes\n",
+		    __func__, transfer_size);
+		return (ENOMEM);
+	}
+
+	for (i = 0; i < transfer_len; i += transfer_size) {
+		/* Calculate how big a transfer to attempt */
+		s = MIN(transfer_size, transfer_len - i);
+
+		MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+		    "%s: transfer %d bytes at offset 0x%08x, copy %d bytes\n",
+		    __func__, s, offset + i, MIN(s, len - i));
+
+		memset(buf, 0, transfer_size);
+
+		/* Do transfer */
+		req.bmRequestType = UT_READ_VENDOR_DEVICE;
+		req.bRequest = MTWN_USB_VENDOR_READ_EXT;
+		USETW(req.wValue, (offset + i) >> 16);
+		USETW(req.wIndex, offset + i);
+		USETW(req.wLength, s);
+
+		error = mtwn_do_request(MTWN_USB_SOFTC(sc), &req, (void *) buf);
+		if (error != 0) {
+			MTWN_ERR_PRINTF(sc, "%s: USB transfer failed\n",
+			    __func__);
+			free(buf, M_TEMP);
+			return (error);
+		}
+
+		/*
+		 * Copy the data back, make sure we only copy as much as
+		 * we can possibly fit (if we're given a non DWORD sized
+		 * buffer.)
+		 */
+		memcpy(data + i, buf, MIN(s, len - i));
+	}
+	free(buf, M_TEMP);
 	return (0);
 }
 
+/**
+ * @brief do a multi-write copy starting at the given offset.
+ *
+ * This doesn't do any endian swizzling; it's purely for
+ * copying a range of memory in/out of the chip register
+ * space.
+ *
+ * Note that this gets bumped to only copy a multiple of
+ * 4 bytes, to avoid data corruption.
+ * From mt76: See: "mt76: round up length on mt76_wr_copy"
+ *
+ * NOTE: it's also limited to a 16 bit address, it's not
+ * populating a full 32 bit address like the read_4/write_4
+ * APIs are doing.
+ */
 int
 mtwn_usb_write_copy_4(struct mtwn_softc *sc, uint32_t offset,
     const char *data, int len)
 {
+	usb_device_request_t req;
+	int error, transfer_size;
+	char *buf;
+	int i, s, transfer_len;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	/*
+	 * TODO: find the maximum control transfer size by using
+	 * usbd_get_max_frame_length(); see ng_ubt.c for the only
+	 * example I can find.
+	 */
+	MTWN_TODO_PRINTF(sc, "%s: TODO: use usbd_get_max_frame_length()!\n",
+	    __func__);
+	transfer_size = 16;
+	transfer_len = roundup(len, 4);
+
+	/*
+	 * Note: this is OK, as we're using a temp buffer that should
+	 * avoid writing data out that's past the end of the given buffer.
+	 * However I'd like to know and understand why!
+	 */
+	if (transfer_len != len)
+		MTWN_WARN_PRINTF(sc,
+		    "%s: Verify why we're given a non-DWORD aligned buffer!\n",
+		    __func__);
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	    "%s: called; offset=0x%08x, len=%d, transfer_len=%d\n", __func__,
+	    offset, len, transfer_len);
+
+	buf = malloc(transfer_size, M_TEMP, M_ZERO | M_NOWAIT);
+	if (buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to allocate %d bytes\n",
+		    __func__, transfer_size);
+		return (ENOMEM);
+	}
+
+	for (i = 0; i < transfer_len; i += transfer_size) {
+		/* Calculate how big a transfer to attempt */
+		s = MIN(transfer_size, transfer_len - i);
+
+		MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+		    "%s: transfer %d bytes at offset 0x%08x\n",
+		    __func__, s, offset + i);
+
+		memset(buf, 0, transfer_size);
+		memcpy(buf, data + i, s);
+
+		/* Do transfer */
+		req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+		req.bRequest = MTWN_USB_VENDOR_MULTI_WRITE;
+		USETW(req.wValue, 0);
+		USETW(req.wIndex, offset + i);
+		USETW(req.wLength, s);
+
+		error = mtwn_do_request(MTWN_USB_SOFTC(sc), &req, (void *) buf);
+		if (error != 0) {
+			MTWN_ERR_PRINTF(sc, "%s: USB transfer failed\n",
+			    __func__);
+			free(buf, M_TEMP);
+			return (error);
+		}
+	}
+	free(buf, M_TEMP);
 	return (0);
 }
