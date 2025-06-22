@@ -21,7 +21,6 @@ extern	int mtwn_mt76x0_chip_onoff(struct mtwn_softc *, bool, bool);
 extern	int mtwn_mt7610_mac_init(struct mtwn_softc *);
 
 /* placeholders! */
-extern	int mtwn_mt7610_wcid_init(struct mtwn_softc *);
 extern	int mtwn_mt7610_phy_init(struct mtwn_softc *);
 
 #endif	/* __MTWN_MT7610_INIT_H__ */

@@ -40,8 +40,8 @@ struct mtwn_mt7610_chip_priv {
  *
  * ba_mask - little endian
  */
-struct mt7610_mac_wcid_addr {
-	uint8_t macaddr[6];
+struct mtwn_mt7610_mac_wcid_addr {
+	uint8_t macaddr[ETHER_ADDR_LEN];
 	uint16_t ba_mask;
 } __packed __aligned(4);
 
@@ -49,7 +49,7 @@ struct mt7610_mac_wcid_addr {
  * This is used by the hardware as well as arguments, so it
  * lives here instead of *reg.h.
  */
-struct mt7610_mac_wcid_key {
+struct mtwn_mt7610_mac_wcid_key {
 	uint8_t key[16];
 	uint8_t tx_mic[8];
 	uint8_t rx_mic[8];

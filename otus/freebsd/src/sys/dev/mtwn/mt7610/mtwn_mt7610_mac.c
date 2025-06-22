@@ -266,3 +266,71 @@ mtwn_mt7610_mac_shared_keys_init(struct mtwn_softc *sc)
 	return (0);
 }
 
+int
+mtwn_mt7610_mac_wcid_setup(struct mtwn_softc *sc, uint8_t id, uint8_t vif,
+    uint8_t *macaddr)
+{
+	struct mtwn_mt7610_mac_wcid_addr addr = { 0 };
+	uint32_t attr;
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (id >= sc->sc_chip_cfg.num_wcid) {
+		MTWN_ERR_PRINTF(sc, "%s: invalid wcid (id %d, max %d)\n",
+		    __func__, id, sc->sc_chip_cfg.num_wcid);
+		return (EINVAL);
+	}
+
+	/*
+	 * Calculate initial attribute - the vif index
+	 * Note: it looks like the hardware "grew" an extra 8 vif ids;
+	 * a bit was added for the high bit of vif, rather than shuffling
+	 * around the entire register definition.
+	 */
+	attr = _IEEE80211_SHIFTMASK(vif & 7, MT7610_REG_WCID_ATTR_BSS_IDX);
+	if ((vif & 8) != 0)
+		attr |= MT7610_REG_WCID_ATTR_BSS_IDX_EXT;
+
+	MTWN_REG_WRITE_4(sc, MT7610_REG_WCID_ATTR(id), attr);
+
+	/* Note: I'm not sure why the index is capped here at 128 */
+	if (id >= 128)
+		return (0);
+
+	if (macaddr != NULL)
+		memcpy(addr.macaddr, macaddr, ETHER_ADDR_LEN);
+
+	ret = MTWN_REG_WRITE_COPY_4(sc, MT7610_REG_WCID_ADDR(id),
+	    (void *) &addr, sizeof(addr));
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: failed to write WCID_ADDR(%d) (err %d)\n",
+		    __func__, id, ret);
+		return (ret);
+	}
+
+	return (0);
+}
+
+/**
+ * @brief Initialise the STA array with blank entries on vif 0.
+ */
+int
+mtwn_mt7610_mac_wcid_init(struct mtwn_softc *sc)
+{
+	int i, ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	for (i = 0; i < sc->sc_chip_cfg.num_wcid; i++) {
+		ret = mtwn_mt7610_mac_wcid_setup(sc, i, 0, NULL);
+		if (ret != 0) {
+			MTWN_ERR_PRINTF(sc,
+			    "%s: couldn't init wcid idx %d (err %d)\n",
+			    __func__, i, ret);
+			return (ret);
+		}
+	}
+	return (0);
+}

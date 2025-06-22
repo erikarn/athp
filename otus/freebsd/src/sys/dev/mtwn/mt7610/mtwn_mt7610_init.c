@@ -232,15 +232,6 @@ mtwn_mt7610_mac_init(struct mtwn_softc *sc)
 
 /* TODO: placeholder */
 int
-mtwn_mt7610_wcid_init(struct mtwn_softc *sc)
-{
-	MTWN_LOCK_ASSERT(sc, MA_OWNED);
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-	return (0);
-}
-
-/* TODO: placeholder */
-int
 mtwn_mt7610_phy_init(struct mtwn_softc *sc)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);

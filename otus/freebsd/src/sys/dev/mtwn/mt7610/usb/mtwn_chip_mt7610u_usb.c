@@ -371,7 +371,7 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_bbp_init = mtwn_mt7610_bbp_init;
 	sc->sc_chipops.sc_chip_shared_keys_init =
 	    mtwn_mt7610_mac_shared_keys_init;
-	sc->sc_chipops.sc_chip_wcid_init = mtwn_mt7610_wcid_init;
+	sc->sc_chipops.sc_chip_wcid_init = mtwn_mt7610_mac_wcid_init;
 	sc->sc_chipops.sc_chip_phy_init = mtwn_mt7610_phy_init;
 
 	/* eeprom attach methods */

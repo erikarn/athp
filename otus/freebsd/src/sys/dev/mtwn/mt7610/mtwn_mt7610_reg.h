@@ -383,6 +383,10 @@
 #define	MT7610_REG_TXOP_HLDR_ET			0x1608
 #define		MT_TXOP_HLDR_TX40M_BLK_EN		0x00000001
 
+/* WCID address base - 0x1800 -> 0x1fff (256 entries, 8 bytes each) */
+#define	MT7610_REG_WCID_ADDR_BASE		0x1800
+#define	MT7610_REG_WCID_ADDR(_id)			\
+	    (MT7610_REG_WCID_ADDR_BASE + ((_id) * 8))
 
 /* BBP region - 0x2000 -> 0x2fff */
 #define	MT7610_REG_BBP_CORE_BASE		0x2000
@@ -405,6 +409,23 @@
 
 #define	MT76_REG_USB3_DMA_CFG			0x9018
 /* Note: shares register definitions with MT76_REG_USB_DMA_CFG */
+
+/* WCID attribute base - 0xa800 -> 0xabff (256 entries; 4 bytes each) */
+#define MT7610_REG_WCID_ATTR_BASE			0xa800
+#define MT7610_REG_WCID_ATTR(_idx)			\
+	    (MT7610_REG_WCID_ATTR_BASE + ((_idx) * 4))
+#define		MT7610_REG_WCID_ATTR_PAIRWISE		0x00000001
+#define		MT7610_REG_WCID_ATTR_PKEY_MODE		0x0000000e
+#define		MT7610_REG_WCID_ATTR_PKEY_MODE_S	1
+#define		MT7610_REG_WCID_ATTR_BSS_IDX		0x00000070
+#define		MT7610_REG_WCID_ATTR_BSS_IDX_S		4
+#define		MT7610_REG_WCID_ATTR_RXWI_UDF		0x00000380
+#define		MT7610_REG_WCID_ATTR_RXWI_UDF_S		7
+#define		MT7610_REG_WCID_ATTR_PKEY_MODE_EXT	0x00000400
+#define		MT7610_REG_WCID_ATTR_BSS_IDX_EXT	0x00000800
+#define		MT7610_REG_WCID_ATTR_WAPI_MCBC		0x00008000
+#define		MT7610_REG_WCID_ATTR_WAPI_KEYID		0xff000000
+#define		MT7610_REG_WCID_ATTR_WAPI_KEYID_S	24
 
 /*
  * These control the shared key array/mode, indexed by vif id.
