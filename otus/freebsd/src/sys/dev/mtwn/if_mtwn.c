@@ -181,6 +181,26 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
+	/*
+	 * These are from mt76x0_eeprom_init and need to be done
+	 * as part of the initialisation before the PHY init is done.
+	 *
+	 * I'm not sure where the right spot to put all of this stuff
+	 * is - it's likely in an "eeprom chip val init" or something method -
+	 * but it needs to be documented somewhere!
+	 */
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO - eeprom_override\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO - mac_setaddr\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO - set_chip_cap\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO - set_freq_offset\n", __func__);
+	MTWN_TODO_PRINTF(sc, "%s: TODO - set_temp_offset\n", __func__);
+	/* TODO: mt76_eeprom_override - the openfirmware override stuff */
+	/* TODO: mt76x02_mac_setaddr - set mac address based on EEPROM */
+	/* TODO: mt76x0_set_chip_cap - set initial chip capabilities based on EEPROM */
+	/* TODO: mt76x0_set_freq_offset - populate calibration frequency offset */
+	/* TODO: mt76x0_set_temp_offset - populate calibration frequency offset */
+
 	/* PHY init */
 	ret = MTWN_CHIP_PHY_INIT(sc);
 	if (ret != 0) {
