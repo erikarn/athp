@@ -22,5 +22,6 @@ extern bool mtwn_mt7610_mac_wait_for_txrx_idle(struct mtwn_softc *);
 extern int mtwn_mt7610_mac_init_registers(struct mtwn_softc *);
 extern	int mtwn_mt7610_mac_shared_key_setup(struct mtwn_softc *, uint8_t,
 	    uint8_t, struct ieee80211_key *);
+extern int mtwn_mt7610_mac_shared_keys_init(struct mtwn_softc *);
 
 #endif	/* __MTWN_MT76X0_MAC_H__ */

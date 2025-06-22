@@ -245,5 +245,24 @@ mtwn_mt7610_mac_shared_key_setup(struct mtwn_softc *sc, uint8_t vif,
 	    MTWN_MT7610_MAC_SHARED_KEY_SIZE);
 
 	return (0);
-
 }
+
+/**
+ * @brief Initialise the shared key entries in each supported vif to null
+ *
+ * This effectively clears out the shared key entries.
+ */
+int
+mtwn_mt7610_mac_shared_keys_init(struct mtwn_softc *sc)
+{
+	int i, j;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	for (i = 0; i < sc->sc_chip_cfg.num_vifs; i++)
+		for (j = 0; j < 4; j++)
+			mtwn_mt7610_mac_shared_key_setup(sc, i, j, NULL);
+
+	return (0);
+}
+

@@ -35,6 +35,9 @@ struct mtwn_mt7610_chip_priv {
 	    ((struct mtwn_mt7610_chip_priv *)((sc)->sc_chipops_priv))
 
 /*
+ * This is used by the hardware as well as arguments, so it
+ * lives here instead of *reg.h.
+ *
  * ba_mask - little endian
  */
 struct mt7610_mac_wcid_addr {
@@ -42,12 +45,20 @@ struct mt7610_mac_wcid_addr {
 	uint16_t ba_mask;
 } __packed __aligned(4);
 
+/*
+ * This is used by the hardware as well as arguments, so it
+ * lives here instead of *reg.h.
+ */
 struct mt7610_mac_wcid_key {
 	uint8_t key[16];
 	uint8_t tx_mic[8];
 	uint8_t rx_mic[8];
 } __packed __aligned(4);
 
+/*
+ * This is used by the hardware as well as arguments, so it
+ * lives here instead of *reg.h.
+ */
 enum mtwn_mt7610_mac_cipher_type {
 	MT7610_MAC_CIPHER_NONE = 0,
 	MT7610_MAC_CIPHER_WEP40 = 1,
