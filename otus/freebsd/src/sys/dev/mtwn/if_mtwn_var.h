@@ -110,9 +110,14 @@ struct mtwn_eeprom_ops {
 	int		(*sc_eeprom_detach)(struct mtwn_softc *sc);
 	int		(*sc_efuse_validate)(struct mtwn_softc *sc);
 	int		(*sc_efuse_populate)(struct mtwn_softc *sc);
+	int		(*sc_eeprom_read_2)(struct mtwn_softc *sc, uint16_t);
 
 	int		(*sc_eeprom_macaddr_read)(struct mtwn_softc *sc,
 			    uint8_t *);
+#if 0
+	int		(*sc_eeprom_get_version)(struct mtwn_softc *);
+	int		(*sc_eeprom_get_pci_id)(struct mtwn_softc *);
+#endif
 };
 
 struct mtwn_mcu_cfg {
@@ -263,6 +268,8 @@ struct mtwn_softc {
 	    ((_sc)->sc_eepromops.sc_efuse_populate((_sc)))
 #define	MTWN_EEPROM_MACADDR_READ(_sc, _mac)			\
 	    ((_sc)->sc_eepromops.sc_eeprom_macaddr_read((_sc), (_mac)))
+#define	MTWN_EEPROM_READ_2(_sc, _reg)			\
+	    ((_sc)->sc_eepromops.sc_eeprom_read_2((_sc), (_reg)))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);

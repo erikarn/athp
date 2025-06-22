@@ -24,5 +24,6 @@ extern	int mtwn_mt7610_efuse_physical_size_check(struct mtwn_softc *);
 extern	int mtwn_mt7610_efuse_populate(struct mtwn_softc *, char *, uint32_t);
 
 extern	int mtwn_mt7610_eeprom_macaddr_read(struct mtwn_softc *, uint8_t *);
+extern	int mtwn_mt7610_eeprom_read_2(struct mtwn_softc *, uint16_t);
 
 #endif	/* __MTWN_MT7610_EEPROM_H__ */

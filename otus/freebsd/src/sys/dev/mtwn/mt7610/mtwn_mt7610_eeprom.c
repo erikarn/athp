@@ -197,9 +197,34 @@ mtwn_mt7610_eeprom_macaddr_read(struct mtwn_softc *sc, uint8_t *mac)
 	if (sc->sc_eepromops_priv == NULL)
 		return (ENXIO);
 
-	/* XXX TODO: ether addr len */
-	memcpy(mac, (char *) sc->sc_eepromops_priv + MT7610_EEPROM_MAC_ADDR, 6);
+	memcpy(mac, (char *) sc->sc_eepromops_priv + MT7610_EEPROM_MAC_ADDR,
+	    ETHER_ADDR_LEN);
 
 	return (0);
 }
 
+/**
+ * @brief read two bytes at the given offset, or return -1 upon failure.
+ */
+int
+mtwn_mt7610_eeprom_read_2(struct mtwn_softc *sc, uint16_t offset)
+{
+	uint16_t val;
+
+	if (sc->sc_eepromops_priv == NULL)
+		return (-1);
+
+	/*
+	 * Check the request fits in the eeprom range, remembering
+	 * we are reading two bytes.
+	 */
+	if (offset > MT7610_EEPROM_SIZE-2)
+		return (-1);
+	if ((offset & 1) != 0)
+		return (-1);
+
+	memcpy(&val, ((const char *) sc->sc_eepromops_priv) + offset,
+	    sizeof(uint16_t));
+
+	return (val);
+}
