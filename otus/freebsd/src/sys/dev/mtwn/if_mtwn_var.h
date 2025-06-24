@@ -48,7 +48,6 @@ struct mtwn_bus_ops {
  * + detach() - detach private state (eg memory) before driver detach finishes
  * + reset() - chip reset, lock TBD
  * + setup_hardware() - initial attach hardware setup, called w/out lock held
- * + init_hardware() - do hardware init after power-on / firmware load
  * + power_on() - power off the chip, w/ or w/out reset, called w/ lock held
  * + power_off() - power off the chip, called w/ lock held
  * + mac_wait_ready() - wait for the MAC to be ready
@@ -69,9 +68,6 @@ struct mtwn_bus_ops {
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
 	int		(*sc_chip_reset)(struct mtwn_softc *);
-#if 0
-	int		(*sc_chip_init_hardware)(struct mtwn_softc *);
-#endif
 	int		(*sc_chip_setup_hardware)(struct mtwn_softc *);
 	int		(*sc_chip_power_on)(struct mtwn_softc *sc, bool);
 	int		(*sc_chip_power_off)(struct mtwn_softc *sc);
@@ -208,10 +204,6 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_reset((_sc)))
 #define	MTWN_CHIP_DETACH(_sc)					\
 	    ((_sc)->sc_chipops.sc_chip_detach((_sc)))
-#if 0
-#define	MTWN_CHIP_INIT_HARDWARE(_sc)				\
-	    ((_sc)->sc_chipops.sc_chip_init_hardware((_sc)))
-#endif
 #define	MTWN_CHIP_SETUP_HARDWARE(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_setup_hardware((_sc)))
 #define	MTWN_CHIP_POWER_ON(_sc, _reset)				\

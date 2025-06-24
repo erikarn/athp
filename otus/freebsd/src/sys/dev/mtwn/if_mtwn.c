@@ -119,17 +119,6 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
-#if 0
-	/* Chipset hardware init */
-	/* TODO: this likely will get further decomposed into more methods */
-	ret = MTWN_CHIP_INIT_HARDWARE(sc);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: INIT_HARDWARE failed (err %d)\n",
-		    __func__, ret);
-		goto error;
-	}
-#endif
-
 	/* mac init */
 	ret = MTWN_CHIP_MAC_INIT(sc);
 	if (ret != 0) {
