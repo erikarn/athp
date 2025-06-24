@@ -90,6 +90,12 @@ enum ath10k_pktlog_filter {
 		device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
 
+#define	ath10k_todo(sc, fmt, ...) \
+	do { \
+		device_printf(sc->sc_dev, "TODO: " fmt, ##__VA_ARGS__); \
+	} while (0)
+
+
 struct ath10k;
 extern	void ath10k_dbg_dump(struct ath10k *ar, uint64_t mask,
 	    const char *msg, const char *prefix, const void *buf, size_t len);

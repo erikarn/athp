@@ -366,6 +366,7 @@ static int ath10k_send_key(struct ath10k_vif *arvif,
 		 */
 		arg.key_len += 16;
 		arg.key_cipher = WMI_CIPHER_TKIP;
+		ath10k_todo(ar, "Add TKIP MIC accessor!\n");
 		break;
 	case IEEE80211_CIPHER_WEP:
 		arg.key_cipher = WMI_CIPHER_WEP;
