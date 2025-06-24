@@ -3193,12 +3193,15 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	vht_cap = vhtcap.vht_cap_info;
 
 	if (! IEEE80211_IS_CHAN_VHT(sta->ni_chan)) {
-		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac vht not a VHT channel\n", __func__);
+		ath10k_dbg(ar, ATH10K_DBG_MAC,
+		    "%s: mac vht not a VHT channel\n", __func__);
 		return;
 	}
 
 	if (! (sta->ni_flags & IEEE80211_NODE_VHT)) {
-		ath10k_dbg(ar, ATH10K_DBG_MAC, "%s: mac HTC_VHT not set (vhtcap 0x%08x)\n", __func__, vht_cap);
+		ath10k_dbg(ar, ATH10K_DBG_MAC,
+		    "%s: mac HTC_VHT not set (vhtcap 0x%08x)\n",
+		    __func__, vht_cap);
 		return;
 	}
 
@@ -3587,8 +3590,9 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	ret = ath10k_wmi_peer_assoc(ar, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to run peer assoc for %6D vdev %i: %d\n",
-			    ni->ni_macaddr, ":", arvif->vdev_id, ret);
+		ath10k_warn(ar,
+		    "failed to run peer assoc for %6D vdev %i: %d\n",
+		    ni->ni_macaddr, ":", arvif->vdev_id, ret);
 		return;
 	}
 
@@ -3601,21 +3605,26 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 
 	ret = ath10k_mac_vif_recalc_txbf(ar, vif, vhtcap);
 	if (ret) {
-		ath10k_warn(ar, "failed to recalc txbf for vdev %i on bss %6D: %d\n",
-			    arvif->vdev_id, ni->ni_macaddr, ":", ret);
+		ath10k_warn(ar,
+		    "failed to recalc txbf for vdev %i on bss %6D: %d\n",
+		    arvif->vdev_id, ni->ni_macaddr, ":", ret);
 		return;
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC,
 		   "mac vdev %d up (associated) bssid %6D aid %d\n",
-		   arvif->vdev_id, ni->ni_macaddr, ":", IEEE80211_AID(ni->ni_associd));
+		   arvif->vdev_id, ni->ni_macaddr, ":",
+		   IEEE80211_AID(ni->ni_associd));
 
 	WARN_ON(arvif->is_up);
 
 	arvif->aid = IEEE80211_AID(ni->ni_associd);
 	ether_addr_copy(arvif->bssid, ni->ni_macaddr);
 
-	/* Note: if we haven't restarted the vdev before here; this causes a firmware panic */
+	/*
+	 * Note: if we haven't restarted the vdev before here; this causes
+	 * a firmware panic
+	 */
 	ret = ath10k_wmi_vdev_up(ar, arvif->vdev_id, arvif->aid, arvif->bssid);
 	if (ret) {
 		ath10k_warn(ar, "failed to set vdev %d up: %d\n",
@@ -3632,8 +3641,9 @@ void ath10k_bss_assoc(struct ath10k *ar, struct ieee80211_node *ni, int is_run)
 	ret = ath10k_wmi_peer_set_param(ar, arvif->vdev_id, arvif->bssid,
 					WMI_PEER_DUMMY_VAR, 1);
 	if (ret) {
-		ath10k_warn(ar, "failed to poke peer %6D param for ps workaround on vdev %i: %d\n",
-			    arvif->bssid, ":", arvif->vdev_id, ret);
+		ath10k_warn(ar,
+		    "failed to poke peer %6D param for ps workaround on "
+		    "vdev %i: %d\n", arvif->bssid, ":", arvif->vdev_id, ret);
 		return;
 	}
 }
@@ -3689,15 +3699,17 @@ int ath10k_station_assoc(struct ath10k *ar,
 
 	ret = ath10k_peer_assoc_prepare(ar, vif, sta, &peer_arg, 1);
 	if (ret) {
-		ath10k_warn(ar, "failed to prepare WMI peer assoc for %6D vdev %i: %i\n",
-			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
+		ath10k_warn(ar,
+		    "failed to prepare WMI peer assoc for %6D vdev %i: %i\n",
+		    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 		return ret;
 	}
 
 	ret = ath10k_wmi_peer_assoc(ar, &peer_arg);
 	if (ret) {
-		ath10k_warn(ar, "failed to run peer assoc for STA %6D vdev %i: %d\n",
-			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
+		ath10k_warn(ar,
+		    "failed to run peer assoc for STA %6D vdev %i: %d\n",
+		    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 		return ret;
 	}
 
@@ -3710,23 +3722,28 @@ int ath10k_station_assoc(struct ath10k *ar,
 	if (!reassoc) {
 		ret = ath10k_setup_peer_smps(ar, arvif, sta->ni_macaddr, sta);
 		if (ret) {
-			ath10k_warn(ar, "failed to setup peer SMPS for vdev %d: %d\n",
-				    arvif->vdev_id, ret);
+			ath10k_warn(ar,
+			    "failed to setup peer SMPS for vdev %d: %d\n",
+			    arvif->vdev_id, ret);
 			return ret;
 		}
 
 		ret = ath10k_peer_assoc_qos_ap(ar, vif, sta);
 		if (ret) {
-			ath10k_warn(ar, "failed to set qos params for STA %6D for vdev %i: %d\n",
-				    sta->ni_macaddr, ":", arvif->vdev_id, ret);
+			ath10k_warn(ar,
+			    "failed to set qos params for STA %6D for "
+			    "vdev %i: %d\n",
+			    sta->ni_macaddr, ":", arvif->vdev_id, ret);
 			return ret;
 		}
 		if (! (sta->ni_flags & IEEE80211_NODE_QOS)) {
 			arvif->num_legacy_stations++;
 			ret  = ath10k_recalc_rtscts_prot(arvif);
 			if (ret) {
-				ath10k_warn(ar, "failed to recalculate rts/cts prot for vdev %d: %d\n",
-					    arvif->vdev_id, ret);
+				ath10k_warn(ar,
+				    "failed to recalculate rts/cts prot "
+				    "for vdev %d: %d\n",
+				    arvif->vdev_id, ret);
 				return ret;
 			}
 		}
@@ -3735,8 +3752,10 @@ int ath10k_station_assoc(struct ath10k *ar,
 		if (arvif->def_wep_key_idx != -1) {
 			ret = ath10k_install_peer_wep_keys(arvif, sta->ni_macaddr);
 			if (ret) {
-				ath10k_warn(ar, "failed to install peer wep keys for vdev %i: %d\n",
-					    arvif->vdev_id, ret);
+				ath10k_warn(ar,
+				    "failed to install peer wep keys for "
+				    "vdev %i: %d\n",
+				    arvif->vdev_id, ret);
 				return ret;
 			}
 		}
@@ -3760,16 +3779,19 @@ int ath10k_station_disassoc(struct ath10k *ar, struct ieee80211vap *vif,
 		arvif->num_legacy_stations--;
 		ret = ath10k_recalc_rtscts_prot(arvif);
 		if (ret) {
-			ath10k_warn(ar, "failed to recalculate rts/cts prot for vdev %d: %d\n",
-				    arvif->vdev_id, ret);
+			ath10k_warn(ar,
+			    "failed to recalculate rts/cts prot for "
+			    "vdev %d: %d\n",
+			    arvif->vdev_id, ret);
 			return ret;
 		}
 	}
 
 	ret = ath10k_clear_peer_keys(arvif, macaddr);
 	if (ret) {
-		ath10k_warn(ar, "failed to clear all peer wep keys for vdev %i: %d\n",
-			    arvif->vdev_id, ret);
+		ath10k_warn(ar,
+		    "failed to clear all peer wep keys for vdev %i: %d\n",
+		    arvif->vdev_id, ret);
 		return ret;
 	}
 
@@ -4322,7 +4344,8 @@ static void ath10k_tx_h_nwifi(struct ath10k *ar, struct athp_buf *skb)
  * For now we aren't going to use it, until we absolutely have to do it
  * for bringup.
  */
-static void ath10k_tx_h_8023(struct athp_buf *skb)
+static void
+ath10k_tx_h_8023(struct ath10k *ar, struct athp_buf *skb)
 {
 #if 0
 	struct ieee80211_frame *hdr;
@@ -4349,7 +4372,7 @@ static void ath10k_tx_h_8023(struct athp_buf *skb)
 	ether_addr_copy(eth->h_source, sa);
 	eth->h_proto = type;
 #else
-	printf("%s: TODO: implement!\n", __func__);
+	ath10k_todo(ar, "%s: implement!\n", __func__);
 #endif
 }
 
@@ -4468,14 +4491,11 @@ ath10k_offchan_tx_purge(struct ath10k *ar)
 	ATHP_DATA_LOCK_ASSERT(ar);
 
 	for (;;) {
-		//ATHP_DATA_LOCK(ar);
 		skb = TAILQ_FIRST(&ar->offchan_tx_queue);
 		if (!skb) {
-			//ATHP_DATA_UNLOCK(ar);
 			break;
 		}
 		TAILQ_REMOVE(&ar->offchan_tx_queue, skb, next);
-		//ATHP_DATA_UNLOCK(ar);
 
 		ath10k_tx_free_pbuf(ar, skb, 0);
 	}
@@ -4803,13 +4823,11 @@ static int ath10k_start_scan(struct ath10k *ar,
  * fails.  So, it's likely best to make both paths just always succeed
  * for now.
  */
-void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *skb)
+void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni,
+    struct athp_buf *skb)
 {
-//	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211vap *vif = ni->ni_vap;
-//	struct ieee80211_sta *sta = control->sta;
 	struct ieee80211_frame *hdr;
-//	__le16 fc = hdr->frame_control;
 
 	hdr = mtod(skb->m, struct ieee80211_frame *);
 
@@ -4844,7 +4862,7 @@ void ath10k_tx(struct ath10k *ar, struct ieee80211_node *ni, struct athp_buf *sk
 		ath10k_tx_h_seq_no(vif, skb);
 		break;
 	case ATH10K_HW_TXRX_ETHERNET:
-		ath10k_tx_h_8023(skb);
+		ath10k_tx_h_8023(ar, skb);
 		break;
 	case ATH10K_HW_TXRX_RAW:
 		if (!test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
