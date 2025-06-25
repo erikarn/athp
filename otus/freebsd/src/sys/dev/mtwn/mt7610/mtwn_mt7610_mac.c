@@ -334,3 +334,86 @@ mtwn_mt7610_mac_wcid_init(struct mtwn_softc *sc)
 	}
 	return (0);
 }
+
+/**
+ * @brief Set the MAC address for the given BSSID index.
+ *
+ * I'm not sure why it's masking 0..7, since at least in the
+ * initialisation code it's looping from 0..15.
+ */
+int
+mtwn_mt7610_mac_set_bssid(struct mtwn_softc *sc, uint8_t bss_idx,
+    const char *macaddr)
+{
+	uint32_t idx = bss_idx & 7;
+	uint32_t mac_hi;
+	uint16_t mac_lo;
+
+	/*
+	 * TODO: why's it limited to 0..7? Should this be a hard limit
+	 * on the platform/chipset?
+	 */
+
+	mac_lo = le32dec(macaddr);
+	mac_hi = le16dec(macaddr + 4);
+
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_APC_BSSID_L(idx), mac_lo);
+
+	MTWN_REG_RMW_4(sc, MT7610_REG_MAC_APC_BSSID_H(idx),
+	    MT7610_REG_MAC_APC_BSSID_H_ADDR,
+	    _IEEE80211_SHIFTMASK(mac_hi, MT7610_REG_MAC_APC_BSSID_H_ADDR));
+
+	return (0);
+}
+
+int
+mtwn_mt7610_mac_setaddr(struct mtwn_softc *sc, const char *macaddr)
+{
+	/* XXX TODO: sigh */
+	const uint8_t null_addr[ETHER_ADDR_LEN] = { 0 };
+	int i, ret;
+	uint32_t mac_hi;
+	uint16_t mac_lo;
+
+	memcpy(sc->mac_state.sc_macaddr, macaddr, ETHER_ADDR_LEN);
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO! MAC=%6D\n", __func__, macaddr, ":");
+
+	MTWN_TODO_PRINTF(sc, "%s: TODO! Perform valid MAC address check1\n",
+	    __func__);
+
+	mac_lo = le32dec(macaddr);
+	mac_hi = le16dec(macaddr + 4);
+
+	/* Program main MAC */
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_ADDR_DW0, mac_lo);
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_ADDR_DW1,
+	    _IEEE80211_SHIFTMASK(mac_hi, MT7610_REG_MAC_ADDR_DW1_ADDR) |
+	    _IEEE80211_SHIFTMASK(0xff, MT7610_REG_MAC_ADDR_DW1_U2ME_MASK));
+
+	/* Program BSSID MAC */
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_BSSID_DW0, mac_lo);
+	/* 8 APs + 8 STAs */
+	MTWN_REG_WRITE_4(sc, MT7610_REG_MAC_BSSID_DW1,
+	    _IEEE80211_SHIFTMASK(mac_hi, MT7610_REG_MAC_BSSID_DW1_ADDR) |
+	    _IEEE80211_SHIFTMASK(3, MT7610_REG_MAC_BSSID_DW1_MBSS_MODE) |
+	    MT7610_REG_MAC_BSSID_DW1_MBSS_LOCAL_BIT);
+	/* Enable 7 additional beacon slots; control with bypass mask */
+	MTWN_REG_RMW_4(sc, MT7610_REG_MAC_BSSID_DW1,
+	    MT7610_REG_MAC_BSSID_DW1_MBEACON_N,
+	    _IEEE80211_SHIFTMASK(7, MT7610_REG_MAC_BSSID_DW1_MBEACON_N));
+
+	/* Initialise blank BSSIDs */
+	MTWN_TODO_PRINTF(sc, "%s; TODO: why 16?!\n", __func__);
+	for (i = 0; i < 16; i++) {
+		ret = mtwn_mt7610_mac_set_bssid(sc, i, null_addr);
+		if (ret != 0) {
+			MTWN_ERR_PRINTF(sc,
+			    "%s: failed to call mac_set_bssid (err %d)\n",
+			    __func__, ret);
+			return (ret);
+		}
+	}
+
+	return (0);
+}

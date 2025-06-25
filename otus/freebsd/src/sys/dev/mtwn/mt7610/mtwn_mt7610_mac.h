@@ -26,5 +26,8 @@ extern int mtwn_mt7610_mac_shared_keys_init(struct mtwn_softc *);
 extern	int mtwn_mt7610_mac_wcid_setup(struct mtwn_softc *, uint8_t, uint8_t,
 	    uint8_t *);
 extern	int mtwn_mt7610_mac_wcid_init(struct mtwn_softc *);
+extern	int mtwn_mt7610_mac_set_bssid(struct mtwn_softc *, uint8_t,
+    const char *);
+extern	int mtwn_mt7610_mac_setaddr(struct mtwn_softc *, const char *);
 
 #endif	/* __MTWN_MT76X0_MAC_H__ */

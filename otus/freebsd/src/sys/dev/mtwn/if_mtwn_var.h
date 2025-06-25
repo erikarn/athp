@@ -162,6 +162,7 @@ struct mtwn_softc {
 	/* MAC state */
 	struct {
 		uint32_t	sc_rx_filter;
+		char		sc_macaddr[ETHER_ADDR_LEN];
 	} mac_state;
 };
 
