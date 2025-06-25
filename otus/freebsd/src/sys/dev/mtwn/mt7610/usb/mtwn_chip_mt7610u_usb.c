@@ -373,6 +373,8 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	    mtwn_mt7610_mac_shared_keys_init;
 	sc->sc_chipops.sc_chip_wcid_init = mtwn_mt7610_mac_wcid_init;
 	sc->sc_chipops.sc_chip_phy_init = mtwn_mt7610_phy_init;
+	sc->sc_chipops.sc_chip_mac_setaddr = mtwn_mt7610_mac_setaddr;
+	sc->sc_chipops.sc_chip_mac_set_bssid = mtwn_mt7610_mac_set_bssid;
 
 	/* eeprom attach methods */
 	sc->sc_eepromops.sc_eeprom_init = mtwn_mt7610u_eeprom_init;

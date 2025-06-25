@@ -404,6 +404,7 @@ mtwn_mt7610_mac_setaddr(struct mtwn_softc *sc, const char *macaddr)
 	    _IEEE80211_SHIFTMASK(7, MT7610_REG_MAC_BSSID_DW1_MBEACON_N));
 
 	/* Initialise blank BSSIDs */
+	// sc->sc_chip_cfg.num_vifs ?
 	MTWN_TODO_PRINTF(sc, "%s; TODO: why 16?!\n", __func__);
 	for (i = 0; i < 16; i++) {
 		ret = mtwn_mt7610_mac_set_bssid(sc, i, null_addr);

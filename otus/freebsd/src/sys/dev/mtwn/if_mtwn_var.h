@@ -82,6 +82,10 @@ struct mtwn_chip_ops {
 	int		(*sc_chip_shared_keys_init)(struct mtwn_softc *);
 	int		(*sc_chip_wcid_init)(struct mtwn_softc *);
 	int		(*sc_chip_phy_init)(struct mtwn_softc *);
+	int		(*sc_chip_mac_setaddr)(struct mtwn_softc *,
+			    const char *);
+	int		(*sc_chip_mac_set_bssid)(struct mtwn_softc *, uint8_t,
+			    const char *);
 };
 
 struct mtwn_mcu_ops {
@@ -232,6 +236,11 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_wcid_init((_sc)))
 #define	MTWN_CHIP_PHY_INIT(_sc)			\
 	    ((_sc)->sc_chipops.sc_chip_phy_init((_sc)))
+#define	MTWN_CHIP_MAC_SETADDR(_sc, _macaddr)		\
+	    ((_sc)->sc_chipops.sc_chip_mac_setaddr((_sc), (_macaddr)))
+#define	MTWN_CHIP_MAC_SET_BSSID(_sc, _bssidx, _macaddr)		\
+	    ((_sc)->sc_chipops.sc_chip_mac_set_bssid((_sc),	\
+	    (_bssidx), (_macaddr)))
 
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\

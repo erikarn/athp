@@ -179,16 +179,35 @@ mtwn_init(struct mtwn_softc *sc)
 	 * but it needs to be documented somewhere!
 	 */
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO - eeprom_override\n", __func__);
-	MTWN_TODO_PRINTF(sc, "%s: TODO - mac_setaddr\n", __func__);
-	MTWN_TODO_PRINTF(sc, "%s: TODO - set_chip_cap\n", __func__);
-	MTWN_TODO_PRINTF(sc, "%s: TODO - set_freq_offset\n", __func__);
-	MTWN_TODO_PRINTF(sc, "%s: TODO - set_temp_offset\n", __func__);
+	ret = MTWN_EEPROM_MACADDR_READ(sc, sc->mac_state.sc_macaddr);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: MACADDR_READ failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
+
+	MTWN_INFO_PRINTF(sc, "%s: MAC address: %6D\n", __func__,
+	    sc->mac_state.sc_macaddr, ":");
+
 	/* TODO: mt76_eeprom_override - the openfirmware override stuff */
-	/* TODO: mt76x02_mac_setaddr - set mac address based on EEPROM */
+	MTWN_TODO_PRINTF(sc, "%s: TODO - eeprom_override\n", __func__);
+
+	/* Set initial MAC address and blank BSSIDs */
+	ret = MTWN_CHIP_MAC_SETADDR(sc, sc->mac_state.sc_macaddr);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: MTWN_MAC_SETADDR failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
+
 	/* TODO: mt76x0_set_chip_cap - set initial chip capabilities based on EEPROM */
+	MTWN_TODO_PRINTF(sc, "%s: TODO - set_chip_cap\n", __func__);
+
 	/* TODO: mt76x0_set_freq_offset - populate calibration frequency offset */
+	MTWN_TODO_PRINTF(sc, "%s: TODO - set_freq_offset\n", __func__);
+
 	/* TODO: mt76x0_set_temp_offset - populate calibration frequency offset */
+	MTWN_TODO_PRINTF(sc, "%s: TODO - set_temp_offset\n", __func__);
 
 	/* PHY init */
 	ret = MTWN_CHIP_PHY_INIT(sc);
@@ -253,7 +272,6 @@ int
 mtwn_attach(struct mtwn_softc *sc)
 {
 	int ret;
-	uint8_t macaddr[IEEE80211_ADDR_LEN] = { 0 };
 
 	MTWN_INFO_PRINTF(sc, "%s: hi!\n", __func__);
 
@@ -268,15 +286,6 @@ mtwn_attach(struct mtwn_softc *sc)
 	ret = mtwn_init(sc);
 	if (ret != 0)
 		return (ret);
-
-	ret = MTWN_EEPROM_MACADDR_READ(sc, macaddr);
-	if (ret != 0) {
-		MTWN_ERR_PRINTF(sc, "%s: failed to read MAC address (err %d)\n",
-		    __func__, ret);
-		return (ret);
-	}
-
-	MTWN_INFO_PRINTF(sc, "%s: MAC address: %6D\n", __func__, macaddr, ":");
 
 	return (0);
 }
