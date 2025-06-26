@@ -59,6 +59,7 @@
 #include "../if_mtwn_debug.h"
 #include "../if_mtwn_util.h"
 
+#include "mtwn_mt7610_var.h"
 #include "mtwn_mt7610_init.h"
 #include "mtwn_mt7610_mac.h"
 #include "mtwn_mt7610_bbp.h"
