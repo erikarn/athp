@@ -79,6 +79,7 @@ struct mtwn_bus_ops {
  *
  * + get_supported_bands() - get supported band set
  * + get_supported_streams() - get supported tx/rx stream count
+ * + chip_pre_phy_setup() - populate info (eg calib data) before PHY init
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
@@ -105,6 +106,7 @@ struct mtwn_chip_ops {
 			    struct mtwn_supported_bands *);
 	int		(*sc_chip_get_supported_streams)(struct mtwn_softc *,
 			    struct mtwn_supported_streams *);
+	int		(*sc_chip_pre_phy_setup)(struct mtwn_softc *);
 };
 
 struct mtwn_mcu_ops {
@@ -273,6 +275,8 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_get_supported_bands((_sc), (_bands)))
 #define	MTWN_CHIP_GET_SUPPORTED_STREAMS(_sc, _streams)		\
 	    ((_sc)->sc_chipops.sc_chip_get_supported_streams((_sc), (_streams)))
+#define	MTWN_CHIP_PRE_PHY_SETUP(_sc)				\
+	    ((_sc)->sc_chipops.sc_chip_pre_phy_setup((_sc)))
 
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\

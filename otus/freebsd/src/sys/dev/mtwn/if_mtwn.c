@@ -231,12 +231,13 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
-
-	/* TODO: mt76x0_set_freq_offset - populate calibration frequency offset */
-	MTWN_TODO_PRINTF(sc, "%s: TODO - set_freq_offset\n", __func__);
-
-	/* TODO: mt76x0_set_temp_offset - populate calibration frequency offset */
-	MTWN_TODO_PRINTF(sc, "%s: TODO - set_temp_offset\n", __func__);
+	/* Do any setup needed before PHY init (eg calibration EEPROM stuff) */
+	ret = MTWN_CHIP_PRE_PHY_SETUP(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: PRE_PHY_SETUP failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
 
 	/* PHY init */
 	ret = MTWN_CHIP_PHY_INIT(sc);
@@ -261,6 +262,11 @@ mtwn_init(struct mtwn_softc *sc)
 		    __func__, ret);
 		goto error;
 	}
+
+	/*
+	 * At this point we should have everything required
+	 * to do the net80211 setup.
+	 */
 
 	MTWN_UNLOCK(sc);
 

@@ -68,6 +68,12 @@
 #include "mtwn_mt7610_mcu_reg.h" /* XXX for Q_SELECT */
 #include "mtwn_mt7610_eeprom_reg.h"
 
+/*
+ * These are a collection of init time routines that likely can
+ * be moved into different source files once driver bring-up is
+ * finished.  For now it's convenient to park them here.
+ */
+
 /**
  * @brief enable/disable the WLAN clock; verify it's stable
  */
@@ -203,9 +209,6 @@ mtwn_mt7610_mac_init(struct mtwn_softc *sc)
 	}
 
 	/* mcu function select - this sends an MCU command / waits for resp */
-	/*
-	 * XXX TODO: this is where I wonder how to better split this up...
-	 */
 	ret = mtwn_mt7610_mcu_function_select(sc, MT7610_MCU_FUNC_Q_SELECT,
 	    1);
 	if (ret != 0) {
@@ -308,5 +311,19 @@ mtwn_mt7610_get_supported_streams(struct mtwn_softc *sc,
 		ss->num_rx_streams = 1;
 	}
 
+	return (0);
+}
+
+/**
+ * @brief Populate any information required (eg from EEPROM) before PHY init.
+ */
+int
+mtwn_mt7610_pre_phy_setup(struct mtwn_softc *sc)
+{
+	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+
+	/* TODO: frequency offset calibration */
+
+	/* TODO: temp offset calibration */
 	return (0);
 }

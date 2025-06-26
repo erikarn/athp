@@ -379,6 +379,7 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	    mtwn_mt7610_get_supported_bands;
 	sc->sc_chipops.sc_chip_get_supported_streams =
 	    mtwn_mt7610_get_supported_streams;
+	sc->sc_chipops.sc_chip_pre_phy_setup = mtwn_mt7610_pre_phy_setup;
 
 	/* eeprom attach methods */
 	sc->sc_eepromops.sc_eeprom_init = mtwn_mt7610u_eeprom_init;
