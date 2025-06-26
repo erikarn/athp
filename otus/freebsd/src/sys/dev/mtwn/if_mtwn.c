@@ -200,8 +200,29 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
-	/* TODO: mt76x0_set_chip_cap - set initial chip capabilities based on EEPROM */
-	MTWN_TODO_PRINTF(sc, "%s: TODO - set_chip_cap\n", __func__);
+	ret = MTWN_CHIP_GET_SUPPORTED_BANDS(sc, &sc->sc_phy_cap.sb);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: GET_SUPPORTED_BANDS failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
+
+	ret = MTWN_CHIP_GET_SUPPORTED_STREAMS(sc, &sc->sc_phy_cap.ss);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: GET_SUPPORTED_STREAMS failed (err %d)\n",
+		    __func__, ret);
+		goto error;
+	}
+
+	MTWN_INFO_PRINTF(sc,
+	    "%s: Bands supported: %s %s; %u TX stream, %u RX stream\n",
+	    __func__,
+	    (sc->sc_phy_cap.sb.has_2ghz ? "2G" : ""),
+	    (sc->sc_phy_cap.sb.has_2ghz ? "5G" : ""),
+	    sc->sc_phy_cap.ss.num_tx_streams,
+	    sc->sc_phy_cap.ss.num_rx_streams);
+
 
 	/* TODO: mt76x0_set_freq_offset - populate calibration frequency offset */
 	MTWN_TODO_PRINTF(sc, "%s: TODO - set_freq_offset\n", __func__);

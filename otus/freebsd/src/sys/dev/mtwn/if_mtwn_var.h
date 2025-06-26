@@ -25,6 +25,16 @@ struct mtwn_reg_pair {
 	uint32_t val;
 };
 
+struct mtwn_supported_bands {
+	bool has_2ghz;
+	bool has_5ghz;
+};
+
+struct mtwn_supported_streams {
+	uint8_t num_tx_streams;
+	uint8_t num_rx_streams;
+};
+
 struct mtwn_bus_ops {
 	void		(*sc_write_4)(struct mtwn_softc *, uint32_t, uint32_t);
 	uint32_t	(*sc_read_4)(struct mtwn_softc *, uint32_t);
@@ -64,6 +74,10 @@ struct mtwn_bus_ops {
  * + key_init() - key init
  * + wcid_init() - wcid init
  * + phy_init() - PHY/RF init
+ *
+ * More stuff:
+ *
+ * + get_supported_bands() - get supported band set
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
@@ -86,6 +100,10 @@ struct mtwn_chip_ops {
 			    const char *);
 	int		(*sc_chip_mac_set_bssid)(struct mtwn_softc *, uint8_t,
 			    const char *);
+	int		(*sc_chip_get_supported_bands)(struct mtwn_softc *,
+			    struct mtwn_supported_bands *);
+	int		(*sc_chip_get_supported_streams)(struct mtwn_softc *,
+			    struct mtwn_supported_streams *);
 };
 
 struct mtwn_mcu_ops {
@@ -135,6 +153,11 @@ struct mtwn_mcu_state {
 	uint32_t msg_seq;
 };
 
+struct mtwn_phy_capabilities {
+	struct mtwn_supported_streams ss;
+	struct mtwn_supported_bands sb;
+};
+
 struct mtwn_softc {
 	device_t		sc_dev;
 	uint32_t		sc_debug;
@@ -168,6 +191,9 @@ struct mtwn_softc {
 		uint32_t	sc_rx_filter;
 		char		sc_macaddr[ETHER_ADDR_LEN];
 	} mac_state;
+
+	/* PHY capabilities */
+	struct mtwn_phy_capabilities sc_phy_cap;
 };
 
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
@@ -241,6 +267,11 @@ struct mtwn_softc {
 #define	MTWN_CHIP_MAC_SET_BSSID(_sc, _bssidx, _macaddr)		\
 	    ((_sc)->sc_chipops.sc_chip_mac_set_bssid((_sc),	\
 	    (_bssidx), (_macaddr)))
+
+#define	MTWN_CHIP_GET_SUPPORTED_BANDS(_sc, _bands)		\
+	    ((_sc)->sc_chipops.sc_chip_get_supported_bands((_sc), (_bands)))
+#define	MTWN_CHIP_GET_SUPPORTED_STREAMS(_sc, _streams)		\
+	    ((_sc)->sc_chipops.sc_chip_get_supported_streams((_sc), (_streams)))
 
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\

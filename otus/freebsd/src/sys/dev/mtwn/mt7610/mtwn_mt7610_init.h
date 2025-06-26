@@ -23,4 +23,9 @@ extern	int mtwn_mt7610_mac_init(struct mtwn_softc *);
 /* placeholders! */
 extern	int mtwn_mt7610_phy_init(struct mtwn_softc *);
 
+extern	int mtwn_mt7610_get_supported_bands(struct mtwn_softc *,
+	    struct mtwn_supported_bands *);
+extern	int mtwn_mt7610_get_supported_streams(struct mtwn_softc *,
+	    struct mtwn_supported_streams *);
+
 #endif	/* __MTWN_MT7610_INIT_H__ */

@@ -375,6 +375,10 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_chipops.sc_chip_phy_init = mtwn_mt7610_phy_init;
 	sc->sc_chipops.sc_chip_mac_setaddr = mtwn_mt7610_mac_setaddr;
 	sc->sc_chipops.sc_chip_mac_set_bssid = mtwn_mt7610_mac_set_bssid;
+	sc->sc_chipops.sc_chip_get_supported_bands =
+	    mtwn_mt7610_get_supported_bands;
+	sc->sc_chipops.sc_chip_get_supported_streams =
+	    mtwn_mt7610_get_supported_streams;
 
 	/* eeprom attach methods */
 	sc->sc_eepromops.sc_eeprom_init = mtwn_mt7610u_eeprom_init;

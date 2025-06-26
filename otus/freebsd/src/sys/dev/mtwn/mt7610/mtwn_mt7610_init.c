@@ -66,6 +66,7 @@
 #include "mtwn_mt7610_reg.h"
 #include "mtwn_mt7610_mcu.h"
 #include "mtwn_mt7610_mcu_reg.h" /* XXX for Q_SELECT */
+#include "mtwn_mt7610_eeprom_reg.h"
 
 /**
  * @brief enable/disable the WLAN clock; verify it's stable
@@ -236,5 +237,76 @@ mtwn_mt7610_phy_init(struct mtwn_softc *sc)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	return (0);
+}
+
+/**
+ * @brief Get the supported bands.
+ *
+ * This will check the EEPROM and any futher sanity checks / chipset specific
+ * information and populate the supported bands.
+ */
+int
+mtwn_mt7610_get_supported_bands(struct mtwn_softc *sc,
+    struct mtwn_supported_bands *sb)
+{
+	uint16_t val;
+
+	memset(sb, 0, sizeof(*sb));
+
+	val = MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_NIC_CONF_0);
+
+	switch (_IEEE80211_MASKSHIFT(val,
+	    MT7610_EEPROM_NIC_CONF_0_BOARD_TYPE)) {
+	case MT7610_EEPROM_NIC_CONF_0_BOARD_TYPE_VAL_2GHZ:
+		sb->has_2ghz = true;
+		break;
+	case MT7610_EEPROM_NIC_CONF_0_BOARD_TYPE_VAL_5GHZ:
+		sb->has_5ghz = true;
+		break;
+	default:
+		sb->has_2ghz = true;
+		sb->has_5ghz = true;
+		break;
+	}
+
+	return (0);
+}
+
+/**
+ * @brief Get the supported number of transmit and receive streams.
+ *
+ * This will check the EEPROM and any futher sanity checks / chipset specific
+ * information and populate the supported transmit/receive streams.
+ */
+int
+mtwn_mt7610_get_supported_streams(struct mtwn_softc *sc,
+    struct mtwn_supported_streams *ss)
+{
+	uint16_t val;
+
+	memset(ss, 0, sizeof(*ss));
+
+	val = MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_NIC_CONF_0);
+
+	ss->num_tx_streams =
+	    _IEEE80211_MASKSHIFT(val, MT7610_EEPROM_NIC_CONF_0_TX_PATH);
+	ss->num_rx_streams =
+	    _IEEE80211_MASKSHIFT(val, MT7610_EEPROM_NIC_CONF_0_RX_PATH);
+
+	/* The MT7610 chipset is 1x1, so enforce that */
+
+	if (ss->num_tx_streams > 1) {
+		MTWN_WARN_PRINTF(sc, "%s: got %u TX streams, limit is 1\n",
+		    __func__, ss->num_tx_streams);
+		ss->num_tx_streams = 1;
+	}
+
+	if (ss->num_rx_streams > 1) {
+		MTWN_WARN_PRINTF(sc, "%s: got %u RX streams, limit is 1\n",
+		    __func__, ss->num_rx_streams);
+		ss->num_rx_streams = 1;
+	}
+
 	return (0);
 }
