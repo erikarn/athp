@@ -200,6 +200,9 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
+	/* TODO: mt76x02_config_mac_addr_list() */
+	MTWN_TODO_PRINTF(sc, "%s: configure_mac_addr_list\n", __func__);
+
 	ret = MTWN_CHIP_GET_SUPPORTED_BANDS(sc, &sc->sc_phy_cap.sb);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: GET_SUPPORTED_BANDS failed (err %d)\n",
@@ -262,6 +265,11 @@ mtwn_init(struct mtwn_softc *sc)
 		    __func__, ret);
 		goto error;
 	}
+
+	/* TODO: everything that's in mt76x0_register_device() */
+	/* fetch the LDPC coding config for 2g/5g vht and ht */
+	/* mt76x0_init_txpower() for 2ghz if needed */
+	/* mt76x0_init_txpower() for 5ghz if needed */
 
 	/*
 	 * At this point we should have everything required

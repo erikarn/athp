@@ -1,0 +1,68 @@
+
+The mt7610u attach path:
+
+mt76x0u_probe()
+	- mt76x02_init_mcu - mcu methods
+	- mt76u_init
+	- (done) chip on off
+	- (done) wait for mac
+	- mt76x0u_register_device
+
+mt76x0u_register_device()
+	- memory / queue alloc
+	- mt76x0u_init_hardware()
+	- some amsdu / tx fragments
+	- mt76x0_register_device()
+	- MT76_STATE_INITIALISED in phy state
+
+# mt76x0u_init_hardware() is called both by register_device
+# and by mt76x0_resume()
+
+mt76x0u_init_hardware()
+	- (done) chip on / off
+	- (done) wait for mac
+	- (done) mt76x0u_mcu_init
+	- (done) mt76x0_init_usb_dma
+	- (done) mt76x0_init_hardware
+	- mt76x02u_init_beacon_config
+	- (done) cca/cyc/txop config
+
+# called form mt76x0u_init_hardware() and the PCI version
+# of it.
+
+mt76x0_init_hardware()
+	- (done) wait for wpdma
+	- (done) wait for mac
+	- (done) reset_csr_bbp
+	- (done) mcu_function_select
+	- (done) init_mac_registers
+	- (done) wait for txrx idle
+	- (done) mt76x0_init_bbp
+	- (done) shared key setup
+	- (done) wcid setup
+	- (done) mt76x0_eeprom_init
+	- mt76x0_phy_init
+
+# TODO: this is the bit I haven't done yet
+# it's going to end up happening after the phy init code
+# this is also called from the usb and pci init paths
+# but note it's not called during hardware init, it's called
+# as part of attach
+
+mt76x0_register_device()
+	- mt76x02_init_device()
+	- mt76x02_config_mac_addr_list() - needs macaddr read first
+	- clear rxldpc vhtcap if 5g
+	- mt76x0_init_txpower() on 5g if needed
+	- mt76x0_init_txpower() on 2g if needed
+	- mt76x02_init_debugfs()
+
+# this looks like mac80211/nl80211/cfg80211 related stuff, mostly
+
+mt76x02_init_device()
+	- sets up rate control config, queues, retries, tx headroom,
+	- interface combinations, DFS stuff, LED callbacks, feature set,
+	- the nl80211/mac80211 stuff
+	- global_wcid.idx , global_wcid.hw_key_idx, slottime
+	- default chainmask, LDPC coding
+
