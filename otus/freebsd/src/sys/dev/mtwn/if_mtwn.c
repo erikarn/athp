@@ -223,6 +223,14 @@ mtwn_init(struct mtwn_softc *sc)
 	    sc->sc_phy_cap.ss.num_tx_streams,
 	    sc->sc_phy_cap.ss.num_rx_streams);
 
+	if ((sc->sc_phy_cap.ss.num_tx_streams < 1) ||
+	   (sc->sc_phy_cap.ss.num_tx_streams < 1)) {
+		MTWN_ERR_PRINTF(sc, "%s: invalid TX/RX stream count\n",
+		    __func__);
+		ret = ENXIO;
+		goto error;
+	}
+
 
 	/* TODO: mt76x0_set_freq_offset - populate calibration frequency offset */
 	MTWN_TODO_PRINTF(sc, "%s: TODO - set_freq_offset\n", __func__);
