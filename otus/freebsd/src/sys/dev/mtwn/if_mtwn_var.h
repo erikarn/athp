@@ -78,6 +78,7 @@ struct mtwn_bus_ops {
  * More stuff:
  *
  * + get_supported_bands() - get supported band set
+ * + get_supported_streams() - get supported tx/rx stream count
  */
 struct mtwn_chip_ops {
 	void		(*sc_chip_detach)(struct mtwn_softc *);
