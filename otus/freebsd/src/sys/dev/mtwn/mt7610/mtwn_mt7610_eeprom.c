@@ -228,3 +228,53 @@ mtwn_mt7610_eeprom_read_2(struct mtwn_softc *sc, uint16_t offset)
 
 	return (val);
 }
+
+/**
+ * @brief Validate that a field is "valid".
+ *
+ * Validating a field is "valid" here is that it is not 0x0 or 0xff.
+ * This is from mt76; my guess is to capture field validity based on
+ * whether it's populated (not 0x0) and not invalid/missing from
+ * efuse (0xff).
+ */
+bool
+mtwn_mt7610_eeprom_field_valid_1(struct mtwn_softc *sc, uint8_t field)
+{
+	return ((field != 0) && (field != 0xff));
+}
+
+/**
+ * @brief Sign extend a value.
+ *
+ * size is the number of bits the value can have.
+ */
+int32_t
+mtwn_mt7610_eeprom_field_sign_extend(struct mtwn_softc *sc, uint32_t val,
+    uint32_t size)
+{
+	bool sign = (val & (1 << (size - 1)));
+
+	val &= (1 << (size - 1)) - 1;
+	return (sign ? val : -val);
+}
+
+/**
+ * @brief Sign extend a value, or return 0.
+ *
+ * this will sign extend based on the number of bits in size,
+ * however if BIT(size) is 0, then 0 is returned.
+ *
+ * Eg if the number is 0x, and size is 8, then bits 0..7 are checked
+ * for the value (and not sign extended) but then since bit 8 isn't set,
+ * 0 is returned.
+ */
+int32_t
+mtwn_mt7610_eeprom_field_sign_extend_optional(struct mtwn_softc *sc,
+    uint32_t val, uint32_t size)
+{
+	bool enable;
+
+	enable = val & (1 << size);
+	return (enable ? mtwn_mt7610_eeprom_field_sign_extend(sc, val, size)
+	    : 0);
+}

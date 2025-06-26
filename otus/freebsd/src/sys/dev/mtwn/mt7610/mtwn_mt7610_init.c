@@ -273,6 +273,10 @@ mtwn_mt7610_get_supported_bands(struct mtwn_softc *sc,
 		break;
 	}
 
+	/* MT7630 is 2GHz only */
+	if (MTWN_MT7610_CHIP_IS_MT7630(sc))
+		sb->has_5ghz = false;
+
 	return (0);
 }
 

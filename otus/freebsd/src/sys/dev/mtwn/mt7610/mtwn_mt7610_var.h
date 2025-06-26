@@ -34,6 +34,9 @@ struct mtwn_mt7610_chip_priv {
 #define	MTWN_MT7610_CHIP_SOFTC(sc)			\
 	    ((struct mtwn_mt7610_chip_priv *)((sc)->sc_chipops_priv))
 
+#define	MTWN_MT7610_CHIP_IS_MT7610(sc)		(true)
+#define	MTWN_MT7610_CHIP_IS_MT7630(sc)		(false)
+
 /*
  * This is used by the hardware as well as arguments, so it
  * lives here instead of *reg.h.
