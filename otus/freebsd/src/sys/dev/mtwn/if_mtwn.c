@@ -242,6 +242,8 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
+	/* TODO: Init/setup PHY calibration work (mt76x0_phy_calibration_work) */
+
 	/* PHY init */
 	ret = MTWN_CHIP_PHY_INIT(sc);
 	if (ret != 0) {

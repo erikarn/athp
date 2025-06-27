@@ -19,6 +19,7 @@ SRCS	+= mtwn_mt7610_eeprom.c
 SRCS	+= mtwn_mt7610_init.c
 SRCS	+= mtwn_mt7610_mac.c
 SRCS	+= mtwn_mt7610_mcu.c
+SRCS	+= mtwn_mt7610_phy.c
 
 .PATH: ${.CURDIR}/../../dev/mtwn/mt7610/usb
 

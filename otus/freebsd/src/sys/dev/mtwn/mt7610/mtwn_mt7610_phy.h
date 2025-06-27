@@ -13,17 +13,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef	__MTWN_MT7610_INIT_H__
-#define	__MTWN_MT7610_INIT_H__
+#ifndef	__MTWN_MT7610_PHY_H__
+#define	__MTWN_MT7610_PHY_H__
 
-extern	int mtwn_mt76x0_set_wlan_state(struct mtwn_softc *, uint32_t, bool);
-extern	int mtwn_mt76x0_chip_onoff(struct mtwn_softc *, bool, bool);
-extern	int mtwn_mt7610_mac_init(struct mtwn_softc *);
+extern	int mtwn_mt7610_phy_ant_select(struct mtwn_softc *);
+extern	int mtwn_mt7610_phy_rf_init(struct mtwn_softc *);
+extern	int mtwn_mt7610_phy_set_rxpath(struct mtwn_softc *);
+extern	int mtwn_mt7610_phy_set_txdac(struct mtwn_softc *);
+extern	int mtwn_mt7610_phy_init(struct mtwn_softc *);
 
-extern	int mtwn_mt7610_get_supported_bands(struct mtwn_softc *,
-	    struct mtwn_supported_bands *);
-extern	int mtwn_mt7610_get_supported_streams(struct mtwn_softc *,
-	    struct mtwn_supported_streams *);
-extern	int mtwn_mt7610_pre_phy_setup(struct mtwn_softc *);
-
-#endif	/* __MTWN_MT7610_INIT_H__ */
+#endif	/* __MTWN_MT7610_PHY_H__ */

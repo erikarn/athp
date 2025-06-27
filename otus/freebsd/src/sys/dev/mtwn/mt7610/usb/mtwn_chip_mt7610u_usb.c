@@ -64,6 +64,7 @@
 #include "../mtwn_mt7610_bbp.h"
 #include "../mtwn_mt7610_reg.h"
 #include "../mtwn_mt7610_mcu.h"
+#include "../mtwn_mt7610_phy.h"
 #include "../mtwn_mt7610_eeprom.h"
 #include "../mtwn_mt7610_eeprom_reg.h" /* XXX for eeprom size */
 
