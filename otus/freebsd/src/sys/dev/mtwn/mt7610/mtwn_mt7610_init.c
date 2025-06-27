@@ -61,6 +61,7 @@
 
 #include "mtwn_mt7610_var.h"
 #include "mtwn_mt7610_init.h"
+#include "mtwn_mt7610_eeprom.h"
 #include "mtwn_mt7610_mac.h"
 #include "mtwn_mt7610_bbp.h"
 #include "mtwn_mt7610_dma.h"
@@ -319,16 +320,79 @@ mtwn_mt7610_get_supported_streams(struct mtwn_softc *sc,
 	return (0);
 }
 
+static void
+mtwn_mt7610_fetch_temp_offset(struct mtwn_softc *sc)
+{
+	struct mtwn_mt7610_chip_priv *psc = MTWN_MT7610_CHIP_SOFTC(sc);
+	uint8_t val;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	val = MTWN_EEPROM_READ_1(sc, MT7610_EEPROM_TEMP_OFFSET);
+	if (mtwn_mt7610_eeprom_field_valid_1(sc, val))
+		psc->rx_freq_cal.temp_offset =
+		    mtwn_mt7610_eeprom_field_sign_extend(sc, val, 8);
+	else
+		psc->rx_freq_cal.temp_offset = -10;
+
+	MTWN_DEBUG_PRINTF(sc, "%s: 2G_TARGET_POWER=0x%04x, TEMP_OFFSET=0x%02x, val=%d (%d)\n",
+	    __func__,
+	    MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_2G_TARGET_POWER),
+	    MTWN_EEPROM_READ_1(sc, MT7610_EEPROM_TEMP_OFFSET),
+	    val,
+	    mtwn_mt7610_eeprom_field_sign_extend(sc, val, 8));
+}
+
+static void
+mtwn_mt7610_fetch_freq_offset(struct mtwn_softc *sc)
+{
+	struct mtwn_mt7610_chip_priv *psc = MTWN_MT7610_CHIP_SOFTC(sc);
+	uint8_t val;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* Base frequency offset */
+	val = MTWN_EEPROM_READ_1(sc, MT7610_EEPROM_FREQ_OFFSET);
+	if (!mtwn_mt7610_eeprom_field_valid_1(sc, val))
+		val = 0;
+
+	/* TODO: is this implicitly doing unsigned -> signed conversion? */
+	psc->rx_freq_cal.freq_offset = val;
+
+	/* Offset compensation */
+	val = MTWN_EEPROM_READ_1(sc, MT7610_EEPROM_FREQ_OFFSET_COMPENSATION);
+	if (!mtwn_mt7610_eeprom_field_valid_1(sc, val))
+		val = 0;
+
+	MTWN_DEBUG_PRINTF(sc, "%s: 2: FREQ_OFFSET=0x%04x, TSSI_BOUND4=0x%04x\n",
+	  __func__,
+	  MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_FREQ_OFFSET),
+	  MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_TSSI_BOUND4));
+
+	MTWN_DEBUG_PRINTF(sc, "%s: FREQ_OFFSET=0x%02x, COMP=0x%02x\n",
+	  __func__,
+	  MTWN_EEPROM_READ_1(sc, MT7610_EEPROM_FREQ_OFFSET),
+	  MTWN_EEPROM_READ_1(sc, MT7610_EEPROM_FREQ_OFFSET_COMPENSATION));
+
+	MTWN_DEBUG_PRINTF(sc, "%s: OFFSET=%d, comp=%d\n", __func__,
+	    psc->rx_freq_cal.freq_offset,
+	    mtwn_mt7610_eeprom_field_sign_extend(sc, val, 8));
+
+	psc->rx_freq_cal.freq_offset -=
+	    mtwn_mt7610_eeprom_field_sign_extend(sc, val, 8);
+}
+
+
 /**
  * @brief Populate any information required (eg from EEPROM) before PHY init.
  */
 int
 mtwn_mt7610_pre_phy_setup(struct mtwn_softc *sc)
 {
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	/* frequency offset calibration */
+	mtwn_mt7610_fetch_freq_offset(sc);
 
-	/* TODO: frequency offset calibration */
-
-	/* TODO: temp offset calibration */
+	/* temp offset calibration */
+	mtwn_mt7610_fetch_temp_offset(sc);
 	return (0);
 }
