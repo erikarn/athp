@@ -132,6 +132,7 @@ struct mtwn_eeprom_ops {
 	int		(*sc_efuse_validate)(struct mtwn_softc *sc);
 	int		(*sc_efuse_populate)(struct mtwn_softc *sc);
 	int		(*sc_eeprom_read_2)(struct mtwn_softc *sc, uint16_t);
+	int		(*sc_eeprom_read_1)(struct mtwn_softc *sc, uint16_t);
 
 	int		(*sc_eeprom_macaddr_read)(struct mtwn_softc *sc,
 			    uint8_t *);
@@ -308,6 +309,8 @@ struct mtwn_softc {
 	    ((_sc)->sc_eepromops.sc_eeprom_macaddr_read((_sc), (_mac)))
 #define	MTWN_EEPROM_READ_2(_sc, _reg)			\
 	    ((_sc)->sc_eepromops.sc_eeprom_read_2((_sc), (_reg)))
+#define	MTWN_EEPROM_READ_1(_sc, _reg)			\
+	    ((_sc)->sc_eepromops.sc_eeprom_read_1((_sc), (_reg)))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);

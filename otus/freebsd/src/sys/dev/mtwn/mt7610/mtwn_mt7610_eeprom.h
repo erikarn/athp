@@ -25,6 +25,7 @@ extern	int mtwn_mt7610_efuse_populate(struct mtwn_softc *, char *, uint32_t);
 
 extern	int mtwn_mt7610_eeprom_macaddr_read(struct mtwn_softc *, uint8_t *);
 extern	int mtwn_mt7610_eeprom_read_2(struct mtwn_softc *, uint16_t);
+extern	int mtwn_mt7610_eeprom_read_1(struct mtwn_softc *, uint16_t);
 
 extern	bool mtwn_mt7610_eeprom_field_valid_1(struct mtwn_softc *, uint8_t);
 extern	int32_t mtwn_mt7610_eeprom_field_sign_extend(struct mtwn_softc *,

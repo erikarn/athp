@@ -209,8 +209,6 @@ mtwn_mt7610_eeprom_macaddr_read(struct mtwn_softc *sc, uint8_t *mac)
 int
 mtwn_mt7610_eeprom_read_2(struct mtwn_softc *sc, uint16_t offset)
 {
-	uint16_t val;
-
 	if (sc->sc_eepromops_priv == NULL)
 		return (-1);
 
@@ -223,10 +221,35 @@ mtwn_mt7610_eeprom_read_2(struct mtwn_softc *sc, uint16_t offset)
 	if ((offset & 1) != 0)
 		return (-1);
 
-	memcpy(&val, ((const char *) sc->sc_eepromops_priv) + offset,
+	return (le16dec(((const char *) sc->sc_eepromops_priv) + offset));
+}
+
+/**
+ * @brief read one byte at any offset, or return -1 upon failure.
+ */
+int
+mtwn_mt7610_eeprom_read_1(struct mtwn_softc *sc, uint16_t offset)
+{
+	uint16_t addr;
+	uint16_t val;
+
+	if (sc->sc_eepromops_priv == NULL)
+		return (-1);
+
+	/* Check the request fits in the eeprom range */
+	if (offset > MT7610_EEPROM_SIZE-1)
+		return (-1);
+
+	/* We're reading two bytes, and masking off one as needed */
+	addr = offset & 0xfffe;
+
+	memcpy(&val, ((const char *) sc->sc_eepromops_priv) + addr,
 	    sizeof(uint16_t));
 
-	return (val);
+	if ((offset & 1) == 0)
+		return (val & 0xff);
+	else
+		return (val >> 8);
 }
 
 /**
@@ -252,10 +275,16 @@ int32_t
 mtwn_mt7610_eeprom_field_sign_extend(struct mtwn_softc *sc, uint32_t val,
     uint32_t size)
 {
+#if 0
 	bool sign = (val & (1 << (size - 1)));
 
 	val &= (1 << (size - 1)) - 1;
 	return (sign ? val : -val);
+#else
+	uint32_t sign = val & (1 << (size - 1));
+	uint32_t val2 = val & (1 << (size - 1)) - 1;
+	return (val2 | -sign);
+#endif
 }
 
 /**

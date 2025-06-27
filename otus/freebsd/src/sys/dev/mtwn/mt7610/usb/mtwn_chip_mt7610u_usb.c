@@ -389,6 +389,7 @@ mtwn_chip_mt7610u_attach(struct mtwn_softc *sc)
 	sc->sc_eepromops.sc_eeprom_macaddr_read =
 	    mtwn_mt7610_eeprom_macaddr_read;
 	sc->sc_eepromops.sc_eeprom_read_2 = mtwn_mt7610_eeprom_read_2;
+	sc->sc_eepromops.sc_eeprom_read_1 = mtwn_mt7610_eeprom_read_1;
 
 	/* chipset config */
 	sc->sc_chip_cfg.num_vifs = 16;
