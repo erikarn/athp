@@ -2,16 +2,16 @@
 The mt7610u attach path:
 
 mt76x0u_probe()
-	- mt76x02_init_mcu - mcu methods
-	- mt76u_init
+	- (not needed) mt76x02_init_mcu - mcu methods
+	- (not needed) mt76u_init
 	- (done) chip on off
 	- (done) wait for mac
 	- mt76x0u_register_device
 
 mt76x0u_register_device()
-	- memory / queue alloc
+	- (done) memory / queue alloc
 	- mt76x0u_init_hardware()
-	- some amsdu / tx fragments
+	- (todo when needed) some amsdu / tx fragments
 	- mt76x0_register_device()
 	- MT76_STATE_INITIALISED in phy state
 
