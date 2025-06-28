@@ -1,3 +1,6 @@
+
+/* TODO: remove this once everything has been migrated to subsystem initval headers! */
+
 /*
  * Copyright (c) 2025, Adrian Chadd <adrian@FreeBSD.org>
  *
