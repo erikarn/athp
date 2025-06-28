@@ -62,17 +62,70 @@
 #include "mtwn_mt7610_reg.h"
 #include "mtwn_mt7610_mac.h"
 #include "mtwn_mt7610_mcu_reg.h" /* for MT7610_MCU_MEMMAP_WLAN */
+#include "mtwn_mt7610_eeprom_reg.h" /* for EEPROM defs */
 
 #include "mtwn_mt7610_var.h"
 #include "mtwn_mt7610_phy_reg.h"
 #include "mtwn_mt7610_phy.h"
 
+#include "mtwn_mt7610_phy_initvals.h"
+
 int
 mtwn_mt7610_phy_ant_select(struct mtwn_softc *sc)
 {
+	uint16_t ee_ant, ee_cfg1, nic_conf2;
+	uint32_t wlan, coex3;
+	bool ant_div;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	ee_ant = MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_ANTENNA);
+	ee_cfg1 = MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_CFG1_INIT);
+	nic_conf2 = MTWN_EEPROM_READ_2(sc, MT7610_EEPROM_NIC_CONF_2);
+
+	wlan = MTWN_REG_READ_4(sc, MT76_REG_WLAN_FUN_CTRL);
+	coex3 = MTWN_REG_READ_4(sc, MT7610_REG_COEXCFG3);
+
+	MTWN_TODO_PRINTF(sc,
+	    "%s: TODO: does the reference driver define these bit fields?\n",
+	    __func__);
+
+	/* Mask out bits that we will configure */
+	ee_ant &= ~0x00005000;	/* Bit 12, bit 14 */
+	wlan &= ~(MT76_REG_WLAN_FUN_CTRL_FRC_WL_ANT_SEL |
+	    MT76_REG_WLAN_FUN_CTRL_INV_ANT_SEL);
+	coex3 &= 0x00000003c; /* bits 2..5 */
+
+	if (ee_ant & MT7610_EEPROM_ANTENNA_DUAL) {
+		/* Dual antenna */
+		ant_div = !(nic_conf2 & MT7610_EEPROM_NIC_CONF_2_ANT_OPT) &&
+		    (nic_conf2 & MT7610_EEPROM_NIC_CONF_2_ANT_DIV);
+		if (ant_div)
+			ee_ant |= (1 << 12);
+		else
+			coex3 |= (1 << 4);
+		coex3 |= (1 << 3);
+		if (sc->sc_phy_cap.sb.has_2ghz)
+			wlan |= MT76_REG_WLAN_FUN_CTRL_INV_ANT_SEL;
+	} else {
+		/* Single antenna */
+		if (sc->sc_phy_cap.sb.has_5ghz)
+			coex3 |= (1 << 3) | (1 << 4);
+		else {
+			wlan |= MT76_REG_WLAN_FUN_CTRL_INV_ANT_SEL;
+			coex3 |= (1 << 1);
+		}
+	}
+
+	if (MTWN_MT7610_CHIP_IS_MT7630(sc))
+		ee_ant |= (1 << 14) | (1 << 11);
+
+	MTWN_REG_WRITE_4(sc, MT76_REG_WLAN_FUN_CTRL, wlan);
+	MTWN_REG_RMW_4(sc, MT76_REG_CMB_CTRL, 0x0000ffff, ee_ant);
+	MTWN_REG_RMW_4(sc, MT7610_REG_CSR_EE_CFG1, 0x0000ffff, ee_cfg1);
+	MTWN_REG_CLEAR_4(sc, MT7610_REG_COEXCFG0, (1 << 2));
+	MTWN_REG_WRITE_4(sc, MT7610_REG_COEXCFG3, coex3);
+
 	return (0);
 }
 

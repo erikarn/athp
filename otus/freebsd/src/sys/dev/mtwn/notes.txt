@@ -66,3 +66,10 @@ mt76x02_init_device()
 	- global_wcid.idx , global_wcid.hw_key_idx, slottime
 	- default chainmask, LDPC coding
 
+mt76x0_phy_init()
+	- init calibration task (but don't run it yet)
+	- mt76x0_phy_ant_select()
+	- mt76x0_phy_rf_init()
+	- mt76x02_phy_set_rxpath()
+	- mt76x02_phy_set_txdac()
+

@@ -50,7 +50,7 @@ static const struct mtwn_reg_pair mtwn_mt7610_common_mac_reg_table[] = {
 	{ MT7610_REG_PWR_PIN_CFG,		0x00000000 },
 };
 
-static const struct mt76_reg_pair mt76x0_mac_reg_table[] = {
+static const struct mtwn_reg_pair mt76x0_mac_reg_table[] = {
 	{ MT7610_REG_IOCFG_6,			0xa0040080 },
 	{ MT7610_REG_PBF_SYS_CTRL,		0x00080c00 },
 	{ MT7610_REG_PBF_CFG,			0x77723c1f },
@@ -88,7 +88,7 @@ static const struct mt76_reg_pair mt76x0_mac_reg_table[] = {
 	{ MT7610_REG_VHT_HT_FBK_CFG1,		0xedcba980 },
 };
 
-static const struct mt76_reg_pair mt76x0_bbp_init_tab[] = {
+static const struct mtwn_reg_pair mt76x0_bbp_init_tab[] = {
 	{ MT7610_REG_BBP(CORE, 1),	0x00000002 },
 	{ MT7610_REG_BBP(CORE, 4),	0x00000000 },
 	{ MT7610_REG_BBP(CORE, 24),	0x00000000 },
