@@ -22,6 +22,9 @@
 /* TODO: is this just part of the global memory map? */
 #define	MT7610_MCU_MEMMAP_WLAN		0x410000
 
+#define	MT7610_MCU_MEMMAP_RF		0x80000000
+
+
 #define	MT7610_MCU_INBAND_PACKET_MAX_LEN	192
 
 /*

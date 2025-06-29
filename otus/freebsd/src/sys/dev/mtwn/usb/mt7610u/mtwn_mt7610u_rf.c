@@ -67,13 +67,15 @@
 #include "../if_mtwn_usb_vendor_io.h"
 #include "../if_mtwn_usb_cmd.h"
 
-#include "../../mt7610/mtwn_mt7610_reg.h"
+#include "../../mt7610/mtwn_mt7610_mcu_reg.h"
 
 #include "mtwn_mt7610u_rf.h"
 
 static uint32_t
 mtwn_mt7610u_rf_reg_read(struct mtwn_softc *sc, uint32_t reg)
 {
+	/* TODO: until the regpair APIs actually return read IO right */
+
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (0xffffffff);
 }
@@ -82,20 +84,44 @@ static int
 mtwn_mt7610u_rf_reg_write(struct mtwn_softc *sc, uint32_t reg,
     uint32_t data)
 {
-	MTWN_TODO_PRINTF(sc, "%s: TODO: reg=0x%08x, val=0x%08x\n",
+	struct mtwn_reg_pair rp = { 0 };
+	int ret;
+
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	rp.reg = reg;
+	rp.val = data;
+
+	MTWN_DEBUG_PRINTF(sc, "%s: reg=0x%08x, val=0x%08x\n",
 	    __func__, reg, data);
-	return (ENXIO);
+
+	ret = MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_RF, &rp, 1);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: REG_PAIR_WRITE_4 failed (err %d)\n",
+		    __func__, ret);
+	}
+
+	return (ret);
 }
 
 static int
-mtwn_mt7610u_rf_reg_pair_write(struct mtwn_softc *sc, uint32_t base,
+mtwn_mt7610u_rf_reg_pair_write(struct mtwn_softc *sc,
     const struct mtwn_reg_pair *rp, int n)
 {
+	int ret;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO: base=0x%08x, n=%d\n", __func__,
-	    base, n);
-	return (ENXIO);
+	MTWN_DEBUG_PRINTF(sc, "%s: n=%d\n", __func__, n);
+
+	ret = MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_RF, rp, n);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: REG_PAIR_WRITE_4 failed (err %d)\n",
+		    __func__, ret);
+	}
+
+	return (ret);
+
 }
 
 static int
@@ -103,6 +129,8 @@ mtwn_mt7610u_rf_reg_rmw(struct mtwn_softc *sc, uint32_t reg,
     uint32_t mask, uint32_t set)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* TODO: until the regpair APIs actually return read IO right */
 
 	MTWN_TODO_PRINTF(sc, "%s: TODO: reg=0x%08x, mask=0x%08x, set=0x%08x\n",
 	    __func__, reg, mask, set);

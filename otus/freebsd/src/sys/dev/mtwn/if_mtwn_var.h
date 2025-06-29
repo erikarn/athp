@@ -148,7 +148,7 @@ struct mtwn_rf_ops {
 	int		(*sc_rf_reg_rmw_4)(struct mtwn_softc *, uint32_t,
 			    uint32_t, uint32_t);
 	int		(*sc_rf_reg_pair_write)(struct mtwn_softc *,
-			    uint32_t, const struct mtwn_reg_pair *rp, int);
+			    const struct mtwn_reg_pair *rp, int);
 };
 
 struct mtwn_mcu_cfg {
@@ -324,9 +324,9 @@ struct mtwn_softc {
 	    ((_sc)->sc_eepromops.sc_eeprom_read_1((_sc), (_reg)))
 
 /* RF operations */
-#define	MTWN_RF_REG_PAIR_WRITE_4(_sc, _base, _rp, _n)		\
+#define	MTWN_RF_REG_PAIR_WRITE_4(_sc, _rp, _n)			\
 	    ((_sc)->sc_rfops.sc_rf_reg_pair_write((_sc),	\
-	    (_base), (_rp), (_n)))
+	    (_rp), (_n)))
 #define	MTWN_RF_REG_READ_4(_sc, _reg)				\
 	    ((_sc)->sc_rfops.sc_rf_reg_read_4((_sc), (_reg)))
 #define	MTWN_RF_REG_WRITE_4(_sc, _reg, _val)			\
