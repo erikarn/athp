@@ -309,7 +309,7 @@ mtwn_mcu_mt7610u_mcu_reg_write(struct mtwn_softc *sc, uint32_t reg,
 
 static int
 mtwn_mcu_mt7610u_mcu_reg_pair_read_chunk(struct mtwn_softc *sc,
-    int base, struct mtwn_reg_pair *rp, int n, bool final)
+    uint32_t base, struct mtwn_reg_pair *rp, int n, bool final)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
@@ -327,7 +327,7 @@ mtwn_mcu_mt7610u_mcu_reg_pair_read_chunk(struct mtwn_softc *sc,
 }
 
 static int
-mtwn_mcu_mt7610u_mcu_reg_pair_read(struct mtwn_softc *sc, int base,
+mtwn_mcu_mt7610u_mcu_reg_pair_read(struct mtwn_softc *sc, uint32_t base,
     struct mtwn_reg_pair *rp, int n)
 {
 	int count, ret = 0;
@@ -353,7 +353,7 @@ error:
 
 static int
 mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
-    int base, const struct mtwn_reg_pair *rp, int n, bool final)
+    uint32_t base, const struct mtwn_reg_pair *rp, int n, bool final)
 {
 	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
 	struct mtwn_cmd *cmd;
@@ -413,7 +413,7 @@ mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
 }
 
 static int
-mtwn_mcu_mt7610u_mcu_reg_pair_write(struct mtwn_softc *sc, int base,
+mtwn_mcu_mt7610u_mcu_reg_pair_write(struct mtwn_softc *sc, uint32_t base,
     const struct mtwn_reg_pair *rp, int n)
 {
 	int count, ret = 0;

@@ -80,6 +80,7 @@
 #include "../mt7610/usb/mtwn_chip_mt7610u_usb.h"
 
 #include "mt7610u/mtwn_mt7610u_mcu.h"
+#include "mt7610u/mtwn_mt7610u_rf.h"
 
 static const STRUCT_USB_HOST_ID mtwn_usb_devs[] = {
 #define MTWN_DEV(v, p, chipid)						\
@@ -115,7 +116,7 @@ mtwn_usb_match(device_t self)
 }
 
 static int
-mtwn_usb_reg_pair_read(struct mtwn_softc *sc, int base,
+mtwn_usb_reg_pair_read(struct mtwn_softc *sc, uint32_t base,
     struct mtwn_reg_pair *rp, int n)
 {
 	int i;
@@ -135,7 +136,7 @@ mtwn_usb_reg_pair_read(struct mtwn_softc *sc, int base,
 }
 
 static int
-mtwn_usb_reg_pair_write(struct mtwn_softc *sc, int base,
+mtwn_usb_reg_pair_write(struct mtwn_softc *sc, uint32_t base,
     const struct mtwn_reg_pair *rp, int n)
 {
 	int i;
@@ -200,6 +201,11 @@ mtwn_usb_attach(device_t self)
 		error = mtwn_mcu_mt7610u_attach(sc);
 		if (error != 0)
 			goto detach;
+		/* XXX print error */
+		error = mtwn_mt7610u_rf_attach(sc);
+		if (error != 0)
+			goto detach;
+
 		break;
 	default:
 		MTWN_ERR_PRINTF(sc, "%s: unknown chip\n", __func__);

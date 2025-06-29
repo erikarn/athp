@@ -19,5 +19,6 @@ SRCS    = if_mtwn_usb_attach.c \
 .PATH: ${.CURDIR}/../../dev/mtwn/usb/mt7610u
 
 SRCS	+= mtwn_mt7610u_mcu.c
+SRCS	+= mtwn_mt7610u_rf.c
 
 .include <bsd.kmod.mk>

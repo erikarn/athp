@@ -44,10 +44,9 @@ struct mtwn_bus_ops {
 
 	/* Note: these may end up going via the MCU path if the MCU is up */
 	int		(*sc_reg_pair_read)(struct mtwn_softc *,
-			    int, struct mtwn_reg_pair *rp, int);
+			    uint32_t, struct mtwn_reg_pair *rp, int);
 	int		(*sc_reg_pair_write)(struct mtwn_softc *,
-			    int, const struct mtwn_reg_pair *rp, int);
-
+			    uint32_t, const struct mtwn_reg_pair *rp, int);
 	int		(*sc_read_copy_4)(struct mtwn_softc *, uint32_t,
 			    char *, int);
 	int		(*sc_write_copy_4)(struct mtwn_softc *, uint32_t,
@@ -118,9 +117,9 @@ struct mtwn_mcu_ops {
 	int		(*sc_mcu_reg_write)(struct mtwn_softc *, uint32_t,
 			    uint32_t);
 	int		(*sc_mcu_reg_pair_read)(struct mtwn_softc *,
-			    int, struct mtwn_reg_pair *rp, int);
+			    uint32_t, struct mtwn_reg_pair *rp, int);
 	int		(*sc_mcu_reg_pair_write)(struct mtwn_softc *,
-			    int, const struct mtwn_reg_pair *rp, int);
+			    uint32_t, const struct mtwn_reg_pair *rp, int);
 
 	int		(*sc_mcu_init)(struct mtwn_softc *sc,
 			    const void *, size_t);
@@ -140,6 +139,16 @@ struct mtwn_eeprom_ops {
 	int		(*sc_eeprom_get_version)(struct mtwn_softc *);
 	int		(*sc_eeprom_get_pci_id)(struct mtwn_softc *);
 #endif
+};
+
+struct mtwn_rf_ops {
+	uint32_t	(*sc_rf_reg_read_4)(struct mtwn_softc *, uint32_t);
+	int		(*sc_rf_reg_write_4)(struct mtwn_softc *, uint32_t,
+			    uint32_t);
+	int		(*sc_rf_reg_rmw_4)(struct mtwn_softc *, uint32_t,
+			    uint32_t, uint32_t);
+	int		(*sc_rf_reg_pair_write)(struct mtwn_softc *,
+			    uint32_t, const struct mtwn_reg_pair *rp, int);
 };
 
 struct mtwn_mcu_cfg {
@@ -190,6 +199,9 @@ struct mtwn_softc {
 	struct mtwn_mcu_cfg	sc_mcucfg;
 	struct mtwn_mcu_state	sc_mcustate;
 
+	/* RF operations */
+	struct mtwn_rf_ops	sc_rfops;
+
 	/* MAC state */
 	struct {
 		uint32_t	sc_rx_filter;
@@ -226,7 +238,6 @@ struct mtwn_softc {
 #define	MTWN_REG_PAIR_WRITE_4(_sc, _base, _rp, _n)		\
 	    ((_sc)->sc_busops.sc_reg_pair_write((_sc), (_base),	\
 	    (_rp), (_n)))
-
 #define	MTWN_REG_READ_COPY_4(_sc, _base, _data, _n)		\
 	    ((_sc)->sc_busops.sc_read_copy_4((_sc),		\
 	    (_base), (_data), (_n)))
@@ -311,6 +322,22 @@ struct mtwn_softc {
 	    ((_sc)->sc_eepromops.sc_eeprom_read_2((_sc), (_reg)))
 #define	MTWN_EEPROM_READ_1(_sc, _reg)			\
 	    ((_sc)->sc_eepromops.sc_eeprom_read_1((_sc), (_reg)))
+
+/* RF operations */
+#define	MTWN_RF_REG_PAIR_WRITE_4(_sc, _base, _rp, _n)		\
+	    ((_sc)->sc_rfops.sc_rf_reg_pair_write((_sc),	\
+	    (_base), (_rp), (_n)))
+#define	MTWN_RF_REG_READ_4(_sc, _reg)				\
+	    ((_sc)->sc_rfops.sc_rf_reg_read_4((_sc), (_reg)))
+#define	MTWN_RF_REG_WRITE_4(_sc, _reg, _val)			\
+	    ((_sc)->sc_rfops.sc_rf_reg_write_4((_sc), (_reg), (_val)))
+#define	MTWN_RF_REG_RMW_4(_sc, _reg, _mask, _val)		\
+	    ((_sc)->sc_rfops.sc_rf_rmw_4((_sc), (_reg), (_mask),\
+	    (_val)))
+#define	MTWN_RF_REG_SET_4(_sc, _reg, _val)			\
+	    ((_sc)->sc_rfops.sc_rf_reg_rmw_4((_sc), (_reg), 0, (_val)))
+#define	MTWN_RF_REG_CLEAR_4(_sc, _reg, _val)			\
+	    ((_sc)->sc_rfops.sc_rf_rmw_4((_sc), (_reg), (_val), 0))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);
