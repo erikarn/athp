@@ -132,9 +132,44 @@ mtwn_mt7610_phy_ant_select(struct mtwn_softc *sc)
 int
 mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 {
+	int ret;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+
+	/* TODO: patch/upload rf_central_tab */
+	/* TODO: patch/upload 2g_channel_0_tab */
+
+	/* 5g_channel_0_tab */
+	ret = MTWN_RF_REG_PAIR_WRITE_4(sc, mtwn_mt7610_rf_5g_channel_0_tab,
+	    nitems(mtwn_mt7610_rf_5g_channel_0_tab));
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: failed to write 5g_channel_0_tab (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* vga_channel_0_tab */
+	ret = MTWN_RF_REG_PAIR_WRITE_4(sc, mtwn_mt7610_rf_vga_channel_0_tab,
+	    nitems(mtwn_mt7610_rf_vga_channel_0_tab));
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: failed to write vga_channel_0_tab (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	/* TODO: rf_bw_switch_tab - 20, 20+G */
+	/* TODO: rf_bw_switch_tab - G */
+
+	/* TODO: frequency calibration */
+
+	/* TODO: DAC reset */
+
+	/* TODO: VCO calibration */
+
 	return (0);
 }
 
