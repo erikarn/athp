@@ -132,6 +132,7 @@ mtwn_mt7610_phy_ant_select(struct mtwn_softc *sc)
 int
 mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 {
+	const struct mtwn_mt7610_chip_priv *psc = MTWN_MT7610_CHIP_SOFTC(sc);
 	int ret;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
@@ -165,6 +166,13 @@ mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 	/* TODO: rf_bw_switch_tab - G */
 
 	/* TODO: frequency calibration */
+	MTWN_DEBUG_PRINTF(sc, "%s: CAL before: 0x%08x\n",
+	    __func__, MTWN_RF_REG_READ_4(sc, MT7610_REG_RF(0, 22)));
+	MTWN_RF_REG_WRITE_4(sc, MT7610_REG_RF(0, 22),
+	    MIN((uint8_t) psc->rx_freq_cal.freq_offset, 0xbf));
+
+	MTWN_DEBUG_PRINTF(sc, "%s: CAL after: 0x%08x\n",
+	    __func__, MTWN_RF_REG_READ_4(sc, MT7610_REG_RF(0, 22)));
 
 	/* TODO: DAC reset */
 

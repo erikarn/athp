@@ -80,6 +80,12 @@ mtwn_usb_cmd_free_list_array(struct mtwn_usb_softc *uc, struct mtwn_cmd cmd[],
 			free(c->buf, M_USBDEV);
 			c->buf = NULL;
 		}
+		if (c->resp.buf != NULL) {
+			free(c->resp.buf, M_USBDEV);
+			c->resp.buf = NULL;
+			c->resp.len = 0;
+		}
+
 		wakeup(c);
 	}
 }
@@ -139,6 +145,48 @@ mtwn_usb_free_cmd_list(struct mtwn_usb_softc *uc)
 }
 
 /**
+ * @brief Copy the given response payload into the command buffer.
+ *
+ * The payload is copied into the response buffer so that it's made
+ * available when the sleeping thread completes.  The sender will
+ * provide its own buffer to copy into.  Yes, it's a double copy,
+ * but that way we don't need to worry about the sending thread timing
+ * out - the mtwn_cmd response buffer will always be available.
+ *
+ * @param uc	usb_softc
+ * @param cmd	command to set completion info for
+ * @param buf	payload buffer to copy from
+ * @param len	response length; 0 for empty response, > 0 for response,
+ *		-1 for error/missed response
+ */
+void
+mtwn_usb_cmd_copyin_response(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
+    const char *buf, int len)
+{
+	/*
+	 * If we get an error or zero-size response then don't copy, but do set
+	 * completion.
+	 *
+	 * If there's no response buffer presented then treat it as a zero
+	 * length response.
+	 *
+	 * Treat a NULL buffer with a >= 0 length as a 0 length reply.
+	 */
+	if (len <= 0)
+		cmd->resp.len = len;
+	else if (buf == NULL)
+		cmd->resp.len = 0;
+	else if (cmd->resp.buf == NULL)
+		cmd->resp.len = 0;
+	else {
+		memcpy(cmd->resp.buf, buf, MIN(len, cmd->resp.bufsize));
+		cmd->resp.len = MIN(len, cmd->resp.bufsize);
+	}
+
+	cmd->flags.resp_set = true;
+}
+
+/**
  * @brief Complete the given command, re-insert it on the inactive list.
  */
 void
@@ -150,6 +198,12 @@ mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p; completing\n",
 	    __func__, cmd);
 	wakeup(cmd);
+
+	/* Free response buffer contents */
+	if (cmd->resp.buf != NULL)
+		free(cmd->resp.buf, M_USBDEV);
+	bzero(&cmd->resp, sizeof(cmd->resp));
+
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 }
 
@@ -197,7 +251,7 @@ mtwn_usb_cmd_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd, int timeout)
  * @brief Allocate a TX command to queue.
  */
 struct mtwn_cmd *
-mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size)
+mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size, int rx_size)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	struct mtwn_cmd *cmd;
@@ -214,17 +268,36 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size)
 		return (NULL);
 	}
 
+	if (rx_size > MTWN_USB_CMDBUFSZ) {
+		MTWN_ERR_PRINTF(sc, "%s: rx size (%d) > %d bytes\n",
+		    __func__, total_size, MTWN_USB_CMDBUFSZ);
+		return (NULL);
+	}
+
 	cmd = STAILQ_FIRST(&uc->uc_cmd_inactive);
 	if (cmd == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: out of command buffers\n", __func__);
 		return (NULL);
 	}
-	STAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
 
 	/* Zero the response and flags fields */
 	bzero(&cmd->flags, sizeof(cmd->flags));
 	bzero(&cmd->resp, sizeof(cmd->resp));
 	cmd->seq = 0;
+
+	/* Allocate RX buffer if needed */
+	if (rx_size > 0) {
+		cmd->resp.buf = malloc(rx_size, M_USBDEV, M_NOWAIT | M_ZERO);
+		if (cmd->resp.buf == NULL) {
+			MTWN_ERR_PRINTF(sc, "%s: couldn't allocate %d bytes\n",
+			    __func__, rx_size);
+			return (NULL);
+		}
+		cmd->resp.bufsize = rx_size;
+		cmd->resp.len = 0;
+	}
+
+	STAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
 
 	return (cmd);
 }
@@ -240,6 +313,11 @@ mtwn_usb_cmd_return(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	struct mtwn_softc *sc = &uc->uc_sc;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* Free response buffer contents */
+	if (cmd->resp.buf != NULL)
+		free(cmd->resp.buf, M_USBDEV);
+	bzero(&cmd->resp, sizeof(cmd->resp));
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 }

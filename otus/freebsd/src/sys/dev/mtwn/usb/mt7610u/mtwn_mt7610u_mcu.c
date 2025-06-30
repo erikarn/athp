@@ -135,16 +135,21 @@ mtwn_mt7610u_dma_mbuf_setup(struct mtwn_softc *sc, struct mbuf *m,
 
 static int
 mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
-    const void *data, int len, bool wait_tx, bool wait_resp)
+    const void *data, int len, void *rx_data, int *rx_len,
+    bool wait_tx, bool wait_resp)
 {
 	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
 	struct mtwn_cmd *bf = NULL;
 	struct mbuf *m = NULL;
 	uint32_t info;
-	int ret;
+	int ret, rx_buf_len = 0;
 	uint8_t seq = 0;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	/* Fetch RX buffer length to allocate */
+	if (rx_len != NULL)
+		rx_buf_len = *rx_len;
 
 	/* Base off of __m76x02u_mcu_send_msg */
 	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
@@ -152,7 +157,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	    __func__, cmd, data, len, wait_tx, wait_resp);
 
 	/* Allocate a buffer for transmit */
-	bf = mtwn_usb_cmd_get(uc, len);
+	bf = mtwn_usb_cmd_get(uc, len, rx_buf_len);
 	if (bf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buf!\n", __func__);
 		return (ENOBUFS);
@@ -209,7 +214,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	 * completion.
 	 */
 	if (wait_tx)
-		ret = mtwn_usb_cmd_queue_wait(uc, bf, 1000, wait_resp);
+		ret = mtwn_usb_cmd_queue_wait(uc, bf, 5000, wait_resp);
 	else
 		ret = mtwn_usb_cmd_queue(uc, bf);
 
@@ -266,18 +271,25 @@ mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
 	if (seq != 0) {
 		struct mtwn_cmd *cmd;
 
-		MTWN_TODO_PRINTF(sc, "%s: handle finding/waking up seq %d\n",
-		    __func__, seq);
+		MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+		    "%s: finding/waking up seq %d\n", __func__, seq);
 
 		while ((cmd = mtwn_usb_cmd_get_waiting(uc)) != NULL) {
 			if (cmd->seq == seq) {
-				MTWN_TODO_PRINTF(sc,
-				    "%s: TODO: copy completion info in!\n",
-				    __func__);
+				MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+				    "%s:  found seq %d\n", __func__, seq);
+				/* Copy in, wake-up */
+				mtwn_usb_cmd_copyin_response(uc, cmd,
+				    buf + 4, len - 4);
 				mtwn_usb_cmd_complete(uc, cmd);
 				break;
-			} else
+			} else {
+				MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+				    "%s:  error/wake seq %d\n", __func__, seq);
+				/* Signify error, wake-up */
+				mtwn_usb_cmd_copyin_response(uc, cmd, NULL, -1);
 				mtwn_usb_cmd_complete(uc, cmd);
+			}
 		}
 		return (0);
 	}
@@ -376,8 +388,8 @@ mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
 		return (ENOBUFS);
 	}
 
-	/* Allocate cmd buffer */
-	cmd = mtwn_usb_cmd_get(uc, alloc_size);
+	/* Allocate cmd buffer, no RX buffer required */
+	cmd = mtwn_usb_cmd_get(uc, alloc_size, 0);
 	if (cmd == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate command buffer\n",
 		    __func__);
@@ -400,7 +412,7 @@ mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
 	 * wait for RX completion if required.
 	 */
 	ret = MTWN_MCU_SEND_MSG(sc, MT7610_MCU_CMD_RANDOM_WRITE, buf,
-	    alloc_size, true, final);
+	    alloc_size, NULL, NULL, true, final);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to send (err %d)\n", __func__,
 		    ret);
@@ -549,7 +561,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	    __func__, len, addr);
 
 	/* Grab a TX command buffer; fail early if we can't */
-	bf = mtwn_usb_cmd_get(uc, len);
+	bf = mtwn_usb_cmd_get(uc, len, 0);
 	if (bf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: failed to get tx buffer\n", __func__);
 		return (ENOBUFS);

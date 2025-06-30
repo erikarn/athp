@@ -179,6 +179,7 @@ mtwn_usb_attach(device_t self)
 	uc->uc_rx_buf_size = MTWN_USB_RXBUFSZ_DEF;
 
 	//sc->sc_debug = MTWN_DEBUG_XMIT | MTWN_DEBUG_USB | MTWN_DEBUG_CMD;
+	sc->sc_debug = MTWN_DEBUG_CMD;
 
 	/* bus access methods */
 	sc->sc_busops.sc_read_4 = mtwn_usb_read_4;

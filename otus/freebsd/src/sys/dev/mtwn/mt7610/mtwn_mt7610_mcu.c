@@ -98,6 +98,6 @@ mtwn_mt7610_mcu_function_select(struct mtwn_softc *sc, uint32_t func,
 
 	/* Wait for TX completion if requested, don't want for RX notif */
 	ret = MTWN_MCU_SEND_MSG(sc, MT7610_MCU_CMD_FUN_SET_OP, &msg,
-	    sizeof(msg), wait, false);
+	    sizeof(msg), NULL, NULL, wait, false);
 	return (ret);
 }

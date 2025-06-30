@@ -80,6 +80,7 @@ struct mtwn_cmd {
 	int			seq;
 	struct {
 		bool do_wait;
+		bool resp_set;
 	} flags;
 	struct {
 		char *buf;

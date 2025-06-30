@@ -110,7 +110,7 @@ struct mtwn_chip_ops {
 
 struct mtwn_mcu_ops {
 	int		(*sc_mcu_send_msg)(struct mtwn_softc *,
-			    int, const void *, int, bool, bool);
+			    int, const void *, int, void *, int *, bool, bool);
 	int		(*sc_mcu_handle_response)(struct mtwn_softc *,
 			    char *, int);
 	uint32_t	(*sc_mcu_reg_read)(struct mtwn_softc *, uint32_t);
@@ -293,9 +293,10 @@ struct mtwn_softc {
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\
 	    ((_sc)->sc_mcuops.sc_mcu_init((_sc), (_data), (_len)))
-#define	MTWN_MCU_SEND_MSG(_sc, _func, _msg, _len, _wait_tx, _wait_resp) \
+#define	MTWN_MCU_SEND_MSG(_sc, _func, _msg, _len, _rx_buf, _rx_len, \
+	    _wait_tx, _wait_resp) \
 	    ((_sc)->sc_mcuops.sc_mcu_send_msg((_sc), (_func),	\
-	     (_msg), (_len), (_wait_tx), (_wait_resp)))
+	     (_msg), (_len), (_rx_buf), (_rx_len), (_wait_tx), (_wait_resp)))
 #define	MTWN_MCU_HANDLE_RESPONSE(_sc, _msg, _len)		\
 	    ((_sc)->sc_mcuops.sc_mcu_handle_response((_sc),	\
 	     (_msg), (_len)))
