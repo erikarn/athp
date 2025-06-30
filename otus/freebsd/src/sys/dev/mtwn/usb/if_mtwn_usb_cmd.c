@@ -165,8 +165,8 @@ mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p\n",
-	    __func__, cmd);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p, do_wait=%d\n",
+	    __func__, cmd, cmd->flags.do_wait);
 
 	if (cmd->flags.do_wait == true)
 		STAILQ_INSERT_HEAD(&uc->uc_cmd_waiting, cmd, next);
@@ -185,8 +185,9 @@ mtwn_usb_cmd_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd, int timeout)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p, seq=%d, waiting\n",
-	    __func__, cmd, cmd->seq);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	    "%s: cmd=%p, seq=%d, timeout=%d, wait=%d, waiting\n",
+	    __func__, cmd, cmd->seq, timeout, cmd->flags.do_wait);
 
 	ret = msleep(cmd, &sc->sc_mtx, 0, "mtxn_tx_cmd_wait", timeout);
 	return (ret);
@@ -272,8 +273,7 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	/* Wait for completion, not just transmit */
-	if (wait_resp)
-		cmd->flags.do_wait = true;
+	cmd->flags.do_wait = wait_resp;
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
