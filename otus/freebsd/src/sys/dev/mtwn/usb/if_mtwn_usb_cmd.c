@@ -220,6 +220,12 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size)
 		return (NULL);
 	}
 	STAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
+
+	/* Zero the response and flags fields */
+	bzero(&cmd->flags, sizeof(cmd->flags));
+	bzero(&cmd->resp, sizeof(cmd->resp));
+	cmd->seq = 0;
+
 	return (cmd);
 }
 
