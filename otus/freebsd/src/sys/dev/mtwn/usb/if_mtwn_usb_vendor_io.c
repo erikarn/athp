@@ -183,7 +183,7 @@ mtwn_usb_rmw_4(struct mtwn_softc *sc, uint32_t reg, uint32_t mask,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 	r = mtwn_usb_read_4(sc, reg) & ~mask;
-	r |= (val & ~mask);
+	r |= (val & mask);
 	mtwn_usb_write_4(sc, reg, r);
 	return (r);
 }
