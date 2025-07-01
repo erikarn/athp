@@ -74,12 +74,23 @@ struct mtwn_data {
 };
 typedef STAILQ_HEAD(, mtwn_data) mtwn_datahead;
 
+typedef enum {
+	MTWN_CMD_STATE_NONE = 0,	/* not allocated/inactive */
+	MTWN_CMD_STATE_INACTIVE,	/* on inactive list */
+	MTWN_CMD_STATE_ALLOCED,		/* allocated, not on any list */
+	MTWN_CMD_STATE_ACTIVE,		/* on active list */
+	MTWN_CMD_STATE_PENDING,		/* on pending list */
+	MTWN_CMD_STATE_WAITING,		/* on waiting list */
+	MTWN_CMD_STATE_COMPLETED,	/* TODO: on completed list */
+} mtwn_cmd_state_t;
+
 struct mtwn_cmd {
 	uint8_t			*buf;
 	uint16_t		buflen;
 	int			seq;
+	mtwn_cmd_state_t	state;
 	struct {
-		bool do_wait;
+		bool do_wait;		/* wait for matching response */
 		bool resp_set;
 	} flags;
 	struct {
@@ -90,7 +101,6 @@ struct mtwn_cmd {
 	STAILQ_ENTRY(mtwn_cmd)	next;
 };
 typedef STAILQ_HEAD(, mtwn_cmd) mtwn_cmd_head;
-
 
 struct mtwn_usb_softc {
 	struct mtwn_softc	uc_sc;		/* must be the first */

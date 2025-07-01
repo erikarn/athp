@@ -85,6 +85,7 @@ mtwn_usb_cmd_free_list_array(struct mtwn_usb_softc *uc, struct mtwn_cmd cmd[],
 			c->resp.buf = NULL;
 			c->resp.len = 0;
 		}
+		c->state = MTWN_CMD_STATE_NONE;
 
 		wakeup(c);
 	}
@@ -127,8 +128,10 @@ mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *uc)
 	if (ret != 0)
 		return (ret);
 
-	for (i = 0; i < MTWN_USB_CMD_LIST_COUNT; i++)
+	for (i = 0; i < MTWN_USB_CMD_LIST_COUNT; i++) {
 		STAILQ_INSERT_HEAD(&uc->uc_cmd_inactive, &uc->uc_cmd[i], next);
+		uc->uc_cmd[i].state = MTWN_CMD_STATE_INACTIVE;
+	}
 	return (0);
 }
 
@@ -205,6 +208,7 @@ mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	bzero(&cmd->resp, sizeof(cmd->resp));
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
+	cmd->state = MTWN_CMD_STATE_INACTIVE;
 }
 
 /*
@@ -222,9 +226,10 @@ mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p, do_wait=%d\n",
 	    __func__, cmd, cmd->flags.do_wait);
 
-	if (cmd->flags.do_wait == true)
+	if (cmd->flags.do_wait == true) {
+		cmd->state = MTWN_CMD_STATE_WAITING;
 		STAILQ_INSERT_HEAD(&uc->uc_cmd_waiting, cmd, next);
-	else
+	} else
 		mtwn_usb_cmd_complete(uc, cmd);
 }
 
@@ -298,6 +303,7 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size, int rx_size)
 	}
 
 	STAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
+	cmd->state = MTWN_CMD_STATE_ALLOCED;
 
 	return (cmd);
 }
@@ -320,6 +326,7 @@ mtwn_usb_cmd_return(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	bzero(&cmd->resp, sizeof(cmd->resp));
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
+	cmd->state = MTWN_CMD_STATE_INACTIVE;
 }
 
 /**
@@ -334,6 +341,7 @@ mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
+	cmd->state = MTWN_CMD_STATE_PENDING;
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 	return (0);
 }
@@ -360,6 +368,7 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 	cmd->flags.do_wait = wait_resp;
 
 	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
+	cmd->state = MTWN_CMD_STATE_PENDING;
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 
 	ret = mtwn_usb_cmd_wait(uc, cmd, timeout);
@@ -386,6 +395,7 @@ mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *xfer, usb_error_t error)
 		if (cmd == NULL)
 			goto tr_setup;
 		STAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
+		cmd->state = MTWN_CMD_STATE_ALLOCED;
 
 		/* TX completed */
 		mtwn_usb_cmd_eof(uc, cmd);
@@ -399,6 +409,7 @@ tr_setup:
 		}
 		STAILQ_REMOVE_HEAD(&uc->uc_cmd_pending, next);
 		STAILQ_INSERT_TAIL(&uc->uc_cmd_active, cmd, next);
+		cmd->state = MTWN_CMD_STATE_ACTIVE;
 
 		usbd_xfer_set_frame_data(xfer, 0, cmd->buf, cmd->buflen);
 		usbd_transfer_submit(xfer);
@@ -408,6 +419,7 @@ tr_setup:
 		if (cmd == NULL)
 			goto tr_setup;
 		STAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
+		cmd->state = MTWN_CMD_STATE_ALLOCED;
 
 		/* TX completed */
 		mtwn_usb_cmd_eof(uc, cmd);
@@ -442,5 +454,6 @@ mtwn_usb_cmd_get_waiting(struct mtwn_usb_softc *uc)
 	if (cmd == NULL)
 		return (NULL);
 	STAILQ_REMOVE_HEAD(&uc->uc_cmd_waiting, next);
+	cmd->state = MTWN_CMD_STATE_ALLOCED;
 	return (cmd);
 }
