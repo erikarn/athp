@@ -122,6 +122,7 @@ mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *uc)
 	TAILQ_INIT(&uc->uc_cmd_pending);
 	TAILQ_INIT(&uc->uc_cmd_waiting);
 	TAILQ_INIT(&uc->uc_cmd_inactive);
+	TAILQ_INIT(&uc->uc_cmd_completed);
 
 	ret = mtwn_usb_cmd_alloc_list_array(uc, uc->uc_cmd,
 	    MTWN_USB_CMD_LIST_COUNT, MTWN_USB_CMDBUFSZ);
@@ -145,6 +146,7 @@ mtwn_usb_free_cmd_list(struct mtwn_usb_softc *uc)
 	TAILQ_INIT(&uc->uc_cmd_pending);
 	TAILQ_INIT(&uc->uc_cmd_waiting);
 	TAILQ_INIT(&uc->uc_cmd_inactive);
+	TAILQ_INIT(&uc->uc_cmd_completed);
 }
 
 /**
@@ -156,6 +158,9 @@ mtwn_usb_free_cmd_list(struct mtwn_usb_softc *uc)
  * but that way we don't need to worry about the sending thread timing
  * out - the mtwn_cmd response buffer will always be available.
  *
+ * This must only be called on buffers that are in the ALLOCED state;
+ * ie they're not on any lists.
+ *
  * @param uc	usb_softc
  * @param cmd	command to set completion info for
  * @param buf	payload buffer to copy from
@@ -166,6 +171,12 @@ void
 mtwn_usb_cmd_copyin_response(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
     const char *buf, int len)
 {
+	struct mtwn_softc *sc = &uc->uc_sc;
+
+	if (cmd->state != MTWN_CMD_STATE_ALLOCED)
+		MTWN_WARN_PRINTF(sc, "%s: cmd %p has the wrong state! (%d)\n",
+		    __func__, cmd, cmd->state);
+
 	/*
 	 * If we get an error or zero-size response then don't copy, but do set
 	 * completion.
@@ -190,17 +201,24 @@ mtwn_usb_cmd_copyin_response(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 }
 
 /**
- * @brief Complete the given command, re-insert it on the inactive list.
+ * @brief Return the given buffer to the inactive list.
+ *
+ * This must only be called on a cmd buffer that isn't on any list,
+ * and is in the ALLOCED state.
  */
-void
-mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
+static void
+mtwn_usb_cmd_return_inactive(struct mtwn_usb_softc *uc,
+    struct mtwn_cmd *cmd)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p; completing\n",
+	if (cmd->state != MTWN_CMD_STATE_ALLOCED)
+		MTWN_WARN_PRINTF(sc, "%s: cmd %p has the wrong state! (%d)\n",
+		    __func__, cmd, cmd->state);
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p; returning to inactive\n",
 	    __func__, cmd);
-	wakeup(cmd);
 
 	/* Free response buffer contents */
 	if (cmd->resp.buf != NULL)
@@ -209,12 +227,57 @@ mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 
 	TAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 	cmd->state = MTWN_CMD_STATE_INACTIVE;
+	cmd->flags.do_wait = false;
+	cmd->flags.resp_set = false;
+}
+
+/**
+ * @brief Complete the given command, re-insert it on the inactive list.
+ *
+ * The command must be in the ALLOCED state and not on any list.
+ *
+ * If the buffer is 'wait', then move it to the completed list before
+ * waking up. If not, just free it.
+ */
+void
+mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
+{
+	struct mtwn_softc *sc = &uc->uc_sc;
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (cmd->state != MTWN_CMD_STATE_ALLOCED)
+		MTWN_WARN_PRINTF(sc, "%s: cmd %p has the wrong state! (%d)\n",
+		    __func__, cmd, cmd->state);
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p; completing\n",
+	    __func__, cmd);
+
+	if (cmd->flags.do_wait == true) {
+		MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+		    "%s: cmd=%p; moving to COMPLETED queue\n", __func__, cmd);
+		/* Move the buffer to the completed state */
+		TAILQ_INSERT_TAIL(&uc->uc_cmd_completed, cmd, next);
+		cmd->state = MTWN_CMD_STATE_COMPLETED;
+
+		/* Signal any waiter that the command has completed */
+		wakeup(cmd);
+	} else {
+		/* Signal any waiter that the command has completed */
+		wakeup(cmd);
+
+		/* Return the buffer to the inactive list */
+		mtwn_usb_cmd_return_inactive(uc, cmd);
+	}
 }
 
 /*
- * Handle completion of the given command buffer.
+ * @brief Handle completion of the given command buffer.
  *
- * Note the caller still needs to shuffle it to the inactive list.
+ * The command buffer must not be on any active lists, and must be
+ * in the ALLOCED state.
+ *
+ * If we're required to wait for a follow-up RX notification (do_wait=true)
+ * then move it to WAITING, else immediately complete it.
  */
 static void
 mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
@@ -223,12 +286,16 @@ mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p, do_wait=%d\n",
-	    __func__, cmd, cmd->flags.do_wait);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: completed, cmd=%p, do_wait=%d, state=%d\n",
+	    __func__, cmd, cmd->flags.do_wait, cmd->state);
+
+	if (cmd->state != MTWN_CMD_STATE_ALLOCED)
+		MTWN_WARN_PRINTF(sc, "%s: cmd %p has the wrong state! (%d)\n",
+		    __func__, cmd, cmd->state);
 
 	if (cmd->flags.do_wait == true) {
-		cmd->state = MTWN_CMD_STATE_WAITING;
 		TAILQ_INSERT_HEAD(&uc->uc_cmd_waiting, cmd, next);
+		cmd->state = MTWN_CMD_STATE_WAITING;
 	} else
 		mtwn_usb_cmd_complete(uc, cmd);
 }
@@ -236,7 +303,7 @@ mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 /**
  * @brief wait for the command buffer in question to complete.
  */
-int
+static int
 mtwn_usb_cmd_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd, int timeout)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
@@ -305,6 +372,8 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size, int rx_size)
 	TAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
 	cmd->state = MTWN_CMD_STATE_ALLOCED;
 
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p\n", __func__, cmd);
+
 	return (cmd);
 }
 
@@ -319,14 +388,9 @@ mtwn_usb_cmd_return(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	struct mtwn_softc *sc = &uc->uc_sc;
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
-
-	/* Free response buffer contents */
-	if (cmd->resp.buf != NULL)
-		free(cmd->resp.buf, M_USBDEV);
-	bzero(&cmd->resp, sizeof(cmd->resp));
-
-	TAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
-	cmd->state = MTWN_CMD_STATE_INACTIVE;
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: cmd=%p, state=%d\n", __func__, cmd, cmd->state);
+	/* Return the buffer to the inactive list */
+	mtwn_usb_cmd_return_inactive(uc, cmd);
 }
 
 /**
@@ -340,6 +404,9 @@ mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	struct mtwn_softc *sc = &uc->uc_sc;
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	    "%s: cmd=%p\n", __func__, cmd);
+
 	TAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
 	cmd->state = MTWN_CMD_STATE_PENDING;
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
@@ -352,8 +419,8 @@ mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
  * Note to the caller that once this is called, the buffer is no
  * longer owned by the caller.
  *
- * Also note this isn't going to wait for the RESPONSE, only the
- * transfer completed.
+ * This will either wait for the TX completion (do_wait == false);
+ * or TX + RX completion (do_wait == true).
  */
 int
 mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
@@ -364,15 +431,111 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
+	    "%s: cmd=%p; timeout=%d, wait_resp=%d\n", __func__, cmd,
+	    timeout, wait_resp);
+
 	/* Wait for completion, not just transmit */
 	cmd->flags.do_wait = wait_resp;
 
+	/* Enqueue */
 	TAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
 	cmd->state = MTWN_CMD_STATE_PENDING;
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 
+	/* Wait for TX completion, optional RX completion */
 	ret = mtwn_usb_cmd_wait(uc, cmd, timeout);
-	return (ret);
+
+	/*
+	 * If it's a timeout, then mark it as no longer waiting so it'll
+	 * be immediately freed, or free it here if we have to.
+	 */
+	if (ret != 0) {
+		/* error path */
+		MTWN_WARN_PRINTF(sc, "%s: cmd %p (state %d) timeout\n",
+		    __func__, cmd, cmd->state);
+		cmd->flags.do_wait = false;
+
+		/* TODO: refactor this out */
+		switch (cmd->state) {
+		case MTWN_CMD_STATE_ACTIVE:
+		case MTWN_CMD_STATE_PENDING:
+			/* These two will complete w/ do_wait and go straight to inactive */
+			break;
+		case MTWN_CMD_STATE_WAITING:
+			/*
+			 * Don't wait until the next firmware RX notification
+			 * to run through the waiting list and free this; just
+			 * free it now.
+			 */
+			TAILQ_REMOVE(&uc->uc_cmd_waiting, cmd, next);
+			cmd->state = MTWN_CMD_STATE_ALLOCED;
+			mtwn_usb_cmd_return_inactive(uc, cmd);
+			break;
+		case MTWN_CMD_STATE_COMPLETED:
+			MTWN_WARN_PRINTF(sc,
+			    "%s: cmd %p timeout but state=COMPLETED?\n",
+			    __func__, cmd);
+			/*
+			 * This is a weird situation to be in, but at least
+			 * handle it.
+			 *
+			 * This may actually be OK and we may want to just
+			 * jump to the normal completion path / response
+			 * path below somehow.
+			 */
+			TAILQ_REMOVE(&uc->uc_cmd_completed, cmd, next);
+			cmd->state = MTWN_CMD_STATE_ALLOCED;
+			mtwn_usb_cmd_return_inactive(uc, cmd);
+			break;
+		default:
+			/* TODO: actually figure out what list to remove it from, do so, etc */
+			MTWN_WARN_PRINTF(sc,
+			    "%s: cmd %p (state %d) invalid/unhandled state!\n",
+			    __func__, cmd, cmd->state);
+			break;
+		}
+
+		return (ret);
+	}
+	MTWN_DEBUG_PRINTF(sc,
+	    "%s: completion, cmd=%p, state=%d, resp=%d, wait=%d\n", __func__,
+	    cmd, cmd->state, cmd->flags.resp_set, cmd->flags.do_wait);
+
+	/* Completion path */
+
+	/* handle response */
+	if (cmd->flags.resp_set == true) {
+		MTWN_TODO_PRINTF(sc,
+		    "%s: TODO: **** COMPLETION COPYOUT TIME (%p) ****\n",
+		    __func__, cmd);
+		/* XXX TODO: copy the RX specific payload out */
+	}
+
+	/*
+	 * if we're waiting for the response on this command buffer then
+	 * we need to also clean it up.
+	 *
+	 * TODO: We're using do_wait == true as the flag for whether to clean
+	 * it up from the COMPLETED queue or not, whereas what we SHOULD do
+	 * is have a generic "just clean this thing up" routine.  There's some
+	 * stuff above that kinda does it, and it should be leveraged.
+	 */
+	if (cmd->flags.do_wait == true) {
+		/* XXX refactor this out */
+		if (cmd->state != MTWN_CMD_STATE_COMPLETED)
+			MTWN_WARN_PRINTF(sc, "%s: cmd %p in wrong state (%d)\n",
+			    __func__, cmd, cmd->state);
+
+		/* Remove from the completed list */
+		TAILQ_REMOVE(&uc->uc_cmd_completed, cmd, next);
+		cmd->state = MTWN_CMD_STATE_ALLOCED;
+
+		/* Return the buffer to the inactive list */
+		mtwn_usb_cmd_return_inactive(uc, cmd);
+	}
+
+	return (0);
 }
 
 /*
@@ -383,7 +546,7 @@ mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct mtwn_usb_softc *uc = usbd_xfer_softc(xfer);
 	struct mtwn_softc *sc = &uc->uc_sc;
-	struct mtwn_cmd *cmd;
+	struct mtwn_cmd *cmd, *c;
 
 	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: called\n", __func__);
 
@@ -397,6 +560,14 @@ mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *xfer, usb_error_t error)
 		TAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
 		cmd->state = MTWN_CMD_STATE_ALLOCED;
 
+		/*
+		 * TODO: usbd_xfer_get_priv() to fetch cmd, verify against
+		 * uc_cmd_active head!
+		 */
+		c = usbd_xfer_get_priv(xfer);
+		if (c != cmd)
+			MTWN_WARN_PRINTF(sc,
+			    "%s: mismatch between xfer and cmd\n", __func__);
 		/* TX completed */
 		mtwn_usb_cmd_eof(uc, cmd);
 		/* FALLTHROUGH */
@@ -412,6 +583,7 @@ tr_setup:
 		cmd->state = MTWN_CMD_STATE_ACTIVE;
 
 		usbd_xfer_set_frame_data(xfer, 0, cmd->buf, cmd->buflen);
+		usbd_xfer_set_priv(xfer, cmd);
 		usbd_transfer_submit(xfer);
 		break;
 	default:

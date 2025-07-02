@@ -61,8 +61,6 @@ enum {
  * + It's the USB transfer buffer, for both transmit/receive endpoints
  * + It holds a node reference during 802.11 TX
  * + It holds an mbuf reference during 802.11 TX
- * + For the command endpoint, it holds state and can be slept on
- *   for the transfer completion notification
  */
 struct mtwn_data {
 	uint8_t			*buf;
@@ -127,6 +125,7 @@ struct mtwn_usb_softc {
 	mtwn_cmd_head		uc_cmd_inactive;
 	mtwn_cmd_head		uc_cmd_pending;
 	mtwn_cmd_head		uc_cmd_waiting;
+	mtwn_cmd_head		uc_cmd_completed;
 };
 
 #endif	/* __IF_MTWN_USB_VAR_H__ */

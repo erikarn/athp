@@ -202,6 +202,7 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	/* Copy data into the mtwn_buf; mbuf reference */
 	/* XXX TODO: i wish I could just dma mbufs here... */
 	/* XXX TODO: assert the message fits in the buf size */
+	/* XXX TODO: make a method for copying data into the command buffer */
 	memcpy(bf->buf, m->m_data, m->m_len);
 	bf->buflen = m->m_len;
 
@@ -212,6 +213,12 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	/*
 	 * wait_tx signals whether to wait for TX to complete, not RX
 	 * completion.
+	 *
+	 * We can only get responses w/ both wait_tx and wait_resp.
+	 *
+	 * TODO: once this is all done, we'll want to be able to add
+	 * rx_data, rx_len, etc to the cmd_buf so they're filled in
+	 * upon a successful return.
 	 */
 	if (wait_tx)
 		ret = mtwn_usb_cmd_queue_wait(uc, bf, 5000, wait_resp);
@@ -221,7 +228,6 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't queue buffer (err %d)\n",
 		    __func__, ret);
-		mtwn_usb_cmd_return(uc, bf);
 		m_freem(m);
 		return (ret);
 	}
@@ -367,8 +373,6 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
     uint32_t base, const struct mtwn_reg_pair *rp, int n, bool final)
 {
-	struct mtwn_usb_softc *uc = MTWN_USB_SOFTC(sc);
-	struct mtwn_cmd *cmd;
 	char *buf;
 	int alloc_size;
 	int i, offset, ret;
@@ -385,15 +389,6 @@ mtwn_mcu_mt7610u_mcu_reg_pair_write_chunk(struct mtwn_softc *sc,
 	if (buf == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buffer\n",
 		    __func__);
-		return (ENOBUFS);
-	}
-
-	/* Allocate cmd buffer, no RX buffer required */
-	cmd = mtwn_usb_cmd_get(uc, alloc_size, 0);
-	if (cmd == NULL) {
-		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate command buffer\n",
-		    __func__);
-		free(buf, M_TEMP);
 		return (ENOBUFS);
 	}
 
