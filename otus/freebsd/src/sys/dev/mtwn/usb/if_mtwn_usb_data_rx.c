@@ -81,12 +81,12 @@ mtwn_usb_alloc_rx_list(struct mtwn_usb_softc *uc)
 	if (error != 0)
 		return (error);
 
-	STAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
-	STAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
-	STAILQ_INIT(&uc->uc_rx_inactive);
+	TAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
+	TAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
+	TAILQ_INIT(&uc->uc_rx_inactive);
 
 	for (i = 0; i < MTWN_USB_RX_LIST_COUNT; i++)
-		STAILQ_INSERT_HEAD(&uc->uc_rx_inactive, &uc->uc_rx[i], next);
+		TAILQ_INSERT_HEAD(&uc->uc_rx_inactive, &uc->uc_rx[i], next);
 
 	return (0);
 }
@@ -96,7 +96,7 @@ mtwn_usb_free_rx_list(struct mtwn_usb_softc *uc)
 {
 	mtwn_usb_free_list(&uc->uc_sc, uc->uc_rx, MTWN_USB_RX_LIST_COUNT);
 
-	STAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
-	STAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
-	STAILQ_INIT(&uc->uc_rx_inactive);
+	TAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
+	TAILQ_INIT(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
+	TAILQ_INIT(&uc->uc_rx_inactive);
 }

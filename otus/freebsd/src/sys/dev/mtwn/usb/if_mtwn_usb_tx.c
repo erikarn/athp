@@ -89,7 +89,7 @@ mtwn_usb_txeof(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *data)
 		MTWN_TODO_PRINTF(sc,
 		    "%s: need to handle ni/m free!\n", __func__);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, data, next);
+	TAILQ_INSERT_TAIL(&uc->uc_tx_inactive, data, next);
 
 	/* TODO: only wake-up if a flag is set in the data struct? */
 	wakeup(data);
@@ -106,7 +106,7 @@ mtwn_usb_tx_getbuf(struct mtwn_usb_softc *uc)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	bf = STAILQ_FIRST(&uc->uc_tx_inactive);
+	bf = TAILQ_FIRST(&uc->uc_tx_inactive);
 	if (bf == NULL) {
 		/*
 		 * XXX TODO: make it not an error once we start doing
@@ -119,7 +119,7 @@ mtwn_usb_tx_getbuf(struct mtwn_usb_softc *uc)
 		MTWN_ERR_PRINTF(sc, "%s: out of xmit buffers\n", __func__);
 		return (NULL);
 	}
-	STAILQ_REMOVE_HEAD(&uc->uc_tx_inactive, next);
+	TAILQ_REMOVE_HEAD(&uc->uc_tx_inactive, next);
 	return (bf);
 }
 
@@ -135,7 +135,7 @@ mtwn_usb_tx_returnbuf(struct mtwn_usb_softc *uc, struct mtwn_data *bf)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_inactive, bf, next);
+	TAILQ_INSERT_TAIL(&uc->uc_tx_inactive, bf, next);
 }
 
 /**
@@ -149,7 +149,7 @@ mtwn_usb_tx_queue(struct mtwn_usb_softc *uc, int qid, struct mtwn_data *bf)
 	struct mtwn_softc *sc = &uc->uc_sc;
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
+	TAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
 	usbd_transfer_start(uc->uc_xfer[qid]);
 	return (0);
 }
@@ -169,7 +169,7 @@ mtwn_usb_tx_queue_wait(struct mtwn_usb_softc *uc, int qid,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
+	TAILQ_INSERT_TAIL(&uc->uc_tx_pending[qid], bf, next);
 	usbd_transfer_start(uc->uc_xfer[qid]);
 
 	ret = msleep(bf, &sc->sc_mtx, 0, "mtxn_tx_wait", timeout);
@@ -194,32 +194,32 @@ mtwn_bulk_tx_callback_qid(struct usb_xfer *xfer, usb_error_t error, int qid)
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
-		data = STAILQ_FIRST(&uc->uc_tx_active[qid]);
+		data = TAILQ_FIRST(&uc->uc_tx_active[qid]);
 		if (data == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
+		TAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
 
 		/* TX completed */
 		mtwn_usb_txeof(uc, qid, data);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
-		data = STAILQ_FIRST(&uc->uc_tx_pending[qid]);
+		data = TAILQ_FIRST(&uc->uc_tx_pending[qid]);
 		if (data == NULL) {
 			/* Empty! */
 			goto finish;
 		}
-		STAILQ_REMOVE_HEAD(&uc->uc_tx_pending[qid], next);
-		STAILQ_INSERT_TAIL(&uc->uc_tx_active[qid], data, next);
+		TAILQ_REMOVE_HEAD(&uc->uc_tx_pending[qid], next);
+		TAILQ_INSERT_TAIL(&uc->uc_tx_active[qid], data, next);
 
 		usbd_xfer_set_frame_data(xfer, 0, data->buf, data->buflen);
 		usbd_transfer_submit(xfer);
 		break;
 	default:
-		data = STAILQ_FIRST(&uc->uc_tx_active[qid]);
+		data = TAILQ_FIRST(&uc->uc_tx_active[qid]);
 		if (data == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
+		TAILQ_REMOVE_HEAD(&uc->uc_tx_active[qid], next);
 
 		/* TX completed */
 		mtwn_usb_txeof(uc, qid, data);

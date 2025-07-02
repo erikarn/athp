@@ -82,25 +82,25 @@ mtwn_bulk_rx_pkt_callback(struct usb_xfer *xfer, usb_error_t error)
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
-		data = STAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
+		data = TAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
 		if (data == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_PKT], next);
+		TAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_PKT], next);
 
 		/* TODO: here's where we'd process it! */
 		MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, data);
 
-		STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
+		TAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
-		data = STAILQ_FIRST(&uc->uc_rx_inactive);
+		data = TAILQ_FIRST(&uc->uc_rx_inactive);
 		if (data == NULL) {
 			/* XXX error! */
 			goto finish;
 		}
-		STAILQ_REMOVE_HEAD(&uc->uc_rx_inactive, next);
-		STAILQ_INSERT_TAIL(&uc->uc_rx_active[MTWN_BULK_RX_PKT],
+		TAILQ_REMOVE_HEAD(&uc->uc_rx_inactive, next);
+		TAILQ_INSERT_TAIL(&uc->uc_rx_active[MTWN_BULK_RX_PKT],
 		    data, next);
 		usbd_xfer_set_frame_data(xfer, 0, data->buf,
 		    usbd_xfer_max_len(xfer));
@@ -108,11 +108,11 @@ tr_setup:
 		break;
 	default:
 		/* needs it to the inactive queue due to a error. */
-		data = STAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
+		data = TAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_PKT]);
 		if (data != NULL) {
-			STAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_PKT],
+			TAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_PKT],
 			    next);
-			STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
+			TAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		}
 		if (error != USB_ERR_CANCELLED) {
 			usbd_xfer_set_stall(xfer);
@@ -146,7 +146,7 @@ mtwn_bulk_rx_cmd_rxeof(struct mtwn_usb_softc *uc, struct usb_xfer *xfer,
 
 	MTWN_MCU_HANDLE_RESPONSE(sc, bf->buf, len);
 
-	STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, bf, next);
+	TAILQ_INSERT_TAIL(&uc->uc_rx_inactive, bf, next);
 }
 void
 mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
@@ -161,10 +161,10 @@ mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
-		data = STAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
+		data = TAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
 		if (data == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
+		TAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
 		     next);
 
 		/* Process it; recycle buffer */
@@ -172,13 +172,13 @@ mtwn_bulk_rx_cmd_resp_callback(struct usb_xfer *xfer, usb_error_t error)
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
-		data = STAILQ_FIRST(&uc->uc_rx_inactive);
+		data = TAILQ_FIRST(&uc->uc_rx_inactive);
 		if (data == NULL) {
 			/* XXX error! */
 			goto finish;
 		}
-		STAILQ_REMOVE_HEAD(&uc->uc_rx_inactive, next);
-		STAILQ_INSERT_TAIL(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
+		TAILQ_REMOVE_HEAD(&uc->uc_rx_inactive, next);
+		TAILQ_INSERT_TAIL(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
 		    data, next);
 		usbd_xfer_set_frame_data(xfer, 0, data->buf,
 		    usbd_xfer_max_len(xfer));
@@ -186,11 +186,11 @@ tr_setup:
 		break;
 	default:
 		/* needs it to the inactive queue due to a error. */
-		data = STAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
+		data = TAILQ_FIRST(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP]);
 		if (data != NULL) {
-			STAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
+			TAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_CMD_RESP],
 			    next);
-			STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
+			TAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		}
 		if (error != USB_ERR_CANCELLED) {
 			usbd_xfer_set_stall(xfer);

@@ -70,9 +70,9 @@ struct mtwn_data {
 	int			qid;
 	struct mbuf		*m;
 	struct ieee80211_node	*ni;
-	STAILQ_ENTRY(mtwn_data)	next;
+	TAILQ_ENTRY(mtwn_data)	next;
 };
-typedef STAILQ_HEAD(, mtwn_data) mtwn_datahead;
+typedef TAILQ_HEAD(, mtwn_data) mtwn_datahead;
 
 typedef enum {
 	MTWN_CMD_STATE_NONE = 0,	/* not allocated/inactive */
@@ -98,9 +98,9 @@ struct mtwn_cmd {
 		int bufsize;
 		int len;	/* response length */
 	} resp;
-	STAILQ_ENTRY(mtwn_cmd)	next;
+	TAILQ_ENTRY(mtwn_cmd)	next;
 };
-typedef STAILQ_HEAD(, mtwn_cmd) mtwn_cmd_head;
+typedef TAILQ_HEAD(, mtwn_cmd) mtwn_cmd_head;
 
 struct mtwn_usb_softc {
 	struct mtwn_softc	uc_sc;		/* must be the first */

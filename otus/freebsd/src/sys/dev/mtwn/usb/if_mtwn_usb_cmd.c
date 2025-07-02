@@ -118,10 +118,10 @@ mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *uc)
 {
 	int i, ret;
 
-	STAILQ_INIT(&uc->uc_cmd_active);
-	STAILQ_INIT(&uc->uc_cmd_pending);
-	STAILQ_INIT(&uc->uc_cmd_waiting);
-	STAILQ_INIT(&uc->uc_cmd_inactive);
+	TAILQ_INIT(&uc->uc_cmd_active);
+	TAILQ_INIT(&uc->uc_cmd_pending);
+	TAILQ_INIT(&uc->uc_cmd_waiting);
+	TAILQ_INIT(&uc->uc_cmd_inactive);
 
 	ret = mtwn_usb_cmd_alloc_list_array(uc, uc->uc_cmd,
 	    MTWN_USB_CMD_LIST_COUNT, MTWN_USB_CMDBUFSZ);
@@ -129,7 +129,7 @@ mtwn_usb_alloc_cmd_list(struct mtwn_usb_softc *uc)
 		return (ret);
 
 	for (i = 0; i < MTWN_USB_CMD_LIST_COUNT; i++) {
-		STAILQ_INSERT_HEAD(&uc->uc_cmd_inactive, &uc->uc_cmd[i], next);
+		TAILQ_INSERT_HEAD(&uc->uc_cmd_inactive, &uc->uc_cmd[i], next);
 		uc->uc_cmd[i].state = MTWN_CMD_STATE_INACTIVE;
 	}
 	return (0);
@@ -141,10 +141,10 @@ mtwn_usb_free_cmd_list(struct mtwn_usb_softc *uc)
 	mtwn_usb_cmd_free_list_array(uc, uc->uc_cmd,
 	    MTWN_USB_CMD_LIST_COUNT);
 
-	STAILQ_INIT(&uc->uc_cmd_active);
-	STAILQ_INIT(&uc->uc_cmd_pending);
-	STAILQ_INIT(&uc->uc_cmd_waiting);
-	STAILQ_INIT(&uc->uc_cmd_inactive);
+	TAILQ_INIT(&uc->uc_cmd_active);
+	TAILQ_INIT(&uc->uc_cmd_pending);
+	TAILQ_INIT(&uc->uc_cmd_waiting);
+	TAILQ_INIT(&uc->uc_cmd_inactive);
 }
 
 /**
@@ -207,7 +207,7 @@ mtwn_usb_cmd_complete(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 		free(cmd->resp.buf, M_USBDEV);
 	bzero(&cmd->resp, sizeof(cmd->resp));
 
-	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
+	TAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 	cmd->state = MTWN_CMD_STATE_INACTIVE;
 }
 
@@ -228,7 +228,7 @@ mtwn_usb_cmd_eof(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 
 	if (cmd->flags.do_wait == true) {
 		cmd->state = MTWN_CMD_STATE_WAITING;
-		STAILQ_INSERT_HEAD(&uc->uc_cmd_waiting, cmd, next);
+		TAILQ_INSERT_HEAD(&uc->uc_cmd_waiting, cmd, next);
 	} else
 		mtwn_usb_cmd_complete(uc, cmd);
 }
@@ -279,7 +279,7 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size, int rx_size)
 		return (NULL);
 	}
 
-	cmd = STAILQ_FIRST(&uc->uc_cmd_inactive);
+	cmd = TAILQ_FIRST(&uc->uc_cmd_inactive);
 	if (cmd == NULL) {
 		MTWN_ERR_PRINTF(sc, "%s: out of command buffers\n", __func__);
 		return (NULL);
@@ -302,7 +302,7 @@ mtwn_usb_cmd_get(struct mtwn_usb_softc *uc, int size, int rx_size)
 		cmd->resp.len = 0;
 	}
 
-	STAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
+	TAILQ_REMOVE_HEAD(&uc->uc_cmd_inactive, next);
 	cmd->state = MTWN_CMD_STATE_ALLOCED;
 
 	return (cmd);
@@ -325,7 +325,7 @@ mtwn_usb_cmd_return(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 		free(cmd->resp.buf, M_USBDEV);
 	bzero(&cmd->resp, sizeof(cmd->resp));
 
-	STAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
+	TAILQ_INSERT_TAIL(&uc->uc_cmd_inactive, cmd, next);
 	cmd->state = MTWN_CMD_STATE_INACTIVE;
 }
 
@@ -340,7 +340,7 @@ mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
 	struct mtwn_softc *sc = &uc->uc_sc;
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
+	TAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
 	cmd->state = MTWN_CMD_STATE_PENDING;
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 	return (0);
@@ -367,7 +367,7 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 	/* Wait for completion, not just transmit */
 	cmd->flags.do_wait = wait_resp;
 
-	STAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
+	TAILQ_INSERT_TAIL(&uc->uc_cmd_pending, cmd, next);
 	cmd->state = MTWN_CMD_STATE_PENDING;
 	usbd_transfer_start(uc->uc_xfer[MTWN_BULK_TX_INBAND_CMD]);
 
@@ -391,10 +391,10 @@ mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *xfer, usb_error_t error)
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
-		cmd = STAILQ_FIRST(&uc->uc_cmd_active);
+		cmd = TAILQ_FIRST(&uc->uc_cmd_active);
 		if (cmd == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
+		TAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
 		cmd->state = MTWN_CMD_STATE_ALLOCED;
 
 		/* TX completed */
@@ -402,23 +402,23 @@ mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *xfer, usb_error_t error)
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
-		cmd = STAILQ_FIRST(&uc->uc_cmd_pending);
+		cmd = TAILQ_FIRST(&uc->uc_cmd_pending);
 		if (cmd == NULL) {
 			/* Empty! */
 			goto finish;
 		}
-		STAILQ_REMOVE_HEAD(&uc->uc_cmd_pending, next);
-		STAILQ_INSERT_TAIL(&uc->uc_cmd_active, cmd, next);
+		TAILQ_REMOVE_HEAD(&uc->uc_cmd_pending, next);
+		TAILQ_INSERT_TAIL(&uc->uc_cmd_active, cmd, next);
 		cmd->state = MTWN_CMD_STATE_ACTIVE;
 
 		usbd_xfer_set_frame_data(xfer, 0, cmd->buf, cmd->buflen);
 		usbd_transfer_submit(xfer);
 		break;
 	default:
-		cmd = STAILQ_FIRST(&uc->uc_cmd_active);
+		cmd = TAILQ_FIRST(&uc->uc_cmd_active);
 		if (cmd == NULL)
 			goto tr_setup;
-		STAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
+		TAILQ_REMOVE_HEAD(&uc->uc_cmd_active, next);
 		cmd->state = MTWN_CMD_STATE_ALLOCED;
 
 		/* TX completed */
@@ -450,10 +450,10 @@ mtwn_usb_cmd_get_waiting(struct mtwn_usb_softc *uc)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	cmd = STAILQ_FIRST(&uc->uc_cmd_waiting);
+	cmd = TAILQ_FIRST(&uc->uc_cmd_waiting);
 	if (cmd == NULL)
 		return (NULL);
-	STAILQ_REMOVE_HEAD(&uc->uc_cmd_waiting, next);
+	TAILQ_REMOVE_HEAD(&uc->uc_cmd_waiting, next);
 	cmd->state = MTWN_CMD_STATE_ALLOCED;
 	return (cmd);
 }
