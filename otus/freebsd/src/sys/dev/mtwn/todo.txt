@@ -1,0 +1,19 @@
+
+Stuff that I need to revisit
+
+* anywhere there's a TODO or MTWN_TODO_PRINTF()
+
+* the whole mtwn_usb_cmd stuff - notably the cmd struct list management
+  and cleanup.  Since we now have state and each state is on a specific
+  list or no list at all, it should be easy to refactor things out to
+  a 'newstate' routine that deletes from the old list and puts on the
+  new list, and then the 'free' routine can just force move it to
+  ALLOCED (ie ensure its on no list) before putting it on the inactive
+  list.
+
+* .. and then make sure the re-init path will do the right thing if
+  buffers are already allocated/on lists...
+
+* I FINALLY need to link the command write/wait/read response stuff
+  together so I can continue with bring-up
+
