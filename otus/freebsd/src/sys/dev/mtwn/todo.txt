@@ -1,4 +1,10 @@
 
+TODO stuff to make forward progress:
+
+* I FINALLY need to link the command write/wait/read response stuff
+  together so I can continue with bring-up
+* _____ This is required for the rest of the bring-up path! _____
+
 Stuff that I need to revisit
 
 * anywhere there's a TODO or MTWN_TODO_PRINTF()
@@ -13,7 +19,4 @@ Stuff that I need to revisit
 
 * .. and then make sure the re-init path will do the right thing if
   buffers are already allocated/on lists...
-
-* I FINALLY need to link the command write/wait/read response stuff
-  together so I can continue with bring-up
 
