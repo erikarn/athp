@@ -468,6 +468,10 @@ athp_transmit_frame(struct ath10k *ar, struct mbuf *m0)
 	 */
 	m0 = NULL;
 
+	/* Assign sequence numbers if we're in raw mode */
+	if (test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags))
+		ieee80211_output_seqno_assign(ni, -1, m);
+
 	ath10k_dbg(ar, ATH10K_DBG_XMIT,
 	    "%s: called; ni=%p, m=%p; pbuf=%p, ni.macaddr=%6D; iswep=%d, isqos=%d, seqno=0x%04x\n",
 	    __func__, ni, m, pbuf, ni->ni_macaddr, ":", is_wep, is_qos, seqno);
@@ -2925,11 +2929,17 @@ athp_attach_net80211(struct ath10k *ar)
 		    IEEE80211_CRYPTO_TKIPMIC;
 	}
 
-	/* capabilities, etc */
-	ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD
-	    | IEEE80211_FEXT_FRAG_OFFLOAD
-//	    | IEEE80211_FEXT_SEQNO_OFFLOAD
-	    ;
+	/*
+	 * We're responsible for everything in raw mode - including not having
+	 * support for background scans or sequence number / fragment offload.
+	 */
+
+	if (!test_bit(ATH10K_FLAG_RAW_MODE, &ar->dev_flags)) {
+		ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_OFFLOAD
+		    | IEEE80211_FEXT_FRAG_OFFLOAD
+		    | IEEE80211_FEXT_SEQNO_OFFLOAD
+		    ;
+	}
 
 	/* Channels/regulatory */
 	athp_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
