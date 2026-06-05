@@ -1,4 +1,16 @@
 
+The linux commit I'm basing this on:
+
+adrian@gertrude:~/git/kernel.org/linux-next % git show
+commit a24588245776dafc227243a01bfbeb8a59bafba9 (HEAD -> adrian-20260604-mt76u-work-base)
+Merge: 0e8863244ef5 d1be0cf3b8ae
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Tue Apr 8 17:16:43 2025 -0700
+
+    Merge tag 'linux_kselftest-kunit-6.15-rc2' of git://git.kernel.org/pub/scm/linux/kernel/git/shuah/linux-kselftest
+
+===
+
 The mt7610u attach path:
 
 mt76x0u_probe()
