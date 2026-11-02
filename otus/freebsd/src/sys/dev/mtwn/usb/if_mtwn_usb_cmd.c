@@ -177,6 +177,9 @@ mtwn_usb_cmd_copyin_response(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 		MTWN_WARN_PRINTF(sc, "%s: cmd %p has the wrong state! (%d)\n",
 		    __func__, cmd, cmd->state);
 
+	MTWN_DEBUG_PRINTF(sc, "%s: len=%d, buf=%p, resp.buf=%p\n",
+	    __func__, len, buf, cmd->resp.buf);
+
 	/*
 	 * If we get an error or zero-size response then don't copy, but do set
 	 * completion.
@@ -424,7 +427,7 @@ mtwn_usb_cmd_queue(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd)
  */
 int
 mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
-    int timeout, bool wait_resp)
+    int timeout, bool wait_resp, void *rx_data, int *rx_len)
 {
 	struct mtwn_softc *sc = &uc->uc_sc;
 	int ret;
@@ -499,17 +502,34 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 		return (ret);
 	}
 	MTWN_DEBUG_PRINTF(sc,
-	    "%s: completion, cmd=%p, state=%d, resp=%d, wait=%d\n", __func__,
-	    cmd, cmd->state, cmd->flags.resp_set, cmd->flags.do_wait);
+	    "%s: completion, cmd=%p, state=%d, resp.set=%d, wait=%d, resp.len=%d\n", __func__,
+	    cmd, cmd->state, cmd->flags.resp_set, cmd->flags.do_wait, cmd->resp.len);
 
 	/* Completion path */
 
 	/* handle response */
 	if (cmd->flags.resp_set == true) {
+		/*
+		 * This code path hasn't yet been actually run WITH the
+		 * completion buffer contents - all the current callers
+		 * are waiting for RX but not caring about the results.
+
+		 * Remove this comment this has been fully vetted end to end.^
+		 */
 		MTWN_TODO_PRINTF(sc,
-		    "%s: TODO: **** COMPLETION COPYOUT TIME (%p) ****\n",
+		    "%s: **** COMPLETION COPYOUT TIME (%p) ****\n",
 		    __func__, cmd);
-		/* XXX TODO: copy the RX specific payload out */
+		/* Copy the RX specific payload out */
+		if (rx_data != NULL && rx_len != NULL) {
+			memcpy(rx_data, cmd->resp.buf, MIN(*rx_len,
+			    cmd->resp.len));
+			*rx_len = MIN(*rx_len, cmd->resp.len);
+		}
+	} else {
+		/* Set length to -1 to signal nothing was copied */
+		if (rx_len != NULL) {
+			*rx_len = -1;
+		}
 	}
 
 	/*

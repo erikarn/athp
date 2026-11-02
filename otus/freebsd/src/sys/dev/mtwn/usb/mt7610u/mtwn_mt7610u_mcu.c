@@ -153,8 +153,8 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 
 	/* Base off of __m76x02u_mcu_send_msg */
 	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
-	    "%s: called; cmd=%d, data=%p, len=%d, wait_tx=%d, wait_resp=%d\n",
-	    __func__, cmd, data, len, wait_tx, wait_resp);
+	    "%s: called; cmd=%d, data=%p, len=%d, wait_tx=%d, wait_resp=%d, rx_buf_len=%d\n",
+	    __func__, cmd, data, len, wait_tx, wait_resp, rx_buf_len);
 
 	/* Allocate a buffer for transmit */
 	bf = mtwn_usb_cmd_get(uc, len, rx_buf_len);
@@ -212,16 +212,13 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 
 	/*
 	 * wait_tx signals whether to wait for TX to complete, not RX
-	 * completion.
-	 *
-	 * We can only get responses w/ both wait_tx and wait_resp.
-	 *
-	 * TODO: once this is all done, we'll want to be able to add
-	 * rx_data, rx_len, etc to the cmd_buf so they're filled in
-	 * upon a successful return.
+	 * completion.  wait_resp requires wait_tx to be set, and it
+	 * will wait for the RX completion and copy data to the
+	 * rx_data / rx_len fields.
 	 */
 	if (wait_tx)
-		ret = mtwn_usb_cmd_queue_wait(uc, bf, 5000, wait_resp);
+		ret = mtwn_usb_cmd_queue_wait(uc, bf, 5000, wait_resp,
+		    rx_data, rx_len);
 	else
 		ret = mtwn_usb_cmd_queue(uc, bf);
 
@@ -233,12 +230,9 @@ mtwn_mcu_mt7610u_mcu_send_msg(struct mtwn_softc *sc, int cmd,
 	}
 
 	/*
-	 * if wait_resp, do mt76x02u_mcu_wait_resp to wait for the
-	 * actual response notification
+	 * Note: mtwn_usb_cmd_queue_wait() has already waited for the
+	 * requested TX/RX response.
 	 */
-	if (wait_resp) {
-		MTWN_TODO_PRINTF(sc, "%s: TODO: RX response!\n", __func__);
-	}
 
 	/* Done! */
 	m_freem(m);
@@ -283,7 +277,8 @@ mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
 		while ((cmd = mtwn_usb_cmd_get_waiting(uc)) != NULL) {
 			if (cmd->seq == seq) {
 				MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
-				    "%s:  found seq %d\n", __func__, seq);
+				    "%s:  found seq %d, resp len=%d\n",
+				    __func__, seq, len - 4);
 				/* Copy in, wake-up */
 				mtwn_usb_cmd_copyin_response(uc, cmd,
 				    buf + 4, len - 4);
@@ -600,7 +595,7 @@ mtwn_mt7610u_mcu_fw_send_data_chunk(struct mtwn_softc *sc,
 	bf->buflen = data_len;
 
 	/* Wait for TX completion, but don't wait for RX notification */
-	err = mtwn_usb_cmd_queue_wait(uc, bf, 1000, false);
+	err = mtwn_usb_cmd_queue_wait(uc, bf, 1000, false, NULL, NULL);
 	MTWN_DPRINTF(sc, MTWN_DEBUG_FIRMWARE,
 	    "%s: actual bulk EP, %d bytes, returned %d\n",
 	    __func__, data_len, err);

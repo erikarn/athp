@@ -29,7 +29,7 @@ extern	void mtwn_usb_cmd_return(struct mtwn_usb_softc *, struct mtwn_cmd *);
 
 extern	int mtwn_usb_cmd_queue(struct mtwn_usb_softc *, struct mtwn_cmd *);
 extern	int mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *, struct mtwn_cmd *,
-	    int, bool);
+	    int, bool, void *, int *);
 
 extern	void mtwn_bulk_tx_inband_cmd_callback(struct usb_xfer *, usb_error_t);
 
