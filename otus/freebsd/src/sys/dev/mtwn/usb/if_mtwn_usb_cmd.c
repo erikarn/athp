@@ -177,7 +177,7 @@ mtwn_usb_cmd_copyin_response(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 		MTWN_WARN_PRINTF(sc, "%s: cmd %p has the wrong state! (%d)\n",
 		    __func__, cmd, cmd->state);
 
-	MTWN_DEBUG_PRINTF(sc, "%s: len=%d, buf=%p, resp.buf=%p\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: len=%d, buf=%p, resp.buf=%p\n",
 	    __func__, len, buf, cmd->resp.buf);
 
 	/*
@@ -501,7 +501,7 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 
 		return (ret);
 	}
-	MTWN_DEBUG_PRINTF(sc,
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD,
 	    "%s: completion, cmd=%p, state=%d, resp.set=%d, wait=%d, resp.len=%d\n", __func__,
 	    cmd, cmd->state, cmd->flags.resp_set, cmd->flags.do_wait, cmd->resp.len);
 
