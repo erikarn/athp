@@ -509,16 +509,6 @@ mtwn_usb_cmd_queue_wait(struct mtwn_usb_softc *uc, struct mtwn_cmd *cmd,
 
 	/* handle response */
 	if (cmd->flags.resp_set == true) {
-		/*
-		 * This code path hasn't yet been actually run WITH the
-		 * completion buffer contents - all the current callers
-		 * are waiting for RX but not caring about the results.
-
-		 * Remove this comment this has been fully vetted end to end.^
-		 */
-		MTWN_TODO_PRINTF(sc,
-		    "%s: **** COMPLETION COPYOUT TIME (%p) ****\n",
-		    __func__, cmd);
 		/* Copy the RX specific payload out */
 		if (rx_data != NULL && rx_len != NULL) {
 			memcpy(rx_data, cmd->resp.buf, MIN(*rx_len,
