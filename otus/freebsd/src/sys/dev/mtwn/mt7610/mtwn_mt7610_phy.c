@@ -129,6 +129,53 @@ mtwn_mt7610_phy_ant_select(struct mtwn_softc *sc)
 	return (0);
 }
 
+static int
+mtwn_mt7610_phy_rf_patch_reg_array(struct mtwn_softc *sc,
+    const struct mtwn_reg_pair *rp, int n)
+{
+	int i;
+
+	for (i = 0; i < n; i++) {
+		uint32_t reg, val;
+		int ret;
+
+		reg = rp[i].reg;
+		val = rp[i].val;
+
+		switch (reg) {
+		case MT7610_REG_RF(0, 3):
+			if (MTWN_IS_BUS_MMIO(sc)) {
+				if (MTWN_MT7610_CHIP_IS_MT7630(sc))
+					val = 0x70;
+				else
+					val = 0x63;
+			} else {
+				val = 0x73;
+			}
+			break;
+		case MT7610_REG_RF(0, 21):
+			if (MTWN_MT7610_CHIP_IS_MT7610E(sc))
+				val = 0x10;
+			else
+				val = 0x12;
+		case MT7610_REG_RF(5, 2):
+			if (MTWN_MT7610_CHIP_IS_MT7630(sc))
+				val = 0x1d;
+			else if (MTWN_MT7610_CHIP_IS_MT7610E(sc))
+				val = 0x00;
+			else
+				val = 0x0c;
+		default:
+			break;
+		}
+
+		ret = MTWN_RF_REG_WRITE_4(sc, reg, val);
+		if (ret != 0)
+			return (ret);
+	}
+	return (0);
+}
+
 int
 mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 {
@@ -139,8 +186,24 @@ mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 
-	/* TODO: patch/upload rf_central_tab */
-	/* TODO: patch/upload 2g_channel_0_tab */
+	ret = mtwn_mt7610_phy_rf_patch_reg_array(sc,
+	    mtwn_mt7610_rf_central_tab, nitems(mtwn_mt7610_rf_central_tab));
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: failed to write rf_central_tab (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
+
+	ret = mtwn_mt7610_phy_rf_patch_reg_array(sc,
+	    mtwn_mt761x0_rf_2g_channel_0_tab,
+	    nitems(mtwn_mt761x0_rf_2g_channel_0_tab));
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: failed to write 2g_channel_0_tab (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
 
 	/* 5g_channel_0_tab */
 	ret = MTWN_RF_REG_PAIR_WRITE_4(sc, mtwn_mt7610_rf_5g_channel_0_tab,

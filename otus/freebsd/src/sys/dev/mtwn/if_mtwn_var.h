@@ -177,6 +177,8 @@ struct mtwn_softc {
 	struct mtx		sc_mtx;
 	int			sc_detached;
 
+	uint32_t		asic_ver;
+
 	struct {
 		bool mcu_running;
 		bool power_on;
@@ -215,6 +217,12 @@ struct mtwn_softc {
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	MTWN_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
 #define	MTWN_LOCK_ASSERT(sc, t)	mtx_assert(&(sc)->sc_mtx, t)
+
+#define	MTWN_IS_BUS_MMIO(sc)	(false)
+#define	MTWN_IS_BUS_USB(sc)	(true)
+
+#define	MTWN_CHIP_ID(sc)	(((sc)->asic_ver >> 16) & 0xffff)
+#define	MTWN_REV_ID(sc)		((sc)->asic_ver & 0xffff)
 
 /* Bus operations */
 #define	MTWN_REG_READ_4(_sc, _reg)				\

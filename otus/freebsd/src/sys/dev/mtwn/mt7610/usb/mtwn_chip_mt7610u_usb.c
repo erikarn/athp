@@ -105,9 +105,8 @@ mtwn_chip_mt7610u_reset(struct mtwn_softc *sc)
 static int
 mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 {
+	uint32_t mac_ver, efuse;
 	int ret;
-	uint32_t asic_ver, mac_ver;
-	uint32_t efuse;
 
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
 
@@ -125,11 +124,11 @@ mtwn_chip_mt7610u_setup_hardware(struct mtwn_softc *sc)
 	}
 
 	/* populate asic/mac rev, efuse */
-	asic_ver = MTWN_REG_READ_4(sc, MT76_REG_ASIC_VERSION);
+	sc->asic_ver = MTWN_REG_READ_4(sc, MT76_REG_ASIC_VERSION);
 	mac_ver = MTWN_REG_READ_4(sc, MT76_REG_MAC_CSR0);
 	efuse = MTWN_REG_READ_4(sc, MT7610_REG_EFUSE_CTRL);
 	device_printf(sc->sc_dev, "%s: asic_ver=0x%08x, mac_ver=0x%08x, efuse=0x%08x\n",
-	    __func__, asic_ver, mac_ver, efuse);
+	    __func__, sc->asic_ver, mac_ver, efuse);
 
 	/* efuse check */
 	if ((efuse & MT7610_REG_EFUSE_CTRL_SEL) == 0)

@@ -1,7 +1,7 @@
 
 TODO stuff to make forward progress:
 
-* [done, untested] I FINALLY need to link the command write/wait/read response stuff
+* [done, sort of tested] I FINALLY need to link the command write/wait/read response stuff
   together so I can continue with bring-up
 * _____ This is required for the rest of the bring-up path! _____
 
@@ -12,8 +12,17 @@ TODO stuff to make forward progress:
 * (the write_pair / write_pair_chunk looks done but not yet verified?)
 
 * mtwn_mt7610u_rf_reg_read()
-  - requires the command request/repsonse stuff above to be done
-  - right now i return 0xffffffff which is wrong and i feel bad.
+  - [done] requires the command request/repsonse stuff above to be done
+  - [done] right now i return 0xffffffff which is wrong and i feel bad.
+
+* What's the RF register read/write stuff value width?
+  mt76x0_rf_wr() takes a u8 val, not a u32 val.  I need to re-review
+  this to se what's going on here; it's very possible I've slightly
+  fucked this up?
+* .. the reg pair stuff has a 32 bit val
+* but the rf_rd / rf_wr routines do NOT.
+* maybe I need to implement MTWN_RF_REG_WRITE_1() / MTWN_RF_REG_READ_1()
+  just to enforce an 8 bit wide field?
 
 Stuff that I need to revisit
 
