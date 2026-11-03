@@ -346,7 +346,7 @@ struct mtwn_softc {
 #define	MTWN_RF_REG_SET_4(_sc, _reg, _val)			\
 	    ((_sc)->sc_rfops.sc_rf_reg_rmw_4((_sc), (_reg), 0, (_val)))
 #define	MTWN_RF_REG_CLEAR_4(_sc, _reg, _val)			\
-	    ((_sc)->sc_rfops.sc_rf_rmw_4((_sc), (_reg), (_val), 0))
+	    ((_sc)->sc_rfops.sc_rf_reg_rmw_4((_sc), (_reg), (_val), 0))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);
