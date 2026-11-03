@@ -262,6 +262,9 @@ mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_D_PORT),
 	    _IEEE80211_MASKSHIFT(rxfce, MT7610_DMA_RX_FCE_INFO_TYPE));
 
+	if (sc->sc_debug & MTWN_DEBUG_CMD)
+		hexdump(buf, len, "rx buffer: ", 0);
+
 	/*
 	 * If we have a sequence number then we need to complete the
 	 * existing waiting buffers until we find ours, then copy the
@@ -308,6 +311,7 @@ mtwn_mcu_mt7610u_mcu_handle_response(struct mtwn_softc *sc, char *buf,
 static uint32_t
 mtwn_mcu_mt7610u_mcu_reg_read(struct mtwn_softc *sc, uint32_t reg)
 {
+	/* [adrian] TODO - where's the mt76 code for this */
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (0xffffffff);
 }
@@ -316,6 +320,7 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_write(struct mtwn_softc *sc, uint32_t reg,
     uint32_t data)
 {
+	/* [adrian] TODO - where's the mt76 code for this */
 	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
 	return (ENXIO);
 }
@@ -324,17 +329,85 @@ static int
 mtwn_mcu_mt7610u_mcu_reg_pair_read_chunk(struct mtwn_softc *sc,
     uint32_t base, struct mtwn_reg_pair *rp, int n, bool final)
 {
+	/*
+	 * [adrian] I think this is mt76x02u_mcu_rd_rp() ?
+	 */
+	char *buf;
+	char *ret_buf;
+	int alloc_size;
+	int i, offset, ret;
+	int ret_len;
+
+	alloc_size = (n * sizeof(uint32_t) * 2);
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!: base=0x%08x, n=%d, final=%d\n",
+	/* Note: final doesn't matter here; every transfer has to wait for RX completion */
+
+	MTWN_DPRINTF(sc, MTWN_DEBUG_CMD, "%s: base=0x%08x, n=%d, final=%d\n",
 	    __func__, base, n, final);
 
+	/* Allocate temporary buffer */
+	buf = malloc(alloc_size, M_TEMP, M_NOWAIT | M_ZERO);
+	if (buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buffer\n",
+		    __func__);
+		return (ENOBUFS);
+	}
+
+	ret_len = alloc_size;
+	ret_buf = malloc(ret_len, M_TEMP, M_NOWAIT | M_ZERO);
+	if (buf == NULL) {
+		MTWN_ERR_PRINTF(sc, "%s: couldn't allocate buffer\n",
+		    __func__);
+		free(buf, M_TEMP);
+		return (ENOBUFS);
+	}
+
+	/* Append our register/value pairs */
+	for (offset = 0, i = 0; i < n; i++, offset += (sizeof(uint32_t) * 2)) {
+		uint32_t val;
+
+		val = htole32(rp[i].reg + base);
+		memcpy(buf + offset, &val, sizeof(uint32_t));
+		val = htole32(rp[i].val);
+		memcpy(buf + offset + sizeof(uint32_t), &val, sizeof(uint32_t));
+	}
+
 	/*
-	 * This is more exciting because not only do we need to
-	 * wait for the completion of the actual command, we also
-	 * need to grab the contents from the notification and
-	 * populate our regpair with it!
+	 * Send the message, always wait for TX completion first;
+	 * wait for RX completion if required.
 	 */
+	ret = MTWN_MCU_SEND_MSG(sc, MT7610_MCU_CMD_RANDOM_READ, buf,
+	    alloc_size, ret_buf, &ret_len, true, true);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: failed to send (err %d)\n", __func__,
+		    ret);
+		free(buf, M_TEMP);
+		return (ret);
+	}
+
+	/* Validate/copy our read register/value pairs */
+	for (offset = 0, i = 0; i < n; i++, offset += (sizeof(uint32_t) * 2)) {
+		uint32_t reg, orig_reg, val;
+
+		orig_reg = rp[i].reg + base;
+		memcpy(&reg, ret_buf + offset, sizeof(uint32_t));
+		memcpy(&val, ret_buf + offset + sizeof(uint32_t), sizeof(uint32_t));
+
+		reg = le32toh(reg);
+		val = le32toh(val);
+
+		if (reg != orig_reg)
+			MTWN_ERR_PRINTF(sc, "%s: mismatch register! id%d, "
+			    "reg=0x%08x, val=0x%08x, orig_reg=0x%08x\n",
+			    __func__, i, reg, val, orig_reg);
+
+		rp[i].val = val;
+	}
+
+	free(buf, M_TEMP);
+	free(ret_buf, M_TEMP);
 
 	return (0);
 }

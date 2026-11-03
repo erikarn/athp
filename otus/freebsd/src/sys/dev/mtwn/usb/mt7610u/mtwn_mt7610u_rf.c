@@ -74,10 +74,28 @@
 static uint32_t
 mtwn_mt7610u_rf_reg_read(struct mtwn_softc *sc, uint32_t reg)
 {
-	/* TODO: until the regpair APIs actually return read IO right */
+	struct mtwn_reg_pair rp = { 0 };
+	int ret;
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-	return (0xffffffff);
+	MTWN_LOCK_ASSERT(sc, MA_OWNED);
+
+	rp.reg = reg;
+	rp.val = 0;
+
+	MTWN_DEBUG_PRINTF(sc, "%s: read: reg=0x%08x\n", __func__, reg);
+
+	ret = MTWN_REG_PAIR_READ_4(sc, MT7610_MCU_MEMMAP_RF, &rp, 1);
+
+	/* XXX TODO: should really change the API to return the error, not the value */
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc, "%s: REG_PAIR_READ_4 failed (err %d)\n",
+		    __func__, ret);
+		return (0xffffffff);
+	}
+	MTWN_DEBUG_PRINTF(sc, "%s: read: reg=0x%08x; val=0x%08x\n",
+	    __func__, reg, rp.val);
+
+	return (rp.val);
 }
 
 static int
