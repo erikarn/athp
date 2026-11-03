@@ -176,6 +176,42 @@ mtwn_mt7610_phy_rf_patch_reg_array(struct mtwn_softc *sc,
 	return (0);
 }
 
+static int
+mtwn_mt760_phy_rf_init_switch_table(struct mtwn_softc *sc)
+{
+	int ret = 0;
+	int i;
+
+	for (i = 0; i < nitems(mtwn_mt7610_rf_bw_switch_tab); i++) {
+		const struct mtwn_mt7610_rf_switch_item *e =
+		    &mtwn_mt7610_rf_bw_switch_tab[i];
+
+		ret = 0;
+		if (e->bw_band == MTWN_MT7610_PHY_RF_BW_20)
+			ret = MTWN_RF_REG_WRITE_4(sc, e->rf_bank_reg, e->value);
+		else if ((e->bw_band &
+		    (MTWN_MT7610_PHY_RF_BW_20 | MTWN_MT7610_PHY_RF_G_BAND)) ==
+		    (MTWN_MT7610_PHY_RF_BW_20 | MTWN_MT7610_PHY_RF_G_BAND))
+			ret = MTWN_RF_REG_WRITE_4(sc, e->rf_bank_reg, e->value);
+
+		if (ret != 0)
+			goto finish;
+	}
+
+	for (i = 0; i < nitems(mtwn_mt7610_rf_band_switch_tab); i++) {
+		const struct mtwn_mt7610_rf_switch_item *e =
+		    &mtwn_mt7610_rf_band_switch_tab[i];
+
+		ret = 0;
+		if (e->bw_band & MTWN_MT7610_PHY_RF_G_BAND)
+			ret = MTWN_RF_REG_WRITE_4(sc, e->rf_bank_reg, e->value);
+		if (ret != 0)
+			goto finish;
+	}
+finish:
+	return (ret);
+}
+
 int
 mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 {
@@ -225,21 +261,31 @@ mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 		return (ret);
 	}
 
-	/* TODO: rf_bw_switch_tab - 20, 20+G */
-	/* TODO: rf_bw_switch_tab - G */
+	ret = mtwn_mt760_phy_rf_init_switch_table(sc);
+	if (ret != 0) {
+		MTWN_ERR_PRINTF(sc,
+		    "%s: failed to write switch table (err %d)\n",
+		    __func__, ret);
+		return (ret);
+	}
 
-	/* TODO: frequency calibration */
+	/* frequency calibration */
 	MTWN_DEBUG_PRINTF(sc, "%s: CAL before: 0x%08x\n",
 	    __func__, MTWN_RF_REG_READ_4(sc, MT7610_REG_RF(0, 22)));
 	MTWN_RF_REG_WRITE_4(sc, MT7610_REG_RF(0, 22),
 	    MIN((uint8_t) psc->rx_freq_cal.freq_offset, 0xbf));
+	MTWN_RF_REG_READ_4(sc, MT7610_REG_RF(0, 22));
 
 	MTWN_DEBUG_PRINTF(sc, "%s: CAL after: 0x%08x\n",
 	    __func__, MTWN_RF_REG_READ_4(sc, MT7610_REG_RF(0, 22)));
 
-	/* TODO: DAC reset */
+	/* DAC reset */
+	ret = MTWN_RF_REG_SET_4(sc, MT7610_REG_RF(0, 74), 0x80);
+	ret = MTWN_RF_REG_CLEAR_4(sc, MT7610_REG_RF(0, 74), 0x80);
+	ret = MTWN_RF_REG_SET_4(sc, MT7610_REG_RF(0, 74), 0x80);
 
-	/* TODO: VCO calibration */
+	/* VCO calibration */
+	ret = MTWN_RF_REG_SET_4(sc, MT7610_REG_RF(0, 4), 0x80);
 
 	return (0);
 }
