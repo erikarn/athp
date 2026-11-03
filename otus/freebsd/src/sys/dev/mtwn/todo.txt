@@ -1,9 +1,19 @@
 
 TODO stuff to make forward progress:
 
-* I FINALLY need to link the command write/wait/read response stuff
+* [done, untested] I FINALLY need to link the command write/wait/read response stuff
   together so I can continue with bring-up
 * _____ This is required for the rest of the bring-up path! _____
+
+* mtwn_mcu_mt7610u_mcu_reg_read()
+* mtwn_mcu_mt7610u_mcu_reg_write()
+* mtwn_mcu_mt7610u_mcu_reg_pair_read_chunk()
+* mtwn_mcu_mt7610u_mcu_reg_pair_read()
+* (the write_pair / write_pair_chunk looks done but not yet verified?)
+
+* mtwn_mt7610u_rf_reg_read()
+  - requires the command request/repsonse stuff above to be done
+  - right now i return 0xffffffff which is wrong and i feel bad.
 
 Stuff that I need to revisit
 
