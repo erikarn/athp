@@ -71,6 +71,11 @@
 
 #include "mtwn_mt7610u_rf.h"
 
+/*
+ * Note: the Linux mt76 routines (eg mt76x0_rf_wr()) are
+ * treating the values as 8 bit values.
+ */
+
 static uint32_t
 mtwn_mt7610u_rf_reg_read(struct mtwn_softc *sc, uint32_t reg)
 {
@@ -95,7 +100,7 @@ mtwn_mt7610u_rf_reg_read(struct mtwn_softc *sc, uint32_t reg)
 	MTWN_DEBUG_PRINTF(sc, "%s: read: reg=0x%08x; val=0x%08x\n",
 	    __func__, reg, rp.val);
 
-	return (rp.val);
+	return (rp.val & 0xff);
 }
 
 static int
@@ -108,10 +113,10 @@ mtwn_mt7610u_rf_reg_write(struct mtwn_softc *sc, uint32_t reg,
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
 	rp.reg = reg;
-	rp.val = data;
+	rp.val = data & 0xff;
 
 	MTWN_DEBUG_PRINTF(sc, "%s: reg=0x%08x, val=0x%08x\n",
-	    __func__, reg, data);
+	    __func__, rp.reg, rp.val);
 
 	ret = MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_RF, &rp, 1);
 	if (ret != 0) {
@@ -121,6 +126,8 @@ mtwn_mt7610u_rf_reg_write(struct mtwn_softc *sc, uint32_t reg,
 
 	return (ret);
 }
+
+/* Note: mt76 implements /this/ with 32 bit register values */
 
 static int
 mtwn_mt7610u_rf_reg_pair_write(struct mtwn_softc *sc,
@@ -142,17 +149,34 @@ mtwn_mt7610u_rf_reg_pair_write(struct mtwn_softc *sc,
 
 }
 
+/**
+ * @brief Implement RF register read/modify/write.
+ *
+ * The value is read, then the bits set in 'mask' are
+ * cleared, then the bits in 'set' are set, then
+ * the value is written back.
+ */
 static int
 mtwn_mt7610u_rf_reg_rmw(struct mtwn_softc *sc, uint32_t reg,
     uint32_t mask, uint32_t set)
 {
+	uint32_t val;
+	int ret;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	/* TODO: until the regpair APIs actually return read IO right */
+	mask &= 0xff;
+	set &= 0xff;
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO: reg=0x%08x, mask=0x%08x, set=0x%08x\n",
+	MTWN_TODO_PRINTF(sc, "%s: reg=0x%08x, mask=0x%08x, set=0x%08x\n",
 	    __func__, reg, mask, set);
-	return (ENXIO);
+
+	val = mtwn_mt7610u_rf_reg_read(sc, reg);
+	val &= ~mask;
+	val |= set;
+	ret = mtwn_mt7610u_rf_reg_write(sc, reg, val);
+
+	return (ret);
 }
 
 int
