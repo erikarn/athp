@@ -88,7 +88,7 @@ mtwn_bulk_rx_pkt_callback(struct usb_xfer *xfer, usb_error_t error)
 		TAILQ_REMOVE_HEAD(&uc->uc_rx_active[MTWN_BULK_RX_PKT], next);
 
 		/* TODO: here's where we'd process it! */
-		MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, data);
+		MTWN_TODO_PRINTF(sc, "%s: processed %p\n", __func__, data);
 
 		TAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		/* FALLTHROUGH */
@@ -140,7 +140,7 @@ mtwn_bulk_rx_cmd_rxeof(struct mtwn_usb_softc *uc, struct usb_xfer *xfer,
 	struct mtwn_softc *sc = &uc->uc_sc;
 	int len;
 
-	MTWN_INFO_PRINTF(sc, "%s: processed %p\n", __func__, bf);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_USB, "%s: processed %p\n", __func__, bf);
 
 	usbd_xfer_status(xfer, &len, NULL, NULL, NULL);
 

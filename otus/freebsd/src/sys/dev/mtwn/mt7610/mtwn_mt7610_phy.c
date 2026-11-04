@@ -220,8 +220,6 @@ mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
-
 	ret = mtwn_mt7610_phy_rf_patch_reg_array(sc,
 	    mtwn_mt7610_rf_central_tab, nitems(mtwn_mt7610_rf_central_tab));
 	if (ret != 0) {

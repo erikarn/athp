@@ -87,7 +87,8 @@ mtwn_mt7610u_rf_reg_read(struct mtwn_softc *sc, uint32_t reg)
 	rp.reg = reg;
 	rp.val = 0;
 
-	MTWN_DEBUG_PRINTF(sc, "%s: read: reg=0x%08x\n", __func__, reg);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO, "%s: read: reg=0x%08x\n",
+	    __func__, reg);
 
 	ret = MTWN_REG_PAIR_READ_4(sc, MT7610_MCU_MEMMAP_RF, &rp, 1);
 
@@ -97,8 +98,8 @@ mtwn_mt7610u_rf_reg_read(struct mtwn_softc *sc, uint32_t reg)
 		    __func__, ret);
 		return (0xffffffff);
 	}
-	MTWN_DEBUG_PRINTF(sc, "%s: read: reg=0x%08x; val=0x%08x\n",
-	    __func__, reg, rp.val);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
+	    "%s: read: reg=0x%08x; val=0x%08x\n", __func__, reg, rp.val);
 
 	return (rp.val & 0xff);
 }
@@ -115,7 +116,7 @@ mtwn_mt7610u_rf_reg_write(struct mtwn_softc *sc, uint32_t reg,
 	rp.reg = reg;
 	rp.val = data & 0xff;
 
-	MTWN_DEBUG_PRINTF(sc, "%s: reg=0x%08x, val=0x%08x\n",
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO, "%s: reg=0x%08x, val=0x%08x\n",
 	    __func__, rp.reg, rp.val);
 
 	ret = MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_RF, &rp, 1);
@@ -137,7 +138,7 @@ mtwn_mt7610u_rf_reg_pair_write(struct mtwn_softc *sc,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DEBUG_PRINTF(sc, "%s: n=%d\n", __func__, n);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO, "%s: n=%d\n", __func__, n);
 
 	ret = MTWN_REG_PAIR_WRITE_4(sc, MT7610_MCU_MEMMAP_RF, rp, n);
 	if (ret != 0) {
@@ -168,8 +169,9 @@ mtwn_mt7610u_rf_reg_rmw(struct mtwn_softc *sc, uint32_t reg,
 	mask &= 0xff;
 	set &= 0xff;
 
-	MTWN_TODO_PRINTF(sc, "%s: reg=0x%08x, mask=0x%08x, set=0x%08x\n",
-	    __func__, reg, mask, set);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO,
+	    "%s: reg=0x%08x, mask=0x%08x, set=0x%08x\n", __func__, reg,
+	    mask, set);
 
 	val = mtwn_mt7610u_rf_reg_read(sc, reg);
 	val &= ~mask;

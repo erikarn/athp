@@ -420,7 +420,8 @@ mtwn_mcu_mt7610u_mcu_reg_pair_read(struct mtwn_softc *sc, uint32_t base,
 
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_DEBUG_PRINTF(sc, "%s: base=0x%08x, n=%d\n", __func__, base, n);
+	MTWN_DPRINTF(sc, MTWN_DEBUG_REGIO, "%s: base=0x%08x, n=%d\n",
+	    __func__, base, n);
 
 	for (count = 0; count < n; count += MT7610_MCU_MAX_REGPAIR_IO_PER_PKT) {
 		int num = MIN(MT7610_MCU_MAX_REGPAIR_IO_PER_PKT, n - count);
