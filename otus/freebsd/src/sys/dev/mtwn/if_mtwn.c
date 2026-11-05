@@ -269,9 +269,20 @@ mtwn_init(struct mtwn_softc *sc)
 		goto error;
 	}
 
+	/* TODO: MT_TX_SG_MAX_SIZE / sg_en flag for enabling AMSDU? */
+
 	/* TODO: everything that's in mt76x0_register_device() */
-	/* fetch the LDPC coding config for 2g/5g vht and ht */
+
+	/*
+	 * TODO: calculate list of mac addresses to provide for vaps
+	 * in mt76x02_config_mac_addr_list()
+	 */
+	MTWN_TODO_PRINTF(sc, "%s: calculate mac addr list\n", __func__);
+
+	/* TODO: fetch the LDPC coding config for 2g/5g vht and ht */
+	MTWN_TODO_PRINTF(sc, "%s: disable VHT LDPC coding in 5ghz if enabled\n", __func__);
 	/* mt76x0_init_txpower() for 2ghz if needed */
+	MTWN_TODO_PRINTF(sc, "%s: 2ghz/5ghz max txpower limits\n", __func__);
 	/* mt76x0_init_txpower() for 5ghz if needed */
 
 	/*
