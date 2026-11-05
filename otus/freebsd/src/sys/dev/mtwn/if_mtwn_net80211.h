@@ -18,4 +18,10 @@
 
 struct mtwn_softc;
 
-#endif	/* __IF_MTWN_NET80211_H__
+int	mtwn_net80211_attach(struct mtwn_softc *);
+int	mtwn_net80211_detach(struct mtwn_softc *);
+int	mtwn_net80211_suspend(struct mtwn_softc *);
+int	mtwn_net80211_resume(struct mtwn_softc *);
+int	mtwn_net80211_shutdown(struct mtwn_softc *);
+
+#endif	/* __IF_MTWN_NET80211_H__ */

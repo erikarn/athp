@@ -183,8 +183,13 @@ struct mtwn_phy_capabilities {
 	struct mtwn_supported_bands sb;
 };
 
+#define	IF_MTWN_SC_TO_NET80211(_sc) (&(_sc)->sc_ic)
+#define	IF_MTWN_NET80211_TO_SC(_ic) ((_ic)->ic_softc)
+
 struct mtwn_softc {
 	device_t		sc_dev;
+	struct ieee80211com	sc_ic;
+
 	uint32_t		sc_debug;
 	struct mtx		sc_mtx;
 	int			sc_detached;
@@ -228,6 +233,11 @@ struct mtwn_softc {
 
 	/* PHY capabilities */
 	struct mtwn_phy_capabilities sc_phy_cap;
+
+	/* net80211 functions */
+	void		(*sc_node_free)(struct ieee80211_node *);
+	void		(*sc_scan_curchan)(struct ieee80211_scan_state *,
+			    unsigned long);
 };
 
 #define	MTWN_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
@@ -374,6 +384,25 @@ struct mtwn_softc {
 
 #define	MTWN_BEACON_INIT_CONFIG(_sc)				\
 	    ((_sc)->sc_beacon_ops.sc_init_beacon_config((_sc)))
+
+/* Vap */
+struct mtwn_node {
+	struct ieee80211_node	ni;
+};
+
+#define	MTWN_NODE(ni)		((struct mtwn_node *)(ni))
+
+struct mtwn_vap {
+	struct ieee80211vap	vap;
+
+	int			(*newstate)(struct ieee80211vap *,
+				    enum ieee80211_state, int);
+	void			(*recv_mgmt)(struct ieee80211_node *,
+				    struct mbuf *, int,
+				    const struct ieee80211_rx_stats *,
+				    int, int);
+};
+#define	MTWN_VAP(vap)		((struct mtwn_vap *)(vap))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);

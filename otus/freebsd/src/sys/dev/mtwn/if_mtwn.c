@@ -57,6 +57,7 @@
 
 #include "if_mtwn_var.h"
 #include "if_mtwn_debug.h"
+#include "if_mtwn_net80211.h"
 
 /*
  * @brief Do probe/attach time hardware setup.
@@ -350,8 +351,17 @@ mtwn_attach(struct mtwn_softc *sc)
 int
 mtwn_detach(struct mtwn_softc *sc)
 {
-	MTWN_INFO_PRINTF(sc, "%s: bye!\n", __func__);
+	int ret;
+
+	MTWN_TODO_PRINTF(sc, "%s: bye!\n", __func__);
+
+	MTWN_LOCK(sc);
 	sc->sc_detached = 1;
+	MTWN_UNLOCK(sc);
+
+	ret = mtwn_net80211_detach(sc);
+	if (ret != 0)
+		return (ret);
 
 	return (0);
 }
@@ -363,6 +373,8 @@ mtwn_suspend(struct mtwn_softc *sc)
 
 	MTWN_FUNC_ENTER(sc);
 	MTWN_TODO_PRINTF(sc, "%s: ieee80211_suspend_all\n", __func__);
+
+	(void) mtwn_net80211_suspend(sc);
 
 	MTWN_LOCK(sc);
 	ret = MTWN_CHIP_POWER_OFF(sc);
@@ -382,6 +394,7 @@ mtwn_resume(struct mtwn_softc *sc)
 	MTWN_TODO_PRINTF(sc, "%s: ieee80211_resume_all\n", __func__);
 	MTWN_TODO_PRINTF(sc, "%s: explicit chip power-on / hardware-init?\n",
 	    __func__);
+	(void) mtwn_net80211_resume(sc);
 
 	return (0);
 }
