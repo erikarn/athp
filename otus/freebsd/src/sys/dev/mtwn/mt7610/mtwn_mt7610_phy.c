@@ -288,12 +288,45 @@ mtwn_mt7610_phy_rf_init(struct mtwn_softc *sc)
 	return (0);
 }
 
+/*
+ * Note: mt76x02_phy_set_rxpath() in mt76
+ */
 int
 mtwn_mt7610_phy_set_rxpath(struct mtwn_softc *sc)
 {
+	uint32_t val;
+
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	val = MTWN_REG_READ_4(sc, MT7610_REG_BBP(AGC, 0));
+	val &= ~ (1 << 4);
+
+	/*
+	 * Note: this code in mt76 is run after the
+	 * init code establishes which chipset and thus
+	 * how many tx/rx chains there are.
+	 */
+
+#if 0
+	MTWN_DEBUG_PRINTF(sc, "%s: streams tx=%d rx=%d\n",
+	    __func__,
+	    sc->sc_phy_cap.ss.num_tx_streams,
+	    sc->sc_phy_cap.ss.num_rx_streams);
+#endif
+
+	switch (sc->sc_phy_cap.ss.num_rx_streams) {
+	case 2:
+		val |= (1 << 3);
+		break;
+	default:
+		val &= ~(1 << 3);
+		break;
+	}
+
+	MTWN_REG_WRITE_4(sc, MT7610_REG_BBP(AGC, 0), val);
+	/* TODO: ensure MTWN_REG_READ_4 has a barrier, or we add a barrier here */
+	val = MTWN_REG_READ_4(sc, MT7610_REG_BBP(AGC, 0));
+
 	return (0);
 }
 
@@ -302,7 +335,15 @@ mtwn_mt7610_phy_set_txdac(struct mtwn_softc *sc)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc, "%s: TODO!\n", __func__);
+	switch (sc->sc_phy_cap.ss.num_tx_streams) {
+	case 2:
+		MTWN_REG_SET_4(sc, MT7610_REG_BBP(TXBE, 5), 0x3);
+		break;
+	default:
+		MTWN_REG_CLEAR_4(sc, MT7610_REG_BBP(TXBE, 5), 0x3);
+		break;
+	}
+
 	return (0);
 }
 
