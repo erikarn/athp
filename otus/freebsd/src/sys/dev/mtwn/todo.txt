@@ -39,3 +39,44 @@ Stuff that I need to revisit
 * .. and then make sure the re-init path will do the right thing if
   buffers are already allocated/on lists...
 
+
+===
+
+ok, what's needed to stand up a station session? Monitor mode session?
+
+These two files are a good starting point:
+
+* mac80211.c
+* mt76x02_util.c
+
+What functions are interesting / involved here?
+
+* mt76x02_sta_add / mt76x02_sta_remove - creating wcid contexts per STA join/remove
+* mt76_wcid_alloc / mt76_wcid_cleanup / other wcid functions - needed for STA join/remove, VIF work
+* mt76x02_vif_init - will alloc the 'group_wcid' for a vif
+* mt76x02_add_interface - does a bunch of mac address stuff, figuring out which bssidx
+  based on the previously allocated bssid mac address list; we can use 0 for now
+  for a single STA/AP vif.
+
+then there's a bunch more stuff in the above two source files to
+do tx param setup, ack setup, ampdu enable/disable, bar handling,
+rts/cts threshold config, etc.
+
+None of that is required yet for STA mode operation, but
+once monitor mode is up, we should figure out what to do for
+STA mode operation.
+
+===
+
+scanning work
+
+* there's some AGC control happening (dev->cal ; gain_init_done,
+  low_gain, cal_work) that's worth digging into once basic monitor
+  mode is up.  It's possible there'll be a bunch of stuff we should
+  do here during scanning and restore afterwards.
+
+===
+
+rate table work
+
+* mt76x02_sta_rate_tbl_update
