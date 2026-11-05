@@ -88,7 +88,7 @@ struct mtwn_chip_ops {
 	int		(*sc_chip_power_off)(struct mtwn_softc *sc);
 	bool		(*sc_chip_mac_wait_ready)(struct mtwn_softc *sc);
 	bool		(*sc_chip_dma_param_setup)(struct mtwn_softc *sc);
-	bool		(*sc_chip_beacon_config)(struct mtwn_softc *sc);
+	int		(*sc_chip_beacon_config)(struct mtwn_softc *sc);
 	bool		(*sc_chip_post_init_setup)(struct mtwn_softc *sc);
 	uint32_t	(*sc_chip_rxfilter_read)(struct mtwn_softc *sc);
 
@@ -151,6 +151,13 @@ struct mtwn_rf_ops {
 			    const struct mtwn_reg_pair *rp, int);
 };
 
+struct mtwn_beacon_ops {
+	int		(*sc_pre_tbtt_enable)(struct mtwn_softc *, bool);
+	int		(*sc_beacon_enable)(struct mtwn_softc *, bool en);
+	int		(*sc_init_beacon_config)(struct mtwn_softc *);
+	int		(*sc_exit_beacon_config)(struct mtwn_softc *);
+};
+
 struct mtwn_mcu_cfg {
 	uint32_t headroom;
 	uint32_t tailroom;
@@ -160,6 +167,11 @@ struct mtwn_mcu_cfg {
 struct mtwn_mac_cfg {
 	int num_vifs;
 	int num_wcid;
+};
+
+struct mtwn_beacon_cfg {
+	uint32_t nslots;
+	uint32_t slot_size;
 };
 
 struct mtwn_mcu_state {
@@ -203,6 +215,10 @@ struct mtwn_softc {
 
 	/* RF operations */
 	struct mtwn_rf_ops	sc_rfops;
+
+	/* Beacon operations */
+	struct mtwn_beacon_ops	sc_beacon_ops;
+	struct mtwn_beacon_cfg	sc_beacon_cfg;
 
 	/* MAC state */
 	struct {
@@ -347,6 +363,17 @@ struct mtwn_softc {
 	    ((_sc)->sc_rfops.sc_rf_reg_rmw_4((_sc), (_reg), 0, (_val)))
 #define	MTWN_RF_REG_CLEAR_4(_sc, _reg, _val)			\
 	    ((_sc)->sc_rfops.sc_rf_reg_rmw_4((_sc), (_reg), (_val), 0))
+
+/* Beacon operations */
+#if 0
+	int		(*sc_pre_tbtt_enable)(struct mtwn_softc *, bool);
+	int		(*sc_beacon_enable)(struct mtwn_softc *, bool en);
+	int		(*sc_init_beacon_config)(struct mtwn_softc *);
+	int		(*sc_exit_beacon_config)(struct mtwn_softc *);
+#endif
+
+#define	MTWN_BEACON_INIT_CONFIG(_sc)				\
+	    ((_sc)->sc_beacon_ops.sc_init_beacon_config((_sc)))
 
 /* if_mtwn.c */
 extern	int mtwn_attach(struct mtwn_softc *);

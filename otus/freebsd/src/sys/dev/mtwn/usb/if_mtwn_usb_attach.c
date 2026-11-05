@@ -78,6 +78,7 @@
 #include "if_mtwn_usb_rx.h"
 
 #include "../mt7610/usb/mtwn_chip_mt7610u_usb.h"
+#include "../mt7610/usb/mtwn_beacon_mt7610u_usb.h"
 
 #include "mt7610u/mtwn_mt7610u_mcu.h"
 #include "mt7610u/mtwn_mt7610u_rf.h"
@@ -194,12 +195,15 @@ mtwn_usb_attach(device_t self)
 	/* chipset / MCU access methods */
 	switch (USB_GET_DRIVER_INFO(uaa)) {
 	case MTWN_CHIP_MT7610U:
-		error = mtwn_chip_mt7610u_attach(sc);
 		/* XXX print error */
+		error = mtwn_chip_mt7610u_attach(sc);
 		if (error != 0)
 			goto detach;
 		/* XXX print error */
 		error = mtwn_mcu_mt7610u_attach(sc);
+		if (error != 0)
+			goto detach;
+		error = mtwn_beacon_mt7610u_attach(sc);
 		if (error != 0)
 			goto detach;
 		/* XXX print error */

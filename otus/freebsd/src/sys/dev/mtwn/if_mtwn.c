@@ -253,6 +253,7 @@ mtwn_init(struct mtwn_softc *sc)
 	}
 
 	/* Beacon config */
+	/* TODO: migrate to MTWN_BEACON_INIT_CONFIG() */
 	ret = MTWN_CHIP_BEACON_CONFIG(sc);
 	if (ret != 0) {
 		MTWN_ERR_PRINTF(sc, "%s: BEACON_CONFIG failed (err %d)\n",

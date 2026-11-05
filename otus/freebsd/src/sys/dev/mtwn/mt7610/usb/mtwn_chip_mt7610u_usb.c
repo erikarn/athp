@@ -215,15 +215,15 @@ mtwn_chip_mt7610u_power_on(struct mtwn_softc *sc, bool reset)
 	return (0);
 }
 
-static bool
+/*
+ * TODO: Delete this; just directly call the beacon config routine
+ */
+static int
 mtwn_mt7610u_beacon_config(struct mtwn_softc *sc)
 {
 	MTWN_LOCK_ASSERT(sc, MA_OWNED);
 
-	MTWN_TODO_PRINTF(sc,
-	    "%s: TODO: implement in chip layer and call from here\n",
-	    __func__);
-	return (0);
+	return (MTWN_BEACON_INIT_CONFIG(sc));
 }
 
 static bool
