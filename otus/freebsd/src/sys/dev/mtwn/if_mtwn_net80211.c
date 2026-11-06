@@ -443,6 +443,8 @@ mtwn_net80211_attach(struct mtwn_softc *sc)
 {
 	struct ieee80211com *ic = IF_MTWN_SC_TO_NET80211(sc);
 
+	MTWN_TODO_PRINTF(sc, "%s: called\n", __func__);
+
 	ic->ic_softc = sc;
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
@@ -531,13 +533,19 @@ mtwn_net80211_attach(struct mtwn_softc *sc)
 	if (bootverbose)
 		ieee80211_announce(ic);
 
+	MTWN_TODO_PRINTF(sc, "%s: done\n", __func__);
+
 	return (0);
 }
 
 int
 mtwn_net80211_detach(struct mtwn_softc *sc)
 {
+	struct ieee80211com *ic = IF_MTWN_SC_TO_NET80211(sc);
+
 	MTWN_TODO_PRINTF(sc, "%s: called\n", __func__);
+	ieee80211_ifdetach(ic);
+
 	return (0);
 }
 

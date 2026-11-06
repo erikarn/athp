@@ -345,6 +345,10 @@ mtwn_attach(struct mtwn_softc *sc)
 	if (ret != 0)
 		return (ret);
 
+	ret = mtwn_net80211_attach(sc);
+	if (ret != 0)
+		return (ret);
+
 	return (0);
 }
 
