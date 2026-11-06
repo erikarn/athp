@@ -96,6 +96,10 @@ struct mtwn_chip_ops {
 	int		(*sc_chip_mac_init)(struct mtwn_softc *);
 	int		(*sc_chip_shared_keys_init)(struct mtwn_softc *);
 	int		(*sc_chip_wcid_init)(struct mtwn_softc *);
+	int		(*sc_chip_wcid_set_drop)(struct mtwn_softc *, uint8_t,
+			    bool);
+	int		(*sc_chip_wcid_setup)(struct mtwn_softc *, uint8_t,
+			    uint8_t, uint8_t *);
 	int		(*sc_chip_phy_init)(struct mtwn_softc *);
 	int		(*sc_chip_mac_setaddr)(struct mtwn_softc *,
 			    const char *);
@@ -106,6 +110,7 @@ struct mtwn_chip_ops {
 	int		(*sc_chip_get_supported_streams)(struct mtwn_softc *,
 			    struct mtwn_supported_streams *);
 	int		(*sc_chip_pre_phy_setup)(struct mtwn_softc *);
+	void		(*sc_chip_mac_config_macaddr_list)(struct mtwn_softc *);
 };
 
 struct mtwn_mcu_ops {
@@ -186,9 +191,11 @@ struct mtwn_phy_capabilities {
 #define	IF_MTWN_SC_TO_NET80211(_sc) (&(_sc)->sc_ic)
 #define	IF_MTWN_NET80211_TO_SC(_ic) ((_ic)->ic_softc)
 
+#define	MTWN_MACADDR_LIST_SIZE		8
+
 struct mtwn_softc {
-	device_t		sc_dev;
 	struct ieee80211com	sc_ic;
+	device_t		sc_dev;
 
 	uint32_t		sc_debug;
 	struct mtx		sc_mtx;
@@ -229,6 +236,8 @@ struct mtwn_softc {
 	struct {
 		uint32_t	sc_rx_filter;
 		char		sc_macaddr[ETHER_ADDR_LEN];
+		char		sc_macaddr_list[MTWN_MACADDR_LIST_SIZE][ETHER_ADDR_LEN];
+		uint64_t	sc_vif_mask;
 	} mac_state;
 
 	/* PHY capabilities */
@@ -309,6 +318,8 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_shared_keys_init((_sc)))
 #define	MTWN_CHIP_WCID_INIT(_sc)			\
 	    ((_sc)->sc_chipops.sc_chip_wcid_init((_sc)))
+#define	MTWN_CHIP_WCID_SET_DROP(_sc, _idx, _drop)	\
+	    ((_sc)->sc_chipops.sc_chip_wcid_set_drop((_sc), (_idx), (_drop)))
 #define	MTWN_CHIP_PHY_INIT(_sc)			\
 	    ((_sc)->sc_chipops.sc_chip_phy_init((_sc)))
 #define	MTWN_CHIP_MAC_SETADDR(_sc, _macaddr)		\
@@ -323,6 +334,8 @@ struct mtwn_softc {
 	    ((_sc)->sc_chipops.sc_chip_get_supported_streams((_sc), (_streams)))
 #define	MTWN_CHIP_PRE_PHY_SETUP(_sc)				\
 	    ((_sc)->sc_chipops.sc_chip_pre_phy_setup((_sc)))
+#define	MTWN_CHIP_MAC_CONFIG_MACADDR_LIST(_sc)		\
+	    ((_sc)->sc_chipops.sc_chip_mac_config_macaddr_list((_sc)))
 
 /* MCU operations */
 #define	MTWN_MCU_INIT(_sc, _data, _len)			\
@@ -394,6 +407,7 @@ struct mtwn_node {
 
 struct mtwn_vap {
 	struct ieee80211vap	vap;
+	uint8_t			vif_idx;
 
 	int			(*newstate)(struct ieee80211vap *,
 				    enum ieee80211_state, int);

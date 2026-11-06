@@ -186,9 +186,10 @@ mtwn_init(struct mtwn_softc *sc)
 		    __func__, ret);
 		goto error;
 	}
-
 	MTWN_INFO_PRINTF(sc, "%s: MAC address: %6D\n", __func__,
 	    sc->mac_state.sc_macaddr, ":");
+	/* Copy the macaddr into net80211 for it to use */
+	IEEE80211_ADDR_COPY(sc->sc_ic.ic_macaddr, sc->mac_state.sc_macaddr);
 
 	/* TODO: mt76_eeprom_override - the openfirmware override stuff */
 	MTWN_TODO_PRINTF(sc, "%s: TODO - eeprom_override\n", __func__);
@@ -274,11 +275,8 @@ mtwn_init(struct mtwn_softc *sc)
 
 	/* TODO: everything that's in mt76x0_register_device() */
 
-	/*
-	 * TODO: calculate list of mac addresses to provide for vaps
-	 * in mt76x02_config_mac_addr_list()
-	 */
-	MTWN_TODO_PRINTF(sc, "%s: calculate mac addr list\n", __func__);
+	/* Calculate list of mac addresses to provide for vaps */
+	MTWN_CHIP_MAC_CONFIG_MACADDR_LIST(sc);
 
 	/* TODO: fetch the LDPC coding config for 2g/5g vht and ht */
 	MTWN_TODO_PRINTF(sc, "%s: disable VHT LDPC coding in 5ghz if enabled\n", __func__);

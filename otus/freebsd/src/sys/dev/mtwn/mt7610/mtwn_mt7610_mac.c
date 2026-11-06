@@ -266,6 +266,12 @@ mtwn_mt7610_mac_shared_keys_init(struct mtwn_softc *sc)
 	return (0);
 }
 
+/**
+ * @brief Initialise a WCID with the given details
+ *
+ * The given WCID slot in the firmware is enabled with
+ * a MAC address and vif.
+ */
 int
 mtwn_mt7610_mac_wcid_setup(struct mtwn_softc *sc, uint8_t id, uint8_t vif,
     uint8_t *macaddr)
@@ -294,7 +300,10 @@ mtwn_mt7610_mac_wcid_setup(struct mtwn_softc *sc, uint8_t id, uint8_t vif,
 
 	MTWN_REG_WRITE_4(sc, MT7610_REG_WCID_ATTR(id), attr);
 
-	/* Note: I'm not sure why the index is capped here at 128 */
+	/*
+	 * Note: I'm not sure why the index is capped here at 128
+	 * however the mt76 code does not return an error here.
+	 */
 	if (id >= 128)
 		return (0);
 
@@ -332,6 +341,23 @@ mtwn_mt7610_mac_wcid_init(struct mtwn_softc *sc)
 			return (ret);
 		}
 	}
+	return (0);
+}
+
+int
+mtwn_mt7610_mac_wcid_set_drop(struct mtwn_softc *sc, uint8_t idx, bool drop)
+{
+	uint32_t val;
+	uint32_t bit;
+
+	val = MTWN_REG_READ_4(sc, MT7610_REG_WCID_DROP(idx));
+	bit = MT7610_REG_WCID_DROP_MASK(idx);
+
+	/* Prevent unnecessary writes - useful for USB */
+	if ((val & bit) != (bit * drop))
+		MTWN_REG_WRITE_4(sc, MT7610_REG_WCID_DROP(idx),
+		    (val & ~bit) | (bit * drop));
+
 	return (0);
 }
 
@@ -417,4 +443,21 @@ mtwn_mt7610_mac_setaddr(struct mtwn_softc *sc, const char *macaddr)
 	}
 
 	return (0);
+}
+
+void
+mtwn_mt7610_mac_config_macaddr_list(struct mtwn_softc *sc)
+{
+	int i;
+
+	for (i = 0; i < MTWN_MACADDR_LIST_SIZE; i++) {
+		char *macaddr = sc->mac_state.sc_macaddr_list[i];
+
+		memcpy(macaddr, sc->mac_state.sc_macaddr, ETHER_ADDR_LEN);
+		if (i == 0)
+			continue;
+
+		macaddr[0] |= (1 << 1);
+		macaddr[0] ^= ((i - 1) << 2);
+	}
 }

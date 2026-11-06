@@ -80,3 +80,85 @@ scanning work
 rate table work
 
 * mt76x02_sta_rate_tbl_update
+
+
+===
+
+Heading towards fixed channel monitor mode
+
+I need to look at mt76x2/usb_main.c and the ieee80211_ops to
+map out what's going on.
+
+--
+
+Overview
+
+* start/stop
+* add/remove interface
+* config
+* configure filter
+* scan start/complete
+
+--
+
+VIF creation
+
+* mt76x02_add_interface() - do idx allocation based on mode, provided mac
+  address (there's a list provided to mac80211), etc
+* mt76x02_vif_init() - allocate vif group wcid, call mt76_wcid_init()
+* will need MT_VIF_WCID() and MT_MAX_VIFS defined
+* will need struct mt76_wcid ported; it turns out it has a LOT of
+  state, not just an index
+* will need mt76_wcid_init() and mt76_wcid_cleanup() ported
+  (from mt76/mac80211.h)
+
+* Need to figure out what's doing the transmit queue management here;
+  mt76 wcid has a txq and some state machine around it?
+
+--
+
+Channel programming
+
+* mt76x2u_set_channel()
+  - pre_tbtt_enable(false)
+  - mac_stop; phy_set_channel; mac_cc_reset; mac_resume
+  - pre_tbtt_enable(true)
+
+--
+
+Start
+
+mt76x2u_start():
+
+  - update MT76_STATE_RUNNING state bit
+  - schedule mac_work to start
+  - mt76x02_mac_work() does the work
+    - this is grabbing aggregate stats, check mac err, tx status check
+    - requeue delayed work
+
+* Is there a start_tx() that I'm missing here?
+
+mt76x2u_stop():
+
+  - update MT76_STATE_RUNNING state bit
+  - mt76u_stop_tx()
+  - mt76x2u_stop_hw()
+
+--
+
+Config
+
+* mt76x2u_config()
+  - this handles enable/disable monitor mode rx filter
+  - and changing txpower
+  - and update channel
+
+--
+
+Enable receive, getting monitor mode packets
+
+--
+
+Handling said packets, decoding them, passing them up to net80211, etc
+
+

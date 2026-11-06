@@ -209,6 +209,11 @@ mtwn_net80211_vap_delete(struct ieee80211vap *vap)
 
 	ieee80211_ratectl_deinit(vap);
 	ieee80211_vap_detach(vap);
+
+	MTWN_LOCK(sc);
+	sc->mac_state.sc_vif_mask &= ~(1ULL << uvp->vif_idx);
+	MTWN_UNLOCK(sc);
+
 	free(uvp, M_80211_VAP);
 }
 
@@ -310,6 +315,7 @@ mtwn_net80211_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ],
 	struct mtwn_softc *sc = IF_MTWN_NET80211_TO_SC(ic);
 	struct mtwn_vap *uvp;
 	struct ieee80211vap *vap;
+	uint8_t vif_idx;
 
 	MTWN_TODO_PRINTF(sc, "%s: called\n", __func__);
 
@@ -317,14 +323,30 @@ mtwn_net80211_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ],
 	 * There's a lot of stuff to do here, including choosing a bss index
 	 * and potential a station / wcid entry.
 	 */
+	MTWN_TODO_PRINTF(sc, "%s: hard-coded idx 8 for STA\n", __func__);
+
+	MTWN_LOCK(sc);
+
+	vif_idx = 8;
+	if (sc->mac_state.sc_vif_mask & (1ULL << vif_idx)) {
+		MTWN_UNLOCK(sc);
+		return (NULL);
+	}
+	sc->mac_state.sc_vif_mask |= (1ULL << vif_idx);
+
+	MTWN_UNLOCK(sc);
 
 	uvp = malloc(sizeof(struct mtwn_vap), M_80211_VAP, M_WAITOK | M_ZERO);
 	vap = &uvp->vap;
+	uvp->vif_idx = vif_idx;
 
 	if (ieee80211_vap_setup(ic, vap, name, unit, opmode,
 	    flags | IEEE80211_CLONE_NOBEACONS, bssid) != 0) {
 		/* out of memory */
 		free(uvp, M_80211_VAP);
+		MTWN_LOCK(sc);
+		sc->mac_state.sc_vif_mask |= (1ULL << vif_idx);
+		MTWN_UNLOCK(sc);
 		return (NULL);
 	}
 
@@ -358,7 +380,7 @@ mtwn_net80211_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ],
 	ieee80211_vap_attach(vap, ieee80211_media_change,
 	    ieee80211_media_status, mac);
 
-	/* mtwn_vap_postattac - likely will program in enough to start stuff up */
+	/* TODO: mtwn_vap_postattach - likely will program in enough to start stuff up */
 
 	return (vap);
 }

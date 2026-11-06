@@ -222,6 +222,13 @@
 #define	MT7610_REG_AMPDU_MAX_LEN_40M2S		0x103c
 #define	MT7610_REG_AMPDU_MAX_LEN		0x1040
 
+/* WCID drop base - 0x106c -> 0x1088 (256 entries; 1 bit each) */
+#define	MT7610_REG_WCID_DROP_BASE			0xa800
+#define	MT7610_REG_WCID_DROP(_idx)			\
+	    (MT7610_REG_WCID_DROP_BASE + (((_idx) >> 5) * 4))
+#define	MT7610_REG_WCID_DROP_MASK(_n)			\
+	    (1 << ((_n) % 32))
+
 #define	MT7610_REG_BCN_BYPASS_MASK		0x108c
 
 /*

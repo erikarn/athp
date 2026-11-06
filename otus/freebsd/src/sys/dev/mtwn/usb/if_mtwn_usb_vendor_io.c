@@ -82,7 +82,7 @@ mtwn_do_request(struct mtwn_usb_softc *uc, usb_device_request_t *req,
 
 	while (ntries--) {
 		err = usbd_do_request_flags(uc->uc_udev, &sc->sc_mtx, req, data,
-		    0, NULL, 2000); // XXX make a define
+		    0, NULL, 200); // XXX make a define
 		if (err == 0)
 			break;
 		MTWN_DPRINTF(sc, MTWN_DEBUG_USB,
